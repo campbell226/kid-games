@@ -1,0 +1,3 @@
+# Store everything with LF endings in the repo, so the same files look
+# identical on every computer this gets cloned to.
+* text=auto eol=lf
