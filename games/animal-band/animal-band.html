@@ -1,0 +1,905 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#141d3a">
+<title>Animal Band</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #141d3a;
+    overflow: hidden;
+    touch-action: manipulation;
+    overscroll-behavior: none;
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #stage {
+    display: block;
+    width: 100vw; height: 100vh;
+    width: 100dvw; height: 100dvh;
+  }
+  .hit { fill: transparent; cursor: pointer; }
+</style>
+</head>
+<body>
+<svg id="stage" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 640" preserveAspectRatio="xMidYMid meet" aria-label="Animal Band">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1b2450"/>
+      <stop offset="1" stop-color="#40336b"/>
+    </linearGradient>
+    <linearGradient id="curtain" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#7d1f38"/>
+      <stop offset="0.45" stop-color="#c0344f"/>
+      <stop offset="1" stop-color="#7d1f38"/>
+    </linearGradient>
+    <linearGradient id="wood" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#cf9459"/>
+      <stop offset="1" stop-color="#a4703c"/>
+    </linearGradient>
+    <linearGradient id="grassg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#488a4a"/>
+      <stop offset="1" stop-color="#2b5c33"/>
+    </linearGradient>
+    <radialGradient id="spot" cx="0.5" cy="0.05" r="0.85">
+      <stop offset="0" stop-color="#fff3c4" stop-opacity="0.32"/>
+      <stop offset="1" stop-color="#fff3c4" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowg" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fffbe6" stop-opacity="0.9"/>
+      <stop offset="0.6" stop-color="#ffe9a0" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#ffe9a0" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <g id="scenery"></g>
+  <g id="lamps"></g>
+  <g id="conductor"></g>
+  <g id="actors"></g>
+</svg>
+
+<script>
+(function () {
+  'use strict';
+
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  var svg = document.getElementById('stage');
+
+  function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+  function el(tag, attrs) {
+    var n = document.createElementNS(SVGNS, tag);
+    if (attrs) { for (var k in attrs) { n.setAttribute(k, attrs[k]); } }
+    return n;
+  }
+  function clear(n) { while (n.firstChild) { n.removeChild(n.firstChild); } }
+
+  var reduceQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+  var reduced = reduceQuery.matches;
+  if (reduceQuery.addEventListener) {
+    reduceQuery.addEventListener('change', function (e) { reduced = e.matches; });
+  }
+
+  // ------------------------------------------------------------------
+  // Music theory, such as it is.
+  //
+  // Every animal draws from one C major pentatonic scale, in its own
+  // octave. That is the whole trick: no combination of animals, rhythms
+  // and tempos can sound wrong, so there is nothing to get wrong.
+  // ------------------------------------------------------------------
+  var PENT = [0, 2, 4, 7, 9];
+
+  function pentMidi(base, i) {
+    var oct = Math.floor(i / 5);
+    var d = ((i % 5) + 5) % 5;
+    return base + PENT[d] + 12 * oct;
+  }
+  function mtof(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+
+  // ------------------------------------------------------------------
+  // Audio, synthesised from nothing so the game is never silent and
+  // never waits on a download.
+  // ------------------------------------------------------------------
+  var AC = null, master = null, noiseBuf = null;
+
+  function initAudio() {
+    if (AC) {
+      if (AC.state === 'suspended') { AC.resume(); }
+      return;
+    }
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) { return; }
+    AC = new Ctx();
+
+    // Six animals at once should get louder, not turn into clipped mush.
+    var comp = AC.createDynamicsCompressor();
+    comp.threshold.setValueAtTime(-16, AC.currentTime);
+    comp.ratio.setValueAtTime(6, AC.currentTime);
+    comp.attack.setValueAtTime(0.004, AC.currentTime);
+    comp.release.setValueAtTime(0.2, AC.currentTime);
+
+    master = AC.createGain();
+    master.gain.setValueAtTime(0.55, AC.currentTime);
+    master.connect(comp);
+    comp.connect(AC.destination);
+
+    var n = Math.floor(AC.sampleRate * 0.5);
+    noiseBuf = AC.createBuffer(1, n, AC.sampleRate);
+    var data = noiseBuf.getChannelData(0);
+    for (var i = 0; i < n; i++) { data[i] = Math.random() * 2 - 1; }
+
+    if (AC.state === 'suspended') { AC.resume(); }
+    nextTime = AC.currentTime + 0.08;
+  }
+
+  // Each voice schedules itself at absolute time t and returns how long
+  // it will sound, so the mouth stays open for exactly that long.
+  var VOICES = {};
+
+  VOICES.frog = function (t, f, spb) {
+    var dur = Math.min(0.42, spb * 0.9);
+    var o = AC.createOscillator(), g = AC.createGain(), lp = AC.createBiquadFilter();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(f * 1.8, t);
+    o.frequency.exponentialRampToValueAtTime(f, t + 0.09);
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(1400, t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.9, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(lp); lp.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.05);
+    return dur;
+  };
+
+  VOICES.cow = function (t, f, spb) {
+    var dur = Math.min(1.6, spb * 1.7);
+    var g = AC.createGain(), lp = AC.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(380, t);
+    lp.frequency.linearRampToValueAtTime(950, t + dur * 0.35);
+    lp.frequency.linearRampToValueAtTime(420, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.42, t + 0.16);
+    g.gain.setValueAtTime(0.42, t + dur * 0.6);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    [[0, 'sine'], [-8, 'triangle'], [8, 'triangle']].forEach(function (v) {
+      var o = AC.createOscillator();
+      o.type = v[1];
+      o.frequency.setValueAtTime(f, t);
+      o.detune.setValueAtTime(v[0], t);
+      o.connect(lp);
+      o.start(t); o.stop(t + dur + 0.05);
+    });
+    lp.connect(g); g.connect(master);
+    return dur;
+  };
+
+  VOICES.bird = function (t, f, spb) {
+    var dur = Math.min(0.4, spb * 0.8);
+    var o = AC.createOscillator(), g = AC.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(f * 0.86, t);
+    o.frequency.exponentialRampToValueAtTime(f, t + 0.05);
+    o.frequency.exponentialRampToValueAtTime(f * 1.07, t + dur);
+    var lfo = AC.createOscillator(), lg = AC.createGain();
+    lfo.type = 'sine';
+    lfo.frequency.setValueAtTime(7.5, t);
+    lg.gain.setValueAtTime(f * 0.022, t);
+    lfo.connect(lg); lg.connect(o.frequency);
+    lfo.start(t); lfo.stop(t + dur + 0.05);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.42, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.05);
+    return dur;
+  };
+
+  VOICES.cat = function (t, f, spb) {
+    var dur = Math.min(0.55, spb * 0.95);
+    var o = AC.createOscillator(), bp = AC.createBiquadFilter(), g = AC.createGain();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(f * 0.78, t);
+    o.frequency.exponentialRampToValueAtTime(f * 1.12, t + dur * 0.3);
+    o.frequency.exponentialRampToValueAtTime(f * 0.82, t + dur);
+    bp.type = 'bandpass';
+    bp.Q.setValueAtTime(3.2, t);
+    bp.frequency.setValueAtTime(700, t);
+    bp.frequency.linearRampToValueAtTime(1600, t + dur * 0.3);
+    bp.frequency.linearRampToValueAtTime(620, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.6, t + 0.05);
+    g.gain.setValueAtTime(0.6, t + dur * 0.5);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(bp); bp.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.05);
+    return dur;
+  };
+
+  VOICES.dog = function (t, f, spb) {
+    var dur = 0.2;
+    var src = AC.createBufferSource();
+    src.buffer = noiseBuf;
+    var bp = AC.createBiquadFilter(), ng = AC.createGain();
+    bp.type = 'bandpass';
+    bp.Q.setValueAtTime(1.1, t);
+    bp.frequency.setValueAtTime(1100, t);
+    bp.frequency.exponentialRampToValueAtTime(480, t + dur);
+    ng.gain.setValueAtTime(0.0001, t);
+    ng.gain.exponentialRampToValueAtTime(0.5, t + 0.012);
+    ng.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(bp); bp.connect(ng); ng.connect(master);
+    src.start(t); src.stop(t + dur + 0.05);
+
+    var o = AC.createOscillator(), g = AC.createGain();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(f, t);
+    o.frequency.exponentialRampToValueAtTime(f * 0.55, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.55, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.05);
+    return dur;
+  };
+
+  VOICES.mouse = function (t, f, spb) {
+    var dur = 0.12;
+    var o = AC.createOscillator(), g = AC.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(f, t);
+    o.frequency.exponentialRampToValueAtTime(f * 1.5, t + dur * 0.45);
+    o.frequency.exponentialRampToValueAtTime(f * 1.15, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.3, t + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.05);
+    return dur;
+  };
+
+  // A tap answers back at once rather than waiting for the next beat.
+  function chirp(spec) {
+    if (!AC) { return; }
+    VOICES[spec.voice](AC.currentTime + 0.01, mtof(pentMidi(spec.base, 3)), 0.4);
+  }
+
+  // ------------------------------------------------------------------
+  // Drawing helpers shared by every animal
+  // ------------------------------------------------------------------
+  function eyePair(cx, cy, sp, r, pr) {
+    var s = '<g class="eyes" data-cx="' + cx + '" data-cy="' + cy + '">';
+    [-1, 1].forEach(function (d) {
+      var ex = cx + sp * d;
+      s += '<ellipse cx="' + ex + '" cy="' + cy + '" rx="' + r + '" ry="' + r + '" fill="#ffffff"/>'
+        + '<circle cx="' + ex + '" cy="' + (cy + 1) + '" r="' + pr + '" fill="#22203a"/>'
+        + '<circle cx="' + (ex + pr * 0.38) + '" cy="' + (cy - pr * 0.5) + '" r="' + (pr * 0.34) + '" fill="#ffffff"/>';
+    });
+    return s + '</g>';
+  }
+
+  function legPair(spread, w, h, fill) {
+    var s = '<g class="legset">';
+    [-1, 1].forEach(function (d) {
+      var px = spread * d, py = -h;
+      s += '<g class="leg" data-side="' + d + '" data-px="' + px + '" data-py="' + py + '">'
+        + '<rect x="' + (px - w / 2) + '" y="' + py + '" width="' + w + '" height="' + (h + 2) + '" rx="' + (w / 2) + '" fill="' + fill + '"/>'
+        + '</g>';
+    });
+    return s + '</g>';
+  }
+
+  function mouthG(cx, cy, inner) {
+    return '<g class="mouth" data-cx="' + cx + '" data-cy="' + cy + '">' + inner + '</g>';
+  }
+
+  // ------------------------------------------------------------------
+  // The band. Drawn front-on so both eyes and the mouth read clearly.
+  // Feet sit on y = 0; everything else is above it.
+  // ------------------------------------------------------------------
+  var SPECS = [
+    {
+      id: 'frog', voice: 'frog', colour: '#5fae4a', dark: '#3f8232',
+      base: 48, pattern: [0, 0, 3, 0, 2, 0, 3, 4], top: -132,
+      art: function (s) {
+        return legPair(58, 26, 16, s.dark)
+          + '<ellipse cx="-68" cy="-38" rx="27" ry="37" fill="' + s.dark + '"/>'
+          + '<ellipse cx="68" cy="-38" rx="27" ry="37" fill="' + s.dark + '"/>'
+          + '<ellipse cx="0" cy="-54" rx="74" ry="56" fill="' + s.colour + '"/>'
+          + '<ellipse cx="0" cy="-34" rx="48" ry="30" fill="#d7ecab"/>'
+          + '<circle cx="-34" cy="-98" r="30" fill="' + s.colour + '"/>'
+          + '<circle cx="34" cy="-98" r="30" fill="' + s.colour + '"/>'
+          + eyePair(0, -100, 34, 20, 11)
+          + mouthG(0, -56, '<path d="M -48 -58 Q 0 -32 48 -58 Q 0 -48 -48 -58 Z" fill="#2c5a22"/>');
+      }
+    },
+    {
+      id: 'cow', voice: 'cow', colour: '#f2f0ec', dark: '#3a3a46',
+      base: 36, pattern: [0, 0, 3, 0, 2, 0], top: -188,
+      art: function (s) {
+        return legPair(44, 24, 22, '#3a3a46')
+          + '<ellipse cx="0" cy="-74" rx="76" ry="58" fill="' + s.colour + '"/>'
+          + '<ellipse cx="-40" cy="-96" rx="26" ry="20" fill="' + s.dark + '"/>'
+          + '<ellipse cx="42" cy="-56" rx="21" ry="16" fill="' + s.dark + '"/>'
+          + '<ellipse cx="-54" cy="-150" rx="21" ry="12" fill="' + s.dark + '"/>'
+          + '<ellipse cx="54" cy="-150" rx="21" ry="12" fill="' + s.dark + '"/>'
+          + '<ellipse cx="-24" cy="-176" rx="9" ry="12" fill="#e6d8b6"/>'
+          + '<ellipse cx="24" cy="-176" rx="9" ry="12" fill="#e6d8b6"/>'
+          + '<ellipse cx="0" cy="-142" rx="47" ry="41" fill="' + s.colour + '"/>'
+          + '<ellipse cx="0" cy="-118" rx="33" ry="23" fill="#eda9b2"/>'
+          + '<ellipse cx="-13" cy="-122" rx="5" ry="7" fill="#c07f89"/>'
+          + '<ellipse cx="13" cy="-122" rx="5" ry="7" fill="#c07f89"/>'
+          + eyePair(0, -154, 22, 14, 8)
+          + mouthG(0, -104, '<path d="M -20 -104 Q 0 -94 20 -104 Q 0 -100 -20 -104 Z" fill="#b5717c"/>');
+      }
+    },
+    {
+      id: 'bird', voice: 'bird', colour: '#f2b134', dark: '#d68d1d',
+      base: 72, pattern: [4, 3, 2, 4, 5, 6, 4, 2], top: -182,
+      art: function (s) {
+        return '<path d="M -6 -60 L -44 -6 L 30 -22 Z" fill="' + s.dark + '"/>'
+          + legPair(20, 9, 18, '#e07a1f')
+          + '<ellipse cx="0" cy="-74" rx="50" ry="56" fill="' + s.colour + '"/>'
+          + '<ellipse cx="0" cy="-60" rx="30" ry="34" fill="#fbe0a2"/>'
+          + '<ellipse cx="-46" cy="-76" rx="17" ry="32" fill="' + s.dark + '"/>'
+          + '<ellipse cx="46" cy="-76" rx="17" ry="32" fill="' + s.dark + '"/>'
+          + '<ellipse cx="-14" cy="-168" rx="8" ry="16" fill="' + s.dark + '"/>'
+          + '<ellipse cx="2" cy="-174" rx="8" ry="19" fill="' + s.dark + '"/>'
+          + '<ellipse cx="18" cy="-166" rx="8" ry="15" fill="' + s.dark + '"/>'
+          + '<circle cx="0" cy="-134" r="39" fill="' + s.colour + '"/>'
+          + eyePair(0, -142, 17, 13, 7)
+          + mouthG(0, -114, '<path d="M -17 -118 L 17 -118 L 0 -104 Z" fill="#ef7d29"/>');
+      }
+    },
+    {
+      id: 'cat', voice: 'cat', colour: '#93949c', dark: '#6d6e77',
+      base: 60, pattern: [2, 0, 3, 1, 4, 2, 0, 3], top: -194,
+      art: function (s) {
+        return '<path d="M 48 -50 Q 104 -60 92 -120" stroke="' + s.dark + '" stroke-width="17" fill="none" stroke-linecap="round"/>'
+          + legPair(36, 22, 16, s.dark)
+          + '<ellipse cx="0" cy="-72" rx="54" ry="58" fill="' + s.colour + '"/>'
+          + '<ellipse cx="0" cy="-58" rx="30" ry="38" fill="#ccced4"/>'
+          + '<path d="M -46 -168 L -14 -186 L -12 -146 Z" fill="' + s.colour + '"/>'
+          + '<path d="M 46 -168 L 14 -186 L 12 -146 Z" fill="' + s.colour + '"/>'
+          + '<path d="M -38 -166 L -20 -176 L -19 -152 Z" fill="#eda6b0"/>'
+          + '<path d="M 38 -166 L 20 -176 L 19 -152 Z" fill="#eda6b0"/>'
+          + '<circle cx="0" cy="-142" r="44" fill="' + s.colour + '"/>'
+          + '<path d="M -74 -128 L -34 -122" stroke="#e6e7ea" stroke-width="3" stroke-linecap="round"/>'
+          + '<path d="M -74 -114 L -34 -114" stroke="#e6e7ea" stroke-width="3" stroke-linecap="round"/>'
+          + '<path d="M 74 -128 L 34 -122" stroke="#e6e7ea" stroke-width="3" stroke-linecap="round"/>'
+          + '<path d="M 74 -114 L 34 -114" stroke="#e6e7ea" stroke-width="3" stroke-linecap="round"/>'
+          + '<ellipse cx="-14" cy="-118" rx="16" ry="12" fill="#c9cad0"/>'
+          + '<ellipse cx="14" cy="-118" rx="16" ry="12" fill="#c9cad0"/>'
+          + '<path d="M -9 -134 L 9 -134 L 0 -126 Z" fill="#eda6b0"/>'
+          + eyePair(0, -152, 20, 14, 8)
+          + mouthG(0, -120, '<path d="M -14 -120 Q 0 -110 14 -120 Q 0 -116 -14 -120 Z" fill="#4a4b52"/>');
+      }
+    },
+    {
+      id: 'dog', voice: 'dog', colour: '#b57a49', dark: '#8d5a32',
+      base: 48, pattern: [0, 0, 3, 0], top: -186,
+      art: function (s) {
+        return '<path d="M 52 -62 Q 104 -78 96 -134" stroke="' + s.dark + '" stroke-width="19" fill="none" stroke-linecap="round"/>'
+          + legPair(40, 24, 18, s.dark)
+          + '<ellipse cx="0" cy="-72" rx="58" ry="56" fill="' + s.colour + '"/>'
+          + '<ellipse cx="0" cy="-58" rx="32" ry="36" fill="#e0bf99"/>'
+          + '<rect x="-40" y="-114" width="80" height="15" rx="7" fill="#d24b4b"/>'
+          + '<circle cx="0" cy="-100" r="10" fill="#f5c542"/>'
+          + '<ellipse cx="-54" cy="-142" rx="17" ry="38" fill="' + s.dark + '"/>'
+          + '<ellipse cx="54" cy="-142" rx="17" ry="38" fill="' + s.dark + '"/>'
+          + '<ellipse cx="0" cy="-146" rx="48" ry="42" fill="' + s.colour + '"/>'
+          + '<ellipse cx="0" cy="-122" rx="31" ry="23" fill="#f0ddc4"/>'
+          + '<ellipse cx="0" cy="-136" rx="13" ry="10" fill="#3b2f2a"/>'
+          + eyePair(0, -160, 21, 14, 8)
+          + mouthG(0, -112, '<path d="M -18 -112 Q 0 -100 18 -112 Q 0 -106 -18 -112 Z" fill="#5d3a24"/>');
+      }
+    },
+    {
+      id: 'mouse', voice: 'mouse', colour: '#bab7c6', dark: '#9592a4',
+      base: 84, pattern: [0, 2, 4, 1, 3, 0], top: -172,
+      art: function (s) {
+        return '<path d="M 40 -40 Q 96 -34 88 -96" stroke="#e3b7c2" stroke-width="9" fill="none" stroke-linecap="round"/>'
+          + legPair(28, 18, 12, s.dark)
+          + '<ellipse cx="0" cy="-58" rx="46" ry="48" fill="' + s.colour + '"/>'
+          + '<ellipse cx="0" cy="-48" rx="26" ry="30" fill="#ded9e6"/>'
+          + '<circle cx="-33" cy="-138" r="28" fill="' + s.colour + '"/>'
+          + '<circle cx="33" cy="-138" r="28" fill="' + s.colour + '"/>'
+          + '<circle cx="-33" cy="-138" r="18" fill="#f0b7c3"/>'
+          + '<circle cx="33" cy="-138" r="18" fill="#f0b7c3"/>'
+          + '<ellipse cx="0" cy="-112" rx="35" ry="31" fill="' + s.colour + '"/>'
+          + '<path d="M -66 -96 L -26 -92" stroke="#efeaf2" stroke-width="3" stroke-linecap="round"/>'
+          + '<path d="M 66 -96 L 26 -92" stroke="#efeaf2" stroke-width="3" stroke-linecap="round"/>'
+          + '<ellipse cx="0" cy="-94" rx="9" ry="7" fill="#e88fa2"/>'
+          + eyePair(0, -120, 15, 11, 6)
+          + mouthG(0, -84, '<path d="M -12 -84 Q 0 -76 12 -84 Q 0 -80 -12 -84 Z" fill="#6d6a7a"/>');
+      }
+    }
+  ];
+
+  // ------------------------------------------------------------------
+  // Layout. The world is 1000 units wide and however many tall the
+  // viewport needs, so nothing is ever letterboxed or cropped.
+  // ------------------------------------------------------------------
+  var L = {};
+
+  function computeLayout() {
+    var vw = Math.max(1, window.innerWidth), vh = Math.max(1, window.innerHeight);
+    var W = 1000;
+    var H = clamp(Math.round(1000 * vh / vw), 360, 2600);
+    var wide = (vw / vh) >= 1.15;
+    var cols = wide ? 6 : 3;
+    var rows = wide ? 1 : 2;
+    // The left margin is kept clear for the conductor, so nobody in the
+    // band ever stands on top of them.
+    var left = wide ? W * 0.2 : W * 0.22, right = W * 0.975;
+    var colW = (right - left) / cols;
+    var xs = [];
+    for (var c = 0; c < cols; c++) { xs.push(left + colW * (c + 0.5)); }
+
+    var stageY = wide ? [H * 0.54] : [H * 0.36, H * 0.51];
+    var homeY = wide ? [H * 0.87] : [H * 0.73, H * 0.92];
+    var vertAllow = wide ? H * 0.42 : H * 0.225;
+    var scale = clamp(Math.min(colW / 218, vertAllow / 195), 0.24, 1.5);
+
+    L = {
+      W: W, H: H, wide: wide, cols: cols, rows: rows, colW: colW, xs: xs,
+      stageY: stageY, homeY: homeY, scale: scale,
+      platTop: stageY[0] - H * 0.085,
+      platFront: stageY[rows - 1] + H * 0.032,
+      platBottom: stageY[rows - 1] + H * 0.098,
+      condX: W * 0.085,
+      condY: stageY[rows - 1],
+      condScale: clamp(Math.min(scale * 0.8, (W * 0.14) / 184), 0.18, 1)
+    };
+
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    drawScenery();
+    drawLamps();
+    placeConductor();
+    placeActors();
+  }
+
+  function drawScenery() {
+    var g = document.getElementById('scenery');
+    clear(g);
+    var W = L.W, H = L.H;
+    g.appendChild(el('rect', { x: 0, y: 0, width: W, height: H, fill: 'url(#sky)' }));
+    g.appendChild(el('rect', { x: 0, y: 0, width: W, height: L.platBottom, fill: 'url(#spot)' }));
+    g.appendChild(el('rect', { x: 0, y: L.platTop, width: W, height: L.platFront - L.platTop, fill: 'url(#wood)' }));
+    g.appendChild(el('rect', { x: 0, y: L.platFront, width: W, height: L.platBottom - L.platFront, fill: '#7a4f28' }));
+    g.appendChild(el('rect', { x: 0, y: L.platBottom, width: W, height: H - L.platBottom, fill: 'url(#grassg)' }));
+
+    // A few tufts so the grass is not a flat slab.
+    var tuft = '';
+    for (var i = 0; i < 26; i++) {
+      var tx = (i * 137 % 1000), ty = L.platBottom + ((i * 61) % Math.max(1, (H - L.platBottom) * 0.9));
+      tuft += 'M ' + tx + ' ' + ty + ' q 5 -14 10 0 ';
+    }
+    g.appendChild(el('path', { d: tuft, stroke: '#59a05a', 'stroke-width': 4, fill: 'none', opacity: 0.55, 'stroke-linecap': 'round' }));
+
+    var cw = W * 0.06;
+    g.appendChild(el('rect', { x: 0, y: 0, width: cw, height: L.platBottom, fill: 'url(#curtain)' }));
+    g.appendChild(el('rect', { x: W - cw, y: 0, width: cw, height: L.platBottom, fill: 'url(#curtain)' }));
+    g.appendChild(el('rect', { x: 0, y: 0, width: W, height: H * 0.05, fill: 'url(#curtain)' }));
+  }
+
+  // ------------------------------------------------------------------
+  // Twelve lamps along the front of the stage. Twelve is the smallest
+  // number that 1, 2, 3 and 4 all divide into, so every rhythm the
+  // animals can play lines up exactly once per lap. That is where the
+  // times tables become something you can see as well as hear.
+  // ------------------------------------------------------------------
+  var lampNodes = [], lampState = [], lampBase = '#5c3a1c';
+
+  function drawLamps() {
+    var g = document.getElementById('lamps');
+    clear(g);
+    lampNodes = [];
+    if (!lampState.length) {
+      for (var k = 0; k < 12; k++) { lampState.push({ level: 0, colour: '#ffe9a8' }); }
+    }
+    var y = (L.platFront + L.platBottom) / 2;
+    var w = L.W * 0.74, x0 = (L.W - w) / 2;
+    var r = Math.max(3, Math.min(w / 12 * 0.3, (L.platBottom - L.platFront) * 0.3));
+    for (var i = 0; i < 12; i++) {
+      var c = el('circle', {
+        cx: x0 + w * (i + 0.5) / 12, cy: y, r: r,
+        fill: lampBase, stroke: '#3f2712', 'stroke-width': Math.max(1, r * 0.14)
+      });
+      g.appendChild(c);
+      lampNodes.push(c);
+    }
+  }
+
+  function updateLamps(dt) {
+    for (var i = 0; i < 12; i++) {
+      var s = lampState[i];
+      s.level = Math.max(0, s.level - dt * 1.1);
+      lampNodes[i].setAttribute('fill', s.level > 0.02 ? s.colour : lampBase);
+      lampNodes[i].setAttribute('opacity', (0.45 + s.level * 0.55).toFixed(3));
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // The conductor: a penguin who sets the tempo. Tapping cycles it.
+  // ------------------------------------------------------------------
+  var TEMPOS = [70, 96, 128];
+  var tempoIdx = 1;
+  var condArm = null, condDots = [], condSwing = 0;
+
+  function placeConductor() {
+    var g = document.getElementById('conductor');
+    clear(g);
+    var inner = el('g');
+    inner.setAttribute('transform', 'translate(' + L.condX + ',' + L.condY + ') scale(' + L.condScale + ')');
+    inner.innerHTML =
+      legPair(24, 16, 14, '#f0a52e')
+      + '<ellipse cx="0" cy="-64" rx="48" ry="54" fill="#2b2f45"/>'
+      + '<ellipse cx="0" cy="-56" rx="30" ry="40" fill="#f7f6f2"/>'
+      + '<circle cx="0" cy="-124" r="38" fill="#2b2f45"/>'
+      + '<ellipse cx="0" cy="-114" rx="24" ry="22" fill="#f7f6f2"/>'
+      + '<path d="M -14 -110 L 14 -110 L 0 -96 Z" fill="#f0a52e"/>'
+      + '<path d="M -22 -84 L 0 -74 L 22 -84 L 12 -68 L -12 -68 Z" fill="#d24b4b"/>'
+      + eyePair(0, -128, 14, 11, 6)
+      + '<g class="cond-arm" data-px="40" data-py="-84">'
+      + '<path d="M 40 -84 L 96 -136" stroke="#2b2f45" stroke-width="13" stroke-linecap="round" fill="none"/>'
+      + '<path d="M 92 -132 L 122 -164" stroke="#f7f6f2" stroke-width="7" stroke-linecap="round" fill="none"/>'
+      + '</g>';
+    g.appendChild(inner);
+
+    condDots = [];
+    var dg = el('g');
+    for (var i = 0; i < 3; i++) {
+      var d = el('circle', { cx: L.condX - 26 * L.condScale + i * 26 * L.condScale, cy: L.condY - 205 * L.condScale, r: 9 * L.condScale, fill: '#ffffff', opacity: 0.3 });
+      dg.appendChild(d);
+      condDots.push(d);
+    }
+    g.appendChild(dg);
+
+    // Never let the conductor's target shrink below a thumb, however
+    // small the drawing gets.
+    var hw = Math.max(180 * L.condScale, L.W * 0.17);
+    var hh = Math.max(250 * L.condScale, L.W * 0.21);
+    g.appendChild(el('rect', {
+      class: 'hit',
+      x: L.condX - hw / 2, y: L.condY - hh + 20 * L.condScale,
+      width: hw, height: hh
+    }));
+
+    condArm = inner.querySelector('.cond-arm');
+    updateTempoDots();
+  }
+
+  function updateTempoDots() {
+    condDots.forEach(function (d, i) {
+      d.setAttribute('opacity', i <= tempoIdx ? 0.95 : 0.25);
+    });
+  }
+
+  function updateConductor(dt) {
+    var playing = false;
+    for (var i = 0; i < actors.length; i++) { if (actors[i].onStage) { playing = true; break; } }
+    condSwing += dt * (playing && AC ? (TEMPOS[tempoIdx] / 60) * Math.PI : 0.8);
+    if (!condArm) { return; }
+    var deg = reduced ? 0 : Math.sin(condSwing) * (playing ? 34 : 8);
+    condArm.setAttribute('transform', 'rotate(' + deg.toFixed(2) + ' 40 -84)');
+  }
+
+  // ------------------------------------------------------------------
+  // The actors
+  // ------------------------------------------------------------------
+  var actors = [], byId = {};
+
+  function buildActors() {
+    var g = document.getElementById('actors');
+    clear(g);
+    actors = []; byId = {};
+    SPECS.forEach(function (spec) {
+      var node = el('g', { class: 'actor', 'data-id': spec.id });
+      var glow = el('circle', { class: 'glow', cx: 0, cy: -95, r: 135, fill: 'url(#glowg)', opacity: 0 });
+      node.appendChild(glow);
+
+      var lean = el('g');
+      var bob = el('g');
+      bob.innerHTML = spec.art(spec);
+      lean.appendChild(bob);
+      node.appendChild(lean);
+
+      var hit = el('rect', { class: 'hit', x: -108, y: spec.top - 70, width: 216, height: (-spec.top) + 140 });
+      node.appendChild(hit);
+
+      var badge = el('g', { opacity: 0 });
+      node.appendChild(badge);
+      g.appendChild(node);
+
+      actors.push({
+        id: spec.id, spec: spec, node: node, glow: glow, lean: lean, bob: bob, badge: badge, hit: hit,
+        mouth: bob.querySelector('.mouth'),
+        eyes: bob.querySelector('.eyes'),
+        legs: Array.prototype.slice.call(bob.querySelectorAll('.leg')),
+        col: 0, row: 0, scale: 1,
+        home: { x: 0, y: 0 }, stage: { x: 0, y: 0 },
+        onStage: false, division: 0, lastDiv: -1, pi: 0,
+        x: 0, y: 0, vx: 0,
+        walking: false, wt: 1, wdur: 1, path: null, seg: null, total: 1,
+        bounceV: 0, mouthT: 0, mouthAge: 99,
+        legPhase: Math.random() * 6.28, idle: Math.random() * 6.28,
+        blink: 2 + Math.random() * 5, blinkV: 1
+      });
+      byId[spec.id] = actors[actors.length - 1];
+    });
+  }
+
+  function placeActors() {
+    actors.forEach(function (a, i) {
+      a.col = i % L.cols;
+      a.row = Math.floor(i / L.cols);
+      a.scale = L.scale * (L.rows === 1 ? 1 : (a.row === 0 ? 0.86 : 1));
+      a.home = { x: L.xs[a.col], y: L.homeY[a.row] };
+      a.stage = { x: L.xs[a.col], y: L.stageY[a.row] };
+
+      // Tap areas tile their column exactly. If they overlapped, the
+      // animal drawn later would quietly steal its neighbour's edge.
+      var hw = Math.min(230, (L.colW / a.scale) * 0.98);
+      a.hit.setAttribute('x', -hw / 2);
+      a.hit.setAttribute('width', hw);
+
+      var target = a.onStage ? a.stage : a.home;
+      a.walking = false; a.wt = 1; a.vx = 0;
+      a.x = target.x; a.y = target.y;
+      a.lastDiv = -1;
+      updateBadge(a);
+      // Paint a correct pose straight away rather than waiting for the
+      // first animation frame.
+      updateActor(a, 0);
+    });
+  }
+
+  // Characters walk round each other rather than through each other: a
+  // back-row animal steps sideways into the gap between the two in front
+  // before climbing onto the stage.
+  function buildPath(a, from, to) {
+    var pts = [{ x: from.x, y: from.y }];
+    if (L.rows > 1 && a.row === 0) {
+      var dir = (a.col < L.cols - 1) ? 1 : -1;
+      pts.push({ x: from.x + L.colW * 0.5 * dir, y: (from.y + to.y) / 2 });
+    }
+    pts.push({ x: to.x, y: to.y });
+
+    var seg = [], total = 0;
+    for (var i = 1; i < pts.length; i++) {
+      var d = Math.sqrt(Math.pow(pts[i].x - pts[i - 1].x, 2) + Math.pow(pts[i].y - pts[i - 1].y, 2));
+      seg.push(d); total += d;
+    }
+    a.path = pts; a.seg = seg; a.total = total || 1;
+  }
+
+  function alongPath(a, u) {
+    var d = u * a.total, i = 0;
+    while (i < a.seg.length - 1 && d > a.seg[i]) { d -= a.seg[i]; i++; }
+    var t = a.seg[i] ? clamp(d / a.seg[i], 0, 1) : 1;
+    return {
+      x: a.path[i].x + (a.path[i + 1].x - a.path[i].x) * t,
+      y: a.path[i].y + (a.path[i + 1].y - a.path[i].y) * t
+    };
+  }
+
+  function startWalk(a, to) {
+    buildPath(a, { x: a.x, y: a.y }, to);
+    if (reduced) {
+      a.x = to.x; a.y = to.y; a.walking = false; a.wt = 1;
+      return;
+    }
+    a.walking = true;
+    a.wt = 0;
+    a.wdur = clamp(a.total / (L.H * 0.6), 0.5, 1.7);
+  }
+
+  function updateBadge(a) {
+    if (a.division === a.lastDiv) { return; }
+    a.lastDiv = a.division;
+    clear(a.badge);
+    if (!a.division) { a.badge.setAttribute('opacity', 0); return; }
+    a.badge.setAttribute('opacity', 1);
+    var n = a.division, r = 15, gap = 42;
+    var w = gap * (n - 1) + r * 2 + 34, h = r * 2 + 24;
+    var y = a.spec.top - 48;
+    a.badge.appendChild(el('rect', {
+      x: -w / 2, y: y - h / 2, width: w, height: h, rx: h / 2,
+      fill: '#ffffff', opacity: 0.92
+    }));
+    for (var i = 0; i < n; i++) {
+      a.badge.appendChild(el('circle', {
+        cx: -gap * (n - 1) / 2 + gap * i, cy: y, r: r, fill: a.spec.colour
+      }));
+    }
+  }
+
+  // Tapping walks an animal on, then steps its rhythm 1 - 2 - 3 - 4, then
+  // walks it off again. One big target per animal, no small controls.
+  function tapAnimal(a) {
+    initAudio();
+    if (!a.onStage) {
+      a.onStage = true;
+      a.division = 1;
+      a.pi = 0;
+      startWalk(a, a.stage);
+    } else if (a.division < 4) {
+      a.division += 1;
+    } else {
+      a.onStage = false;
+      a.division = 0;
+      startWalk(a, a.home);
+    }
+    updateBadge(a);
+    chirp(a.spec);
+  }
+
+  // ------------------------------------------------------------------
+  // The clock. Audio is scheduled ahead of time against the audio
+  // clock; the visuals are queued to match so a mouth opens exactly
+  // when its note sounds.
+  // ------------------------------------------------------------------
+  var beat = 0, nextTime = 0, visQ = [];
+
+  function secondsPerBeat() { return 60 / TEMPOS[tempoIdx]; }
+
+  function scheduler() {
+    if (!AC || !master) { return; }
+    var now = AC.currentTime;
+    if (nextTime < now) { nextTime = now + 0.06; }
+    while (nextTime < now + 0.15) {
+      var t = nextTime, b = beat, spb = secondsPerBeat(), hit = null;
+      for (var i = 0; i < actors.length; i++) {
+        var a = actors[i];
+        if (a.onStage && a.division > 0 && (b % a.division) === 0) {
+          var idx = a.spec.pattern[a.pi % a.spec.pattern.length];
+          a.pi += 1;
+          var dur = VOICES[a.spec.voice](t, mtof(pentMidi(a.spec.base, idx)), spb);
+          visQ.push({ t: t, id: a.id, dur: dur });
+          if (!hit) { hit = a.spec.colour; }
+        }
+      }
+      visQ.push({ t: t, lamp: b % 12, colour: hit });
+      beat += 1;
+      nextTime += spb;
+    }
+  }
+  setInterval(scheduler, 25);
+
+  function drainVis(now) {
+    while (visQ.length && visQ[0].t <= now) {
+      var e = visQ.shift();
+      if (e.id) {
+        var a = byId[e.id];
+        a.bounceV = 1;
+        a.mouthT = e.dur;
+        a.mouthAge = 0;
+      } else {
+        var s = lampState[e.lamp];
+        s.level = 1;
+        s.colour = e.colour || '#ffe9a8';
+      }
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Frame loop
+  // ------------------------------------------------------------------
+  function updateActor(a, dt) {
+    if (a.walking) {
+      a.wt = clamp(a.wt + dt / a.wdur, 0, 1);
+      var p = alongPath(a, a.wt);
+      a.vx = (p.x - a.x) / Math.max(dt, 0.001);
+      a.x = p.x; a.y = p.y;
+      a.legPhase += dt * 10;
+      if (a.wt >= 1) { a.walking = false; a.vx = 0; }
+    } else {
+      a.vx *= 0.85;
+      a.legPhase += dt * 1.4;
+      a.idle += dt;
+    }
+
+    a.bounceV = Math.max(0, a.bounceV - dt * 3.2);
+    a.mouthAge += dt;
+
+    var open = 0;
+    if (a.mouthT > 0) {
+      var k = 1 - a.mouthAge / a.mouthT;
+      open = k > 0 ? k : 0;
+    }
+
+    var hop = 0, squash = 1;
+    if (!reduced) {
+      var b = Math.sin(Math.PI * (1 - a.bounceV));
+      hop = -b * 26;
+      squash = 1 + b * 0.07;
+      if (!a.walking && !a.onStage) { hop += Math.sin(a.idle * 1.7) * 3; }
+    }
+
+    a.node.setAttribute('transform',
+      'translate(' + a.x.toFixed(2) + ',' + a.y.toFixed(2) + ') scale(' + a.scale.toFixed(4) + ')');
+    a.lean.setAttribute('transform',
+      'rotate(' + (reduced ? 0 : clamp(a.vx * 0.02, -9, 9)).toFixed(2) + ' 0 0)');
+    a.bob.setAttribute('transform',
+      'translate(0,' + hop.toFixed(2) + ') scale(1,' + squash.toFixed(4) + ')');
+
+    var swing = a.walking ? Math.sin(a.legPhase) * 22 : 0;
+    for (var i = 0; i < a.legs.length; i++) {
+      var lg = a.legs[i];
+      lg.setAttribute('transform', 'rotate(' + (swing * (+lg.getAttribute('data-side'))).toFixed(2)
+        + ' ' + lg.getAttribute('data-px') + ' ' + lg.getAttribute('data-py') + ')');
+    }
+
+    if (a.mouth) {
+      var mx = +a.mouth.getAttribute('data-cx'), my = +a.mouth.getAttribute('data-cy');
+      a.mouth.setAttribute('transform',
+        'translate(' + mx + ',' + my + ') scale(1,' + (1 + open * 2.6).toFixed(3) + ') translate(' + (-mx) + ',' + (-my) + ')');
+    }
+
+    a.blink -= dt;
+    if (a.blink <= 0) { a.blink = 2.5 + Math.random() * 5; a.blinkV = 0; }
+    a.blinkV = Math.min(1, a.blinkV + dt * 7);
+    if (a.eyes) {
+      var ex = +a.eyes.getAttribute('data-cx'), ey = +a.eyes.getAttribute('data-cy');
+      var bk = reduced ? 1 : clamp(a.blinkV, 0.08, 1);
+      a.eyes.setAttribute('transform',
+        'translate(' + ex + ',' + ey + ') scale(1,' + bk.toFixed(3) + ') translate(' + (-ex) + ',' + (-ey) + ')');
+    }
+
+    a.glow.setAttribute('opacity', (Math.max(a.bounceV, open) * 0.6).toFixed(3));
+  }
+
+  var lastFrame = 0;
+  function frame(now) {
+    var dt = lastFrame ? Math.min(0.05, (now - lastFrame) / 1000) : 0.016;
+    lastFrame = now;
+    if (AC) { drainVis(AC.currentTime); }
+    for (var i = 0; i < actors.length; i++) { updateActor(actors[i], dt); }
+    updateConductor(dt);
+    updateLamps(dt);
+    requestAnimationFrame(frame);
+  }
+
+  // ------------------------------------------------------------------
+  // Input
+  // ------------------------------------------------------------------
+  svg.addEventListener('pointerdown', function (ev) {
+    initAudio();
+    var t = ev.target;
+    if (!t || !t.closest) { return; }
+    if (t.closest('#conductor')) {
+      tempoIdx = (tempoIdx + 1) % TEMPOS.length;
+      updateTempoDots();
+      return;
+    }
+    var an = t.closest('.actor');
+    if (an) { tapAnimal(byId[an.getAttribute('data-id')]); }
+  });
+
+  svg.addEventListener('contextmenu', function (ev) { ev.preventDefault(); });
+
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden && AC && AC.state === 'suspended') { AC.resume(); }
+  });
+
+  var resizeTimer = 0;
+  window.addEventListener('resize', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(computeLayout, 120);
+  });
+  window.addEventListener('orientationchange', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(computeLayout, 220);
+  });
+
+  buildActors();
+  computeLayout();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

@@ -3,18 +3,128 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#141d3a">
 <title>Kid Games</title>
 <style>
-  html, body { height: 100%; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; min-height: 100%;
+    background: #141d3a;
+    color: #eef2ff;
+    font-family: ui-rounded, "Segoe UI", system-ui, -apple-system, sans-serif;
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
   body {
-    display: grid; place-items: center;
-    background: #10203a; color: #eaf2ff;
-    font: 500 clamp(1rem, 4vw, 1.4rem)/1.5 system-ui, sans-serif;
-    text-align: center; padding: 2rem;
+    display: flex; flex-direction: column; align-items: center;
+    padding: clamp(1.5rem, 6vw, 4rem) clamp(1rem, 4vw, 3rem) 4rem;
+    background-image: radial-gradient(ellipse at 50% 0%, #2c3566 0%, #141d3a 70%);
+    background-repeat: no-repeat;
+  }
+  h1 {
+    margin: 0 0 clamp(1.5rem, 5vw, 3rem);
+    font-size: clamp(1.6rem, 7vw, 2.8rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+  .shelf {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+    gap: clamp(1rem, 3vw, 2rem);
+    width: 100%;
+    max-width: 60rem;
+  }
+  .game {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    background: #1e2952;
+    border: 2px solid #35407a;
+    border-radius: 1.4rem;
+    overflow: hidden;
+    box-shadow: 0 0.6rem 1.6rem rgba(0, 0, 0, 0.35);
+    transition: transform 140ms ease, border-color 140ms ease;
+  }
+  .game:hover, .game:focus-visible { border-color: #7d8ada; transform: translateY(-3px); }
+  .game:active { transform: translateY(0) scale(0.985); }
+  .game svg { display: block; width: 100%; height: auto; }
+  .game span {
+    display: block;
+    padding: 0.9rem 1.1rem 1.1rem;
+    font-size: clamp(1.1rem, 4vw, 1.35rem);
+    font-weight: 700;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .game { transition: none; }
+    .game:hover, .game:focus-visible, .game:active { transform: none; }
   }
 </style>
 </head>
 <body>
-  <p>Games are on their way.</p>
+  <h1>Kid Games</h1>
+
+  <div class="shelf">
+    <a class="game" href="games/animal-band/animal-band.html">
+      <svg viewBox="0 0 320 200" role="img" aria-label="Animal Band">
+        <defs>
+          <linearGradient id="t-sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#1b2450"/><stop offset="1" stop-color="#40336b"/>
+          </linearGradient>
+          <linearGradient id="t-cur" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#7d1f38"/><stop offset="0.5" stop-color="#c0344f"/><stop offset="1" stop-color="#7d1f38"/>
+          </linearGradient>
+          <linearGradient id="t-wood" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#cf9459"/><stop offset="1" stop-color="#a4703c"/>
+          </linearGradient>
+        </defs>
+        <rect width="320" height="200" fill="url(#t-sky)"/>
+        <rect x="0" y="132" width="320" height="34" fill="url(#t-wood)"/>
+        <rect x="0" y="166" width="320" height="34" fill="#7a4f28"/>
+        <rect x="0" y="0" width="22" height="200" fill="url(#t-cur)"/>
+        <rect x="298" y="0" width="22" height="200" fill="url(#t-cur)"/>
+        <rect x="0" y="0" width="320" height="16" fill="url(#t-cur)"/>
+
+        <!-- frog -->
+        <g transform="translate(96,132)">
+          <ellipse cx="0" cy="-20" rx="27" ry="20" fill="#5fae4a"/>
+          <ellipse cx="0" cy="-12" rx="17" ry="11" fill="#d7ecab"/>
+          <circle cx="-12" cy="-36" r="11" fill="#5fae4a"/><circle cx="12" cy="-36" r="11" fill="#5fae4a"/>
+          <circle cx="-12" cy="-37" r="7" fill="#fff"/><circle cx="12" cy="-37" r="7" fill="#fff"/>
+          <circle cx="-12" cy="-36" r="4" fill="#22203a"/><circle cx="12" cy="-36" r="4" fill="#22203a"/>
+          <path d="M -17 -21 Q 0 -10 17 -21 Q 0 -17 -17 -21 Z" fill="#2c5a22"/>
+        </g>
+
+        <!-- cat -->
+        <g transform="translate(160,132)">
+          <ellipse cx="0" cy="-22" rx="20" ry="22" fill="#93949c"/>
+          <path d="M -17 -60 L -5 -68 L -4 -52 Z" fill="#93949c"/>
+          <path d="M 17 -60 L 5 -68 L 4 -52 Z" fill="#93949c"/>
+          <circle cx="0" cy="-51" r="16" fill="#93949c"/>
+          <circle cx="-7" cy="-54" r="5" fill="#fff"/><circle cx="7" cy="-54" r="5" fill="#fff"/>
+          <circle cx="-7" cy="-53" r="3" fill="#22203a"/><circle cx="7" cy="-53" r="3" fill="#22203a"/>
+          <path d="M -3 -46 L 3 -46 L 0 -43 Z" fill="#eda6b0"/>
+        </g>
+
+        <!-- bird -->
+        <g transform="translate(224,132)">
+          <ellipse cx="0" cy="-24" rx="18" ry="21" fill="#f2b134"/>
+          <ellipse cx="0" cy="-20" rx="11" ry="13" fill="#fbe0a2"/>
+          <circle cx="0" cy="-50" r="14" fill="#f2b134"/>
+          <ellipse cx="-1" cy="-64" rx="3" ry="7" fill="#d68d1d"/>
+          <circle cx="-6" cy="-53" r="5" fill="#fff"/><circle cx="6" cy="-53" r="5" fill="#fff"/>
+          <circle cx="-6" cy="-52" r="3" fill="#22203a"/><circle cx="6" cy="-52" r="3" fill="#22203a"/>
+          <path d="M -6 -45 L 6 -45 L 0 -39 Z" fill="#ef7d29"/>
+        </g>
+
+        <g fill="#ffe9a8">
+          <circle cx="40" cy="182" r="5"/><circle cx="72" cy="182" r="5" opacity="0.45"/>
+          <circle cx="104" cy="182" r="5" opacity="0.45"/><circle cx="136" cy="182" r="5"/>
+          <circle cx="168" cy="182" r="5" opacity="0.45"/><circle cx="200" cy="182" r="5" opacity="0.45"/>
+          <circle cx="232" cy="182" r="5"/><circle cx="264" cy="182" r="5" opacity="0.45"/>
+        </g>
+      </svg>
+      <span>Animal Band</span>
+    </a>
+  </div>
 </body>
 </html>
