@@ -103,6 +103,11 @@ its shape:
 To change how the games are made, change `CLAUDE.md`, not this file. Claude obeys
 that one automatically; it only reads this one if asked.
 
+**Hamish's Times Tables is deliberately exempt.** It was written before these
+rules and breaks three of them — Google Fonts, written instructions, and a
+streak that resets on a wrong answer. That is a settled decision, not an
+oversight, and it is not to be "fixed". The rules govern new games.
+
 ---
 
 ## If Claude is ever unavailable
