@@ -14,3 +14,6 @@ Played at: https://campbell226.github.io/kid-games/
 
 There is nothing to install and nothing to compile. Edit the HTML file and
 reload the browser. See CLAUDE.md for the design rules the games follow.
+
+HOWTO.md is the step-by-step: editing from any device, starting a new game,
+and what to do when a push is rejected.
