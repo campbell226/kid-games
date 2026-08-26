@@ -540,25 +540,97 @@
     note(880, ctx.currentTime, 0.09, "sine", 0.08);
   }
 
+  /* A moo is a vowel, not a tone. It travels "mmm-AWW-ooo-mmm" as the mouth
+     opens and closes again, so the formants have to move with it. Three
+     bandpass filters in parallel are the mouth; the sawtooth is the animal.
+     A single swept lowpass — which is what this was — only ever sounds like
+     a kazoo, because nothing in it is shaped like a vowel. */
+  var mooNoise=null;
+  function mooNoiseBuffer(){
+    if(mooNoise) return mooNoise;
+    var len=Math.floor(ctx.sampleRate*1.6);
+    mooNoise=ctx.createBuffer(1,len,ctx.sampleRate);
+    var d=mooNoise.getChannelData(0);
+    for(var i=0;i<len;i++) d[i]=Math.random()*2-1;
+    return mooNoise;
+  }
+
   function sndMoo(){
     if(!ctx||!S.sound) return;
-    var t=ctx.currentTime;
-    var o=ctx.createOscillator(), g=ctx.createGain(), lp=ctx.createBiquadFilter();
-    var vib=ctx.createOscillator(), vg=ctx.createGain();
-    o.type="sawtooth";
-    o.frequency.setValueAtTime(150,t);
-    o.frequency.linearRampToValueAtTime(196,t+0.18);
-    o.frequency.linearRampToValueAtTime(138,t+0.95);
-    vib.frequency.value=6.5; vg.gain.value=5; vib.connect(vg); vg.connect(o.frequency); vib.start(t); vib.stop(t+1.1);
-    lp.type="lowpass";
-    lp.frequency.setValueAtTime(500,t);
-    lp.frequency.linearRampToValueAtTime(1300,t+0.25);
-    lp.frequency.linearRampToValueAtTime(420,t+1.0);
-    g.gain.setValueAtTime(0.0001,t);
-    g.gain.exponentialRampToValueAtTime(0.26,t+0.12);
-    g.gain.setValueAtTime(0.26,t+0.6);
-    g.gain.exponentialRampToValueAtTime(0.0001,t+1.05);
-    o.connect(lp); lp.connect(g); g.connect(master); o.start(t); o.stop(t+1.1);
+    var t=ctx.currentTime, D=1.62, i;
+    var times=[0,0.45,0.95,1.32,D];
+
+    // The close has to stay audible: the final "mmm" is the most cow-like
+    // part of the whole sound, and an exponential fall from the sustain
+    // buries it before anyone hears it.
+    var out=ctx.createGain();
+    out.gain.setValueAtTime(0.0001,t);
+    out.gain.exponentialRampToValueAtTime(0.62,t+0.10);
+    out.gain.setValueAtTime(0.62,t+0.85);
+    out.gain.exponentialRampToValueAtTime(0.50,t+1.15);
+    out.gain.exponentialRampToValueAtTime(0.30,t+1.35);
+    out.gain.exponentialRampToValueAtTime(0.0001,t+D);
+    out.connect(master);
+
+    // how far the mouth is open
+    var mouth=ctx.createBiquadFilter();
+    mouth.type="lowpass"; mouth.Q.value=0.7;
+    mouth.frequency.setValueAtTime(600,t);
+    mouth.frequency.linearRampToValueAtTime(3000,t+0.45);
+    mouth.frequency.linearRampToValueAtTime(2500,t+0.95);
+    mouth.frequency.linearRampToValueAtTime(900,t+1.32);
+    mouth.frequency.linearRampToValueAtTime(640,t+D);
+    mouth.connect(out);
+
+    // the animal itself: a sawtooth for harmonics, a sine to fatten the
+    // fundamental so it still carries on a phone speaker
+    var saw=ctx.createOscillator(); saw.type="sawtooth";
+    var body=ctx.createOscillator(); body.type="sine";
+    var bodyG=ctx.createGain(); bodyG.gain.value=0.3;
+    body.connect(bodyG); bodyG.connect(mouth);
+
+    // pitch rises on the push of breath, then sags away at the end
+    var f0=[118,150,146,138,112], f0t=[0,0.12,0.35,0.85,D];
+    [saw,body].forEach(function(o){
+      o.frequency.setValueAtTime(f0[0],t);
+      for(var k=1;k<f0.length;k++) o.frequency.linearRampToValueAtTime(f0[k],t+f0t[k]);
+    });
+
+    // two wobbles at different speeds, so it breathes instead of droning
+    var lfos=[];
+    [[5.5,3.4],[1.7,1.6]].forEach(function(v){
+      var lfo=ctx.createOscillator(); lfo.frequency.value=v[0];
+      var dep=ctx.createGain(); dep.gain.value=v[1];
+      lfo.connect(dep); dep.connect(saw.frequency); dep.connect(body.frequency);
+      lfos.push(lfo);
+    });
+
+    // the mouth shape, travelling from "m" out to "aw" and back to "m"
+    [{f:[250,620,560,300,240],q:7,g:1.00},
+     {f:[880,1080,1020,900,850],q:9,g:0.42},
+     {f:[2300,2600,2500,2350,2250],q:10,g:0.16}].forEach(function(spec){
+      var bp=ctx.createBiquadFilter();
+      bp.type="bandpass"; bp.Q.value=spec.q;
+      bp.frequency.setValueAtTime(spec.f[0],t);
+      for(var k=1;k<spec.f.length;k++) bp.frequency.linearRampToValueAtTime(spec.f[k],t+times[k]);
+      var g=ctx.createGain(); g.gain.value=spec.g;
+      saw.connect(bp); bp.connect(g); g.connect(out);
+    });
+
+    // air escaping as the mouth opens, and again as it shuts
+    var n=ctx.createBufferSource(); n.buffer=mooNoiseBuffer();
+    var nb=ctx.createBiquadFilter(); nb.type="bandpass"; nb.frequency.value=1050; nb.Q.value=0.8;
+    var ng=ctx.createGain();
+    ng.gain.setValueAtTime(0.0001,t);
+    ng.gain.exponentialRampToValueAtTime(0.05,t+0.05);
+    ng.gain.exponentialRampToValueAtTime(0.006,t+0.35);
+    ng.gain.exponentialRampToValueAtTime(0.05,t+1.38);
+    ng.gain.exponentialRampToValueAtTime(0.0001,t+D);
+    n.connect(nb); nb.connect(ng); ng.connect(out);
+
+    saw.start(t); body.start(t); n.start(t);
+    saw.stop(t+D+0.05); body.stop(t+D+0.05); n.stop(t+D+0.05);
+    for(i=0;i<lfos.length;i++){ lfos[i].start(t); lfos[i].stop(t+D+0.05); }
   }
 
   function sndFanfare(){
