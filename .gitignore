@@ -1,0 +1,13 @@
+# OS clutter
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# Editor clutter
+.vscode/
+.idea/
+*.swp
+
+# Nothing here is built, so there is nothing to ignore beyond junk.
