@@ -5,8 +5,11 @@ younger growing into them. British English throughout. I work from a phone
 or tablet as often as a laptop: keep responses short, do the work in the
 file, ask with tappable options rather than prose questions where you can.
 
-This is a brand new repo — nothing exists yet. Don't assume any prior code,
-sound library, or naming scheme; we're building all of that from here.
+Two games exist so far, in `games/`. Each is completely self-contained —
+there's no shared library, no common sound engine, nothing to import. Read
+`games/animal-band/animal-band.html` before starting a new one: it's the
+game that follows the rules below. `hamish-times-tables` predates them and
+is deliberately exempt, so don't copy its habits or "fix" it.
 
 ## Deliverable
 
