@@ -15,7 +15,8 @@ is deliberately exempt, so don't copy its habits or "fix" it.
 
 One self-contained HTML file per game, in its own folder (e.g.
 `games/<name>/<name>.html`). Inline SVG art, no external images, no build
-step, no framework unless there's a genuinely good reason for one. Portrait
+step, no framework unless there's a genuinely good reason for one. Sound
+is the one exception — see below. Portrait
 and landscape both have to work.
 
 ## Design rules
@@ -34,13 +35,21 @@ and landscape both have to work.
 ## Sound
 
 Every sound effect needs a synthesised (Web Audio) fallback so a game is
-never silent — that's non-negotiable. Recorded clips (children's voices,
-real animal sounds) are a nice-to-have layered on top later; propose an
-approach when we actually get there rather than assuming any particular
-plumbing. Now that this will be a properly hosted site rather than a
-sandboxed preview, plain static audio files served alongside the game are
-probably simpler than anything involving a proxy — but decide that when it's
-actually in front of you.
+never silent — that's non-negotiable, and it stays true even once there
+are recordings.
+
+That question is settled now. Post a Letter keeps 26 recorded letter sounds
+in `games/post-a-letter/sounds/`, played through plain `<audio>`
+elements as ordinary static files. Copy that rather than inventing
+something else, including the two things holding it up: every clip is
+started and stopped once, muted, on the first touch, because a phone
+won't play a sound no finger asked for and the game has to speak on its
+own between rounds; and any clip that won't load or play falls through
+to the synthesised chime.
+
+The masters are in `games/post-a-letter/audio assets/`. Trimming and
+loudness-matching them was a one-off ffmpeg pass, not a build step —
+there is still nothing to run to open a game.
 
 ## Hosting
 

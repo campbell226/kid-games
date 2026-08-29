@@ -95,14 +95,6 @@
     <p class="sub">She will not find this by accident &mdash; it needs a long press on the corner.</p>
 
     <div class="row">
-      <h3>What a letter says when tapped</h3>
-      <div class="seg" id="segVoice">
-        <button type="button" data-v="sound" aria-pressed="true">Sounds &mdash; &ldquo;buh&rdquo;</button>
-        <button type="button" data-v="name" aria-pressed="false">Names &mdash; &ldquo;bee&rdquo;</button>
-      </div>
-    </div>
-
-    <div class="row">
       <h3>How many letters are out</h3>
       <div class="seg" id="segCount">
         <button type="button" data-c="0" aria-pressed="true">Auto</button>
@@ -200,16 +192,6 @@
     return false;
   }
 
-  // Spellings tuned so a text-to-speech voice produces the phonics
-  // sound rather than reading the letter out. "C" said as "see" would
-  // teach exactly the wrong thing.
-  var PHONEME = {
-    A: 'ah', B: 'buh', C: 'cuh', D: 'duh', E: 'eh', F: 'fff', G: 'guh',
-    H: 'huh', I: 'ih', J: 'juh', K: 'kuh', L: 'lll', M: 'mmm', N: 'nnn',
-    O: 'oh', P: 'puh', Q: 'kwuh', R: 'rrr', S: 'sss', T: 'tuh', U: 'uh',
-    V: 'vvv', W: 'wuh', X: 'kss', Y: 'yuh', Z: 'zzz'
-  };
-
   // ------------------------------------------------------------------
   // Sound.
   //
@@ -292,82 +274,70 @@
   }
 
   // ------------------------------------------------------------------
-  // Speech
+  // The voice.
+  //
+  // Twenty-six recordings of a real person, one per letter, sitting in
+  // sounds/ beside this file. The synthesised chime above is still here
+  // and still matters: it stands in for any clip that will not load or
+  // will not play, so there is no path through this that ends in
+  // silence.
   // ------------------------------------------------------------------
-  var synth = window.speechSynthesis || null;
-  var voice = null, voiceTried = false;
-  var speechFails = 0;              // three strikes and we stop waiting on it
-  var voiceMode = 'sound';          // 'sound' = phonics, 'name' = letter names
+  var CLIPS = {};
+  var unlocked = false;
+  var speaking = null;
 
-  function chooseVoice() {
-    if (!synth || !synth.getVoices) { return null; }
-    var vs = synth.getVoices();
-    if (!vs || !vs.length) { return null; }
-    voiceTried = true;
-    var i, v;
-    for (i = 0; i < vs.length; i++) {
-      v = vs[i];
-      if (v.lang === 'en-GB' && /female|hazel|libby|sonia|serena|kate|amelie/i.test(v.name)) { return v; }
+  function clipFor(letter) {
+    var a = CLIPS[letter];
+    if (!a) {
+      a = new window.Audio('sounds/' + letter.toLowerCase() + '.mp3');
+      a.preload = 'auto';
+      a.addEventListener('error', function () { a.broken = true; });
+      CLIPS[letter] = a;
     }
-    for (i = 0; i < vs.length; i++) { if (vs[i].lang === 'en-GB') { return vs[i]; } }
-    for (i = 0; i < vs.length; i++) { if (/^en[-_]/i.test(vs[i].lang)) { return vs[i]; } }
-    return vs[0];
+    return a;
   }
 
-  if (synth && 'onvoiceschanged' in synth) {
-    synth.onvoiceschanged = function () { voice = chooseVoice(); };
+  // A phone will not play a sound that no finger asked for, and the
+  // pillar box has to speak on its own when a round starts. So on the
+  // very first touch every clip is started and stopped again while
+  // muted, which is enough to buy the right to play it later.
+  function unlockClips() {
+    if (unlocked) { return; }
+    unlocked = true;
+    for (var i = 0; i < ALPHABET.length; i++) {
+      (function (a) {
+        a.muted = true;
+        var p;
+        try { p = a.play(); } catch (e) { a.muted = false; return; }
+        if (p && p.then) {
+          p.then(function () {
+            a.pause();
+            try { a.currentTime = 0; } catch (e1) { /* not loaded yet */ }
+            a.muted = false;
+          }, function () { a.muted = false; });
+        } else {
+          a.pause();
+          a.muted = false;
+        }
+      })(clipFor(ALPHABET[i]));
+    }
   }
 
-  // Says the letter, and guarantees a noise either way. If the utterance
-  // has not started within a moment we cancel it and chime instead —
-  // cancelling first, so a late-waking voice can never talk over the
-  // sound that replaced it.
+  // One voice at a time. A second tap cuts the first letter off rather
+  // than talking over it, which is what a person would do.
   function say(letter) {
-    if (!synth || speechFails >= 3) { chime(letter); return; }
-    if (!voice && !voiceTried) { voice = chooseVoice(); }
+    var a = clipFor(letter);
+    if (a.broken) { chime(letter); return; }
 
-    var text = voiceMode === 'name' ? letter : PHONEME[letter];
-    var u;
-    try {
-      u = new window.SpeechSynthesisUtterance(text);
-    } catch (err) {
-      speechFails = 3; chime(letter); return;
+    if (speaking && speaking !== a) {
+      try { speaking.pause(); speaking.currentTime = 0; } catch (e) { /* fine */ }
     }
-    if (voice) { u.voice = voice; }
-    u.lang = 'en-GB';
-    u.rate = voiceMode === 'name' ? 0.85 : 0.75;
-    u.pitch = 1.15;
-    u.volume = 1;
+    speaking = a;
+    try { a.currentTime = 0; } catch (e1) { /* it will start from wherever it is */ }
 
-    var settled = false;
-    var timer = setTimeout(function () {
-      if (settled) { return; }
-      settled = true;
-      speechFails++;
-      try { synth.cancel(); } catch (e) { /* nothing useful to do */ }
-      chime(letter);
-    }, 400);
-
-    u.onstart = function () {
-      if (settled) { return; }
-      settled = true;
-      speechFails = 0;
-      clearTimeout(timer);
-    };
-    u.onerror = function () {
-      if (settled) { return; }
-      settled = true;
-      speechFails++;
-      clearTimeout(timer);
-      chime(letter);
-    };
-
-    try {
-      synth.cancel();
-      synth.speak(u);
-    } catch (err2) {
-      if (!settled) { settled = true; clearTimeout(timer); speechFails++; chime(letter); }
-    }
+    var p;
+    try { p = a.play(); } catch (e2) { chime(letter); return; }
+    if (p && p['catch']) { p['catch'](function () { chime(letter); }); }
   }
 
   // ------------------------------------------------------------------
@@ -1002,6 +972,7 @@
 
   svg.addEventListener('pointerdown', function (ev) {
     initAudio();
+    unlockClips();
     var t = ev.target;
     if (!t || !t.closest) { return; }
 
@@ -1064,7 +1035,6 @@
       var raw = window.localStorage.getItem('post-a-letter');
       if (!raw) { return; }
       var p = JSON.parse(raw);
-      if (p.voiceMode === 'name' || p.voiceMode === 'sound') { voiceMode = p.voiceMode; }
       if (typeof p.countOverride === 'number') { countOverride = clamp(p.countOverride | 0, 0, 6); }
     } catch (e) { /* a fresh start is a perfectly good fallback */ }
   }
@@ -1072,31 +1042,19 @@
   function savePrefs() {
     try {
       window.localStorage.setItem('post-a-letter',
-        JSON.stringify({ voiceMode: voiceMode, countOverride: countOverride }));
+        JSON.stringify({ countOverride: countOverride }));
     } catch (e) { /* private browsing, and it does not matter */ }
   }
 
   function syncPanel() {
-    var vb = document.querySelectorAll('#segVoice button'), i;
-    for (i = 0; i < vb.length; i++) {
-      vb[i].setAttribute('aria-pressed', vb[i].getAttribute('data-v') === voiceMode ? 'true' : 'false');
-    }
     var cb = document.querySelectorAll('#segCount button');
-    for (i = 0; i < cb.length; i++) {
+    for (var i = 0; i < cb.length; i++) {
       cb[i].setAttribute('aria-pressed', (+cb[i].getAttribute('data-c')) === countOverride ? 'true' : 'false');
     }
   }
 
   function openParent() { syncPanel(); parentEl.classList.add('open'); }
   function closeParent() { parentEl.classList.remove('open'); }
-
-  document.getElementById('segVoice').addEventListener('click', function (ev) {
-    var b = ev.target.closest('button');
-    if (!b) { return; }
-    voiceMode = b.getAttribute('data-v');
-    savePrefs(); syncPanel();
-    say(target);
-  });
 
   document.getElementById('segCount').addEventListener('click', function (ev) {
     var b = ev.target.closest('button');
