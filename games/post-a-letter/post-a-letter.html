@@ -1,0 +1,1127 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#8fc3e8">
+<title>Post a Letter</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #8fc3e8;
+    overflow: hidden;
+    touch-action: manipulation;
+    overscroll-behavior: none;
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #stage {
+    display: block;
+    width: 100vw; height: 100vh;
+    width: 100dvw; height: 100dvh;
+  }
+  .hit { fill: transparent; cursor: pointer; }
+
+  /* Parent controls. The only words in the game, and the only part
+     deliberately made fiddly to reach: a long press, so a toddler
+     pawing at the corner never opens it. */
+  #parent {
+    position: fixed; inset: 0;
+    display: none;
+    align-items: center; justify-content: center;
+    background: rgba(12, 24, 40, 0.55);
+    font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: 20px;
+  }
+  #parent.open { display: flex; }
+  #panel {
+    background: #fdfaf3; color: #22303f;
+    border-radius: 18px; padding: 20px 22px 22px;
+    width: min(420px, 100%); max-height: 100%; overflow: auto;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+  }
+  #panel h2 { margin: 0 0 4px; font-size: 19px; }
+  #panel p.sub { margin: 0 0 18px; font-size: 13.5px; color: #63727f; }
+  #panel h3 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
+  .row { margin-bottom: 18px; }
+  .seg { display: flex; flex-wrap: wrap; gap: 8px; }
+  .seg button {
+    flex: 1 1 auto; min-width: 60px; min-height: 46px;
+    border: 2px solid #cfd8e0; background: #fff; color: #22303f;
+    border-radius: 11px; font: inherit; font-size: 15px; cursor: pointer;
+  }
+  .seg button[aria-pressed="true"] { border-color: #c8102e; background: #fdeaed; font-weight: 600; }
+  .wide { display: block; width: 100%; min-height: 46px; border-radius: 11px; font: inherit; font-size: 15px; cursor: pointer; }
+  #clear { border: 2px solid #cfd8e0; background: #fff; color: #22303f; margin-bottom: 10px; }
+  #close { border: 0; background: #c8102e; color: #fff; font-weight: 600; }
+</style>
+</head>
+<body>
+<svg id="stage" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 640" preserveAspectRatio="xMidYMid meet" aria-label="Post a Letter">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9ed2f0"/>
+      <stop offset="1" stop-color="#dcf0f9"/>
+    </linearGradient>
+    <linearGradient id="grass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8ecb6d"/>
+      <stop offset="1" stop-color="#5da24c"/>
+    </linearGradient>
+    <linearGradient id="pillar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#8d0c20"/>
+      <stop offset="0.28" stop-color="#d8213c"/>
+      <stop offset="0.68" stop-color="#c8102e"/>
+      <stop offset="1" stop-color="#7d0a1c"/>
+    </linearGradient>
+    <radialGradient id="cheer" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff8d4" stop-opacity="0.95"/>
+      <stop offset="0.55" stop-color="#ffe27a" stop-opacity="0.4"/>
+      <stop offset="1" stop-color="#ffe27a" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <g id="scenery"></g>
+  <g id="pile"></g>
+  <g id="box"></g>
+  <g id="sparks"></g>
+  <g id="actors"></g>
+  <g id="corner"></g>
+</svg>
+
+<div id="parent" role="dialog" aria-modal="true" aria-label="Parent controls">
+  <div id="panel">
+    <h2>Parent controls</h2>
+    <p class="sub">She will not find this by accident &mdash; it needs a long press on the corner.</p>
+
+    <div class="row">
+      <h3>What a letter says when tapped</h3>
+      <div class="seg" id="segVoice">
+        <button type="button" data-v="sound" aria-pressed="true">Sounds &mdash; &ldquo;buh&rdquo;</button>
+        <button type="button" data-v="name" aria-pressed="false">Names &mdash; &ldquo;bee&rdquo;</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <h3>How many letters are out</h3>
+      <div class="seg" id="segCount">
+        <button type="button" data-c="0" aria-pressed="true">Auto</button>
+        <button type="button" data-c="3" aria-pressed="false">3</button>
+        <button type="button" data-c="4" aria-pressed="false">4</button>
+        <button type="button" data-c="5" aria-pressed="false">5</button>
+        <button type="button" data-c="6" aria-pressed="false">6</button>
+      </div>
+    </div>
+
+    <button type="button" id="clear" class="wide">Clear the pile of posted letters</button>
+    <button type="button" id="close" class="wide">Back to the game</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  var svg = document.getElementById('stage');
+
+  function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+  function el(tag, attrs) {
+    var n = document.createElementNS(SVGNS, tag);
+    if (attrs) { for (var k in attrs) { n.setAttribute(k, attrs[k]); } }
+    return n;
+  }
+  function clear(n) { while (n.firstChild) { n.removeChild(n.firstChild); } }
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+
+  var reduceQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+  var reduced = reduceQuery.matches;
+  if (reduceQuery.addEventListener) {
+    reduceQuery.addEventListener('change', function (e) { reduced = e.matches; });
+  }
+
+  // ------------------------------------------------------------------
+  // The alphabet, drawn rather than typed.
+  //
+  // Every capital is strokes on one grid: x from -40 to 40, y from -60
+  // to 60. Drawn by hand so the shapes are identical on every device
+  // with no font to download, and so the eyes and feet can be pinned
+  // somewhere sensible on each letter rather than guessed at.
+  //
+  //   d  the stroke paths
+  //   e  where the eyes sit
+  //   f  where the two feet come down
+  // ------------------------------------------------------------------
+  var GLYPH = {
+    A: { d: ['M-40 60L0 -60L40 60', 'M-21 12H21'], e: [0, 30], f: [-28, 28] },
+    B: { d: ['M-32 -60V60', 'M-32 -60H6A30 30 0 0 1 6 0H-32', 'M-32 0H12A30 30 0 0 1 12 60H-32'], e: [4, -32], f: [-30, 10] },
+    C: { d: ['M32 -40A38 55 0 1 0 32 40'], e: [2, -4], f: [-10, 22] },
+    D: { d: ['M-30 -60V60', 'M-30 -60H0A38 60 0 0 1 0 60H-30'], e: [4, -4], f: [-24, 12] },
+    E: { d: ['M32 -60H-30V60H32', 'M-30 0H20'], e: [0, -32], f: [-24, 14] },
+    F: { d: ['M-30 60V-60H32', 'M-30 -2H20'], e: [0, -32], f: [-34, -16] },
+    G: { d: ['M32 -40A38 55 0 1 0 36 40', 'M36 40V4H8'], e: [2, -6], f: [-8, 26] },
+    H: { d: ['M-32 -60V60', 'M32 -60V60', 'M-32 0H32'], e: [0, -32], f: [-32, 32] },
+    I: { d: ['M0 -60V60', 'M-24 -60H24', 'M-24 60H24'], e: [0, -8], f: [-18, 18] },
+    J: { d: ['M24 -60V28A28 28 0 0 1 -32 28'], e: [22, -22], f: [-24, 4] },
+    K: { d: ['M-30 -60V60', 'M32 -60L-30 4', 'M-8 -12L34 60'], e: [-8, -34], f: [-30, 26] },
+    L: { d: ['M-28 -60V60H32'], e: [-26, -26], f: [-24, 20] },
+    M: { d: ['M-36 60V-60L0 6L36 -60V60'], e: [0, -30], f: [-34, 34] },
+    N: { d: ['M-32 60V-60L32 60V-60'], e: [0, -26], f: [-30, 30] },
+    O: { d: ['M0 -60A38 60 0 1 0 0 60A38 60 0 1 0 0 -60'], e: [0, -6], f: [-18, 18] },
+    P: { d: ['M-30 60V-60H4A32 32 0 0 1 4 4H-30'], e: [-6, -32], f: [-34, -16] },
+    Q: { d: ['M0 -60A38 60 0 1 0 0 60A38 60 0 1 0 0 -60', 'M10 28L40 62'], e: [0, -6], f: [-16, 18] },
+    R: { d: ['M-30 60V-60H4A32 32 0 0 1 4 4H-30', 'M-4 4L34 60'], e: [-6, -32], f: [-28, 26] },
+    S: { d: ['M30 -40C30 -62 -30 -62 -30 -22C-30 6 30 2 30 26C30 56 -26 58 -32 34'], e: [0, -4], f: [-16, 16] },
+    T: { d: ['M-34 -60H34', 'M0 -60V60'], e: [0, -28], f: [-14, 14] },
+    U: { d: ['M-32 -60V26A32 32 0 0 0 32 26V-60'], e: [0, -22], f: [-30, 30] },
+    V: { d: ['M-36 -60L0 60L36 -60'], e: [0, -38], f: [-10, 10] },
+    W: { d: ['M-40 -60L-22 60L0 -18L22 60L40 -60'], e: [0, -38], f: [-24, 24] },
+    X: { d: ['M-32 -60L32 60', 'M32 -60L-32 60'], e: [0, -30], f: [-30, 30] },
+    Y: { d: ['M-32 -60L0 -2L32 -60', 'M0 -2V60'], e: [0, -38], f: [-14, 14] },
+    Z: { d: ['M-30 -60H32L-30 60H32'], e: [0, -32], f: [-26, 26] }
+  };
+
+  var ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+
+  // Letters that genuinely get muddled at this age. Early rounds keep
+  // these apart; later rounds deliberately put them together, and that
+  // is the whole of the difficulty curve.
+  var CONFUSABLE = [
+    ['E', 'F'], ['M', 'N', 'W'], ['O', 'Q', 'C', 'G', 'D'], ['P', 'R', 'B'],
+    ['U', 'V', 'Y', 'W'], ['I', 'T', 'L', 'J'], ['K', 'X', 'Y'], ['S', 'Z'],
+    ['H', 'N', 'M'], ['C', 'G', 'S'], ['B', 'D'], ['V', 'W'], ['P', 'F']
+  ];
+
+  function confusable(a, b) {
+    for (var i = 0; i < CONFUSABLE.length; i++) {
+      var g = CONFUSABLE[i];
+      if (g.indexOf(a) >= 0 && g.indexOf(b) >= 0) { return true; }
+    }
+    return false;
+  }
+
+  // Spellings tuned so a text-to-speech voice produces the phonics
+  // sound rather than reading the letter out. "C" said as "see" would
+  // teach exactly the wrong thing.
+  var PHONEME = {
+    A: 'ah', B: 'buh', C: 'cuh', D: 'duh', E: 'eh', F: 'fff', G: 'guh',
+    H: 'huh', I: 'ih', J: 'juh', K: 'kuh', L: 'lll', M: 'mmm', N: 'nnn',
+    O: 'oh', P: 'puh', Q: 'kwuh', R: 'rrr', S: 'sss', T: 'tuh', U: 'uh',
+    V: 'vvv', W: 'wuh', X: 'kss', Y: 'yuh', Z: 'zzz'
+  };
+
+  // ------------------------------------------------------------------
+  // Sound.
+  //
+  // Two layers. Every tap gets an instant synthesised noise, so the
+  // game answers the finger before speech has even woken up. On top of
+  // that a voice says the letter — and if speech is missing, blocked or
+  // simply too slow, a pitched chime stands in for it. There is no path
+  // through this code that ends in silence.
+  // ------------------------------------------------------------------
+  var AC = null, master = null;
+
+  function initAudio() {
+    if (AC) {
+      if (AC.state === 'suspended') { AC.resume(); }
+      return;
+    }
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) { return; }
+    AC = new Ctx();
+
+    var comp = AC.createDynamicsCompressor();
+    comp.threshold.setValueAtTime(-18, AC.currentTime);
+    comp.ratio.setValueAtTime(6, AC.currentTime);
+    comp.attack.setValueAtTime(0.004, AC.currentTime);
+    comp.release.setValueAtTime(0.2, AC.currentTime);
+
+    master = AC.createGain();
+    master.gain.setValueAtTime(0.5, AC.currentTime);
+    master.connect(comp);
+    comp.connect(AC.destination);
+
+    if (AC.state === 'suspended') { AC.resume(); }
+  }
+
+  // One note. Sliding from f0 to f1 is what stops these sounding like
+  // a test tone: a rising note reads as a question, a falling one as a
+  // full stop, and toddlers hear that long before they hear pitch.
+  function tone(type, f0, f1, delay, dur, gain) {
+    if (!AC) { return; }
+    var t = AC.currentTime + (delay || 0);
+    var o = AC.createOscillator();
+    var g = AC.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(f0, t);
+    if (f1 && f1 !== f0) { o.frequency.exponentialRampToValueAtTime(f1, t + dur); }
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+
+  function pop() { tone('triangle', 420, 620, 0, 0.11, 0.22); }
+
+  function hop() {
+    tone('sine', 300, 520, 0, 0.13, 0.2);
+    tone('sine', 520, 380, 0.1, 0.16, 0.14);
+  }
+
+  // The stand-in voice: each letter gets its own pitch, so even with no
+  // speech at all the 26 of them stay tellable apart by ear.
+  function chime(letter) {
+    var i = ALPHABET.indexOf(letter);
+    var f = 262 * Math.pow(2, (i % 13) / 13);
+    tone('triangle', f, f, 0, 0.28, 0.28);
+    tone('sine', f * 2, f * 2, 0.02, 0.2, 0.1);
+  }
+
+  function clunk() {
+    tone('sine', 180, 70, 0, 0.16, 0.34);
+    tone('square', 90, 60, 0.02, 0.1, 0.08);
+  }
+
+  function fanfare() {
+    var notes = [523.25, 659.25, 783.99, 1046.5];
+    for (var i = 0; i < notes.length; i++) {
+      tone('triangle', notes[i], notes[i], i * 0.09, 0.34, 0.24);
+    }
+    tone('sine', 1318.5, 1318.5, 0.36, 0.5, 0.14);
+  }
+
+  // ------------------------------------------------------------------
+  // Speech
+  // ------------------------------------------------------------------
+  var synth = window.speechSynthesis || null;
+  var voice = null, voiceTried = false;
+  var speechFails = 0;              // three strikes and we stop waiting on it
+  var voiceMode = 'sound';          // 'sound' = phonics, 'name' = letter names
+
+  function chooseVoice() {
+    if (!synth || !synth.getVoices) { return null; }
+    var vs = synth.getVoices();
+    if (!vs || !vs.length) { return null; }
+    voiceTried = true;
+    var i, v;
+    for (i = 0; i < vs.length; i++) {
+      v = vs[i];
+      if (v.lang === 'en-GB' && /female|hazel|libby|sonia|serena|kate|amelie/i.test(v.name)) { return v; }
+    }
+    for (i = 0; i < vs.length; i++) { if (vs[i].lang === 'en-GB') { return vs[i]; } }
+    for (i = 0; i < vs.length; i++) { if (/^en[-_]/i.test(vs[i].lang)) { return vs[i]; } }
+    return vs[0];
+  }
+
+  if (synth && 'onvoiceschanged' in synth) {
+    synth.onvoiceschanged = function () { voice = chooseVoice(); };
+  }
+
+  // Says the letter, and guarantees a noise either way. If the utterance
+  // has not started within a moment we cancel it and chime instead —
+  // cancelling first, so a late-waking voice can never talk over the
+  // sound that replaced it.
+  function say(letter) {
+    if (!synth || speechFails >= 3) { chime(letter); return; }
+    if (!voice && !voiceTried) { voice = chooseVoice(); }
+
+    var text = voiceMode === 'name' ? letter : PHONEME[letter];
+    var u;
+    try {
+      u = new window.SpeechSynthesisUtterance(text);
+    } catch (err) {
+      speechFails = 3; chime(letter); return;
+    }
+    if (voice) { u.voice = voice; }
+    u.lang = 'en-GB';
+    u.rate = voiceMode === 'name' ? 0.85 : 0.75;
+    u.pitch = 1.15;
+    u.volume = 1;
+
+    var settled = false;
+    var timer = setTimeout(function () {
+      if (settled) { return; }
+      settled = true;
+      speechFails++;
+      try { synth.cancel(); } catch (e) { /* nothing useful to do */ }
+      chime(letter);
+    }, 400);
+
+    u.onstart = function () {
+      if (settled) { return; }
+      settled = true;
+      speechFails = 0;
+      clearTimeout(timer);
+    };
+    u.onerror = function () {
+      if (settled) { return; }
+      settled = true;
+      speechFails++;
+      clearTimeout(timer);
+      chime(letter);
+    };
+
+    try {
+      synth.cancel();
+      synth.speak(u);
+    } catch (err2) {
+      if (!settled) { settled = true; clearTimeout(timer); speechFails++; chime(letter); }
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Layout. One SVG that reflows rather than two designs: the pillar
+  // box takes the short edge — the right in landscape, the bottom in
+  // portrait — and the letters get everything that is left.
+  // ------------------------------------------------------------------
+  var L = null;
+
+  function computeLayout() {
+    var vw = Math.max(1, window.innerWidth), vh = Math.max(1, window.innerHeight);
+    var W = 1000;
+    var H = clamp(Math.round(1000 * vh / vw), 380, 2600);
+    var wide = (vw / vh) >= 1.15;
+
+    // The horizon sits high on purpose. These creatures have feet, so
+    // nearly all of the screen has to be ground for them to walk on —
+    // a letter with legs floating in the sky reads as broken.
+    var box, play, ground;
+    if (wide) {
+      ground = H * 0.26;
+      box = { x: W * 0.855, y: H * 0.90, s: Math.min(H * 0.00175, 0.75) };
+      play = { x0: W * 0.05, x1: W * 0.70, y0: H * 0.34, y1: H * 0.88 };
+    } else {
+      ground = H * 0.17;
+      box = { x: W * 0.71, y: H * 0.955, s: Math.min(W * 0.00062, H * 0.00098) };
+      play = { x0: W * 0.05, x1: W * 0.95, y0: H * 0.24, y1: H * 0.72 };
+    }
+
+    L = {
+      W: W, H: H, wide: wide, ground: ground, box: box, play: play,
+      pile: { x: wide ? W * 0.20 : W * 0.22, y: wide ? H * 0.985 : H * 0.94 }
+    };
+
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    drawScenery();
+    drawBox();
+    drawCorner();
+    layoutActors();
+    drawPile();
+  }
+
+  function drawScenery() {
+    var g = document.getElementById('scenery');
+    clear(g);
+    var W = L.W, H = L.H;
+    g.appendChild(el('rect', { x: 0, y: 0, width: W, height: H, fill: 'url(#sky)' }));
+    g.appendChild(el('rect', { x: 0, y: L.ground, width: W, height: H - L.ground, fill: 'url(#grass)' }));
+    g.appendChild(el('path', {
+      d: 'M0 ' + L.ground + ' Q ' + (W * 0.25) + ' ' + (L.ground - 14) + ' ' + (W * 0.5) + ' ' + L.ground +
+         ' T ' + W + ' ' + L.ground,
+      fill: 'none', stroke: '#a6db85', 'stroke-width': 6, opacity: 0.7
+    }));
+
+    // A couple of hills, purely so the sky is not an empty wall.
+    var hs = L.wide ? [[W * 0.12, 90], [W * 0.34, 60]] : [[W * 0.18, 70], [W * 0.62, 50]];
+    for (var i = 0; i < hs.length; i++) {
+      g.appendChild(el('ellipse', {
+        cx: hs[i][0], cy: L.ground, rx: hs[i][1] * 2.2, ry: hs[i][1],
+        fill: '#7cbb5f', opacity: 0.55
+      }));
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // The pillar box. The target letter sits on its plate in one fixed
+  // neutral colour, never the colour of the creature that matches it —
+  // otherwise she would learn to match colours, which is not the skill.
+  // ------------------------------------------------------------------
+  var boxG = null, plateLetter = null, boxLid = null, boxShake = 0;
+
+  function drawBox() {
+    var g = document.getElementById('box');
+    clear(g);
+    var s = L.box.s;
+    var wrap = el('g', { transform: 'translate(' + L.box.x + ',' + L.box.y + ') scale(' + s + ')' });
+
+    wrap.appendChild(el('ellipse', { cx: 0, cy: 6, rx: 128, ry: 22, fill: '#3f6b34', opacity: 0.32 }));
+    wrap.appendChild(el('rect', { x: -104, y: -22, width: 208, height: 30, rx: 10, fill: '#6b0e1c' }));
+
+    var lid = el('g');
+    lid.appendChild(el('path', {
+      d: 'M-88 -14 L-88 -300 A88 74 0 0 1 88 -300 L88 -14 Z', fill: 'url(#pillar)'
+    }));
+    lid.appendChild(el('path', {
+      d: 'M-88 -300 A88 74 0 0 1 88 -300 L88 -286 L-88 -286 Z', fill: '#a50f26'
+    }));
+    lid.appendChild(el('rect', { x: -96, y: -292, width: 192, height: 18, rx: 9, fill: '#8d0c20' }));
+    lid.appendChild(el('rect', { x: -58, y: -252, width: 116, height: 26, rx: 13, fill: '#2a0509' }));
+    lid.appendChild(el('rect', { x: -58, y: -252, width: 116, height: 8, rx: 4, fill: '#1a0306' }));
+
+    // The plate the target letter lives on.
+    lid.appendChild(el('rect', { x: -72, y: -196, width: 144, height: 150, rx: 16, fill: '#fdfaf3', stroke: '#8d0c20', 'stroke-width': 7 }));
+    plateLetter = el('g', { transform: 'translate(0,-121) scale(0.86)' });
+    lid.appendChild(plateLetter);
+
+    wrap.appendChild(lid);
+    boxLid = lid;
+    g.appendChild(wrap);
+    boxG = wrap;
+    if (target) { paintPlate(); }
+  }
+
+  function paintPlate() {
+    if (!plateLetter) { return; }
+    clear(plateLetter);
+    strokeGlyph(plateLetter, target, '#22303f', 15);
+  }
+
+  function strokeGlyph(parent, letter, colour, width) {
+    var paths = GLYPH[letter].d;
+    for (var i = 0; i < paths.length; i++) {
+      parent.appendChild(el('path', {
+        d: paths[i], fill: 'none', stroke: colour, 'stroke-width': width,
+        'stroke-linecap': 'round', 'stroke-linejoin': 'round'
+      }));
+    }
+  }
+
+  // The long-press corner for the parent controls. Deliberately dull.
+  function drawCorner() {
+    var g = document.getElementById('corner');
+    clear(g);
+    var r = Math.max(26, L.W * 0.032);
+    var c = el('circle', { id: 'cornerdot', cx: L.W - r * 0.9, cy: r * 0.9, r: r, fill: '#ffffff', opacity: 0.18 });
+    g.appendChild(c);
+  }
+
+  // ------------------------------------------------------------------
+  // The letter creatures.
+  //
+  // A creature never mirrors itself to change direction — a flipped
+  // letter is a different letter, or worse, a wrong one. It turns by
+  // looking where it is going and leaning into the walk instead.
+  // ------------------------------------------------------------------
+  var COLOURS = ['#e8663c', '#f0a830', '#4aa3d8', '#7a5cc4', '#3f9e6b', '#d8508f', '#2f7fa8', '#c2472f'];
+  var actors = [];
+
+  function makeCreature(letter, colour) {
+    var g = el('g', { 'class': 'actor' });
+    g.setAttribute('data-letter', letter);
+
+    var body = el('g');
+
+    var legs = el('g');
+    var f = GLYPH[letter].f;
+    var legParts = [];
+    for (var i = 0; i < 2; i++) {
+      var leg = el('g');
+      leg.appendChild(el('line', {
+        x1: f[i], y1: 54, x2: f[i], y2: 88,
+        stroke: colour, 'stroke-width': 11, 'stroke-linecap': 'round'
+      }));
+      leg.appendChild(el('ellipse', { cx: f[i] + (i ? 7 : -7), cy: 90, rx: 15, ry: 8, fill: '#2f3b48' }));
+      legs.appendChild(leg);
+      legParts.push(leg);
+    }
+    body.appendChild(legs);
+
+    strokeGlyph(body, letter, colour, 17);
+
+    // Eyes go on last so they read over the strokes rather than under.
+    var e = GLYPH[letter].e;
+    var eyes = el('g', { transform: 'translate(' + e[0] + ',' + e[1] + ')' });
+    var pupils = [];
+    var lids = [];
+    for (var k = 0; k < 2; k++) {
+      var dx = k ? 17 : -17;
+      eyes.appendChild(el('circle', { cx: dx, cy: 0, r: 15, fill: '#fdfaf3', stroke: '#2f3b48', 'stroke-width': 3 }));
+      var p = el('circle', { cx: dx, cy: 0, r: 7, fill: '#2f3b48' });
+      eyes.appendChild(p);
+      pupils.push(p);
+      var ld = el('rect', { x: dx - 16, y: -17, width: 32, height: 0, rx: 3, fill: colour });
+      eyes.appendChild(ld);
+      lids.push(ld);
+    }
+    body.appendChild(eyes);
+
+    // The shadow belongs to the ground, not to the creature, so it sits
+    // outside the group that bobs and leans.
+    g.appendChild(el('ellipse', { cx: 0, cy: 94, rx: 42, ry: 11, fill: '#3f6b34', opacity: 0.22 }));
+    g.appendChild(body);
+
+    // The tap target: one generous rectangle, sized in a moment by the
+    // layout so neighbouring letters can never steal each other's edge.
+    var hit = el('rect', { 'class': 'hit', x: -60, y: -80, width: 120, height: 180 });
+    g.appendChild(hit);
+
+    return {
+      letter: letter, g: g, body: body, hit: hit,
+      legs: legParts, pupils: pupils, lids: lids, eyeAt: e,
+      x: 0, y: 0, scale: 1, cell: null,
+      tx: 0, ty: 0,          // where it is wandering to
+      vx: 0, phase: rnd(0, 6.3), bob: rnd(0, 6.3),
+      state: 'wander',       // wander | walking | posting | gone
+      pt: 0, pdur: 1, path: null,
+      hopT: 0, pause: 0, pop: 1, popBase: 1, blink: rnd(2, 6)
+    };
+  }
+
+  // ------------------------------------------------------------------
+  // Rounds.
+  //
+  // Two dials, both turned by how she is actually doing and never by a
+  // clock. How many letters are out, and how alike they are. Nothing
+  // here can be lost or failed: the worst case is that the game quietly
+  // gets easier.
+  // ------------------------------------------------------------------
+  var target = null;
+  var posted = [];
+  var wins = 0, missStreak = 0, struggle = 0;
+  var recent = [];
+  var mastery = {};
+  var countOverride = 0;
+  var busy = false;
+
+  function activeCount() {
+    if (countOverride) { return countOverride; }
+    var n = 3;
+    if (wins >= 4) { n = 4; }
+    if (wins >= 9) { n = 5; }
+    if (wins >= 15) { n = 6; }
+    return clamp(n - struggle, 3, 6);
+  }
+
+  function shuffle(a) {
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+
+  // Prefer letters she has had least success with, but never the same
+  // one twice running, and never one of the last four.
+  function pickTarget() {
+    var pool = ALPHABET.filter(function (l) { return recent.indexOf(l) < 0; });
+    if (pool.length < 3) { pool = ALPHABET.slice(); }
+    shuffle(pool);
+    var best = pool[0];
+    for (var i = 1; i < Math.min(4, pool.length); i++) {
+      if ((mastery[pool[i]] || 0) < (mastery[best] || 0)) { best = pool[i]; }
+    }
+    recent.push(best);
+    while (recent.length > 4) { recent.shift(); }
+    return best;
+  }
+
+  function pickLetters(n) {
+    var letters = [target];
+    var pool = shuffle(ALPHABET.filter(function (l) { return l !== target; }));
+    var hard = wins >= 6;
+    var i, l;
+
+    // Once she is finding them, deliberately put a look-alike in play.
+    if (hard) {
+      for (i = 0; i < pool.length; i++) {
+        if (confusable(target, pool[i])) { letters.push(pool[i]); pool.splice(i, 1); break; }
+      }
+    }
+
+    for (i = 0; i < pool.length && letters.length < n; i++) {
+      l = pool[i];
+      if (!hard) {
+        var clash = false;
+        for (var k = 0; k < letters.length; k++) {
+          if (confusable(letters[k], l)) { clash = true; break; }
+        }
+        if (clash) { continue; }
+      }
+      letters.push(l);
+    }
+    // If the no-look-alikes rule left us short, fill up anyway. Having
+    // the right number out matters more than the purity of the rule.
+    for (i = 0; i < pool.length && letters.length < n; i++) {
+      if (letters.indexOf(pool[i]) < 0) { letters.push(pool[i]); }
+    }
+    return shuffle(letters);
+  }
+
+  function newRound(first) {
+    target = pickTarget();
+    var letters = pickLetters(activeCount());
+    var colours = shuffle(COLOURS.slice());
+
+    var g = document.getElementById('actors');
+    clear(g);
+    actors = [];
+    for (var i = 0; i < letters.length; i++) {
+      var a = makeCreature(letters[i], colours[i % colours.length]);
+      actors.push(a);
+      g.appendChild(a.g);
+    }
+
+    missStreak = 0;
+    helpT = 0;
+    busy = false;
+    if (!first) {
+      paintPlate();
+      layoutActors();
+      // Say the new letter once it has settled, so it does not tread on
+      // the fanfare that got us here.
+      setTimeout(function () { say(target); }, 700);
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Placing them. Each creature owns a cell and wanders only inside it,
+  // which is what keeps the tap targets big and stops two letters ever
+  // sitting on top of each other.
+  // ------------------------------------------------------------------
+  function layoutActors() {
+    var n = actors.length;
+    if (!n) { return; }
+    var rows = L.wide ? (n <= 3 ? 1 : 2) : (n <= 4 ? 2 : 3);
+    var cols = Math.ceil(n / rows);
+    var pw = (L.play.x1 - L.play.x0) / cols;
+    var ph = (L.play.y1 - L.play.y0) / rows;
+    var scale = clamp(Math.min(pw / 104, ph / 220), 0.16, 1.35);
+
+    for (var i = 0; i < n; i++) {
+      var a = actors[i];
+      var c = i % cols, r = Math.floor(i / cols);
+      // Back rows stand a little further off, so the field has depth
+      // rather than being a grid of identical stickers. They are also
+      // drawn first, which puts them behind.
+      var depth = rows === 1 ? 1 : 0.84 + 0.16 * (r / (rows - 1));
+      // The last row is centred when it is short, so a row of two under
+      // a row of three does not sit oddly to one side.
+      var inRow = Math.min(cols, n - r * cols);
+      var offset = (cols - inRow) * pw / 2;
+      a.cell = {
+        x0: L.play.x0 + offset + c * pw, x1: L.play.x0 + offset + (c + 1) * pw,
+        y0: L.play.y0 + r * ph, y1: L.play.y0 + (r + 1) * ph
+      };
+      a.scale = scale * depth;
+      a.cx = (a.cell.x0 + a.cell.x1) / 2;
+      a.cy = (a.cell.y0 + a.cell.y1) / 2;
+
+      // How far it may drift from the middle of its cell. A creature is
+      // 40 wide and hangs 105 below its middle, so the room below is
+      // always the tightest of the three.
+      a.ampX = Math.max(0, Math.min(pw * 0.12, pw / 2 - 46 * a.scale));
+      a.ampUp = Math.max(0, Math.min(ph * 0.10, ph / 2 - 64 * a.scale));
+      a.ampDn = Math.max(0, Math.min(ph * 0.10, ph / 2 - 108 * a.scale));
+
+      // The tap target is then whatever is left over: as big as it can
+      // be without ever reaching into the next letter's cell, however
+      // far this one has wandered. Sizing it to the whole cell instead
+      // would let two targets overlap, and she would tap one letter and
+      // get another — the one thing that must never happen.
+      var hw = (pw / 2 - a.ampX - 5) / a.scale;
+      var hh = (ph / 2 - Math.max(a.ampUp, a.ampDn) - 5) / a.scale;
+      a.hit.setAttribute('x', -hw);
+      a.hit.setAttribute('width', hw * 2);
+      a.hit.setAttribute('y', 20 - hh);
+      a.hit.setAttribute('height', hh * 2);
+
+      if (a.state !== 'posting') {
+        a.x = a.cx; a.y = a.cy;
+        wanderTo(a);
+        a.x = a.tx; a.y = a.ty;
+        a.state = 'wander';
+      }
+      paint(a, 0);
+    }
+  }
+
+  // It drifts around the middle of its own cell rather than roaming the
+  // whole field. That is what keeps two letters from ever ending up on
+  // top of each other, and it still reads as pottering about.
+  function wanderTo(a) {
+    a.tx = a.cx + rnd(-a.ampX, a.ampX);
+    a.ty = a.cy + rnd(-a.ampUp, a.ampDn);
+    a.pause = rnd(0.4, 2.2);
+  }
+
+  // ------------------------------------------------------------------
+  // The pile of posted letters. No score anywhere, but a heap that
+  // grows is a record she can see without being able to read.
+  // ------------------------------------------------------------------
+  function drawPile() {
+    var g = document.getElementById('pile');
+    clear(g);
+    var show = posted.slice(-14);
+    var s = (L.wide ? L.H : L.W) * 0.00042;
+    for (var i = 0; i < show.length; i++) {
+      var row = Math.floor(i / 5), col = i % 5;
+      var wob = ((i * 37) % 13) - 6;
+      var gg = el('g', {
+        transform: 'translate(' + (L.pile.x + (col - 2) * 62 * s * 1.6 + wob) + ',' +
+                   (L.pile.y - row * 74 * s * 1.5) + ') scale(' + s + ') rotate(' + wob + ')',
+        opacity: 0.9
+      });
+      strokeGlyph(gg, show[i], '#fdfaf3', 20);
+      g.appendChild(gg);
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Tapping. Every tap is answered, and a wrong one is answered kindly:
+  // the letter says itself, gives a hop, and carries on. The only
+  // difference is that the right one gets to go home.
+  // ------------------------------------------------------------------
+  function tapActor(a) {
+    if (!a || busy || a.state === 'posting' || a.state === 'gone') { return; }
+    pop();
+    if (a.letter === target) {
+      busy = true;
+      mastery[target] = (mastery[target] || 0) + (missStreak ? 1 : 2);
+      wins++;
+      if (missStreak === 0 && struggle > 0) { struggle--; }
+      say(a.letter);
+      startPost(a);
+    } else {
+      missStreak++;
+      if (missStreak >= 3 && struggle < 2) { struggle++; }
+      say(a.letter);
+      if (!reduced) { a.hopT = 0.5; }
+      hop();
+      // Help arrives on its own and never announces itself as help.
+      if (missStreak >= 2) {
+        helpT = 4.5;
+        setTimeout(function () { if (!busy) { say(target); } }, 900);
+      }
+    }
+  }
+
+  function slotPoint() {
+    return { x: L.box.x, y: L.box.y - 239 * L.box.s };
+  }
+
+  function startPost(a) {
+    var slot = slotPoint();
+    var approach = { x: L.box.x - (L.wide ? 150 : 130) * L.box.s, y: L.box.y - 30 * L.box.s };
+    a.state = 'posting';
+    a.pt = 0;
+    a.path = [{ x: a.x, y: a.y }, approach, slot];
+    a.pdur = reduced ? 0.25 : 1.5;
+  }
+
+  function finishPost(a) {
+    a.state = 'gone';
+    a.g.setAttribute('opacity', '0');
+    posted.push(a.letter);
+    drawPile();
+    clunk();
+    if (!reduced) { boxShake = 0.45; }
+    setTimeout(function () { fanfare(); celebrate(); }, 140);
+    setTimeout(function () { newRound(false); }, 1500);
+  }
+
+  function celebrate() {
+    var g = document.getElementById('sparks');
+    clear(g);
+    var slot = slotPoint();
+    var r = (L.wide ? L.H : L.W) * 0.2;
+    var glow = el('circle', { cx: slot.x, cy: slot.y, r: r, fill: 'url(#cheer)', opacity: 0 });
+    g.appendChild(glow);
+    sparkT = 0.9;
+    sparkGlow = glow;
+    sparkBits = [];
+    if (reduced) { glow.setAttribute('opacity', '0.55'); return; }
+    for (var i = 0; i < 10; i++) {
+      var ang = (Math.PI * 2 * i) / 10 + rnd(-0.2, 0.2);
+      var b = el('circle', { cx: slot.x, cy: slot.y, r: rnd(6, 13), fill: i % 2 ? '#ffd84d' : '#fff6cf' });
+      g.appendChild(b);
+      sparkBits.push({ n: b, x: slot.x, y: slot.y, vx: Math.cos(ang) * rnd(90, 210), vy: Math.sin(ang) * rnd(90, 210) - 60 });
+    }
+  }
+
+  var sparkT = 0, sparkGlow = null, sparkBits = [];
+  var helpT = 0;
+
+  // ------------------------------------------------------------------
+  // Animation
+  // ------------------------------------------------------------------
+  function alongPath(path, u) {
+    var seg = [], total = 0, i;
+    for (i = 1; i < path.length; i++) {
+      var d = Math.hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y);
+      seg.push(d); total += d;
+    }
+    total = total || 1;
+    var dist = u * total, k = 0;
+    while (k < seg.length - 1 && dist > seg[k]) { dist -= seg[k]; k++; }
+    var t = seg[k] ? clamp(dist / seg[k], 0, 1) : 1;
+    return {
+      x: path[k].x + (path[k + 1].x - path[k].x) * t,
+      y: path[k].y + (path[k + 1].y - path[k].y) * t
+    };
+  }
+
+  function paint(a, dt) {
+    var bobY = 0, lean = 0, legAng = 0, squash = 1;
+
+    if (!reduced) {
+      var moving = Math.abs(a.vx) > 1 || a.state === 'posting';
+      if (moving) {
+        a.phase += dt * 9;
+        legAng = Math.sin(a.phase) * 22;
+        bobY = -Math.abs(Math.sin(a.phase)) * 4;
+        lean = clamp(a.vx * 0.02, -7, 7);
+      } else {
+        a.bob += dt * 1.9;
+        bobY = Math.sin(a.bob) * 2.4;
+      }
+      if (a.hopT > 0) {
+        a.hopT = Math.max(0, a.hopT - dt);
+        var h = Math.sin((1 - a.hopT / 0.5) * Math.PI);
+        bobY -= h * 34;
+        squash = 1 + h * 0.08;
+      }
+    }
+
+    // The nudge: when she has missed a couple, the right letter grows a
+    // little and settles back, over and over, until it is taken.
+    if (helpT > 0 && a.letter === target && a.state === 'wander') {
+      if (reduced) {
+        squash *= 1.06;
+      } else {
+        squash *= 1 + Math.sin(helpT * 7) * 0.06 + 0.04;
+      }
+    }
+
+    a.g.setAttribute('transform',
+      'translate(' + a.x.toFixed(1) + ',' + a.y.toFixed(1) + ') scale(' + (a.scale * a.pop) + ')');
+    a.body.setAttribute('transform',
+      'translate(0,' + bobY.toFixed(1) + ') rotate(' + lean.toFixed(1) + ') scale(1,' + squash.toFixed(3) + ')');
+
+    var f = GLYPH[a.letter].f;
+    a.legs[0].setAttribute('transform', 'rotate(' + legAng.toFixed(1) + ',' + f[0] + ',54)');
+    a.legs[1].setAttribute('transform', 'rotate(' + (-legAng).toFixed(1) + ',' + f[1] + ',54)');
+
+    // Eyes look where it is going, or at the pillar box when it is not.
+    var lookX, lookY;
+    if (Math.abs(a.vx) > 1) {
+      lookX = clamp(a.vx * 0.02, -1, 1); lookY = 0.2;
+    } else {
+      var slot = slotPoint();
+      var dx = slot.x - a.x, dy = slot.y - a.y;
+      var m = Math.hypot(dx, dy) || 1;
+      lookX = clamp(dx / m, -1, 1); lookY = clamp(dy / m, -1, 1);
+    }
+    for (var i = 0; i < 2; i++) {
+      var base = i ? 17 : -17;
+      a.pupils[i].setAttribute('cx', (base + lookX * 5).toFixed(1));
+      a.pupils[i].setAttribute('cy', (lookY * 5).toFixed(1));
+    }
+
+    a.blink -= dt;
+    var open = a.blink < 0 && a.blink > -0.14;
+    for (var j = 0; j < 2; j++) { a.lids[j].setAttribute('height', open ? 30 : 0); }
+    if (a.blink < -0.2) { a.blink = rnd(2.5, 7); }
+  }
+
+  function updateActor(a, dt) {
+    if (a.state === 'gone') { return; }
+
+    if (a.state === 'posting') {
+      a.pt = Math.min(1, a.pt + dt / a.pdur);
+      var u = a.pt;
+      var p = alongPath(a.path, u);
+      var prevX = a.x;
+      a.x = p.x; a.y = p.y;
+      a.vx = (a.x - prevX) / Math.max(dt, 0.001);
+      // The last stretch is the letter lifting itself into the slot.
+      a.pop = u > 0.72 ? clamp(1 - (u - 0.72) / 0.28, 0.05, 1) * a.popBase : a.popBase;
+      if (u >= 1) { finishPost(a); return; }
+      paint(a, dt);
+      return;
+    }
+
+    if (!reduced) {
+      var dx = a.tx - a.x, dy = a.ty - a.y;
+      var dist = Math.hypot(dx, dy);
+      if (dist < 4) {
+        a.vx = 0;
+        a.pause -= dt;
+        if (a.pause <= 0) { wanderTo(a); }
+      } else {
+        var sp = 42 * a.scale + 22;
+        var step = Math.min(dist, sp * dt);
+        a.x += (dx / dist) * step;
+        a.y += (dy / dist) * step;
+        a.vx = (dx / dist) * sp;
+      }
+    } else {
+      a.vx = 0;
+    }
+    paint(a, dt);
+  }
+
+  var lastFrame = 0;
+  function frame(now) {
+    var dt = lastFrame ? Math.min(0.05, (now - lastFrame) / 1000) : 0.016;
+    lastFrame = now;
+
+    for (var i = 0; i < actors.length; i++) { updateActor(actors[i], dt); }
+
+    if (helpT > 0) { helpT = Math.max(0, helpT - dt); }
+
+    if (boxShake > 0 && boxG) {
+      boxShake = Math.max(0, boxShake - dt);
+      var k = Math.sin(boxShake * 46) * boxShake * 7;
+      boxLid.setAttribute('transform', 'translate(0,' + k.toFixed(2) + ')');
+    }
+
+    if (sparkT > 0) {
+      sparkT = Math.max(0, sparkT - dt);
+      var u = 1 - sparkT / 0.9;
+      if (sparkGlow) { sparkGlow.setAttribute('opacity', (Math.sin(u * Math.PI) * 0.85).toFixed(3)); }
+      for (var s = 0; s < sparkBits.length; s++) {
+        var b = sparkBits[s];
+        b.vy += 420 * dt;
+        b.x += b.vx * dt; b.y += b.vy * dt;
+        b.n.setAttribute('cx', b.x.toFixed(1));
+        b.n.setAttribute('cy', b.y.toFixed(1));
+        b.n.setAttribute('opacity', (1 - u).toFixed(3));
+      }
+      if (sparkT === 0) { clear(document.getElementById('sparks')); sparkGlow = null; sparkBits = []; }
+    }
+
+    requestAnimationFrame(frame);
+  }
+
+  // ------------------------------------------------------------------
+  // Input
+  // ------------------------------------------------------------------
+  var pressTimer = 0;
+  var greeted = false;
+
+  svg.addEventListener('pointerdown', function (ev) {
+    initAudio();
+    var t = ev.target;
+    if (!t || !t.closest) { return; }
+
+    if (t.id === 'cornerdot') {
+      clearTimeout(pressTimer);
+      pressTimer = setTimeout(openParent, 850);
+      return;
+    }
+
+    // Tapping the pillar box asks it to say its letter again. This is
+    // also what makes the game speak at all on a phone, where nothing
+    // is allowed to make a sound until she has touched the screen once.
+    if (t.closest('#box')) {
+      greeted = true;
+      pop();
+      say(target);
+      return;
+    }
+
+    var node = t.closest('.actor');
+    if (!node) {
+      if (!greeted) { greeted = true; say(target); }
+      return;
+    }
+    greeted = true;
+    for (var i = 0; i < actors.length; i++) {
+      if (actors[i].g === node) { tapActor(actors[i]); return; }
+    }
+  });
+
+  function endPress() { clearTimeout(pressTimer); }
+  svg.addEventListener('pointerup', endPress);
+  svg.addEventListener('pointercancel', endPress);
+  svg.addEventListener('pointerleave', endPress);
+  svg.addEventListener('contextmenu', function (ev) { ev.preventDefault(); });
+
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden && AC && AC.state === 'suspended') { AC.resume(); }
+  });
+
+  var resizeTimer = 0;
+  window.addEventListener('resize', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(computeLayout, 120);
+  });
+  window.addEventListener('orientationchange', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(computeLayout, 220);
+  });
+
+  // ------------------------------------------------------------------
+  // Parent controls. Her progress deliberately starts fresh every time,
+  // but these two settings are remembered — nobody wants to set them
+  // again on every launch.
+  // ------------------------------------------------------------------
+  var parentEl = document.getElementById('parent');
+
+  function loadPrefs() {
+    try {
+      var raw = window.localStorage.getItem('post-a-letter');
+      if (!raw) { return; }
+      var p = JSON.parse(raw);
+      if (p.voiceMode === 'name' || p.voiceMode === 'sound') { voiceMode = p.voiceMode; }
+      if (typeof p.countOverride === 'number') { countOverride = clamp(p.countOverride | 0, 0, 6); }
+    } catch (e) { /* a fresh start is a perfectly good fallback */ }
+  }
+
+  function savePrefs() {
+    try {
+      window.localStorage.setItem('post-a-letter',
+        JSON.stringify({ voiceMode: voiceMode, countOverride: countOverride }));
+    } catch (e) { /* private browsing, and it does not matter */ }
+  }
+
+  function syncPanel() {
+    var vb = document.querySelectorAll('#segVoice button'), i;
+    for (i = 0; i < vb.length; i++) {
+      vb[i].setAttribute('aria-pressed', vb[i].getAttribute('data-v') === voiceMode ? 'true' : 'false');
+    }
+    var cb = document.querySelectorAll('#segCount button');
+    for (i = 0; i < cb.length; i++) {
+      cb[i].setAttribute('aria-pressed', (+cb[i].getAttribute('data-c')) === countOverride ? 'true' : 'false');
+    }
+  }
+
+  function openParent() { syncPanel(); parentEl.classList.add('open'); }
+  function closeParent() { parentEl.classList.remove('open'); }
+
+  document.getElementById('segVoice').addEventListener('click', function (ev) {
+    var b = ev.target.closest('button');
+    if (!b) { return; }
+    voiceMode = b.getAttribute('data-v');
+    savePrefs(); syncPanel();
+    say(target);
+  });
+
+  document.getElementById('segCount').addEventListener('click', function (ev) {
+    var b = ev.target.closest('button');
+    if (!b) { return; }
+    countOverride = +b.getAttribute('data-c');
+    savePrefs(); syncPanel();
+    newRound(false);
+  });
+
+  document.getElementById('clear').addEventListener('click', function () {
+    posted = [];
+    drawPile();
+  });
+
+  document.getElementById('close').addEventListener('click', closeParent);
+  parentEl.addEventListener('click', function (ev) {
+    if (ev.target === parentEl) { closeParent(); }
+  });
+
+  // ------------------------------------------------------------------
+  loadPrefs();
+  newRound(true);
+  computeLayout();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
