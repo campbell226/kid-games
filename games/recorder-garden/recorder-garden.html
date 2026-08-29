@@ -730,16 +730,37 @@
     }
   }
 
+  // Where the finished ones stand: a bed that spreads out from the spot
+  // the flower was actually grown in, rather than anywhere on the hill.
+  // She has to be able to see that the one she just made is still there.
+  // The bud keeps the middle; the finished ones fill in around and below
+  // it, never back up the slope where the friend is standing.
+  var PLOT = [
+    [-44, 12], [44, 14], [-18, 34], [18, 36], [-56, 44],
+    [56, 46], [0, 58], [-38, 68], [38, 70], [0, 84]
+  ];
+
   function drawGarden() {
-    var g = G('garden'), s = '', i, f, lvl, top, bot, y, x, r;
+    var g = G('garden'), s = '', i, f, lvl, top, bot, y, x, r, sc, pl;
     for (i = 0; i < save.garden.length; i++) {
       f = save.garden[i];
       lvl = clamp(f.i | 0, 0, 2);
-      top = L.gy[lvl] + 14;
-      bot = (lvl < 2 ? L.gy[lvl + 1] : L.H) - 10;
-      y = top + Math.max(0, bot - top) * f.v;
-      x = 40 + (L.W - 80) * f.u;
-      r = (6 + 7 * f.v) * clamp(L.scale, 0.55, 1.35);
+      sc = clamp(L.scale * 0.85, 0.3, 1.25);
+      if (typeof f.k === 'number') {
+        pl = PLOT[f.k % PLOT.length];
+        x = L.flowerX[lvl] + pl[0] * sc;
+        y = L.gy[lvl] + 10 + pl[1] * sc;
+        r = 28 * sc;
+      } else {
+        // Flowers from before the beds existed. Left where they fell.
+        top = L.gy[lvl] + 14;
+        bot = (lvl < 2 ? L.gy[lvl + 1] : L.H) - 10;
+        y = top + Math.max(0, bot - top) * (f.v || 0.5);
+        x = 40 + (L.W - 80) * (f.u || 0.5);
+        r = (6 + 7 * (f.v || 0.5)) * clamp(L.scale, 0.55, 1.35);
+      }
+      x = clamp(x, 26, L.W - 26);
+      y = clamp(y, L.gy[lvl] + 6, L.H - 8);
       s += pickedFlower(x, y, r, SPECS[lvl].petal);
     }
     g.innerHTML = s;
@@ -769,7 +790,7 @@
         stem: flower.querySelector('.stem'),
         leaves: flower.querySelector('.leaves'),
         head: flower.querySelector('.head'),
-        growth: 0, sing: 0, excite: 0, shy: 0, hop: 0, pulse: 0,
+        growth: 0, sing: 0, excite: 0, shy: 0, hop: 0, pulse: 0, celebrate: 0,
         singUntil: 0, gigUntil: 0, done: save.done[i] || 0,
         present: i < unlocked(), arriving: false, arriveT: 0,
         bob: Math.random() * 6.28
@@ -849,7 +870,9 @@
     var bend = reduced ? 0 : 9 * Math.sin(f.bob * 0.6);
     f.stem.setAttribute('d', 'M 0 0 Q ' + bend + ' ' + (-h * 0.5) + ' 0 ' + (-h));
     f.leaves.setAttribute('transform', 'translate(0,' + (-h * 0.42) + ') scale(' + (0.4 + 0.6 * f.growth) + ')');
-    f.head.setAttribute('transform', 'translate(0,' + (-h) + ') scale(' + (0.34 + 0.66 * f.growth) + ')');
+    var k = 0.34 + 0.66 * f.growth;
+    if (f.celebrate > 0 && !reduced) { k *= 1 + 0.13 * Math.sin((1.5 - f.celebrate) * 11); }
+    f.head.setAttribute('transform', 'translate(0,' + (-h) + ') scale(' + k + ')');
   }
 
   // ------------------------------------------------------------------
@@ -972,23 +995,33 @@
         arriveSound();
         ask.idx = i;
         ask.next = clock + 3.2;
+        drawHills();
         drawHits();
       }
     }
   }
 
-  function complete(f) {
+  // A full flower stands there and is admired before it is planted. It
+  // used to blink out the instant it filled, which read as losing it.
+  function finish(f) {
+    f.growth = 1;
+    f.celebrate = 1.5;
+    f.excite = 1;
+    sparkleSound();
+    burst(L.flowerX[f.i], L.gy[f.i] - 150 * clamp(L.scale * 0.85, 0.3, 1.25),
+      f.spec.petal, reduced ? 0 : 18, 250);
+    ask.next = clock + 4;
+  }
+
+  function plant(f) {
+    f.celebrate = 0;
     f.growth = 0;
+    save.garden.push({ i: f.i, k: f.done });
     f.done++;
     save.done[f.i] = f.done;
     save.flowers++;
-    save.garden.push({ i: f.i, u: Math.random(), v: rnd(0.12, 0.92) });
-    if (save.garden.length > 60) { save.garden.shift(); }
+    if (save.garden.length > 90) { save.garden.shift(); }
     persist();
-    sparkleSound();
-    f.excite = 1;
-    burst(L.flowerX[f.i], L.gy[f.i] - 150 * clamp(L.scale * 0.85, 0.3, 1.25),
-      f.spec.petal, reduced ? 0 : 18, 250);
     drawGarden();
     unlockCheck();
     pickAsk();
@@ -1026,19 +1059,25 @@
     f.sing += (open - f.sing) * clamp(dt * 12, 0, 1);
 
     f.excite += ((mine ? 1 : 0) - f.excite) * clamp(dt * 5, 0, 1);
-    f.hop = (mine && !reduced) ? Math.abs(Math.sin(clock * 5.5)) * 9 * L.scale : f.hop * 0.9;
+    f.hop = ((mine || f.celebrate > 0) && !reduced)
+      ? Math.abs(Math.sin(clock * 5.5)) * 9 * L.scale : f.hop * 0.9;
 
     // Blowing too hard covers everyone's ears. It costs her nothing.
     var wantShy = (micMine && hold.shrill) ? 1 : 0;
     f.shy += (wantShy - f.shy) * clamp(dt * 9, 0, 1);
     if (wantShy && clock > f.gigUntil) { f.gigUntil = clock + 2.4; giggle(); }
 
-    if (micMine && !hold.shrill) {
-      f.growth = clamp(f.growth + growthRate() * dt, 0, 1);
-    } else if (tapMine) {
-      f.growth = clamp(f.growth + dt / 5.5, 0, 1);
+    if (f.celebrate > 0) {
+      f.celebrate -= dt;
+      if (f.celebrate <= 0) { plant(f); }
+    } else {
+      if (micMine && !hold.shrill) {
+        f.growth = clamp(f.growth + growthRate() * dt, 0, 1);
+      } else if (tapMine) {
+        f.growth = clamp(f.growth + dt / 5.5, 0, 1);
+      }
+      if (f.growth >= 1) { finish(f); }
     }
-    if (f.growth >= 1) { complete(f); }
 
     var dx = 0, dy = 0;
     if (lookAt >= 0 && lookAt !== f.i) {
