@@ -47,9 +47,11 @@ won't play a sound no finger asked for and the game has to speak on its
 own between rounds; and any clip that won't load or play falls through
 to the synthesised chime.
 
-The masters are in `games/post-a-letter/audio assets/`. Trimming and
-loudness-matching them was a one-off ffmpeg pass, not a build step —
-there is still nothing to run to open a game.
+The mp3s are the only copies kept. Tidying the raw recordings — trim,
+mono, loudness-match — was a one-off ffmpeg pass, not a build step, and
+there is still nothing to run to open a game. If a clip ever needs
+redoing, the original recordings are recoverable from the repo's history
+(commit e57d1f1).
 
 ## Hosting
 
