@@ -146,7 +146,7 @@
   // ------------------------------------------------------------------
   var GLYPH = {
     A: { d: ['M-40 60L0 -60L40 60', 'M-21 12H21'], e: [0, 30], f: [-28, 28] },
-    B: { d: ['M-32 -60V60', 'M-32 -60H6A30 30 0 0 1 6 0H-32', 'M-32 0H12A30 30 0 0 1 12 60H-32'], e: [4, -32], f: [-30, 10] },
+    B: { d: ['M-32 -60V60', 'M-32 -60H6A30 30 0 0 1 6 0H-32', 'M-32 0H12A30 30 0 0 1 12 60H-32'], e: [-30, -34], f: [-30, 10] },
     C: { d: ['M32 -40A38 55 0 1 0 32 40'], e: [2, -4], f: [-10, 22] },
     D: { d: ['M-30 -60V60', 'M-30 -60H0A38 60 0 0 1 0 60H-30'], e: [4, -4], f: [-24, 12] },
     E: { d: ['M32 -60H-30V60H32', 'M-30 0H20'], e: [0, -32], f: [-24, 14] },
@@ -157,7 +157,7 @@
     J: { d: ['M24 -60V28A28 28 0 0 1 -32 28'], e: [22, -22], f: [-24, 4] },
     K: { d: ['M-30 -60V60', 'M32 -60L-30 4', 'M-8 -12L34 60'], e: [-8, -34], f: [-30, 26] },
     L: { d: ['M-28 -60V60H32'], e: [-26, -26], f: [-24, 20] },
-    M: { d: ['M-36 60V-60L0 6L36 -60V60'], e: [0, -30], f: [-34, 34] },
+    M: { d: ['M-36 60V-60L0 6L36 -60V60'], e: [0, 28], f: [-34, 34] },
     N: { d: ['M-32 60V-60L32 60V-60'], e: [0, -26], f: [-30, 30] },
     O: { d: ['M0 -60A38 60 0 1 0 0 60A38 60 0 1 0 0 -60'], e: [0, -6], f: [-18, 18] },
     P: { d: ['M-30 60V-60H4A32 32 0 0 1 4 4H-30'], e: [-6, -32], f: [-34, -16] },
@@ -169,7 +169,7 @@
     V: { d: ['M-36 -60L0 60L36 -60'], e: [0, -38], f: [-10, 10] },
     W: { d: ['M-40 -60L-22 60L0 -18L22 60L40 -60'], e: [0, -38], f: [-24, 24] },
     X: { d: ['M-32 -60L32 60', 'M32 -60L-32 60'], e: [0, -30], f: [-30, 30] },
-    Y: { d: ['M-32 -60L0 -2L32 -60', 'M0 -2V60'], e: [0, -38], f: [-14, 14] },
+    Y: { d: ['M-32 -60L0 -2L32 -60', 'M0 -2V60'], e: [0, 16], f: [-14, 14] },
     Z: { d: ['M-30 -60H32L-30 60H32'], e: [0, -32], f: [-26, 26] }
   };
 
@@ -474,6 +474,13 @@
   // looking where it is going and leaning into the walk instead.
   // ------------------------------------------------------------------
   var COLOURS = ['#e8663c', '#f0a830', '#4aa3d8', '#7a5cc4', '#3f9e6b', '#d8508f', '#2f7fa8', '#c2472f'];
+
+  // The colour marks the letter and nothing else. Legs, feet and the
+  // eyes are all one neutral slate, because a leg drawn in the letter's
+  // own colour reads as another stroke of the letter — an L with two
+  // more strokes hanging off the bottom is not an L any more.
+  var LIMB = '#43515f';
+  var BOOT = '#2f3b48';
   var actors = [];
 
   function makeCreature(letter, colour) {
@@ -489,9 +496,9 @@
       var leg = el('g');
       leg.appendChild(el('line', {
         x1: f[i], y1: 54, x2: f[i], y2: 88,
-        stroke: colour, 'stroke-width': 11, 'stroke-linecap': 'round'
+        stroke: LIMB, 'stroke-width': 11, 'stroke-linecap': 'round'
       }));
-      leg.appendChild(el('ellipse', { cx: f[i] + (i ? 7 : -7), cy: 90, rx: 15, ry: 8, fill: '#2f3b48' }));
+      leg.appendChild(el('ellipse', { cx: f[i] + (i ? 7 : -7), cy: 90, rx: 15, ry: 8, fill: BOOT }));
       legs.appendChild(leg);
       legParts.push(leg);
     }
@@ -506,11 +513,11 @@
     var lids = [];
     for (var k = 0; k < 2; k++) {
       var dx = k ? 17 : -17;
-      eyes.appendChild(el('circle', { cx: dx, cy: 0, r: 15, fill: '#fdfaf3', stroke: '#2f3b48', 'stroke-width': 3 }));
-      var p = el('circle', { cx: dx, cy: 0, r: 7, fill: '#2f3b48' });
+      eyes.appendChild(el('circle', { cx: dx, cy: 0, r: 15, fill: '#fdfaf3', stroke: BOOT, 'stroke-width': 3 }));
+      var p = el('circle', { cx: dx, cy: 0, r: 7, fill: BOOT });
       eyes.appendChild(p);
       pupils.push(p);
-      var ld = el('rect', { x: dx - 16, y: -17, width: 32, height: 0, rx: 3, fill: colour });
+      var ld = el('rect', { x: dx - 16, y: -17, width: 32, height: 0, rx: 3, fill: LIMB });
       eyes.appendChild(ld);
       lids.push(ld);
     }
