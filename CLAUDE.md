@@ -55,10 +55,14 @@ redoing, the original recordings are recoverable from the repo's history
 
 ## Hosting
 
-The goal is GitHub Pages: free, one URL, works on every device, easy to send
-to family and friends, updates whenever we push. I've never used GitHub —
-walk me through creating the account and the first push in plain terms, one
-step at a time, when I'm ready for it.
+Live on GitHub Pages from `campbell226/kid-games`, served straight off
+`main`, so a push is a release. Each game sits at
+`https://campbell226.github.io/kid-games/games/<name>/<name>.html`.
+
+That URL is not a convenience. A browser refuses the microphone and camera
+to any page that is not on https, so a game with ears does nothing at all
+opened off the disk — Recorder Garden is the first of those. Anything built
+on a permission like that needs a fallback that still works without it.
 
 ## Working method
 
