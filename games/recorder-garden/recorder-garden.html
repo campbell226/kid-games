@@ -1027,10 +1027,13 @@
     // list rather than by a fixed row number, so a sixth note later is one
     // more line in the table and nothing else.
     var SPREAD = {
+      // Landscape uses the whole hill top to bottom: the top terrace is
+      // held clear of the buttons by the band below, so leaving a margin
+      // here as well only costs height the terraces badly need.
       wide: {
-        3: { y: [0.315, 0.605, 0.895], x: [0.765, 0.505, 0.245] },
-        4: { y: [0.26, 0.485, 0.71, 0.935], x: [0.80, 0.585, 0.365, 0.16] },
-        5: { y: [0.215, 0.395, 0.575, 0.755, 0.935], x: [0.82, 0.655, 0.49, 0.325, 0.16] }
+        3: { y: [0.16, 0.56, 0.96], x: [0.72, 0.28, 0.72] },
+        4: { y: [0.16, 0.427, 0.693, 0.96], x: [0.72, 0.28, 0.72, 0.28] },
+        5: { y: [0.16, 0.36, 0.56, 0.76, 0.96], x: [0.72, 0.28, 0.72, 0.28, 0.72] }
       },
       tall: {
         3: { y: [0.40, 0.645, 0.885], x: [0.655, 0.315, 0.645] },
@@ -1055,7 +1058,8 @@
     // fast forward button, and a fixed margin would have cost portrait
     // height it does not need to give up. Four passes settle it.
     var band = uiSizeFor(W, 1000 / vw) + 24;
-    var hillTop = 0, slotY, slotX, rowH, scale, signScale, pass, want;
+    var hillTop = 0, slotY, slotX, rowH, colH, scale, signScale, pass, want;
+    var outer, room, squash;
     for (pass = 0; pass < 4; pass++) {
       slotY = []; slotX = [];
       for (k = 0; k < table.y.length; k++) {
@@ -1065,10 +1069,25 @@
       rowH = slots > 1
         ? (floor - hillTop) * (table.y[slots - 1] - table.y[0]) / (slots - 1)
         : (floor - hillTop) * 0.3;
-      scale = clamp(Math.min(W * 0.30 / 200, (rowH - 16) / tallest), 0.17, 1.5);
+      // The friends climb left, right, left, so the one standing directly
+      // above another is two rows up. That doubled gap is what they have to
+      // fit inside, and on a short landscape screen - five terraces and a
+      // tune strip on a phone held sideways - it is the difference between
+      // an animal you can read and a speck smaller than its own signpost.
+      colH = rowH * (wide ? 2 : 1);
+      scale = clamp(Math.min(W * 0.30 / 200, (colH - 16) / tallest), 0.14, 1.5);
       signScale = wide
-        ? clamp(Math.min((W * 0.26) / 430, (rowH * 0.62) / 180), 0.16, 0.8)
-        : clamp(Math.min((W * 0.19) / 170, (rowH * 0.92) / 514), 0.14, 1.0);
+        ? clamp(Math.min((W * 0.26) / 430, (colH * 0.62) / 180), 0.14, 0.8)
+        : clamp(Math.min((W * 0.19) / 170, (colH * 0.92) / 514), 0.14, 1.0);
+      // A friend and its signpost stand side by side on their own half of
+      // the screen, and both have to fit between the middle and the edge.
+      outer = 88 * scale + (wide ? 452 : 212) * signScale + 16;
+      room = W * (1 - table.x[0]) - 20;
+      if (outer > room) {
+        squash = room / outer;
+        scale *= squash;
+        signScale *= squash;
+      }
       // It is the signpost, not the friend, that has to clear the buttons:
       // it stands higher to begin with, and swells by a fifth again while
       // its friend is listening.
@@ -1077,7 +1096,17 @@
         slotY[0] + 6 - (wide ? 230 : 530) * signScale * 1.22
       );
       if (want <= 0) { break; }
-      hillTop = Math.min(hillTop + want, floor * 0.45);
+      hillTop = Math.min(hillTop + want, floor * 0.55);
+    }
+
+    // The hill can only start so low before there is no garden left. When
+    // it runs out of room, the friends give up the height instead, so
+    // nothing ever ends up standing behind a button.
+    var head = slotY[0] - band;
+    var need = Math.max(topTop * scale, (wide ? 230 : 530) * signScale * 1.22 - 6);
+    if (need > head && head > 0) {
+      scale *= head / need;
+      signScale *= head / need;
     }
 
     // Indexed by friend, not by row, so saved gardens and every existing
@@ -1097,16 +1126,12 @@
     half = (wide ? 226 : 106) * signScale;
     off = 88 * scale + half + 16;
     for (i = 0; i < SPECS.length; i++) {
-      // Portrait puts the signpost on the outer side of its friend. Pushed
-      // toward the middle instead, all five of them line up in a column
-      // down the centre of the screen, each one nearer the next sign than
-      // the friend it belongs to. Landscape keeps them inboard, where the
-      // columns march across and the outer side is the screen edge.
-      sd = wide ? (xs[i] > W * 0.5 ? -1 : 1) : (xs[i] > W * 0.5 ? 1 : -1);
-      // Except the highest one, whose signpost stands taller than anything
-      // else and would otherwise reach up into the corner controls. That
-      // one turns inward, where the top of the screen is empty.
-      if (SPECS[i].row === rows[0]) { sd = xs[i] > W * 0.5 ? -1 : 1; }
+      // The signpost stands on the outer side of its friend. Pushed toward
+      // the middle instead, they queue down the centre of the screen, each
+      // one nearer the next sign than the animal it belongs to. Out here
+      // each sign has only its own friend beside it, and the flowers get
+      // the middle.
+      sd = xs[i] > W * 0.5 ? 1 : -1;
       side.push(sd);
       signX.push(clamp(xs[i] + sd * off, half + 10, W - half - 10));
       flowerX.push(xs[i] - sd * (100 * scale + 44 * scale));
