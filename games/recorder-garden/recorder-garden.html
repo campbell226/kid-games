@@ -1060,7 +1060,16 @@
       xs.push(slotX[k]);
     }
     var strip = songs ? { y: stripTop, h: stripH } : null;
-    var scale = clamp(Math.min(W * 0.30 / 200, rowH / 230), 0.26, 1.5);
+    // A friend has to fit inside its own row. Sized at rowH/230 it did
+    // not: the rabbit is 240 tall, so it always stood a little higher
+    // than one row gap and its ears ended up inside the signpost of
+    // whoever was above. Portrait never showed it because the size hits
+    // its ceiling first there; landscape shows it every time.
+    var tallest = 0, tk;
+    for (tk = 0; tk < SPECS.length; tk++) {
+      if (SPECS[tk].top > tallest) { tallest = SPECS[tk].top; }
+    }
+    var scale = clamp(Math.min(W * 0.30 / 200, (rowH - 18) / tallest), 0.2, 1.5);
     var signScale = wide
       ? clamp(Math.min((W * 0.26) / 430, (rowH * 0.62) / 180), 0.16, 0.8)
       : clamp(Math.min((W * 0.19) / 170, (rowH * 0.92) / 514), 0.14, 1.0);
