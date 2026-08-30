@@ -1114,7 +1114,10 @@
   function drawTuneStrip() {
     var g = G('tunes');
     beeNode = null;
-    if (!L.strip || !tunesOn()) { clear(g); return; }
+    if (!L.strip || !tunesOn()) {
+      // Nothing left pointing at nodes that are no longer there.
+      clear(g); tune.discs = []; tune.lit = []; return;
+    }
 
     var notes = TUNES[tune.idx].notes, n = notes.length;
     var beats = tuneBeats(tune.idx);
@@ -1138,6 +1141,7 @@
       + '<rect x="' + (left - 18) + '" y="' + (s.y - 10) + '" width="' + (right - left + 36)
       + '" height="' + (s.h + 20) + '" rx="' + (s.h * 0.3) + '" fill="#ffffff" opacity="0.34"/>';
     var i, fi, cx, cy, done, cur, discs = [];
+    tune.lit = [];
     for (k = 0; k < rows.length; k++) {
       sp = specByRow(rows[k]);
       html += '<path d="M ' + left + ' ' + lineY[rows[k]] + ' H ' + right + '" stroke="' + sp.petal
@@ -1145,34 +1149,31 @@
     }
     html += '</g>';
 
-    var acc = 0;
+    // One shape per note, as long as the note lasts. A blob with a line
+    // after it says "and then a line"; a single long pill says hold on.
+    var acc = 0, x0, w, gap = Math.min(r * 0.4, unit * 0.14);
     for (i = 0; i < n; i++) {
       fi = noteIndex(notes[i]);
-      cx = left + (acc + beats[i] * 0.5) * unit;
-      acc += beats[i];
       cy = lineY[SPECS[fi].row];
+      x0 = left + acc * unit + gap;
+      w = Math.max(r * 1.7, beats[i] * unit - gap * 2);
+      acc += beats[i];
+      cx = x0 + r;
       done = i < tune.pos;
       cur = (i === tune.pos);
-      html += '<g>';
-      discs.push({ x: cx, y: cy - r * 2.6 });
+      html += '<g data-note="' + i + '">';
+      discs.push({ x: cx, y: cy - r * 2.6, cx: x0 + w / 2, cy: cy });
+      html += '<rect class="flash" x="' + (x0 - r * 0.55) + '" y="' + (cy - r * 1.55)
+        + '" width="' + (w + r * 1.1) + '" height="' + (r * 3.1) + '" rx="' + (r * 1.55)
+        + '" fill="#ffe37a" opacity="0"/>';
       if (cur) {
         html += '<circle cx="' + cx + '" cy="' + cy + '" r="' + (r * 2) + '" fill="url(#glowg)"/>';
         bee.tx = cx;
         bee.ty = cy - r * 2.6;
       }
-      // A note worth more than one count trails a bar behind it, so the
-      // long ones look long.
-      if (beats[i] > 1) {
-        html += '<rect x="' + (cx - r * 0.2) + '" y="' + (cy - r * 0.34) + '" width="'
-          + ((beats[i] - 1) * unit + r * 0.6) + '" height="' + (r * 0.68) + '" rx="' + (r * 0.34)
-          + '" fill="' + SPECS[fi].petal + '" opacity="' + (done ? 0.85 : 0.4) + '"/>';
-      }
-      html += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="'
-        + (done ? SPECS[fi].petal : '#fffdf6') + '" stroke="' + SPECS[fi].petal
-        + '" stroke-width="' + (r * 0.32) + '"/>';
-      if (done) {
-        html += '<circle cx="' + cx + '" cy="' + cy + '" r="' + (r * 0.3) + '" fill="#ffffff" opacity="0.9"/>';
-      }
+      html += '<rect x="' + x0 + '" y="' + (cy - r) + '" width="' + w + '" height="' + (r * 2)
+        + '" rx="' + r + '" fill="' + (done ? SPECS[fi].petal : '#fffdf6') + '" stroke="'
+        + SPECS[fi].petal + '" stroke-width="' + (r * 0.32) + '"/>';
       html += '</g>';
     }
     if (tune.pos >= n) { bee.tx = right; bee.ty = lineY[rows[rows.length >> 1]] - r * 2.6; }
@@ -1181,9 +1182,29 @@
     html += '<rect class="hit" x="' + (left - 18) + '" y="' + (s.y - 10) + '" width="'
       + (right - left + 36) + '" height="' + (s.h + 20) + '" data-ui="tune"/>';
     g.innerHTML = html;
+    for (i = 0; i < discs.length; i++) {
+      discs[i].node = g.querySelector('[data-note="' + i + '"]');
+      discs[i].flash = discs[i].node ? discs[i].node.querySelector('.flash') : null;
+    }
     beeNode = g.querySelector('#beeg');
     if (!bee.set) { bee.x = bee.tx; bee.y = bee.ty; bee.set = true; }
     placeBee();
+  }
+
+  function litUpStrip() {
+    var i, d, lit;
+    for (i = 0; i < tune.discs.length; i++) {
+      d = tune.discs[i];
+      if (!d.node) { continue; }
+      lit = tune.lit[i] ? clamp((tune.lit[i] - clock) / 0.22, 0, 1) : 0;
+      if (!lit && !d.wasLit) { continue; }
+      d.wasLit = lit;
+      if (d.flash) { d.flash.setAttribute('opacity', (lit * 0.95).toFixed(3)); }
+      d.node.setAttribute('transform', lit
+        ? 'translate(' + d.cx + ',' + d.cy + ') scale(' + (1 + 0.22 * lit).toFixed(3)
+          + ') translate(' + (-d.cx) + ',' + (-d.cy) + ')'
+        : '');
+    }
   }
 
   function placeBee() {
@@ -1442,7 +1463,6 @@
     bee.set = false;
     persist();
     ask.idx = 0;
-    ask.next = clock + 1.8;
     [12, 9, 7, 4, 0].forEach(function (s, k) {
       bell(0.02 + k * 0.06, 523.25 * Math.pow(2, s / 12), 0.2, 0.4);
     });
@@ -1597,7 +1617,7 @@
   // and if she answers a different one instead, that friend answers her
   // just as gladly. The asking only ever points at something.
   // ------------------------------------------------------------------
-  var ask = { idx: 0, next: 2.5 };
+  var ask = { idx: 0 };
   var clock = 0, lookAt = -1, touchHold = -1, firstTouch = false;
 
   function sing(f, dur) {
@@ -1618,7 +1638,6 @@
       if (sc < bestScore) { bestScore = sc; best = i; }
     }
     ask.idx = best;
-    ask.next = clock + 1.8;
   }
 
   // ------------------------------------------------------------------
@@ -1629,7 +1648,7 @@
   // before - the friend answers, the flower grows - while the song moves
   // along underneath whenever the note happens to be the next one.
   // ------------------------------------------------------------------
-  var tune = { idx: 0, pos: 0, playing: false, advance: true, nextAt: 0, discs: [] };
+  var tune = { idx: 0, pos: 0, playing: false, advance: true, nextAt: 0, discs: [], lit: [] };
   var tuneLast = null, tuneHeld = 0, tuneGiven = 0, tuneGap = 0;
   var visQ = [];
 
@@ -1695,7 +1714,6 @@
     }
     tune.nextAt = clock + at + tail;
     // Nothing else speaks over a song.
-    ask.next = Math.max(ask.next, tune.nextAt + 1.5);
   }
 
   function finishTune() {
@@ -1755,6 +1773,9 @@
       if (typeof v.k === 'number' && tune.discs[v.k]) {
         bee.tx = tune.discs[v.k].x;
         bee.ty = tune.discs[v.k].y;
+        // and the note itself lights up under the bee, so it is plain
+        // which one is sounding rather than only where the bee has got to
+        tune.lit[v.k] = clock + v.dur;
       }
     }
   }
@@ -1771,7 +1792,6 @@
         f.flower.setAttribute('opacity', 1);
         arriveSound();
         ask.idx = i;
-        ask.next = clock + 3.2;
         drawHills();
         drawHits();
       }
@@ -1791,7 +1811,6 @@
     if (!tunesOn()) { sparkleSound(); }
     var at = flowerSlot(f);
     burst(at.x, at.y - FULL_H * at.sc, f.shade || f.spec.petal, reduced ? 0 : 18, 250);
-    ask.next = clock + 4;
   }
 
   function plant(f) {
@@ -1940,6 +1959,7 @@
     if (tunesOn() && !tune.playing) {
       ask.idx = noteIndex(TUNES[tune.idx].notes[tune.pos] || 'B');
     }
+    litUpStrip();
     if (beeNode) {
       var lerp = clamp(dt * 7, 0, 1);
       if (bee.tx > bee.x + 2) { bee.face = 1; }
@@ -1956,20 +1976,9 @@
       burst(rnd(L.W * 0.15, L.W * 0.85), L.gy[2] + 26, '#a9d68a', 5, 130);
     }
 
-    // The garden holds its tongue while she is playing.
-    if (MIC.note || touchHold >= 0) { ask.next = Math.max(ask.next, clock + 7); }
-    // Nothing is asked until the audio really is running. A phone keeps
-    // the context asleep until she touches the screen, and notes queued
-    // against a sleeping clock all land in a heap when it wakes.
-    if (clock > ask.next && !tune.playing) {
-      var af = friends[ask.idx];
-      if (AC && AC.state === 'running' && af && af.present && !af.arriving) {
-        sing(af, 1.2);
-        ask.next = clock + 13;
-      } else {
-        ask.next = clock + 1;
-      }
-    }
+    // The garden no longer sings at her unprompted. It answers what she
+    // plays and what she taps, and the glowing signpost still says which
+    // note is wanted - but it does not interrupt to say it out loud.
 
     var i, f;
     for (i = 0; i < friends.length; i++) {
@@ -2018,7 +2027,6 @@
     var f = friends[+owner.getAttribute('data-friend')];
     if (!f || !f.present) { return; }
     sing(f, 1.2);
-    ask.next = clock + 13;
     // With no ears, holding a friend does what holding a note would.
     if (MIC.state !== 'on') { touchHold = f.i; }
   });
