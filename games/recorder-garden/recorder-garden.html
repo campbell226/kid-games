@@ -207,20 +207,43 @@
   // Which is also why the garden could not end at a pile of flowers - it
   // stopped one step short of the thing the notes are for.
   // ------------------------------------------------------------------
+  // beats says how long each note is held: 1 is one count, 2 is twice
+  // that, a half is half. Without it every note lasted exactly as long as
+  // every other one, and a tune she knows perfectly well still did not
+  // sound like itself.
+  //
+  // It changes nothing about what she has to do. The rhythm is the
+  // garden's when it plays the song back, and it spaces the notes along
+  // the strip the way written music does; she still just plays them.
   var TUNES = [
-    { notes: ['B', 'A', 'G', 'B', 'A', 'G'] },
-    { notes: ['B', 'A', 'G', 'A', 'B', 'B', 'B'] },
-    { notes: ['B', 'A', 'G', 'A', 'B', 'B', 'B', 'A', 'A', 'A', 'B', 'B', 'B'] },
-    { notes: ['B', 'A', 'G', 'B', 'A', 'G', 'G', 'G', 'G', 'A', 'A', 'A', 'B', 'A', 'G'] },
+    { notes: ['B', 'A', 'G', 'B', 'A', 'G'],
+      beats: [1, 1, 2, 1, 1, 2] },
+    { notes: ['B', 'A', 'G', 'A', 'B', 'B', 'B'],
+      beats: [1, 1, 1, 1, 1, 1, 2] },
+    { notes: ['B', 'A', 'G', 'A', 'B', 'B', 'B', 'A', 'A', 'A', 'B', 'B', 'B'],
+      beats: [1, 1, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 2] },
+    { notes: ['B', 'A', 'G', 'B', 'A', 'G', 'G', 'G', 'G', 'A', 'A', 'A', 'B', 'A', 'G'],
+      beats: [1, 1, 2, 1, 1, 2, 0.5, 0.5, 1, 0.5, 0.5, 1, 1, 1, 2] },
     // Everything past here needs D, and finishing the four above is what
     // fetches it.
-    { notes: ['D', 'B', 'A', 'G', 'D', 'B', 'A', 'G'] },
-    { notes: ['G', 'A', 'B', 'D', 'D', 'B', 'A', 'G'] },
-    { notes: ['B', 'A', 'G', 'A', 'B', 'B', 'B', 'A', 'A', 'A', 'B', 'D', 'D'] },
+    { notes: ['D', 'B', 'A', 'G', 'D', 'B', 'A', 'G'],
+      beats: [1, 1, 1, 1, 1, 1, 1, 2] },
+    { notes: ['G', 'A', 'B', 'D', 'D', 'B', 'A', 'G'],
+      beats: [1, 1, 1, 1, 1, 1, 1, 2] },
+    { notes: ['B', 'A', 'G', 'A', 'B', 'B', 'B', 'A', 'A', 'A', 'B', 'D', 'D'],
+      beats: [1, 1, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 2] },
     { notes: ['B', 'A', 'G', 'A', 'B', 'B', 'B', 'A', 'A', 'A', 'B', 'D', 'D',
-              'B', 'A', 'G', 'A', 'B', 'B', 'B', 'B', 'A', 'A', 'B', 'A', 'G'] }
+              'B', 'A', 'G', 'A', 'B', 'B', 'B', 'B', 'A', 'A', 'B', 'A', 'G'],
+      beats: [1, 1, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 2,
+              1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4] }
   ];
   var TUNES_3 = 4;   // how many of them the first three notes can manage
+
+  function tuneBeats(idx) {
+    var tn = TUNES[idx], i, b;
+    if (!tn.beats) { b = []; for (i = 0; i < tn.notes.length; i++) { b.push(1); } return b; }
+    return tn.beats;
+  }
 
 
   // ------------------------------------------------------------------
@@ -928,6 +951,11 @@
 
     L = {
       W: W, H: H, wide: wide, gy: gy, xs: xs, scale: scale,
+      // How many of our units make one real pixel on this screen. A phone
+      // packs the whole thousand into about four hundred of them, so a
+      // control sized as a share of the drawing comes out half the size of
+      // a fingertip.
+      perPx: 1000 / vw,
       signScale: signScale, signX: signX, flowerX: flowerX, side: side,
       strip: strip, rowY: rowY, four: four,
       bandTop: [], bandBot: []
@@ -1089,10 +1117,15 @@
     if (!L.strip || !tunesOn()) { clear(g); return; }
 
     var notes = TUNES[tune.idx].notes, n = notes.length;
+    var beats = tuneBeats(tune.idx);
     var s = L.strip, pad = 38, k;
     var left = pad, right = L.W - pad;
-    var step = (right - left) / n;
-    var r = clamp(Math.min(step * 0.36, s.h * (L.four ? 0.095 : 0.19)), 6, 26);
+    // Spaced by how long each note lasts, the way written music is, so a
+    // held note plainly takes up more room than a quick one.
+    var total = 0, least = 99;
+    for (k = 0; k < n; k++) { total += beats[k]; if (beats[k] < least) { least = beats[k]; } }
+    var unit = (right - left) / total;
+    var r = clamp(Math.min(unit * least * 0.38, s.h * (L.four ? 0.095 : 0.19)), 5, 26);
     // One line per friend, in hill order: the squirrel's on top, the
     // badger's at the bottom. Which is a stave, and she can already read
     // it, because the hill has been saying the same thing all along.
@@ -1112,9 +1145,11 @@
     }
     html += '</g>';
 
+    var acc = 0;
     for (i = 0; i < n; i++) {
       fi = noteIndex(notes[i]);
-      cx = left + step * (i + 0.5);
+      cx = left + (acc + beats[i] * 0.5) * unit;
+      acc += beats[i];
       cy = lineY[SPECS[fi].row];
       done = i < tune.pos;
       cur = (i === tune.pos);
@@ -1124,6 +1159,13 @@
         html += '<circle cx="' + cx + '" cy="' + cy + '" r="' + (r * 2) + '" fill="url(#glowg)"/>';
         bee.tx = cx;
         bee.ty = cy - r * 2.6;
+      }
+      // A note worth more than one count trails a bar behind it, so the
+      // long ones look long.
+      if (beats[i] > 1) {
+        html += '<rect x="' + (cx - r * 0.2) + '" y="' + (cy - r * 0.34) + '" width="'
+          + ((beats[i] - 1) * unit + r * 0.6) + '" height="' + (r * 0.68) + '" rx="' + (r * 0.34)
+          + '" fill="' + SPECS[fi].petal + '" opacity="' + (done ? 0.85 : 0.4) + '"/>';
       }
       html += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="'
         + (done ? SPECS[fi].petal : '#fffdf6') + '" stroke="' + SPECS[fi].petal
@@ -1416,7 +1458,7 @@
     if (!L.W) { return; }
     var g = G('ui');
     clear(g);
-    var sz = clamp(L.W * 0.08, 58, 92);
+    var sz = clamp(Math.max(L.W * 0.08, 54 * L.perPx), 58, 190);
     // Top corners: the tune has the bottom of the screen now, and out
     // of the way of a hand resting on the edge of the tablet.
     var cx = 22 + sz / 2, cy = 22 + sz / 2;
@@ -1565,8 +1607,8 @@
     // Once the tunes are running the asking follows the song instead, so
     // the glowing signpost is always the fingering she needs next.
     if (tunesOn()) { return; }
-    var n = unlocked(), best = ask.idx, bestScore = 1e9, i, sc;
-    for (i = 0; i < n; i++) {
+    var best = ask.idx, bestScore = 1e9, i, sc;
+    for (i = 0; i < friends.length; i++) {
       if (!friends[i].present) { continue; }
       sc = friends[i].done * 10 + (i === ask.idx ? 7 : 0) + Math.random() * 4;
       if (sc < bestScore) { bestScore = sc; best = i; }
@@ -1587,9 +1629,16 @@
   var tuneLast = null, tuneHeld = 0, tuneGiven = 0, tuneGap = 0;
   var visQ = [];
 
-  // Not the moment the badger arrives: the moment G is properly hers.
-  // Three of the badger's own flowers, the same as it took to fetch him.
-  function tunesOn() { return (save.done[2] || 0) >= 3; }
+  // Songs wait until the newest note has been worked at on its own.
+  //
+  // Three flowers of it, which is what it took to fetch each friend in the
+  // first place. Before that the strip is not there at all and the garden
+  // simply keeps asking for the new note, so she meets it by itself rather
+  // than halfway through a song made of things she has not learned.
+  function tunesOn() {
+    if (save.four) { return (save.done[3] || 0) >= ARRIVE_AT[1]; }
+    return (save.done[2] || 0) >= ARRIVE_AT[1];
+  }
 
   function playedNote() {
     if (MIC.note) { return MIC.note; }
@@ -1630,21 +1679,24 @@
     if (tune.pos >= notes.length) { finishTune(); } else { persist(); }
   }
 
-  function playThrough(notes, tail) {
-    var i, f, at = 0.3, step = 0.42;
+  function playThrough(notes, tail, beats) {
+    var i, f, b, at = 0.3, step = 0.40;
     tune.playing = true;
     for (i = 0; i < notes.length; i++) {
       f = friends[noteIndex(notes[i])];
-      recorderNote(at, mtof(f.spec.midi), step * 0.92, 0.4);
-      if (AC) { visQ.push({ at: AC.currentTime + at, i: f.i, dur: step * 0.82, k: i }); }
-      at += step;
+      b = beats ? beats[i] : 1;
+      recorderNote(at, mtof(f.spec.midi), step * b * 0.92, 0.4);
+      if (AC) { visQ.push({ at: AC.currentTime + at, i: f.i, dur: step * b * 0.82, k: i }); }
+      at += step * b;
     }
     tune.nextAt = clock + at + tail;
+    // Nothing else speaks over a song.
+    ask.next = Math.max(ask.next, tune.nextAt + 1.5);
   }
 
   function finishTune() {
     tune.advance = true;
-    playThrough(TUNES[tune.idx].notes, 1.7);
+    playThrough(TUNES[tune.idx].notes, 1.7, tuneBeats(tune.idx));
     burst(L.W * 0.5, L.strip ? L.strip.y + L.strip.h : L.gy[0], '#ffd45c', reduced ? 0 : 22, 260);
     persist();
   }
@@ -1660,7 +1712,7 @@
     bee.set = false;
     drawTuneStrip();
     tune.advance = false;
-    playThrough(TUNES[tune.idx].notes, 0.8);
+    playThrough(TUNES[tune.idx].notes, 0.8, tuneBeats(tune.idx));
   }
 
   function nextTune() {
@@ -1680,10 +1732,13 @@
     persist();
     bee.set = false;
     drawTuneStrip();
+    // If the new note still has its practice to do, there is no song to
+    // introduce yet - the garden goes back to asking for it on its own.
+    if (!tunesOn()) { pickAsk(); return; }
     // A new song gets played through once. Being told only its first note
     // is no way to meet a tune.
     tune.advance = false;
-    playThrough(TUNES[tune.idx].notes, 0.9);
+    playThrough(TUNES[tune.idx].notes, 0.9, tuneBeats(tune.idx));
   }
 
   function drainVis() {
@@ -1898,7 +1953,7 @@
     // Nothing is asked until the audio really is running. A phone keeps
     // the context asleep until she touches the screen, and notes queued
     // against a sleeping clock all land in a heap when it wakes.
-    if (clock > ask.next) {
+    if (clock > ask.next && !tune.playing) {
       var af = friends[ask.idx];
       if (AC && AC.state === 'running' && af && af.present && !af.arriving) {
         sing(af, 1.2);
