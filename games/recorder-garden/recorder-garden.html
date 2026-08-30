@@ -1069,7 +1069,7 @@
     for (tk = 0; tk < SPECS.length; tk++) {
       if (SPECS[tk].top > tallest) { tallest = SPECS[tk].top; }
     }
-    var scale = clamp(Math.min(W * 0.30 / 200, (rowH - 18) / tallest), 0.2, 1.5);
+    var scale = clamp(Math.min(W * 0.30 / 200, (rowH - 16) / tallest), 0.17, 1.5);
     var signScale = wide
       ? clamp(Math.min((W * 0.26) / 430, (rowH * 0.62) / 180), 0.16, 0.8)
       : clamp(Math.min((W * 0.19) / 170, (rowH * 0.92) / 514), 0.14, 1.0);
@@ -1214,7 +1214,7 @@
       // squirrel's flowers to the badger's bed, in the badger's colour,
       // which looked for all the world like they had not been saved.
       lvl = clamp(f.i | 0, 0, SPECS.length - 1);
-      sc = clamp(L.scale * 0.85, 0.3, 1.25);
+      sc = clamp(L.scale * 0.85, 0.14, 1.25);
       if (typeof f.k === 'number') {
         pl = PLOT[f.k % PLOT.length];
         x = L.flowerX[lvl] + pl[0] * sc;
@@ -1268,8 +1268,9 @@
   function drawTuneStrip() {
     var g = G('tunes');
     beeNode = null;
-    if (!L.strip || !tunesOn()) {
-      // Nothing left pointing at nodes that are no longer there.
+    if (!L.strip || !tunesOn() || pickerOpen) {
+      // Nothing left pointing at nodes that are no longer there. The shelf
+      // covers the screen when it is open, so the strip stands down.
       clear(g); tune.discs = []; tune.lit = []; return;
     }
 
@@ -1475,7 +1476,7 @@
   // finished one will be saved into, so nothing moves at the moment it is
   // planted - the growing flower simply starts the next one along.
   function flowerSlot(f) {
-    var sc = clamp(L.scale * 0.85, 0.3, 1.25);
+    var sc = clamp(L.scale * 0.85, 0.14, 1.25);
     var pl = PLOT[f.done % PLOT.length];
     return { x: L.flowerX[f.i] + pl[0] * sc, y: L.gy[f.i] + 10 + pl[1] * sc, sc: sc };
   }
@@ -1583,8 +1584,11 @@
     var lines = Math.ceil(TUNES.length / cols);
     var pad = 24;
     var gw = (L.W - pad * 2) / cols;
-    var gh = Math.min((L.H * 0.88) / lines, gw * 0.78);
-    var top = (L.H - gh * lines) / 2;
+    // The microphone, the reset and the full screen button all live along
+    // the top, so the shelf starts below them rather than under them.
+    var band = uiSize() + 34;
+    var gh = Math.min((L.H - band - L.H * 0.05) / lines, gw * 0.78);
+    var top = band + (L.H - band - gh * lines) / 2;
     var cw = gw - 14, ch = gh - 14;
     var html = '<rect class="hit" x="0" y="0" width="' + L.W + '" height="' + L.H
       + '" fill="#ffffff" opacity="0.55" data-ui="pickbg"/>';
@@ -1626,6 +1630,8 @@
       w.addEventListener('release', function () { wakeLock = null; });
     })['catch'](function () { wakeAsking = false; wakeLock = null; });
   }
+
+  function uiSize() { return clamp(Math.max(L.W * 0.08, 54 * L.perPx), 58, 190); }
 
   var micRing = null, resetRing = null, resetCirc = 1;
   var resetBig = null, bigRing = null, bigCirc = 1;
@@ -1719,7 +1725,7 @@
     if (!L.W) { return; }
     var g = G('ui');
     clear(g);
-    var sz = clamp(Math.max(L.W * 0.08, 54 * L.perPx), 58, 190);
+    var sz = uiSize();
     // Top corners: the tune has the bottom of the screen now, and out
     // of the way of a hand resting on the edge of the tablet.
     var cx = 22 + sz / 2, cy = 22 + sz / 2;
@@ -1850,7 +1856,7 @@
       if (!friends[i] || !friends[i].present) { continue; }
       sc = L.scale;
       ss = L.signScale;
-      fs = clamp(sc * 0.85, 0.3, 1.25);
+      fs = clamp(sc * 0.85, 0.14, 1.25);
 
       halfW = (L.wide ? 226 : 106) * ss;
       top = (L.wide ? 256 : 556) * ss;
