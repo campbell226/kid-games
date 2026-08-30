@@ -29,7 +29,7 @@
 </head>
 <body>
 <script>
-// Full screen on the first touch.
+// Full screen on the first touch, and a way back if it is off.
 //
 // A browser will not do this by itself: the request has to come out of a
 // gesture the browser counts as user activation, and that list is fussier
@@ -38,44 +38,80 @@
 // worked on a laptop and did nothing whatever on a tablet. For a finger it
 // is pointerup and touchend that count.
 //
-// So: listen for all of the ones that can work, and keep trying until one
-// of them actually gets us there. Once it has, stop asking - deliberately
-// leaving full screen should stay left.
+// Once full screen is on, the automatic asking stops, so leaving it stays
+// left. But leaving it used to mean reloading to get it back, so there is
+// now a small button at the top of the screen that is only there while
+// full screen is off, and takes itself away the moment it is on.
 //
 // An iPhone ignores the lot, because Safari there gives full screen to
-// video and nothing else. That is what the home screen tags above are for.
+// video and nothing else, so no button is offered. That is what the home
+// screen tags above are for.
 (function () {
   var el = document.documentElement;
   var go = el.requestFullscreen || el.webkitRequestFullscreen;
   if (!go) { return; }
   var EVENTS = ['pointerup', 'touchend', 'click', 'mousedown'];
-  var asking = false, done = false, i;
+  var asking = false, done = false, btn = null, i;
 
   function isFull() {
     return !!(document.fullscreenElement || document.webkitFullscreenElement);
   }
-  function stop() {
-    done = true;
-    for (var k = 0; k < EVENTS.length; k++) {
-      document.removeEventListener(EVENTS[k], attempt, true);
-    }
-  }
-  function attempt() {
-    if (done || asking) { return; }
-    if (isFull()) { stop(); return; }
+
+  function request() {
+    if (asking || isFull()) { return; }
     asking = true;
     try {
       var p = go.call(el);
-      if (p && p.then) { p.then(stop, function () { asking = false; }); }
+      if (p && p.then) { p.then(function () { asking = false; }, function () { asking = false; }); }
       else { setTimeout(function () { asking = false; }, 500); }
     } catch (e) { asking = false; }
   }
 
-  document.addEventListener('fullscreenchange', function () { if (isFull()) { stop(); } });
-  document.addEventListener('webkitfullscreenchange', function () { if (isFull()) { stop(); } });
-  for (i = 0; i < EVENTS.length; i++) {
-    document.addEventListener(EVENTS[i], attempt, true);
+  function stopAuto() {
+    done = true;
+    for (var k = 0; k < EVENTS.length; k++) {
+      document.removeEventListener(EVENTS[k], autoTry, true);
+    }
   }
+
+  function autoTry() {
+    if (done) { return; }
+    if (isFull()) { stopAuto(); sync(); return; }
+    request();
+  }
+
+  function sync() {
+    var want = !isFull();
+    if (want && !btn && document.body) {
+      btn = document.createElement('button');
+      btn.setAttribute('aria-label', 'Full screen');
+      btn.style.cssText = 'position:fixed;top:5px;left:50%;transform:translateX(-50%);'
+        + 'z-index:30;width:46px;height:46px;padding:0;line-height:0;border:0;'
+        + 'border-radius:14px;background:rgba(255,255,255,0.68);cursor:pointer;'
+        + 'box-shadow:0 1px 5px rgba(0,0,0,0.22);-webkit-tap-highlight-color:transparent;';
+      btn.innerHTML = '<svg width="46" height="46" viewBox="0 0 46 46" aria-hidden="true">'
+        + '<g fill="none" stroke="#40563a" stroke-width="3.4" stroke-linecap="round"'
+        + ' stroke-linejoin="round">'
+        + '<path d="M19 14 H14 V19 M27 14 H32 V19 M19 32 H14 V27 M27 32 H32 V27"/>'
+        + '</g></svg>';
+      btn.addEventListener('click', function (e) { e.stopPropagation(); request(); });
+      document.body.appendChild(btn);
+    }
+    if (btn) { btn.style.display = want ? 'block' : 'none'; }
+  }
+
+  document.addEventListener('fullscreenchange', function () {
+    if (isFull()) { stopAuto(); }
+    sync();
+  });
+  document.addEventListener('webkitfullscreenchange', function () {
+    if (isFull()) { stopAuto(); }
+    sync();
+  });
+  for (i = 0; i < EVENTS.length; i++) {
+    document.addEventListener(EVENTS[i], autoTry, true);
+  }
+  sync();
 })();
 </script>
 
