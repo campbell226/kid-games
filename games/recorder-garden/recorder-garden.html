@@ -3,6 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="theme-color" content="#7fc3e8">
 <title>Recorder Garden</title>
 <style>
@@ -28,6 +31,34 @@
 </style>
 </head>
 <body>
+<script>
+// Full screen on the first touch.
+//
+// A browser will not do this by itself. The request has to come out of
+// something the player actually did or it is refused outright, so the
+// first tap carries it - which is as close to "by default" as the web
+// allows. One attempt per visit, so that deliberately leaving full screen
+// stays left.
+//
+// It does nothing on an iPhone, where Safari gives full screen to video
+// and nothing else. Adding the game to the home screen is the answer
+// there, and the meta tags above are what make that launch cleanly.
+(function () {
+  var el = document.documentElement;
+  var go = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (!go) { return; }
+  function once() {
+    document.removeEventListener('pointerdown', once, true);
+    if (document.fullscreenElement || document.webkitFullscreenElement) { return; }
+    try {
+      var p = go.call(el);
+      if (p && p['catch']) { p['catch'](function () {}); }
+    } catch (e) {}
+  }
+  document.addEventListener('pointerdown', once, true);
+})();
+</script>
+
 <svg id="stage" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 640" preserveAspectRatio="xMidYMid meet" aria-label="Recorder Garden">
   <defs>
     <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
