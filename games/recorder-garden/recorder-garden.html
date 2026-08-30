@@ -24,7 +24,7 @@
   .hit { fill: transparent; cursor: pointer; }
   /* Scenery and sparks are not targets, and neither are the two glows,
      which are far bigger than the things they light up. */
-  #garden, #effects, .halo, .signglow { pointer-events: none; }
+  #garden, #marks, #effects, .halo, .signglow, .plain { pointer-events: none; }
 </style>
 </head>
 <body>
@@ -67,11 +67,13 @@
 
   <g id="sky"></g>
   <g id="hills"></g>
+  <g id="marks"></g>
   <g id="garden"></g>
   <g id="hits"></g>
   <g id="signs"></g>
   <g id="friends"></g>
   <g id="flowers"></g>
+  <g id="tunes"></g>
   <g id="effects"></g>
   <g id="ui"></g>
 </svg>
@@ -117,6 +119,29 @@
   ];
 
   function mtof(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+
+  function noteIndex(id) {
+    for (var i = 0; i < SPECS.length; i++) { if (SPECS[i].id === id) { return i; } }
+    return 0;
+  }
+
+  // ------------------------------------------------------------------
+  // The tunes.
+  //
+  // This is the whole reason the first three notes are B, A and G rather
+  // than any other three: real songs are made of them and nothing else.
+  // Which is also why the garden could not end at a pile of flowers - it
+  // stopped one step short of the thing the notes are for.
+  // ------------------------------------------------------------------
+  var TUNES = [
+    { notes: ['B', 'A', 'G', 'B', 'A', 'G'] },
+    { notes: ['B', 'A', 'G', 'A', 'B', 'B', 'B'] },
+    { notes: ['B', 'A', 'G', 'A', 'B', 'B', 'B', 'A', 'A', 'A', 'B', 'B', 'B'] },
+    { notes: ['B', 'A', 'G', 'B', 'A', 'G', 'G', 'G', 'G', 'A', 'A', 'A', 'B', 'A', 'G'] }
+  ];
+
+  // The five things that turn a hillside into somewhere.
+  var MARKS = ['pond', 'tree', 'hive', 'log', 'ring'];
 
   // ------------------------------------------------------------------
   // Audio, synthesised from nothing so the garden is never silent and
@@ -602,7 +627,7 @@
   // ------------------------------------------------------------------
   // What the garden remembers between visits.
   // ------------------------------------------------------------------
-  var save = { flowers: 0, done: [0, 0, 0], garden: [] };
+  var save = { flowers: 0, done: [0, 0, 0], garden: [], marks: [], tune: 0, pos: 0 };
 
   function load() {
     try {
@@ -611,6 +636,9 @@
         save.flowers = s.flowers;
         save.done = (s.done && s.done.length === 3) ? s.done : [0, 0, 0];
         save.garden = s.garden || [];
+        save.marks = s.marks || [];
+        save.tune = s.tune || 0;
+        save.pos = s.pos || 0;
       }
     } catch (e) {}
   }
@@ -646,13 +674,19 @@
     var wide = (vw / vh) >= 1.15;
 
     // Landscape spreads the three heights further apart, because there is
-    // nothing else to spend the height on.
-    var gy = wide ? [H * 0.315, H * 0.605, H * 0.895]
-                  : [H * 0.40, H * 0.645, H * 0.885];
+    // nothing else to spend the height on. Once the tunes arrive, everyone
+    // shuffles down the hill to leave a band of empty sky for them.
+    var songs = tunesOn();
+    var gy = wide
+      ? (songs ? [H * 0.42, H * 0.665, H * 0.905] : [H * 0.315, H * 0.605, H * 0.895])
+      : (songs ? [H * 0.46, H * 0.68, H * 0.90] : [H * 0.40, H * 0.645, H * 0.885]);
     var xs = wide ? [W * 0.765, W * 0.505, W * 0.245]
                   : [W * 0.655, W * 0.315, W * 0.645];
 
-    var rowH = wide ? H * 0.29 : H * 0.245;
+    var rowH = wide ? (songs ? H * 0.245 : H * 0.29) : (songs ? H * 0.22 : H * 0.245);
+    var strip = songs
+      ? { y: H * (wide ? 0.035 : 0.06), h: H * (wide ? 0.145 : 0.13) }
+      : null;
     var scale = clamp(Math.min(W * 0.30 / 200, rowH / 230), 0.26, 1.5);
     var signScale = wide
       ? clamp(Math.min((W * 0.26) / 430, (rowH * 0.62) / 180), 0.16, 0.8)
@@ -669,13 +703,16 @@
     L = {
       W: W, H: H, wide: wide, gy: gy, xs: xs, scale: scale,
       signScale: signScale, signX: signX, flowerX: flowerX, side: side,
+      strip: strip,
       bands: [0, (gy[0] + gy[1]) / 2, (gy[1] + gy[2]) / 2, H]
     };
 
     svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
     drawSky();
     drawHills();
+    drawMarks();
     drawGarden();
+    drawTuneStrip();
     buildSigns();
     placeAll();
     drawHits();
@@ -767,6 +804,166 @@
       s += pickedFlower(x, y, r, SPECS[lvl].petal);
     }
     g.innerHTML = s;
+  }
+
+  // ------------------------------------------------------------------
+  // Landmarks. A flower is a tally; a pond is a place. One arrives every
+  // five flowers and one for every tune finished, so there is always a
+  // next thing on its way even when nothing else is new.
+  // ------------------------------------------------------------------
+  var MARKART = {
+    pond: '<ellipse cx="0" cy="0" rx="58" ry="21" fill="#3f8ec2"/>'
+      + '<ellipse cx="0" cy="-3" rx="49" ry="16" fill="#6fbde4"/>'
+      + '<ellipse cx="-16" cy="-6" rx="15" ry="5" fill="#c2e8fa" opacity="0.75"/>'
+      + '<path d="M 40 -2 q 4 -26 -2 -36 M 48 -2 q 8 -20 4 -30" stroke="#4f9647" '
+      + 'stroke-width="5" fill="none" stroke-linecap="round"/>',
+    tree: '<rect x="-9" y="-70" width="18" height="72" rx="7" fill="#8a6236"/>'
+      + '<circle cx="-26" cy="-74" r="27" fill="#6cb85c"/>'
+      + '<circle cx="27" cy="-76" r="25" fill="#4f9647"/>'
+      + '<circle cx="0" cy="-96" r="34" fill="#5fa851"/>',
+    hive: '<ellipse cx="0" cy="-7" rx="34" ry="12" fill="#c98f3c"/>'
+      + '<ellipse cx="0" cy="-25" rx="32" ry="14" fill="#e0a94f"/>'
+      + '<ellipse cx="0" cy="-43" rx="25" ry="13" fill="#c98f3c"/>'
+      + '<ellipse cx="0" cy="-57" rx="16" ry="10" fill="#e0a94f"/>'
+      + '<circle cx="0" cy="-23" r="7" fill="#6b4a1e"/>',
+    log: '<rect x="-46" y="-25" width="92" height="27" rx="13" fill="#8a6236"/>'
+      + '<ellipse cx="-46" cy="-12" rx="9" ry="13" fill="#a67c48"/>'
+      + '<ellipse cx="-46" cy="-12" rx="4" ry="6" fill="#75512d"/>'
+      + '<path d="M -10 -25 q 14 -6 26 0" stroke="#75512d" stroke-width="4" fill="none"/>',
+    ring: '<g fill="#d9534f">'
+      + '<ellipse cx="-38" cy="-16" rx="13" ry="9"/><ellipse cx="-12" cy="-22" rx="15" ry="10"/>'
+      + '<ellipse cx="14" cy="-19" rx="13" ry="9"/><ellipse cx="38" cy="-14" rx="11" ry="8"/>'
+      + '</g><g fill="#f7efe2">'
+      + '<rect x="-42" y="-16" width="8" height="16" rx="4"/><rect x="-16" y="-22" width="9" height="22" rx="4"/>'
+      + '<rect x="10" y="-19" width="8" height="19" rx="4"/><rect x="34" y="-14" width="7" height="14" rx="4"/>'
+      + '</g>'
+  };
+
+  function drawMarks() {
+    var g = G('marks'), s = '', i, m, lvl, x, y, sc;
+    for (i = 0; i < save.marks.length; i++) {
+      m = save.marks[i];
+      lvl = clamp(m.i | 0, 0, 2);
+      sc = clamp(L.scale * 0.8, 0.26, 1.15);
+      x = clamp(40 + (L.W - 80) * m.u, 34, L.W - 34);
+      y = L.gy[lvl] + 14 + (m.v || 0.4) * 46 * sc;
+      s += '<g transform="translate(' + x + ',' + y + ') scale(' + sc + ')">'
+        + (MARKART[MARKS[m.t % MARKS.length]] || '') + '</g>';
+    }
+    g.innerHTML = s;
+  }
+
+  // Somewhere with room: away from the friend, its signpost and its bed,
+  // and away from the landmarks already on that terrace.
+  function addMark() {
+    if (!L.W || save.marks.length >= 12) { return; }
+    var lvl = save.marks.length % 3;
+    var room = [], bestD = -1, k, m, c, d;
+    for (k = 0; k < 14; k++) {
+      c = 0.07 + 0.86 * (k / 13);
+      d = Math.min(Math.abs(c * L.W - L.xs[lvl]),
+                   Math.abs(c * L.W - L.flowerX[lvl]),
+                   Math.abs(c * L.W - L.signX[lvl]));
+      // And the friend on the terrace below, whose head comes up into
+      // this one. A toadstool ring is not a hat.
+      if (lvl < 2) {
+        d = Math.min(d, Math.abs(c * L.W - L.xs[lvl + 1]),
+                        Math.abs(c * L.W - L.signX[lvl + 1]));
+      }
+      for (m = 0; m < save.marks.length; m++) {
+        if (save.marks[m].i === lvl) {
+          d = Math.min(d, Math.abs((c - save.marks[m].u) * L.W));
+        }
+      }
+      room.push({ u: c, d: d });
+      if (d > bestD) { bestD = d; }
+    }
+    // Anywhere with enough room, not the single roomiest spot, or every
+    // landmark ends up pinned to the same screen edge.
+    var ok = [];
+    for (k = 0; k < room.length; k++) {
+      if (room[k].d >= bestD * 0.62) { ok.push(room[k].u); }
+    }
+    save.marks.push({
+      t: save.marks.length % MARKS.length, i: lvl,
+      u: ok[Math.floor(Math.random() * ok.length)], v: rnd(0.2, 0.85)
+    });
+  }
+
+  // ------------------------------------------------------------------
+  // The tune strip: three lines in the sky, one per friend, and the notes
+  // of the song sitting on them. Higher note, higher line - the same
+  // thing the hill has been teaching all along, which makes this a stave
+  // she can already read.
+  // ------------------------------------------------------------------
+  function beeArt(r) {
+    return '<g transform="scale(' + (r * 0.05) + ')">'
+      + '<ellipse cx="-15" cy="-15" rx="17" ry="11" fill="#ffffff" opacity="0.7" transform="rotate(-26 -15 -15)"/>'
+      + '<ellipse cx="15" cy="-15" rx="17" ry="11" fill="#ffffff" opacity="0.7" transform="rotate(26 15 -15)"/>'
+      + '<ellipse cx="0" cy="0" rx="22" ry="16" fill="#f5c542"/>'
+      + '<path d="M -6 -14 q 3 14 0 28" stroke="#3a3327" stroke-width="7" fill="none"/>'
+      + '<path d="M 8 -13 q 3 13 0 26" stroke="#3a3327" stroke-width="7" fill="none"/>'
+      + '<circle cx="-20" cy="-4" r="9" fill="#3a3327"/>'
+      + '<circle cx="-23" cy="-6" r="2.6" fill="#ffffff"/>'
+      + '</g>';
+  }
+
+  var beeNode = null;
+  var bee = { x: 0, y: 0, tx: 0, ty: 0, set: false };
+
+  function drawTuneStrip() {
+    var g = G('tunes');
+    beeNode = null;
+    if (!L.strip || !tunesOn()) { clear(g); return; }
+
+    var notes = TUNES[tune.idx].notes, n = notes.length;
+    var s = L.strip, pad = 38;
+    var left = pad, right = L.W - pad;
+    var step = (right - left) / n;
+    var r = clamp(Math.min(step * 0.36, s.h * 0.19), 7, 26);
+    var lineY = [s.y + s.h * 0.24, s.y + s.h * 0.5, s.y + s.h * 0.76];
+    var html = '<g class="plain">'
+      + '<rect x="' + (left - 18) + '" y="' + (s.y - 14) + '" width="' + (right - left + 36)
+      + '" height="' + (s.h + 28) + '" rx="' + (s.h * 0.32) + '" fill="#ffffff" opacity="0.32"/>';
+    var k, i, fi, cx, cy, done, cur;
+    for (k = 0; k < 3; k++) {
+      html += '<path d="M ' + left + ' ' + lineY[k] + ' H ' + right + '" stroke="' + SPECS[k].petal
+        + '" stroke-width="3" opacity="0.38" stroke-linecap="round"/>';
+    }
+    html += '</g>';
+
+    for (i = 0; i < n; i++) {
+      fi = noteIndex(notes[i]);
+      cx = left + step * (i + 0.5);
+      cy = lineY[fi];
+      done = i < tune.pos;
+      cur = (i === tune.pos);
+      html += '<g data-friend="' + fi + '">';
+      if (cur) {
+        html += '<circle cx="' + cx + '" cy="' + cy + '" r="' + (r * 2) + '" fill="url(#glowg)"/>';
+        bee.tx = cx;
+        bee.ty = cy - r * 2.5;
+      }
+      html += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="'
+        + (done ? SPECS[fi].petal : '#fffdf6') + '" stroke="' + SPECS[fi].petal
+        + '" stroke-width="' + (r * 0.32) + '"/>';
+      if (done) {
+        html += '<circle cx="' + cx + '" cy="' + cy + '" r="' + (r * 0.3) + '" fill="#ffffff" opacity="0.9"/>';
+      }
+      html += '</g>';
+    }
+    if (tune.pos >= n) { bee.tx = right; bee.ty = lineY[1] - r * 2.5; }
+    html += '<g class="plain" id="beeg">' + beeArt(r) + '</g>';
+    g.innerHTML = html;
+    beeNode = g.querySelector('#beeg');
+    if (!bee.set) { bee.x = bee.tx; bee.y = bee.ty; bee.set = true; }
+    placeBee();
+  }
+
+  function placeBee() {
+    if (!beeNode) { return; }
+    var wob = reduced ? 0 : Math.sin(clock * 6) * 2.5;
+    beeNode.setAttribute('transform', 'translate(' + bee.x + ',' + (bee.y + wob) + ')');
   }
 
   // ------------------------------------------------------------------
@@ -940,17 +1137,20 @@
     save.flowers = 0;
     save.done = [0, 0, 0];
     save.garden = [];
+    save.marks = [];
+    save.tune = 0;
+    save.pos = 0;
+    tune.idx = 0; tune.pos = 0; tune.playing = false;
+    tuneLast = null; tuneHeld = 0; tuneGiven = 0;
+    visQ.length = 0;
+    bee.set = false;
     persist();
     ask.idx = 0;
     ask.next = clock + 1.8;
     [12, 9, 7, 4, 0].forEach(function (s, k) {
       bell(0.02 + k * 0.06, 523.25 * Math.pow(2, s / 12), 0.2, 0.4);
     });
-    drawGarden();
-    drawHills();
-    placeAll();
-    drawHits();
-    drawUI();
+    computeLayout();
   }
 
   function flowerIcon(rs) {
@@ -1071,6 +1271,9 @@
   }
 
   function pickAsk() {
+    // Once the tunes are running the asking follows the song instead, so
+    // the glowing signpost is always the fingering she needs next.
+    if (tunesOn()) { return; }
     var n = unlocked(), best = ask.idx, bestScore = 1e9, i, sc;
     for (i = 0; i < n; i++) {
       if (!friends[i].present) { continue; }
@@ -1079,6 +1282,96 @@
     }
     ask.idx = best;
     ask.next = clock + 1.8;
+  }
+
+  // ------------------------------------------------------------------
+  // Playing a tune.
+  //
+  // There is no mode and no menu. The strip is simply there once all
+  // three notes are hers, and playing carries on doing everything it did
+  // before - the friend answers, the flower grows - while the song moves
+  // along underneath whenever the note happens to be the next one.
+  // ------------------------------------------------------------------
+  var tune = { idx: 0, pos: 0, playing: false, nextAt: 0 };
+  var tuneLast = null, tuneHeld = 0, tuneGiven = 0, tuneGap = 0;
+  var visQ = [];
+
+  function tunesOn() { return unlocked() >= 3; }
+
+  function playedNote() {
+    if (MIC.note) { return MIC.note; }
+    if (touchHold >= 0 && MIC.state !== 'on' && friends[touchHold]) {
+      return friends[touchHold].spec.id;
+    }
+    return null;
+  }
+
+  function tuneTick(dt) {
+    var playing = playedNote();
+    if (!playing) {
+      tuneGap += dt;
+      if (tuneGap > 0.2) { tuneLast = null; tuneHeld = 0; tuneGiven = 0; }
+      return;
+    }
+    tuneGap = 0;
+    if (playing !== tuneLast) { tuneLast = playing; tuneHeld = 0; tuneGiven = 0; }
+    tuneHeld += dt;
+
+    if (!tunesOn() || tune.playing) { return; }
+    var notes = TUNES[tune.idx].notes;
+    if (tune.pos >= notes.length || playing !== notes[tune.pos]) { return; }
+
+    // The first score comes after a moment of steady tone. After that a
+    // note only scores again if she keeps holding it, so three Gs in a
+    // row can be tongued apart - or, if she cannot tongue yet, simply sat
+    // on until they tick over. There is no way to be stuck.
+    var due = tuneGiven === 0 ? 0.18 : 0.18 + tuneGiven * 1.1;
+    if (tuneHeld < due) { return; }
+    tuneGiven++;
+    tune.pos++;
+    save.pos = tune.pos;
+    // No chime for a note landing. Anything the garden says goes straight
+    // back into its own microphone and deafens it for a third of a second,
+    // which is most of the gap between two notes of a tune.
+    drawTuneStrip();
+    if (tune.pos >= notes.length) { finishTune(); } else { persist(); }
+  }
+
+  function finishTune() {
+    var notes = TUNES[tune.idx].notes, i, f, at = 0.3, step = 0.42;
+    tune.playing = true;
+    addMark();
+    drawMarks();
+    for (i = 0; i < notes.length; i++) {
+      f = friends[noteIndex(notes[i])];
+      recorderNote(at, mtof(f.spec.midi), step * 0.92, 0.4);
+      if (AC) { visQ.push({ at: AC.currentTime + at, i: f.i, dur: step * 0.82 }); }
+      at += step;
+    }
+    tune.nextAt = clock + at + 1.7;
+    burst(L.W * 0.5, L.strip ? L.strip.y + L.strip.h : L.gy[0], '#ffd45c', reduced ? 0 : 22, 260);
+    persist();
+  }
+
+  function nextTune() {
+    tune.playing = false;
+    tune.idx = (tune.idx + 1) % TUNES.length;
+    tune.pos = 0;
+    save.tune = tune.idx;
+    save.pos = 0;
+    persist();
+    bee.set = false;
+    drawTuneStrip();
+  }
+
+  function drainVis() {
+    if (!AC) { visQ.length = 0; return; }
+    var now = AC.currentTime;
+    while (visQ.length && visQ[0].at <= now) {
+      var v = visQ.shift();
+      friends[v.i].singUntil = clock + v.dur;
+      friends[v.i].excite = 1;
+    }
   }
 
   function unlockCheck() {
@@ -1094,8 +1387,9 @@
         arriveSound();
         ask.idx = i;
         ask.next = clock + 3.2;
-        drawHills();
-        drawHits();
+        // The third arrival brings the tunes, and the whole hill shifts
+        // down to make room for them.
+        if (unlocked() >= 3) { computeLayout(); } else { drawHills(); drawHits(); }
       }
     }
   }
@@ -1119,6 +1413,7 @@
     f.done++;
     save.done[f.i] = f.done;
     save.flowers++;
+    if (save.flowers % 5 === 0) { addMark(); drawMarks(); }
     if (save.garden.length > 90) { save.garden.shift(); }
     persist();
     drawGarden();
@@ -1228,6 +1523,19 @@
       if (resetHold >= RESET_HOLD) { doReset(); }
     }
 
+    drainVis();
+    tuneTick(dt);
+    if (tune.playing && clock > tune.nextAt) { nextTune(); }
+    if (tunesOn() && !tune.playing) {
+      ask.idx = noteIndex(TUNES[tune.idx].notes[tune.pos] || 'B');
+    }
+    if (beeNode) {
+      var lerp = clamp(dt * 7, 0, 1);
+      bee.x += (bee.tx - bee.x) * lerp;
+      bee.y += (bee.ty - bee.y) * lerp;
+      placeBee();
+    }
+
     // Anything she plays that is not one of the three still stirs the
     // grass, so the recorder never once makes nothing happen.
     if (MIC.anyPitch && !MIC.note && clock > puffNext && !reduced) {
@@ -1321,6 +1629,8 @@
   }
 
   load();
+  tune.idx = clamp(save.tune | 0, 0, TUNES.length - 1);
+  tune.pos = clamp(save.pos | 0, 0, TUNES[tune.idx].notes.length - 1);
   buildFriends();
   computeLayout();
   requestAnimationFrame(frame);
