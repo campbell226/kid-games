@@ -170,6 +170,7 @@
   <g id="flowers"></g>
   <g id="tunes"></g>
   <g id="effects"></g>
+  <g id="picker"></g>
   <g id="ui"></g>
 </svg>
 
@@ -1103,6 +1104,7 @@
     drawHills();
     drawGarden();
     drawTuneStrip();
+    drawPicker();
     buildSigns();
     placeAll();
     drawHits();
@@ -1525,6 +1527,79 @@
   }
 
   // ------------------------------------------------------------------
+  // The songs, once they are all hers.
+  //
+  // She cannot read the names, so each one is drawn as a little picture of
+  // its own shape - the same pills at the same heights she has been
+  // playing off all along. Mary is recognisable from across the room by
+  // the way it steps down and holds at the end. The names are underneath
+  // for me, and for whenever she starts matching the words to the songs
+  // she already knows.
+  // ------------------------------------------------------------------
+  var pickerOpen = false;
+
+  function miniTune(idx, x, y, w, h) {
+    var notes = TUNES[idx].notes, beats = tuneBeats(idx), n = notes.length;
+    var total = 0, i, acc = 0, s = '', sp, cx, cy, pw, ph, unit;
+    for (i = 0; i < n; i++) { total += beats[i]; }
+    unit = w / total;
+    ph = Math.max(2.5, Math.min(h / 6, unit * 0.85));
+    for (i = 0; i < n; i++) {
+      sp = SPECS[noteIndex(notes[i])];
+      cy = y + h * (sp.row / (SPECS.length - 1));
+      cx = x + acc * unit;
+      pw = Math.max(ph, beats[i] * unit - unit * 0.14);
+      acc += beats[i];
+      s += '<rect x="' + cx.toFixed(1) + '" y="' + (cy - ph / 2).toFixed(1) + '" width="'
+        + pw.toFixed(1) + '" height="' + ph.toFixed(1) + '" rx="' + (ph / 2).toFixed(1)
+        + '" fill="' + sp.petal + '"/>';
+    }
+    return s;
+  }
+
+  function doneBadge(x, y, r) {
+    var s = '<g transform="translate(' + x + ',' + y + ')">', i;
+    for (i = 0; i < 5; i++) {
+      s += '<ellipse cx="0" cy="' + (-r * 0.62) + '" rx="' + (r * 0.34) + '" ry="' + (r * 0.62)
+        + '" fill="#f2c141" transform="rotate(' + (i * 72) + ')"/>';
+    }
+    return s + '<circle cx="0" cy="0" r="' + (r * 0.34) + '" fill="#e08a2c"/></g>';
+  }
+
+  function drawPicker() {
+    var g = G('picker');
+    clear(g);
+    if (!save.finished || !pickerOpen) { return; }
+    var cols = L.wide ? 4 : 3;
+    var lines = Math.ceil(TUNES.length / cols);
+    var pad = 24;
+    var gw = (L.W - pad * 2) / cols;
+    var gh = Math.min((L.H * 0.88) / lines, gw * 0.78);
+    var top = (L.H - gh * lines) / 2;
+    var cw = gw - 14, ch = gh - 14;
+    var html = '<rect class="hit" x="0" y="0" width="' + L.W + '" height="' + L.H
+      + '" fill="#ffffff" opacity="0.55" data-ui="pickbg"/>';
+    var i, cx, cy, fs, nm;
+    for (i = 0; i < TUNES.length; i++) {
+      cx = pad + (i % cols) * gw + 7;
+      cy = top + Math.floor(i / cols) * gh + 7;
+      nm = TUNES[i].name;
+      fs = Math.min(ch * 0.19, (cw - 18) / (nm.length * 0.54));
+      html += '<g data-ui="pick" data-tune="' + i + '">';
+      html += '<rect x="' + cx + '" y="' + cy + '" width="' + cw + '" height="' + ch
+        + '" rx="' + (ch * 0.16) + '" fill="#fdf6e3" stroke="'
+        + (save.tunesDone[i] ? '#7ab85f' : '#c99a5e') + '" stroke-width="4"/>';
+      html += miniTune(i, cx + cw * 0.09, cy + ch * 0.18, cw * 0.82, ch * 0.42);
+      html += '<text x="' + (cx + cw / 2) + '" y="' + (cy + ch * 0.87) + '" text-anchor="middle"'
+        + ' fill="#4a4034" font-family="ui-rounded, Segoe UI, system-ui, -apple-system, sans-serif"'
+        + ' font-size="' + fs.toFixed(1) + '" font-weight="700">' + nm + '</text>';
+      if (save.tunesDone[i]) { html += doneBadge(cx + cw - ch * 0.17, cy + ch * 0.17, ch * 0.12); }
+      html += '</g>';
+    }
+    g.innerHTML = html;
+  }
+
+  // ------------------------------------------------------------------
   // The parent's one control: the ears, on or off.
   // ------------------------------------------------------------------
   // A recorder is not a touchscreen. She can play for two solid minutes
@@ -1609,6 +1684,7 @@
     save.five = false;
     save.finished = false;
     save.tunesDone = [];
+    pickerOpen = false;
     tune.idx = 0; tune.pos = 0; tune.playing = false; tune.advance = true;
     tuneLast = null; tuneHeld = 0; tuneGiven = 0;
     visQ.length = 0;
@@ -1675,6 +1751,25 @@
       + '" height="' + (rs * 1.36) + '" data-ui="reset"/>';
     g.appendChild(rst);
     resetRing = rst.querySelector('.rring');
+
+    if (save.finished && !pickerOpen) {
+      var lsx = 22 + sz + 14 + sz / 2;
+      var ls = el('g', { transform: 'translate(' + lsx + ',' + (22 + sz / 2) + ')' });
+      ls.innerHTML =
+        '<rect x="' + (-sz / 2) + '" y="' + (-sz / 2) + '" width="' + sz + '" height="' + sz
+        + '" rx="' + (sz * 0.3) + '" fill="#fdf6e3" opacity="0.9" stroke="#c99a5e" stroke-width="3"/>'
+        + '<g fill="#4a4034">'
+        + '<rect x="' + (-sz * 0.26) + '" y="' + (-sz * 0.24) + '" width="' + (sz * 0.52)
+        + '" height="' + (sz * 0.1) + '" rx="' + (sz * 0.05) + '"/>'
+        + '<rect x="' + (-sz * 0.26) + '" y="' + (-sz * 0.05) + '" width="' + (sz * 0.52)
+        + '" height="' + (sz * 0.1) + '" rx="' + (sz * 0.05) + '"/>'
+        + '<rect x="' + (-sz * 0.26) + '" y="' + (sz * 0.14) + '" width="' + (sz * 0.52)
+        + '" height="' + (sz * 0.1) + '" rx="' + (sz * 0.05) + '"/>'
+        + '</g>'
+        + '<rect class="hit" x="' + (-sz * 0.68) + '" y="' + (-sz * 0.68) + '" width="' + (sz * 1.36)
+        + '" height="' + (sz * 1.36) + '" data-ui="list"/>';
+      g.appendChild(ls);
+    }
 
     if (cheatOn) {
       var chx = L.W - 22 - rs - 14 - rs / 2;
@@ -1912,18 +2007,23 @@
       bell(0.05 + k * 0.13, 523.25 * Math.pow(2, s / 12), 0.26, 0.95);
     });
     persist();
+    pickerOpen = true;
     computeLayout();
   }
 
   function nextTune() {
     tune.playing = false;
     if (save.finished || tune.idx >= TUNES.length - 1) {
-      if (!save.finished) { finishGame(); }
+      if (!save.finished) { finishGame(); return; }
+      // Back to the shelf of songs, with this one now marked as hers.
       tune.pos = 0;
       save.pos = 0;
       persist();
       bee.set = false;
+      pickerOpen = true;
       drawTuneStrip();
+      drawPicker();
+      drawUI();
       return;
     }
     tune.idx = (tune.idx + 1) % TUNES.length;
@@ -2198,6 +2298,33 @@
       var which = ui.getAttribute('data-ui');
       if (which === 'reset') { resetting = true; resetHold = 0; return; }
       if (which === 'tune') { replayTune(); return; }
+      if (which === 'pickbg') { return; }
+      if (which === 'pick') {
+        var pick = +ui.getAttribute('data-tune');
+        if (pick >= 0 && pick < TUNES.length) {
+          tune.idx = pick;
+          tune.pos = 0;
+          save.tune = pick;
+          save.pos = 0;
+          persist();
+          pickerOpen = false;
+          bee.set = false;
+          drawPicker();
+          drawTuneStrip();
+          drawUI();
+          tune.advance = false;
+          playThrough(TUNES[pick].notes, 0.9, tuneBeats(pick));
+        }
+        return;
+      }
+      if (which === 'list') {
+        pickerOpen = true;
+        hushAll();
+        tune.playing = false;
+        drawPicker();
+        drawUI();
+        return;
+      }
       if (which === 'cheat') {
         cheatStep();
         cheatHeld = true;
@@ -2272,6 +2399,8 @@
   }
 
   load();
+  // A game that is already finished opens on the shelf of songs.
+  pickerOpen = !!save.finished;
   tune.idx = clamp(save.tune | 0, 0, TUNES.length - 1);
   tune.pos = clamp(save.pos | 0, 0, TUNES[tune.idx].notes.length - 1);
   buildFriends();
