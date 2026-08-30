@@ -32,7 +32,7 @@
 </head>
 <body>
 <script>
-// Full screen on the first touch, and a way back if it is off.
+// Full screen on the first touch.
 //
 // A browser will not do this by itself: the request has to come out of a
 // gesture the browser counts as user activation, and that list is fussier
@@ -41,80 +41,44 @@
 // worked on a laptop and did nothing whatever on a tablet. For a finger it
 // is pointerup and touchend that count.
 //
-// Once full screen is on, the automatic asking stops, so leaving it stays
-// left. But leaving it used to mean reloading to get it back, so there is
-// now a small button at the top of the screen that is only there while
-// full screen is off, and takes itself away the moment it is on.
+// So: listen for all of the ones that can work, and keep trying until one
+// of them actually gets us there. Once it has, stop asking - deliberately
+// leaving full screen should stay left.
 //
 // An iPhone ignores the lot, because Safari there gives full screen to
-// video and nothing else, so no button is offered. That is what the home
-// screen tags above are for.
+// video and nothing else. That is what the home screen tags above are for.
 (function () {
   var el = document.documentElement;
   var go = el.requestFullscreen || el.webkitRequestFullscreen;
   if (!go) { return; }
   var EVENTS = ['pointerup', 'touchend', 'click', 'mousedown'];
-  var asking = false, done = false, btn = null, i;
+  var asking = false, done = false, i;
 
   function isFull() {
     return !!(document.fullscreenElement || document.webkitFullscreenElement);
   }
-
-  function request() {
-    if (asking || isFull()) { return; }
+  function stop() {
+    done = true;
+    for (var k = 0; k < EVENTS.length; k++) {
+      document.removeEventListener(EVENTS[k], attempt, true);
+    }
+  }
+  function attempt() {
+    if (done || asking) { return; }
+    if (isFull()) { stop(); return; }
     asking = true;
     try {
       var p = go.call(el);
-      if (p && p.then) { p.then(function () { asking = false; }, function () { asking = false; }); }
+      if (p && p.then) { p.then(stop, function () { asking = false; }); }
       else { setTimeout(function () { asking = false; }, 500); }
     } catch (e) { asking = false; }
   }
 
-  function stopAuto() {
-    done = true;
-    for (var k = 0; k < EVENTS.length; k++) {
-      document.removeEventListener(EVENTS[k], autoTry, true);
-    }
-  }
-
-  function autoTry() {
-    if (done) { return; }
-    if (isFull()) { stopAuto(); sync(); return; }
-    request();
-  }
-
-  function sync() {
-    var want = !isFull();
-    if (want && !btn && document.body) {
-      btn = document.createElement('button');
-      btn.setAttribute('aria-label', 'Full screen');
-      btn.style.cssText = 'position:fixed;top:5px;left:50%;transform:translateX(-50%);'
-        + 'z-index:30;width:46px;height:46px;padding:0;line-height:0;border:0;'
-        + 'border-radius:14px;background:rgba(255,255,255,0.68);cursor:pointer;'
-        + 'box-shadow:0 1px 5px rgba(0,0,0,0.22);-webkit-tap-highlight-color:transparent;';
-      btn.innerHTML = '<svg width="46" height="46" viewBox="0 0 46 46" aria-hidden="true">'
-        + '<g fill="none" stroke="#40563a" stroke-width="3.4" stroke-linecap="round"'
-        + ' stroke-linejoin="round">'
-        + '<path d="M19 14 H14 V19 M27 14 H32 V19 M19 32 H14 V27 M27 32 H32 V27"/>'
-        + '</g></svg>';
-      btn.addEventListener('click', function (e) { e.stopPropagation(); request(); });
-      document.body.appendChild(btn);
-    }
-    if (btn) { btn.style.display = want ? 'block' : 'none'; }
-  }
-
-  document.addEventListener('fullscreenchange', function () {
-    if (isFull()) { stopAuto(); }
-    sync();
-  });
-  document.addEventListener('webkitfullscreenchange', function () {
-    if (isFull()) { stopAuto(); }
-    sync();
-  });
+  document.addEventListener('fullscreenchange', function () { if (isFull()) { stop(); } });
+  document.addEventListener('webkitfullscreenchange', function () { if (isFull()) { stop(); } });
   for (i = 0; i < EVENTS.length; i++) {
-    document.addEventListener(EVENTS[i], autoTry, true);
+    document.addEventListener(EVENTS[i], attempt, true);
   }
-  sync();
 })();
 </script>
 
@@ -124,9 +88,6 @@
       <stop offset="0" stop-color="#57a4dc"/>
       <stop offset="0.6" stop-color="#a7dbf2"/>
       <stop offset="1" stop-color="#dff2dd"/>
-    </linearGradient>
-    <linearGradient id="hillpale" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#d7eec9"/><stop offset="1" stop-color="#bee3ab"/>
     </linearGradient>
     <linearGradient id="hilltop" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#c9e8b9"/><stop offset="1" stop-color="#abd897"/>
@@ -170,7 +131,6 @@
   <g id="flowers"></g>
   <g id="tunes"></g>
   <g id="effects"></g>
-  <g id="picker"></g>
   <g id="ui"></g>
 </svg>
 
@@ -217,18 +177,14 @@
   // enough that being slightly sharp on B would read as C, which at five
   // she reliably is.
   var SPECS = [
-    { id: 'B', midi: 83, row: 2, holes: 1, thumb: true, animal: 'bird',
+    { id: 'B', midi: 83, row: 1, holes: 1, thumb: true, animal: 'bird',
       colour: '#f2c141', dark: '#d69c1c', petal: '#ffd45c', top: 182 },
-    { id: 'A', midi: 81, row: 3, holes: 2, thumb: true, animal: 'rabbit',
+    { id: 'A', midi: 81, row: 2, holes: 2, thumb: true, animal: 'rabbit',
       colour: '#cbb4a3', dark: '#a08675', petal: '#f58aa6', top: 240 },
-    { id: 'G', midi: 79, row: 4, holes: 3, thumb: true, animal: 'badger',
+    { id: 'G', midi: 79, row: 3, holes: 3, thumb: true, animal: 'badger',
       colour: '#8d959e', dark: '#585f68', petal: '#a982e0', top: 176 },
     { id: 'D', midi: 86, row: 0, holes: 0, thumb: false, animal: 'squirrel',
-      colour: '#c8703a', dark: '#9d5326', petal: '#4fb8d8', top: 186 },
-    // C and D are the same finger. The thumb is the entire difference
-    // between them, which is worth her noticing.
-    { id: 'C', midi: 84, row: 1, holes: 0, thumb: true, animal: 'fox',
-      colour: '#e08040', dark: '#b35a24', petal: '#e8623f', top: 192 }
+      colour: '#c8703a', dark: '#9d5326', petal: '#4fb8d8', top: 186 }
   ];
 
   function specByRow(r) {
@@ -260,43 +216,28 @@
   // garden's when it plays the song back, and it spaces the notes along
   // the strip the way written music does; she still just plays them.
   var TUNES = [
-    { name: 'Up and Down', notes: ['B', 'A', 'G', 'B', 'A', 'G'],
+    { notes: ['B', 'A', 'G', 'B', 'A', 'G'],
       beats: [1, 1, 2, 1, 1, 2] },
-    { name: 'Merrily', notes: ['B', 'A', 'G', 'A', 'B', 'B', 'B'],
+    { notes: ['B', 'A', 'G', 'A', 'B', 'B', 'B'],
       beats: [1, 1, 1, 1, 1, 1, 2] },
-    { name: 'Merrily We Roll Along',
-      notes: ['B', 'A', 'G', 'A', 'B', 'B', 'B', 'A', 'A', 'A', 'B', 'B', 'B'],
+    { notes: ['B', 'A', 'G', 'A', 'B', 'B', 'B', 'A', 'A', 'A', 'B', 'B', 'B'],
       beats: [1, 1, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 2] },
-    { name: 'Hot Cross Buns',
-      notes: ['B', 'A', 'G', 'B', 'A', 'G', 'G', 'G', 'G', 'A', 'A', 'A', 'B', 'A', 'G'],
+    { notes: ['B', 'A', 'G', 'B', 'A', 'G', 'G', 'G', 'G', 'A', 'A', 'A', 'B', 'A', 'G'],
       beats: [1, 1, 2, 1, 1, 2, 0.5, 0.5, 1, 0.5, 0.5, 1, 1, 1, 2] },
-    // From here on she needs D, and finishing the four above fetches it.
-    { name: 'Hello D', notes: ['D', 'B', 'A', 'G', 'D', 'B', 'A', 'G'],
+    // Everything past here needs D, and finishing the four above is what
+    // fetches it.
+    { notes: ['D', 'B', 'A', 'G', 'D', 'B', 'A', 'G'],
       beats: [1, 1, 1, 1, 1, 1, 1, 2] },
-    { name: 'Up to D', notes: ['G', 'A', 'B', 'D', 'D', 'B', 'A', 'G'],
+    { notes: ['G', 'A', 'B', 'D', 'D', 'B', 'A', 'G'],
       beats: [1, 1, 1, 1, 1, 1, 1, 2] },
-    { name: 'Little Lamb',
-      notes: ['B', 'A', 'G', 'A', 'B', 'B', 'B', 'A', 'A', 'A', 'B', 'D', 'D'],
+    { notes: ['B', 'A', 'G', 'A', 'B', 'B', 'B', 'A', 'A', 'A', 'B', 'D', 'D'],
       beats: [1, 1, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 2] },
-    { name: 'Mary Had a Little Lamb',
-      notes: ['B', 'A', 'G', 'A', 'B', 'B', 'B', 'A', 'A', 'A', 'B', 'D', 'D',
+    { notes: ['B', 'A', 'G', 'A', 'B', 'B', 'B', 'A', 'A', 'A', 'B', 'D', 'D',
               'B', 'A', 'G', 'A', 'B', 'B', 'B', 'B', 'A', 'A', 'B', 'A', 'G'],
       beats: [1, 1, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 2,
-              1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4] },
-    // And from here she needs C, which the fox brings.
-    { name: 'Hello C', notes: ['G', 'A', 'B', 'C', 'C', 'B', 'A', 'G'],
-      beats: [1, 1, 1, 1, 1, 1, 1, 2] },
-    { name: 'Five Steps', notes: ['G', 'A', 'B', 'C', 'D', 'D', 'C', 'B', 'A', 'G'],
-      beats: [1, 1, 1, 1, 2, 1, 1, 1, 1, 2] },
-    { name: 'Frere Jacques',
-      notes: ['G', 'A', 'B', 'G', 'G', 'A', 'B', 'G', 'B', 'C', 'D', 'B', 'C', 'D'],
-      beats: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 2] },
-    { name: 'Ode to Joy',
-      notes: ['B', 'B', 'C', 'D', 'D', 'C', 'B', 'A', 'G', 'G', 'A', 'B', 'B', 'A', 'A'],
-      beats: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.5, 0.5, 2] }
+              1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4] }
   ];
   var TUNES_3 = 4;   // how many of them the first three notes can manage
-  var TUNES_4 = 8;   // and how many before she needs the fifth
 
   function tuneBeats(idx) {
     var tn = TUNES[idx], i, b;
@@ -590,22 +531,13 @@
     // Nearest of the three she is learning, in either octave. Being a
     // whole tone apart, they stay told apart even when she is badly out
     // of tune, which at five she reliably is.
-    // C sits a single semitone from B - the first pair of neighbours on
-    // this hill - and a recorder leaned on sharpens by a third of one. So
-    // the note already sounding keeps its claim unless the pitch moves
-    // well past halfway to its neighbour. Without this she would hear C
-    // every time she pushed a little hard on B.
-    var STICK = 0.35;
     var midi = 69 + 12 * Math.log(MIC.pitch / 440) / Math.LN2;
-    var hit = null, best = 99, err = 99, oct = false, cents = 0, e1, e2, adj, s1, s2;
+    var hit = null, err = 99, oct = false, cents = 0, e1, e2;
     for (i = 0; i < SPECS.length; i++) {
-      adj = (hold.note === SPECS[i].id) ? STICK : 0;
       e1 = midi - SPECS[i].midi;
       e2 = midi - (SPECS[i].midi + 12);
-      s1 = Math.abs(e1) - adj;
-      s2 = Math.abs(e2) - adj;
-      if (s1 < best) { best = s1; err = Math.abs(e1); hit = SPECS[i]; oct = false; cents = e1 * 100; }
-      if (s2 < best) { best = s2; err = Math.abs(e2); hit = SPECS[i]; oct = true; cents = e2 * 100; }
+      if (Math.abs(e1) < err) { err = Math.abs(e1); hit = SPECS[i]; oct = false; cents = e1 * 100; }
+      if (Math.abs(e2) < err) { err = Math.abs(e2); hit = SPECS[i]; oct = true; cents = e2 * 100; }
     }
     if (!hit || err > 0.8) { return; }
     MIC.note = hit.id;
@@ -747,27 +679,6 @@
       + '<ellipse cx="0" cy="-88" rx="12" ry="9" fill="' + stripe + '"/>'
       + mouthG(0, -72, 0.4, '<path d="M -15 -76 Q 0 -60 15 -76 Q 0 -68 -15 -76 Z" fill="#7d5a5f"/>')
       + paws(40, -120, 20, s.dark);
-  };
-
-  ART.fox = function (s) {
-    return '<g class="legs">'
-      + '<rect x="-40" y="-22" width="24" height="24" rx="11" fill="' + s.dark + '"/>'
-      + '<rect x="16" y="-22" width="24" height="24" rx="11" fill="' + s.dark + '"/>'
-      + '</g>'
-      + '<ellipse cx="56" cy="-58" rx="25" ry="46" fill="' + s.dark + '" transform="rotate(26 56 -58)"/>'
-      + '<ellipse cx="74" cy="-96" rx="15" ry="17" fill="#f7ede0" transform="rotate(26 74 -96)"/>'
-      + '<ellipse cx="0" cy="-56" rx="45" ry="46" fill="' + s.colour + '"/>'
-      + '<ellipse cx="0" cy="-44" rx="26" ry="29" fill="#f7ede0"/>'
-      + '<path d="M -33 -104 L -43 -142 L -11 -122 Z" fill="' + s.colour + '"/>'
-      + '<path d="M 33 -104 L 43 -142 L 11 -122 Z" fill="' + s.colour + '"/>'
-      + '<path d="M -30 -108 L -36 -132 L -17 -120 Z" fill="#3a2a22"/>'
-      + '<path d="M 30 -108 L 36 -132 L 17 -120 Z" fill="#3a2a22"/>'
-      + '<circle cx="0" cy="-104" r="34" fill="' + s.colour + '"/>'
-      + '<path d="M -32 -94 q 32 26 64 0 q -32 22 -64 0 z" fill="#f7ede0"/>'
-      + eyePair(0, -110, 16, 12, 7)
-      + '<ellipse cx="0" cy="-86" rx="9" ry="7" fill="#3a2a22"/>'
-      + mouthG(0, -74, 0.4, '<path d="M -13 -78 Q 0 -64 13 -78 Q 0 -70 -13 -78 Z" fill="#8a5c4a"/>')
-      + paws(25, -138, 16, s.dark);
   };
 
   ART.squirrel = function (s) {
@@ -931,8 +842,8 @@
   // ------------------------------------------------------------------
   // What the garden remembers between visits.
   // ------------------------------------------------------------------
-  var save = { flowers: 0, done: [0, 0, 0, 0, 0], garden: [], tune: 0, pos: 0,
-               four: false, five: false, finished: false, tunesDone: [] };
+  var save = { flowers: 0, done: [0, 0, 0, 0], garden: [], tune: 0, pos: 0,
+               four: false, finished: false };
 
   function load() {
     try {
@@ -949,9 +860,7 @@
             save.tune = s.tune || 0;
         save.pos = s.pos || 0;
         save.four = !!s.four;
-        save.five = !!s.five;
         save.finished = !!s.finished;
-        save.tunesDone = s.tunesDone || [];
       }
     } catch (e) {}
   }
@@ -969,25 +878,9 @@
   // The squirrel is not earned with flowers. She gets it for finishing
   // every song the first three notes can make.
   function fourOn() { return !!save.four; }
-  function fiveOn() { return !!save.five; }
-
   function shouldBeHere(i) {
     if (save.finished) { return false; }
-    if (i === 4) { return fiveOn(); }
-    if (i === 3) { return fourOn(); }
-    return i < unlocked();
-  }
-
-  // The rows in play, highest note first. Everything on the hill is placed
-  // by where a friend sits in this list rather than by a fixed row number,
-  // so a sixth note later is one more entry and nothing else.
-  function activeRows() {
-    var i, rows = [];
-    for (i = 0; i < SPECS.length; i++) {
-      if (shouldBeHere(i)) { rows.push(SPECS[i].row); }
-    }
-    rows.sort(function (a, b) { return a - b; });
-    return rows;
+    return i === 3 ? fourOn() : i < unlocked();
   }
 
   // ------------------------------------------------------------------
@@ -1015,125 +908,49 @@
     // left above it. Portrait has room to spare and loses nothing;
     // landscape is where the friends give something up.
     var songs = tunesOn();
-    var rows = activeRows(), slots = rows.length;
-    var stripH = songs ? (wide ? (slots > 3 ? H * 0.20 : H * 0.175)
-                               : (slots > 3 ? H * 0.15 : H * 0.13)) : 0;
+    var stripH = songs ? (wide ? (fourOn() ? H * 0.20 : H * 0.175)
+                               : (fourOn() ? H * 0.15 : H * 0.13)) : 0;
     var stripBot = H - H * 0.045;
     var stripTop = stripBot - stripH;
     var floor = songs ? stripTop - H * 0.03 : H;
 
-    // A terrace per note in play, spread across whatever height is left
-    // above the tune. The friends are placed by where they come in this
-    // list rather than by a fixed row number, so a sixth note later is one
-    // more line in the table and nothing else.
-    var SPREAD = {
-      // Landscape uses the whole hill top to bottom: the top terrace is
-      // held clear of the buttons by the band below, so leaving a margin
-      // here as well only costs height the terraces badly need.
-      wide: {
-        3: { y: [0.16, 0.56, 0.96], x: [0.72, 0.28, 0.72] },
-        4: { y: [0.16, 0.427, 0.693, 0.96], x: [0.72, 0.28, 0.72, 0.28] },
-        5: { y: [0.16, 0.36, 0.56, 0.76, 0.96], x: [0.72, 0.28, 0.72, 0.28, 0.72] }
-      },
-      tall: {
-        3: { y: [0.40, 0.645, 0.885], x: [0.655, 0.315, 0.645] },
-        4: { y: [0.295, 0.50, 0.705, 0.91], x: [0.66, 0.30, 0.68, 0.32] },
-        5: { y: [0.235, 0.41, 0.585, 0.76, 0.935], x: [0.66, 0.30, 0.68, 0.32, 0.66] }
-      }
-    };
-    var table = SPREAD[wide ? 'wide' : 'tall'][slots] || SPREAD[wide ? 'wide' : 'tall'][3];
-    var k;
-
-    // The tallest friend, which is what a row has to be able to hold, and
-    // the friend that will stand on the top terrace, which is what has to
-    // clear the controls along the top of the screen.
-    var tallest = 0, topTop = 0, tk;
-    for (tk = 0; tk < SPECS.length; tk++) {
-      if (SPECS[tk].top > tallest) { tallest = SPECS[tk].top; }
-      if (SPECS[tk].row === rows[0]) { topTop = SPECS[tk].top; }
+    // Four heights once the squirrel is here, and everyone shuffles to
+    // make room for it. Landscape is where that costs something: portrait
+    // has height to spare and the friends stay exactly as big.
+    var four = fourOn();
+    var rowY, rowX, rowH;
+    if (four) {
+      rowY = wide ? [floor * 0.26, floor * 0.485, floor * 0.71, floor * 0.935]
+                  : [floor * 0.295, floor * 0.50, floor * 0.705, floor * 0.91];
+      rowX = wide ? [W * 0.80, W * 0.585, W * 0.365, W * 0.16]
+                  : [W * 0.66, W * 0.30, W * 0.68, W * 0.32];
+      rowH = (rowY[3] - rowY[0]) / 3;
+    } else {
+      rowY = wide ? [0, floor * 0.315, floor * 0.605, floor * 0.895]
+                  : [0, floor * 0.40, floor * 0.645, floor * 0.885];
+      rowX = wide ? [0, W * 0.765, W * 0.505, W * 0.245]
+                  : [0, W * 0.655, W * 0.315, W * 0.645];
+      rowH = wide ? floor * 0.29 : floor * 0.245;
     }
 
-    // The hill starts below the microphone and its neighbours. Only as far
-    // below as it has to: the highest friend was disappearing behind the
-    // fast forward button, and a fixed margin would have cost portrait
-    // height it does not need to give up. Four passes settle it.
-    var band = uiSizeFor(W, 1000 / vw) + 24;
-    var hillTop = 0, slotY, slotX, rowH, colH, scale, signScale, pass, want;
-    var outer, room, squash;
-    for (pass = 0; pass < 4; pass++) {
-      slotY = []; slotX = [];
-      for (k = 0; k < table.y.length; k++) {
-        slotY.push(hillTop + (floor - hillTop) * table.y[k]);
-        slotX.push(W * table.x[k]);
-      }
-      rowH = slots > 1
-        ? (floor - hillTop) * (table.y[slots - 1] - table.y[0]) / (slots - 1)
-        : (floor - hillTop) * 0.3;
-      // The friends climb left, right, left, so the one standing directly
-      // above another is two rows up. That doubled gap is what they have to
-      // fit inside, and on a short landscape screen - five terraces and a
-      // tune strip on a phone held sideways - it is the difference between
-      // an animal you can read and a speck smaller than its own signpost.
-      colH = rowH * (wide ? 2 : 1);
-      scale = clamp(Math.min(W * 0.30 / 200, (colH - 16) / tallest), 0.14, 1.5);
-      signScale = wide
-        ? clamp(Math.min((W * 0.26) / 430, (colH * 0.62) / 180), 0.14, 0.8)
-        : clamp(Math.min((W * 0.19) / 170, (colH * 0.92) / 514), 0.14, 1.0);
-      // A friend and its signpost stand side by side on their own half of
-      // the screen, and both have to fit between the middle and the edge.
-      outer = 88 * scale + (wide ? 452 : 212) * signScale + 16;
-      room = W * (1 - table.x[0]) - 20;
-      if (outer > room) {
-        squash = room / outer;
-        scale *= squash;
-        signScale *= squash;
-      }
-      // It is the signpost, not the friend, that has to clear the buttons:
-      // it stands higher to begin with, and swells by a fifth again while
-      // its friend is listening.
-      want = band - Math.min(
-        slotY[0] - topTop * scale,
-        slotY[0] + 6 - (wide ? 230 : 530) * signScale * 1.22
-      );
-      if (want <= 0) { break; }
-      hillTop = Math.min(hillTop + want, floor * 0.55);
-    }
-
-    // The hill can only start so low before there is no garden left. When
-    // it runs out of room, the friends give up the height instead, so
-    // nothing ever ends up standing behind a button.
-    var head = slotY[0] - band;
-    var need = Math.max(topTop * scale, (wide ? 230 : 530) * signScale * 1.22 - 6);
-    if (need > head && head > 0) {
-      scale *= head / need;
-      signScale *= head / need;
-    }
-
-    // Indexed by friend, not by row, so saved gardens and every existing
-    // lookup keep working. A friend that is not here is parked on the
-    // nearest terrace; it is hidden anyway.
-    var gy = [], xs = [], r, slotOf = {};
-    for (k = 0; k < rows.length; k++) { slotOf[rows[k]] = k; }
+    // Everything below is still indexed by friend, not by row, so that
+    // saved gardens and every existing lookup keep working.
+    var gy = [], xs = [], r;
     for (r = 0; r < SPECS.length; r++) {
-      k = slotOf[SPECS[r].row];
-      if (k === undefined) { k = slots - 1; }
-      gy.push(slotY[k]);
-      xs.push(slotX[k]);
+      gy.push(rowY[SPECS[r].row]);
+      xs.push(rowX[SPECS[r].row]);
     }
     var strip = songs ? { y: stripTop, h: stripH } : null;
+    var scale = clamp(Math.min(W * 0.30 / 200, rowH / 230), 0.26, 1.5);
+    var signScale = wide
+      ? clamp(Math.min((W * 0.26) / 430, (rowH * 0.62) / 180), 0.16, 0.8)
+      : clamp(Math.min((W * 0.19) / 170, (rowH * 0.92) / 514), 0.14, 1.0);
 
-    var signX = [], flowerX = [], side = [], i, sd, off, half;
-    half = (wide ? 226 : 106) * signScale;
-    off = 88 * scale + half + 16;
+    var signX = [], flowerX = [], side = [], i, sd;
     for (i = 0; i < SPECS.length; i++) {
-      // The signpost stands on the outer side of its friend. Pushed toward
-      // the middle instead, they queue down the centre of the screen, each
-      // one nearer the next sign than the animal it belongs to. Out here
-      // each sign has only its own friend beside it, and the flowers get
-      // the middle.
-      sd = xs[i] > W * 0.5 ? 1 : -1;
+      sd = xs[i] > W * 0.5 ? -1 : 1;
       side.push(sd);
-      signX.push(clamp(xs[i] + sd * off, half + 10, W - half - 10));
+      signX.push(xs[i] + sd * (92 * scale + (wide ? 210 : 86) * signScale + 14));
       flowerX.push(xs[i] - sd * (100 * scale + 44 * scale));
     }
 
@@ -1145,22 +962,20 @@
       // a fingertip.
       perPx: 1000 / vw,
       signScale: signScale, signX: signX, flowerX: flowerX, side: side,
-      strip: strip, slotY: slotY, slots: slots, rows: rows,
+      strip: strip, rowY: rowY, four: four,
       bandTop: [], bandBot: []
     };
 
     // A friend's share of the empty ground: from just under whoever is
     // above it to just under itself.
     var edge = [], q;
-    for (q = 0; q < slots; q++) {
-      edge.push(q === 0 ? 0 : (slotY[q - 1] + slotY[q]) / 2);
+    for (q = 0; q < 4; q++) {
+      edge.push(q === 0 ? 0 : (rowY[q - 1] + rowY[q]) / 2);
     }
     edge.push(H);
     for (i = 0; i < SPECS.length; i++) {
-      q = slotOf[SPECS[i].row];
-      if (q === undefined) { q = slots - 1; }
-      L.bandTop.push(edge[q]);
-      L.bandBot.push(edge[q + 1]);
+      L.bandTop.push(edge[SPECS[i].row]);
+      L.bandBot.push(edge[SPECS[i].row + 1]);
     }
 
     svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
@@ -1168,7 +983,6 @@
     drawHills();
     drawGarden();
     drawTuneStrip();
-    drawPicker();
     buildSigns();
     placeAll();
     drawHits();
@@ -1183,7 +997,7 @@
     g.appendChild(el('circle', { cx: sx, cy: sy, r: 110, fill: 'url(#glowg)' }));
     g.appendChild(el('circle', { cx: sx, cy: sy, r: 44, fill: '#fff6cc' }));
     if (save.finished) {
-      var base = L.slotY[0];
+      var base = L.rowY[L.four ? 0 : 1];
       var cols = ['#e2564f', '#ef9a3d', '#f2d049', '#6cb85c', '#4f9be0', '#8a6bd1'];
       var rr = Math.min(W * 0.46, base * 0.94), band = Math.max(4, rr * 0.085), k, rad;
       for (k = 0; k < cols.length; k++) {
@@ -1208,9 +1022,7 @@
     });
   }
 
-  // Palest at the back. However many notes are in play, the nearest
-  // terrace is always the darkest one.
-  var HILLS = ['hillpale', 'hilltop', 'hill0', 'hill1', 'hill2'];
+  var HILLS = ['hilltop', 'hill0', 'hill1', 'hill2'];
 
   function hillPath(y, amp) {
     var W = L.W, H = L.H;
@@ -1224,16 +1036,16 @@
     var g = G('hills'), i, k, amp = clamp(L.H * 0.014, 8, 26);
     clear(g);
 
-    // One terrace per note in play, palest at the back and the nearest
-    // one always the darkest.
-    for (i = 0; i < L.slots; i++) {
+    // One terrace per note, palest at the back. Adding a fifth note later
+    // is adding a fifth row and nothing else.
+    var first = L.four ? 0 : 1;
+    for (i = first; i < 4; i++) {
       g.appendChild(el('path', {
-        d: hillPath(L.slotY[i], amp),
-        fill: 'url(#' + HILLS[HILLS.length - L.slots + i] + ')'
+        d: hillPath(L.rowY[i], amp), fill: 'url(#' + HILLS[i] + ')'
       }));
       var tufts = '';
       for (k = 0; k < 9; k++) {
-        var gx = rnd(20, L.W - 20), ty = L.slotY[i] + rnd(14, 30), th = rnd(9, 18);
+        var gx = rnd(20, L.W - 20), ty = L.rowY[i] + rnd(14, 30), th = rnd(9, 18);
         tufts += '<path d="M ' + gx + ' ' + ty + ' q ' + rnd(-5, 5) + ' ' + (-th) + ' ' + rnd(3, 8) + ' ' + (-th * 1.3) + '" '
           + 'stroke="#3f8a44" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.5"/>';
       }
@@ -1269,7 +1081,7 @@
       // squirrel's flowers to the badger's bed, in the badger's colour,
       // which looked for all the world like they had not been saved.
       lvl = clamp(f.i | 0, 0, SPECS.length - 1);
-      sc = clamp(L.scale * 0.85, 0.14, 1.25);
+      sc = clamp(L.scale * 0.85, 0.3, 1.25);
       if (typeof f.k === 'number') {
         pl = PLOT[f.k % PLOT.length];
         x = L.flowerX[lvl] + pl[0] * sc;
@@ -1323,9 +1135,8 @@
   function drawTuneStrip() {
     var g = G('tunes');
     beeNode = null;
-    if (!L.strip || !tunesOn() || pickerOpen) {
-      // Nothing left pointing at nodes that are no longer there. The shelf
-      // covers the screen when it is open, so the strip stands down.
+    if (!L.strip || !tunesOn()) {
+      // Nothing left pointing at nodes that are no longer there.
       clear(g); tune.discs = []; tune.lit = []; return;
     }
 
@@ -1338,12 +1149,11 @@
     var total = 0, least = 99;
     for (k = 0; k < n; k++) { total += beats[k]; if (beats[k] < least) { least = beats[k]; } }
     var unit = (right - left) / total;
-    var r = clamp(Math.min(unit * least * 0.38,
-      s.h * (L.slots > 4 ? 0.075 : L.slots > 3 ? 0.095 : 0.19)), 5, 26);
+    var r = clamp(Math.min(unit * least * 0.38, s.h * (L.four ? 0.095 : 0.19)), 5, 26);
     // One line per friend, in hill order: the squirrel's on top, the
     // badger's at the bottom. Which is a stave, and she can already read
     // it, because the hill has been saying the same thing all along.
-    var rows = L.rows;
+    var rows = L.four ? [0, 1, 2, 3] : [1, 2, 3];
     var lineY = {}, span = rows.length - 1, sp;
     for (k = 0; k < rows.length; k++) {
       lineY[rows[k]] = s.y + s.h * (0.2 + 0.6 * (span ? k / span : 0.5));
@@ -1531,7 +1341,7 @@
   // finished one will be saved into, so nothing moves at the moment it is
   // planted - the growing flower simply starts the next one along.
   function flowerSlot(f) {
-    var sc = clamp(L.scale * 0.85, 0.14, 1.25);
+    var sc = clamp(L.scale * 0.85, 0.3, 1.25);
     var pl = PLOT[f.done % PLOT.length];
     return { x: L.flowerX[f.i] + pl[0] * sc, y: L.gy[f.i] + 10 + pl[1] * sc, sc: sc };
   }
@@ -1592,82 +1402,6 @@
   }
 
   // ------------------------------------------------------------------
-  // The songs, once they are all hers.
-  //
-  // She cannot read the names, so each one is drawn as a little picture of
-  // its own shape - the same pills at the same heights she has been
-  // playing off all along. Mary is recognisable from across the room by
-  // the way it steps down and holds at the end. The names are underneath
-  // for me, and for whenever she starts matching the words to the songs
-  // she already knows.
-  // ------------------------------------------------------------------
-  var pickerOpen = false;
-
-  function miniTune(idx, x, y, w, h) {
-    var notes = TUNES[idx].notes, beats = tuneBeats(idx), n = notes.length;
-    var total = 0, i, acc = 0, s = '', sp, cx, cy, pw, ph, unit;
-    for (i = 0; i < n; i++) { total += beats[i]; }
-    unit = w / total;
-    ph = Math.max(2.5, Math.min(h / 6, unit * 0.85));
-    for (i = 0; i < n; i++) {
-      sp = SPECS[noteIndex(notes[i])];
-      cy = y + h * (sp.row / (SPECS.length - 1));
-      cx = x + acc * unit;
-      pw = Math.max(ph, beats[i] * unit - unit * 0.14);
-      acc += beats[i];
-      s += '<rect x="' + cx.toFixed(1) + '" y="' + (cy - ph / 2).toFixed(1) + '" width="'
-        + pw.toFixed(1) + '" height="' + ph.toFixed(1) + '" rx="' + (ph / 2).toFixed(1)
-        + '" fill="' + sp.petal + '"/>';
-    }
-    return s;
-  }
-
-  function doneBadge(x, y, r) {
-    var s = '<g transform="translate(' + x + ',' + y + ')">', i;
-    for (i = 0; i < 5; i++) {
-      s += '<ellipse cx="0" cy="' + (-r * 0.62) + '" rx="' + (r * 0.34) + '" ry="' + (r * 0.62)
-        + '" fill="#f2c141" transform="rotate(' + (i * 72) + ')"/>';
-    }
-    return s + '<circle cx="0" cy="0" r="' + (r * 0.34) + '" fill="#e08a2c"/></g>';
-  }
-
-  function drawPicker() {
-    var g = G('picker');
-    clear(g);
-    if (!save.finished || !pickerOpen) { return; }
-    var cols = L.wide ? 4 : 3;
-    var lines = Math.ceil(TUNES.length / cols);
-    var pad = 24;
-    var gw = (L.W - pad * 2) / cols;
-    // The microphone, the reset and the full screen button all live along
-    // the top, so the shelf starts below them rather than under them.
-    var band = uiSize() + 34;
-    var gh = Math.min((L.H - band - L.H * 0.05) / lines, gw * 0.78);
-    var top = band + (L.H - band - gh * lines) / 2;
-    var cw = gw - 14, ch = gh - 14;
-    var html = '<rect class="hit" x="0" y="0" width="' + L.W + '" height="' + L.H
-      + '" fill="#ffffff" opacity="0.55" data-ui="pickbg"/>';
-    var i, cx, cy, fs, nm;
-    for (i = 0; i < TUNES.length; i++) {
-      cx = pad + (i % cols) * gw + 7;
-      cy = top + Math.floor(i / cols) * gh + 7;
-      nm = TUNES[i].name;
-      fs = Math.min(ch * 0.19, (cw - 18) / (nm.length * 0.54));
-      html += '<g data-ui="pick" data-tune="' + i + '">';
-      html += '<rect x="' + cx + '" y="' + cy + '" width="' + cw + '" height="' + ch
-        + '" rx="' + (ch * 0.16) + '" fill="#fdf6e3" stroke="'
-        + (save.tunesDone[i] ? '#7ab85f' : '#c99a5e') + '" stroke-width="4"/>';
-      html += miniTune(i, cx + cw * 0.09, cy + ch * 0.18, cw * 0.82, ch * 0.42);
-      html += '<text x="' + (cx + cw / 2) + '" y="' + (cy + ch * 0.87) + '" text-anchor="middle"'
-        + ' fill="#4a4034" font-family="ui-rounded, Segoe UI, system-ui, -apple-system, sans-serif"'
-        + ' font-size="' + fs.toFixed(1) + '" font-weight="700">' + nm + '</text>';
-      if (save.tunesDone[i]) { html += doneBadge(cx + cw - ch * 0.17, cy + ch * 0.17, ch * 0.12); }
-      html += '</g>';
-    }
-    g.innerHTML = html;
-  }
-
-  // ------------------------------------------------------------------
   // The parent's one control: the ears, on or off.
   // ------------------------------------------------------------------
   // A recorder is not a touchscreen. She can play for two solid minutes
@@ -1685,9 +1419,6 @@
       w.addEventListener('release', function () { wakeLock = null; });
     })['catch'](function () { wakeAsking = false; wakeLock = null; });
   }
-
-  function uiSizeFor(w, perPx) { return clamp(Math.max(w * 0.08, 54 * perPx), 58, 190); }
-  function uiSize() { return uiSizeFor(L.W, L.perPx); }
 
   var micRing = null, resetRing = null, resetCirc = 1;
   var resetBig = null, bigRing = null, bigCirc = 1;
@@ -1747,15 +1478,12 @@
       f.singUntil = 0; f.gigUntil = 0;
     }
     save.flowers = 0;
-    save.done = [0, 0, 0, 0, 0];
+    save.done = [0, 0, 0, 0];
     save.garden = [];
     save.tune = 0;
     save.pos = 0;
     save.four = false;
-    save.five = false;
     save.finished = false;
-    save.tunesDone = [];
-    pickerOpen = false;
     tune.idx = 0; tune.pos = 0; tune.playing = false; tune.advance = true;
     tuneLast = null; tuneHeld = 0; tuneGiven = 0;
     visQ.length = 0;
@@ -1781,11 +1509,10 @@
     if (!L.W) { return; }
     var g = G('ui');
     clear(g);
-    var sz = uiSize();
+    var sz = clamp(Math.max(L.W * 0.08, 54 * L.perPx), 58, 190);
     // Top corners: the tune has the bottom of the screen now, and out
     // of the way of a hand resting on the edge of the tablet.
-    var edge = Math.max(22, sz * 0.2);
-    var cx = edge + sz / 2, cy = 22 + sz / 2;
+    var cx = 22 + sz / 2, cy = 22 + sz / 2;
     var on = MIC.state === 'on';
     var busy = MIC.state === 'asking';
     var ink = on ? '#3f7c36' : '#948d82';
@@ -1810,7 +1537,7 @@
     var rs = sz, rr = rs * 0.6;
     resetCirc = 2 * Math.PI * rr;
     var rst = el('g', {
-      transform: 'translate(' + (L.W - edge - rs / 2) + ',' + (22 + rs / 2) + ')'
+      transform: 'translate(' + (L.W - 22 - rs / 2) + ',' + (22 + rs / 2) + ')'
     });
     rst.innerHTML =
       '<rect x="' + (-rs / 2) + '" y="' + (-rs / 2) + '" width="' + rs + '" height="' + rs
@@ -1824,27 +1551,8 @@
     g.appendChild(rst);
     resetRing = rst.querySelector('.rring');
 
-    if (save.finished && !pickerOpen) {
-      var lsx = edge + sz + 14 + sz / 2;
-      var ls = el('g', { transform: 'translate(' + lsx + ',' + (22 + sz / 2) + ')' });
-      ls.innerHTML =
-        '<rect x="' + (-sz / 2) + '" y="' + (-sz / 2) + '" width="' + sz + '" height="' + sz
-        + '" rx="' + (sz * 0.3) + '" fill="#fdf6e3" opacity="0.9" stroke="#c99a5e" stroke-width="3"/>'
-        + '<g fill="#4a4034">'
-        + '<rect x="' + (-sz * 0.26) + '" y="' + (-sz * 0.24) + '" width="' + (sz * 0.52)
-        + '" height="' + (sz * 0.1) + '" rx="' + (sz * 0.05) + '"/>'
-        + '<rect x="' + (-sz * 0.26) + '" y="' + (-sz * 0.05) + '" width="' + (sz * 0.52)
-        + '" height="' + (sz * 0.1) + '" rx="' + (sz * 0.05) + '"/>'
-        + '<rect x="' + (-sz * 0.26) + '" y="' + (sz * 0.14) + '" width="' + (sz * 0.52)
-        + '" height="' + (sz * 0.1) + '" rx="' + (sz * 0.05) + '"/>'
-        + '</g>'
-        + '<rect class="hit" x="' + (-sz * 0.68) + '" y="' + (-sz * 0.68) + '" width="' + (sz * 1.36)
-        + '" height="' + (sz * 1.36) + '" data-ui="list"/>';
-      g.appendChild(ls);
-    }
-
     if (cheatOn) {
-      var chx = L.W - edge - rs - 14 - rs / 2;
+      var chx = L.W - 22 - rs - 14 - rs / 2;
       var ch = el('g', { transform: 'translate(' + chx + ',' + (22 + rs / 2) + ')' });
       ch.innerHTML =
         '<rect x="' + (-rs / 2) + '" y="' + (-rs / 2) + '" width="' + rs + '" height="' + rs
@@ -1913,7 +1621,7 @@
       if (!friends[i] || !friends[i].present) { continue; }
       sc = L.scale;
       ss = L.signScale;
-      fs = clamp(sc * 0.85, 0.14, 1.25);
+      fs = clamp(sc * 0.85, 0.3, 1.25);
 
       halfW = (L.wide ? 226 : 106) * ss;
       top = (L.wide ? 256 : 556) * ss;
@@ -1978,7 +1686,6 @@
   // simply keeps asking for the new note, so she meets it by itself rather
   // than halfway through a song made of things she has not learned.
   function tunesOn() {
-    if (save.five) { return (save.done[4] || 0) >= ARRIVE_AT[1]; }
     if (save.four) { return (save.done[3] || 0) >= ARRIVE_AT[1]; }
     return (save.done[2] || 0) >= ARRIVE_AT[1];
   }
@@ -2037,7 +1744,6 @@
   }
 
   function finishTune() {
-    save.tunesDone[tune.idx] = 1;
     tune.advance = true;
     playThrough(TUNES[tune.idx].notes, 1.7, tuneBeats(tune.idx));
     burst(L.W * 0.5, L.strip ? L.strip.y + L.strip.h : L.gy[0], '#ffd45c', reduced ? 0 : 22, 260);
@@ -2079,23 +1785,18 @@
       bell(0.05 + k * 0.13, 523.25 * Math.pow(2, s / 12), 0.26, 0.95);
     });
     persist();
-    pickerOpen = true;
     computeLayout();
   }
 
   function nextTune() {
     tune.playing = false;
     if (save.finished || tune.idx >= TUNES.length - 1) {
-      if (!save.finished) { finishGame(); return; }
-      // Back to the shelf of songs, with this one now marked as hers.
+      if (!save.finished) { finishGame(); }
       tune.pos = 0;
       save.pos = 0;
       persist();
       bee.set = false;
-      pickerOpen = true;
       drawTuneStrip();
-      drawPicker();
-      drawUI();
       return;
     }
     tune.idx = (tune.idx + 1) % TUNES.length;
@@ -2105,12 +1806,8 @@
     // Finishing the last song the first three notes can make is what
     // fetches the squirrel, and the hill has to be laid out again around
     // it before anything else is drawn.
-    // Reaching a bank of songs that needs a note she has not met fetches
-    // the friend who plays it.
-    var arrived = false;
-    if (tune.idx >= TUNES_3 && !save.four) { save.four = true; arrived = true; }
-    if (tune.idx >= TUNES_4 && !save.five) { save.five = true; arrived = true; }
-    if (arrived) {
+    if (tune.idx >= TUNES_3 && !save.four) {
+      save.four = true;
       unlockCheck();
       computeLayout();
     }
@@ -2370,33 +2067,6 @@
       var which = ui.getAttribute('data-ui');
       if (which === 'reset') { resetting = true; resetHold = 0; return; }
       if (which === 'tune') { replayTune(); return; }
-      if (which === 'pickbg') { return; }
-      if (which === 'pick') {
-        var pick = +ui.getAttribute('data-tune');
-        if (pick >= 0 && pick < TUNES.length) {
-          tune.idx = pick;
-          tune.pos = 0;
-          save.tune = pick;
-          save.pos = 0;
-          persist();
-          pickerOpen = false;
-          bee.set = false;
-          drawPicker();
-          drawTuneStrip();
-          drawUI();
-          tune.advance = false;
-          playThrough(TUNES[pick].notes, 0.9, tuneBeats(pick));
-        }
-        return;
-      }
-      if (which === 'list') {
-        pickerOpen = true;
-        hushAll();
-        tune.playing = false;
-        drawPicker();
-        drawUI();
-        return;
-      }
       if (which === 'cheat') {
         cheatStep();
         cheatHeld = true;
@@ -2471,18 +2141,10 @@
   }
 
   load();
-  // A game that is already finished opens on the shelf of songs.
-  pickerOpen = !!save.finished;
   tune.idx = clamp(save.tune | 0, 0, TUNES.length - 1);
   tune.pos = clamp(save.pos | 0, 0, TUNES[tune.idx].notes.length - 1);
   buildFriends();
   computeLayout();
-  // A phone is still settling when the page first draws - the address bar
-  // has not finished sliding away - so the first measurement is of a size
-  // that is about to change, and everything lands somewhere it will not
-  // stay. Measure again once it has stopped moving.
-  requestAnimationFrame(function () { computeLayout(); });
-  setTimeout(computeLayout, 400);
   requestAnimationFrame(frame);
 })();
 </script>
