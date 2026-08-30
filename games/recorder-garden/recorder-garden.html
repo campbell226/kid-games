@@ -145,6 +145,10 @@
   // never waits on a download.
   // ------------------------------------------------------------------
   var AC = null, master = null, noiseBuf = null;
+  // Everything audible hangs off this one node rather than off master,
+  // so it can all be cut at once. Once a note is scheduled it is going
+  // to sound - stopping it means silencing what it is plugged into.
+  var voices = null;
 
   // Everything the garden says is heard straight back by the microphone,
   // because echo cancellation is turned off on purpose. So the listener
@@ -164,6 +168,9 @@
     master = AC.createGain();
     master.gain.setValueAtTime(0.6, AC.currentTime);
     master.connect(comp);
+    voices = AC.createGain();
+    voices.gain.setValueAtTime(1, AC.currentTime);
+    voices.connect(master);
     comp.connect(AC.destination);
 
     var n = Math.floor(AC.sampleRate * 0.5);
@@ -174,6 +181,23 @@
   }
 
   function held(t, dur) { if (t + dur > speakUntil) { speakUntil = t + dur; } }
+
+  // A scheduled note cannot be unscheduled, so the bus it is plugged into
+  // is faded out and thrown away and a fresh one put in its place. That is
+  // how a tune stops the instant the garden is emptied instead of playing
+  // on over the top of nothing.
+  function hushAll() {
+    if (!AC || !voices) { return; }
+    var old = voices, now = AC.currentTime;
+    old.gain.cancelScheduledValues(now);
+    old.gain.setValueAtTime(old.gain.value, now);
+    old.gain.linearRampToValueAtTime(0.0001, now + 0.07);
+    setTimeout(function () { try { old.disconnect(); } catch (e) {} }, 500);
+    voices = AC.createGain();
+    voices.gain.setValueAtTime(1, now);
+    voices.connect(master);
+    speakUntil = now + 0.1;
+  }
 
   // A recorder is very nearly a sine wave with a breathy edge, a chiff at
   // the start and a vibrato that only arrives once the note has settled.
@@ -192,7 +216,7 @@
     g.gain.exponentialRampToValueAtTime(vol, t + 0.04);
     g.gain.setValueAtTime(vol, t + dur - 0.11);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    lp.connect(g); g.connect(master);
+    lp.connect(g); g.connect(voices);
 
     var vib = AC.createOscillator();
     vib.type = 'sine';
@@ -224,7 +248,7 @@
     ng.gain.exponentialRampToValueAtTime(vol * 0.055, t + 0.1);
     ng.gain.setValueAtTime(vol * 0.055, t + dur - 0.09);
     ng.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    src.connect(bp); bp.connect(ng); ng.connect(master);
+    src.connect(bp); bp.connect(ng); ng.connect(voices);
     src.start(t); src.stop(t + dur + 0.05);
 
     held(t, dur + 0.22);
@@ -240,7 +264,7 @@
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(vol || 0.28, t + 0.012);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(master);
+    o.connect(g); g.connect(voices);
     o.start(t); o.stop(t + dur + 0.05);
     held(t, dur + 0.12);
   }
@@ -270,7 +294,7 @@
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(0.26, t + 0.02);
     g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
-    o.connect(g); g.connect(master);
+    o.connect(g); g.connect(voices);
     o.start(t); o.stop(t + 0.55);
     held(t, 0.6);
   }
@@ -1145,6 +1169,7 @@
   function doReset() {
     resetting = false;
     resetHold = 0;
+    hushAll();
     var i, f;
     for (i = 0; i < friends.length; i++) {
       f = friends[i];
@@ -1213,7 +1238,7 @@
     g.appendChild(body);
     micRing = body.querySelector('.ring');
 
-    var rs = sz * 0.8, rr = rs * 0.6;
+    var rs = sz, rr = rs * 0.6;
     resetCirc = 2 * Math.PI * rr;
     var rst = el('g', {
       transform: 'translate(' + (L.W - 22 - rs / 2) + ',' + (22 + rs / 2) + ')'
@@ -1225,8 +1250,8 @@
       + '<circle class="rring" cx="0" cy="0" r="' + rr + '" fill="none" stroke="#c2564f" stroke-width="'
       + (rs * 0.11) + '" stroke-linecap="round" stroke-dasharray="' + resetCirc
       + '" stroke-dashoffset="' + resetCirc + '" transform="rotate(-90)"/>'
-      + '<rect class="hit" x="' + (-rs * 0.7) + '" y="' + (-rs * 0.7) + '" width="' + (rs * 1.4)
-      + '" height="' + (rs * 1.4) + '" data-ui="reset"/>';
+      + '<rect class="hit" x="' + (-rs * 0.68) + '" y="' + (-rs * 0.68) + '" width="' + (rs * 1.36)
+      + '" height="' + (rs * 1.36) + '" data-ui="reset"/>';
     g.appendChild(rst);
     resetRing = rst.querySelector('.rring');
 
