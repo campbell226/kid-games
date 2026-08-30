@@ -1390,6 +1390,10 @@
   // blowing, and she will not find it by accident: a quarter of a ring is
   // a narrow thing to stop on once, let alone four times in a row.
   var cheatOn = false, cheatStreak = 0;
+  // Held down, it keeps going. Walking a twenty-six note tune forward
+  // one press at a time is not a fast forward.
+  var cheatHeld = false, cheatNext = 0;
+  var CHEAT_GAP = 0.3;
 
   function cheatStep() {
     var idx = (tunesOn() && !tune.playing)
@@ -1397,7 +1401,7 @@
     var f = friends[idx];
     if (!f || !f.present) { f = friends[ask.idx] || friends[0]; }
     if (!f) { return; }
-    sing(f, 0.5);
+    sing(f, 0.32);
     if (tunesOn() && !tune.playing && tune.pos < TUNES[tune.idx].notes.length) {
       tune.pos++;
       save.pos = tune.pos;
@@ -1917,6 +1921,10 @@
       resetHold += dt;
       if (resetHold >= RESET_HOLD) { doReset(); }
     }
+    if (cheatHeld && clock > cheatNext) {
+      cheatNext = clock + CHEAT_GAP;
+      cheatStep();
+    }
 
     drainVis();
     tuneTick(dt);
@@ -1990,7 +1998,12 @@
       var which = ui.getAttribute('data-ui');
       if (which === 'reset') { resetting = true; resetHold = 0; return; }
       if (which === 'tune') { replayTune(); return; }
-      if (which === 'cheat') { cheatStep(); return; }
+      if (which === 'cheat') {
+        cheatStep();
+        cheatHeld = true;
+        cheatNext = clock + CHEAT_GAP * 1.5;
+        return;
+      }
       if (which === 'mic') {
         if (MIC.state === 'on') { stopMic(); }
         else if (MIC.state !== 'asking') { startMic(); }
@@ -2026,7 +2039,7 @@
         cheatStreak = 0;
       }
     }
-    touchHold = -1; resetting = false; resetHold = 0;
+    touchHold = -1; resetting = false; resetHold = 0; cheatHeld = false;
   }
   window.addEventListener('pointerup', release);
   window.addEventListener('pointercancel', release);
