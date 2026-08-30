@@ -84,7 +84,7 @@
 
 <svg id="stage" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 640" preserveAspectRatio="xMidYMid meet" aria-label="Recorder Garden">
   <defs>
-    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+    <linearGradient id="skywash" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#57a4dc"/>
       <stop offset="0.6" stop-color="#a7dbf2"/>
       <stop offset="1" stop-color="#dff2dd"/>
@@ -842,7 +842,8 @@
   // ------------------------------------------------------------------
   // What the garden remembers between visits.
   // ------------------------------------------------------------------
-  var save = { flowers: 0, done: [0, 0, 0, 0], garden: [], tune: 0, pos: 0, four: false };
+  var save = { flowers: 0, done: [0, 0, 0, 0], garden: [], tune: 0, pos: 0,
+               four: false, finished: false };
 
   function load() {
     try {
@@ -859,6 +860,7 @@
             save.tune = s.tune || 0;
         save.pos = s.pos || 0;
         save.four = !!s.four;
+        save.finished = !!s.finished;
       }
     } catch (e) {}
   }
@@ -876,7 +878,10 @@
   // The squirrel is not earned with flowers. She gets it for finishing
   // every song the first three notes can make.
   function fourOn() { return !!save.four; }
-  function shouldBeHere(i) { return i === 3 ? fourOn() : i < unlocked(); }
+  function shouldBeHere(i) {
+    if (save.finished) { return false; }
+    return i === 3 ? fourOn() : i < unlocked();
+  }
 
   // ------------------------------------------------------------------
   // Layout. The world is 1000 wide and as many tall as the viewport
@@ -987,10 +992,23 @@
   function drawSky() {
     var g = G('sky'), W = L.W, H = L.H;
     clear(g);
-    g.appendChild(el('rect', { x: 0, y: 0, width: W, height: H, fill: 'url(#sky)' }));
+    g.appendChild(el('rect', { x: 0, y: 0, width: W, height: H, fill: 'url(#skywash)' }));
     var sx = L.wide ? W * 0.13 : W * 0.2, sy = L.gy[0] * 0.28;
     g.appendChild(el('circle', { cx: sx, cy: sy, r: 110, fill: 'url(#glowg)' }));
     g.appendChild(el('circle', { cx: sx, cy: sy, r: 44, fill: '#fff6cc' }));
+    if (save.finished) {
+      var base = L.rowY[L.four ? 0 : 1];
+      var cols = ['#e2564f', '#ef9a3d', '#f2d049', '#6cb85c', '#4f9be0', '#8a6bd1'];
+      var rr = Math.min(W * 0.46, base * 0.94), band = Math.max(4, rr * 0.085), k, rad;
+      for (k = 0; k < cols.length; k++) {
+        rad = rr - k * band;
+        g.appendChild(el('path', {
+          d: 'M ' + (W / 2 - rad) + ' ' + base + ' A ' + rad + ' ' + rad
+            + ' 0 0 1 ' + (W / 2 + rad) + ' ' + base,
+          fill: 'none', stroke: cols[k], 'stroke-width': band, opacity: 0.5
+        }));
+      }
+    }
     [[0.42, 0.2, 1], [0.8, 0.12, 0.78], [0.6, 0.42, 0.6]].forEach(function (c) {
       var cg = el('g', {
         transform: 'translate(' + (W * c[0]) + ',' + (L.gy[0] * c[1] + 24) + ') scale(' + c[2] + ')',
@@ -1059,7 +1077,10 @@
     var g = G('garden'), s = '', i, f, lvl, top, bot, y, x, sc, pl, list = [];
     for (i = 0; i < save.garden.length; i++) {
       f = save.garden[i];
-      lvl = clamp(f.i | 0, 0, 2);
+      // Four friends, not three. Clamping to two sent every one of the
+      // squirrel's flowers to the badger's bed, in the badger's colour,
+      // which looked for all the world like they had not been saved.
+      lvl = clamp(f.i | 0, 0, SPECS.length - 1);
       sc = clamp(L.scale * 0.85, 0.3, 1.25);
       if (typeof f.k === 'number') {
         pl = PLOT[f.k % PLOT.length];
@@ -1068,7 +1089,7 @@
       } else {
         // Flowers from before the beds existed. Left where they fell.
         top = L.gy[lvl] + 14;
-        bot = (lvl < 2 ? L.gy[lvl + 1] : L.H) - 10;
+        bot = (L.bandBot[lvl] || L.H) - 10;
         y = top + Math.max(0, bot - top) * (f.v || 0.5);
         x = 40 + (L.W - 80) * (f.u || 0.5);
       }
@@ -1422,13 +1443,18 @@
     var f = friends[idx];
     if (!f || !f.present) { f = friends[ask.idx] || friends[0]; }
     if (!f) { return; }
-    sing(f, 0.32);
+    var completes = false;
     if (tunesOn() && !tune.playing && tune.pos < TUNES[tune.idx].notes.length) {
       tune.pos++;
       save.pos = tune.pos;
       drawTuneStrip();
-      if (tune.pos >= TUNES[tune.idx].notes.length) { finishTune(); } else { persist(); }
+      completes = tune.pos >= TUNES[tune.idx].notes.length;
+      if (completes) { finishTune(); } else { persist(); }
     }
+    // Silent on the step that finishes the tune. Otherwise the note it
+    // sounds lands straight on top of the playback it just started, which
+    // is the stray note you could hear before every play-through.
+    if (!completes) { sing(f, 0.32); }
     if (f.celebrate <= 0 && f.growth < 1) { f.growth = 1; finish(f); }
   }
 
@@ -1457,6 +1483,7 @@
     save.tune = 0;
     save.pos = 0;
     save.four = false;
+    save.finished = false;
     tune.idx = 0; tune.pos = 0; tune.playing = false; tune.advance = true;
     tuneLast = null; tuneHeld = 0; tuneGiven = 0;
     visQ.length = 0;
@@ -1737,8 +1764,41 @@
     playThrough(TUNES[tune.idx].notes, 0.8, tuneBeats(tune.idx));
   }
 
+  // Finishing the last song finishes the game. The friends go off in a
+  // shower of the flowers she grew them, and what is left is her garden,
+  // a rainbow over it, and the song still there to play whenever she
+  // likes. Nothing to beat and nowhere further to get to.
+  function finishGame() {
+    var i, f;
+    save.finished = true;
+    for (i = 0; i < friends.length; i++) {
+      f = friends[i];
+      if (!f.present) { continue; }
+      if (!reduced) {
+        burst(L.xs[i], L.gy[i] - 90 * L.scale, f.spec.petal, 18, 280);
+      }
+      f.present = false;
+      f.growth = 0;
+      f.celebrate = 0;
+    }
+    [0, 4, 7, 12, 16, 19, 24].forEach(function (s, k) {
+      bell(0.05 + k * 0.13, 523.25 * Math.pow(2, s / 12), 0.26, 0.95);
+    });
+    persist();
+    computeLayout();
+  }
+
   function nextTune() {
     tune.playing = false;
+    if (save.finished || tune.idx >= TUNES.length - 1) {
+      if (!save.finished) { finishGame(); }
+      tune.pos = 0;
+      save.pos = 0;
+      persist();
+      bee.set = false;
+      drawTuneStrip();
+      return;
+    }
     tune.idx = (tune.idx + 1) % TUNES.length;
     tune.pos = 0;
     save.tune = tune.idx;
