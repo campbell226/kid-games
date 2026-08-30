@@ -64,28 +64,51 @@
 <script>
 // Full screen on the first touch.
 //
-// A browser will not do this by itself. The request has to come out of
-// something the player actually did or it is refused outright, so the
-// first tap carries it - which is as close to "by default" as the web
-// allows. One attempt per visit, so that deliberately leaving full screen
-// stays left.
+// A browser will not do this by itself: the request has to come out of a
+// gesture the browser counts as user activation, and that list is fussier
+// than it looks. pointerdown only counts when the pointer is a mouse - on
+// a touchscreen it grants nothing at all, which is why listening for it
+// worked on a laptop and did nothing whatever on a tablet. For a finger it
+// is pointerup and touchend that count.
 //
-// It does nothing on an iPhone, where Safari gives full screen to video
-// and nothing else. Adding the game to the home screen is the answer
-// there, and the meta tags above are what make that launch cleanly.
+// So: listen for all of the ones that can work, and keep trying until one
+// of them actually gets us there. Once it has, stop asking - deliberately
+// leaving full screen should stay left.
+//
+// An iPhone ignores the lot, because Safari there gives full screen to
+// video and nothing else. That is what the home screen tags above are for.
 (function () {
   var el = document.documentElement;
   var go = el.requestFullscreen || el.webkitRequestFullscreen;
   if (!go) { return; }
-  function once() {
-    document.removeEventListener('pointerdown', once, true);
-    if (document.fullscreenElement || document.webkitFullscreenElement) { return; }
+  var EVENTS = ['pointerup', 'touchend', 'click', 'mousedown'];
+  var asking = false, done = false, i;
+
+  function isFull() {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement);
+  }
+  function stop() {
+    done = true;
+    for (var k = 0; k < EVENTS.length; k++) {
+      document.removeEventListener(EVENTS[k], attempt, true);
+    }
+  }
+  function attempt() {
+    if (done || asking) { return; }
+    if (isFull()) { stop(); return; }
+    asking = true;
     try {
       var p = go.call(el);
-      if (p && p['catch']) { p['catch'](function () {}); }
-    } catch (e) {}
+      if (p && p.then) { p.then(stop, function () { asking = false; }); }
+      else { setTimeout(function () { asking = false; }, 500); }
+    } catch (e) { asking = false; }
   }
-  document.addEventListener('pointerdown', once, true);
+
+  document.addEventListener('fullscreenchange', function () { if (isFull()) { stop(); } });
+  document.addEventListener('webkitfullscreenchange', function () { if (isFull()) { stop(); } });
+  for (i = 0; i < EVENTS.length; i++) {
+    document.addEventListener(EVENTS[i], attempt, true);
+  }
 })();
 </script>
 
