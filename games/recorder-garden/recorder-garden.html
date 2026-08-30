@@ -718,22 +718,31 @@
     return s;
   }
 
-  function plaqueArt(holes, tint, thumb) {
+  // The note's own name, in capitals, on a badge at the top of its
+  // signpost. A letter is a name, which is the one kind of word this game
+  // allows itself. In landscape the whole plaque is turned on its side, so
+  // the badge is turned back the other way to stay the right way up.
+  function plaqueArt(holes, tint, thumb, name, wide) {
     return '<rect class="signglow" x="-100" y="-224" width="200" height="448" rx="36" fill="#fff3ac" opacity="0"/>'
       + '<rect x="-78" y="-202" width="156" height="404" rx="26" fill="#fdf6e3" stroke="#c99a5e" stroke-width="7"/>'
-      + '<rect x="-62" y="-186" width="124" height="24" rx="12" fill="' + tint + '"/>'
-      + '<g transform="translate(0,22)">' + chartArt(holes, tint, thumb) + '</g>';
+      + '<g transform="translate(0,-152)' + (wide ? ' rotate(90)' : '') + '">'
+      + '<circle cx="0" cy="0" r="37" fill="' + tint + '"/>'
+      + '<text x="0" y="15" text-anchor="middle" fill="#33302a"'
+      + ' font-family="ui-rounded, Segoe UI, system-ui, -apple-system, sans-serif"'
+      + ' font-size="50" font-weight="800">' + name + '</text>'
+      + '</g>'
+      + '<g transform="translate(0,58) scale(0.85)">' + chartArt(holes, tint, thumb) + '</g>';
   }
 
   // Landscape lays the chart on its side. That is the only way it fits
   // in a short row, and it is also how the instrument is actually held,
   // thumb hole underneath.
-  function signArt(holes, tint, wide, thumb) {
+  function signArt(holes, tint, wide, thumb, name) {
     var postH = wide ? 62 : 118;
     var cy = -(postH + (wide ? 90 : 210));
     return '<rect x="-10" y="' + (-postH - 2) + '" width="20" height="' + (postH + 4) + '" rx="8" fill="url(#post)"/>'
       + '<g transform="translate(0,' + cy + ')' + (wide ? ' rotate(-90)' : '') + '">'
-      + plaqueArt(holes, tint, thumb) + '</g>';
+      + plaqueArt(holes, tint, thumb, name, wide) + '</g>';
   }
 
   // ------------------------------------------------------------------
@@ -1180,7 +1189,7 @@
     for (i = 0; i < friends.length; i++) {
       var f = friends[i];
       var sign = el('g', { 'data-friend': i });
-      sign.innerHTML = signArt(f.spec.holes, f.spec.petal, L.wide, f.spec.thumb);
+      sign.innerHTML = signArt(f.spec.holes, f.spec.petal, L.wide, f.spec.thumb, f.spec.id);
       g.appendChild(sign);
       f.sign = sign;
       f.glow = sign.querySelector('.signglow');
@@ -1332,6 +1341,30 @@
   var resetting = false, resetHold = 0;
   var RESET_HOLD = 2.4;
 
+  // A door for me. Start the reset, let go while the ring is somewhere in
+  // its second quarter, four times running, and a button appears that
+  // plays the note the game is waiting for - perfectly, and for as long as
+  // it wanted. It is how I get to the fourth note without an afternoon of
+  // blowing, and she will not find it by accident: a quarter of a ring is
+  // a narrow thing to stop on once, let alone four times in a row.
+  var cheatOn = false, cheatStreak = 0;
+
+  function cheatStep() {
+    var idx = (tunesOn() && !tune.playing)
+      ? noteIndex(TUNES[tune.idx].notes[tune.pos] || 'B') : ask.idx;
+    var f = friends[idx];
+    if (!f || !f.present) { f = friends[ask.idx] || friends[0]; }
+    if (!f) { return; }
+    sing(f, 0.5);
+    if (tunesOn() && !tune.playing && tune.pos < TUNES[tune.idx].notes.length) {
+      tune.pos++;
+      save.pos = tune.pos;
+      drawTuneStrip();
+      if (tune.pos >= TUNES[tune.idx].notes.length) { finishTune(); } else { persist(); }
+    }
+    if (f.celebrate <= 0 && f.growth < 1) { f.growth = 1; finish(f); }
+  }
+
   // Emptying the garden. Two and a half seconds of held finger, which she
   // will not manage by accident and I will not do twice. Everything goes:
   // the flowers, the count, and the two friends who had arrived.
@@ -1424,6 +1457,21 @@
       + '" height="' + (rs * 1.36) + '" data-ui="reset"/>';
     g.appendChild(rst);
     resetRing = rst.querySelector('.rring');
+
+    if (cheatOn) {
+      var chx = L.W - 22 - rs - 14 - rs / 2;
+      var ch = el('g', { transform: 'translate(' + chx + ',' + (22 + rs / 2) + ')' });
+      ch.innerHTML =
+        '<rect x="' + (-rs / 2) + '" y="' + (-rs / 2) + '" width="' + rs + '" height="' + rs
+        + '" rx="' + (rs * 0.3) + '" fill="#fdf6e3" opacity="0.85" stroke="#c99a5e" stroke-width="3"/>'
+        + '<path d="M ' + (-rs * 0.27) + ' ' + (-rs * 0.21) + ' L ' + (-rs * 0.02) + ' 0 L '
+        + (-rs * 0.27) + ' ' + (rs * 0.21) + ' Z" fill="#3f7c36"/>'
+        + '<path d="M ' + (rs * 0.02) + ' ' + (-rs * 0.21) + ' L ' + (rs * 0.27) + ' 0 L '
+        + (rs * 0.02) + ' ' + (rs * 0.21) + ' Z" fill="#3f7c36"/>'
+        + '<rect class="hit" x="' + (-rs * 0.68) + '" y="' + (-rs * 0.68) + '" width="' + (rs * 1.36)
+        + '" height="' + (rs * 1.36) + '" data-ui="cheat"/>';
+      g.appendChild(ch);
+    }
 
     // The countdown belongs in the middle of the screen. On the button it
     // is directly underneath the thumb holding the button down, which is
@@ -1887,6 +1935,7 @@
       var which = ui.getAttribute('data-ui');
       if (which === 'reset') { resetting = true; resetHold = 0; return; }
       if (which === 'tune') { replayTune(); return; }
+      if (which === 'cheat') { cheatStep(); return; }
       if (which === 'mic') {
         if (MIC.state === 'on') { stopMic(); }
         else if (MIC.state !== 'asking') { startMic(); }
@@ -1906,7 +1955,24 @@
     if (MIC.state !== 'on') { touchHold = f.i; }
   });
 
-  function release() { touchHold = -1; resetting = false; resetHold = 0; }
+  function release() {
+    if (resetting) {
+      var p = resetHold / RESET_HOLD;
+      if (p >= 0.25 && p < 0.5) {
+        cheatStreak++;
+        if (cheatStreak >= 4 && !cheatOn) {
+          cheatOn = true;
+          [0, 4, 7].forEach(function (s, i) {
+            bell(0.02 + i * 0.07, 880 * Math.pow(2, s / 12), 0.22, 0.35);
+          });
+          drawUI();
+        }
+      } else {
+        cheatStreak = 0;
+      }
+    }
+    touchHold = -1; resetting = false; resetHold = 0;
+  }
   window.addEventListener('pointerup', release);
   window.addEventListener('pointercancel', release);
   svg.addEventListener('contextmenu', function (ev) { ev.preventDefault(); });
