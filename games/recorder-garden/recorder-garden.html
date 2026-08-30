@@ -440,10 +440,21 @@
     for (i = 0; i < L; i++) { d = hold.hist[i] - mu; vr += d * d; }
     hold.steady = clamp(1 - Math.sqrt(vr / L) / 45, 0, 1);
 
+    // How loud she arrives is a fact about how close the tablet is, not
+    // about how hard she is blowing, and with automatic gain refused it
+    // is louder still. Judging effort by it was plainly wrong: a recorder
+    // at arm's length sat above the old ceiling almost all the time, so
+    // the friend covered its ears and laughed every couple of seconds,
+    // the laugh deafened the microphone for half of each of them, and the
+    // flower could not grow while any of that was going on.
+    //
+    // Blowing a recorder too hard makes it jump the octave. That is the
+    // real signal, it is physics rather than a guessed threshold, and it
+    // is already detected exactly. So it is the only thing that counts.
     var l = MIC.level;
-    hold.gentle = l < 0.02 ? clamp(l / 0.02, 0, 1)
-      : (l <= 0.17 ? 1 : clamp(1 - (l - 0.17) / 0.28, 0.2, 1));
-    hold.shrill = MIC.octave || l > 0.36;
+    hold.gentle = l < 0.015 ? clamp(l / 0.015, 0, 1)
+      : (l <= 0.45 ? 1 : clamp(1 - (l - 0.45) / 0.55, 0.6, 1));
+    hold.shrill = MIC.octave;
   }
 
   // A good note fills a flower in about four and a half seconds. A rough
@@ -1038,8 +1049,7 @@
     var i;
     for (i = 0; i < friends.length; i++) {
       var f = friends[i];
-      f.flower.setAttribute('transform', 'translate(' + L.flowerX[i] + ',' + (L.gy[i] + 10) + ') scale('
-        + clamp(L.scale * 0.85, 0.3, 1.25) + ')');
+      placeFlower(f);
       f.sign.setAttribute('opacity', f.present ? 1 : 0);
       f.flower.setAttribute('opacity', f.present ? 1 : 0);
       f.node.setAttribute('opacity', f.present ? 1 : 0);
@@ -1086,6 +1096,21 @@
         'translate(' + cx + ',' + cy + ') scale(1,' + k + ') translate(' + (-cx) + ',' + (-cy) + ')');
     }
     if (f.pawsG) { f.pawsG.setAttribute('opacity', f.shy); }
+  }
+
+  // Where this friend's next flower stands. It is the same slot the
+  // finished one will be saved into, so nothing moves at the moment it is
+  // planted - the growing flower simply starts the next one along.
+  function flowerSlot(f) {
+    var sc = clamp(L.scale * 0.85, 0.3, 1.25);
+    var pl = PLOT[f.done % PLOT.length];
+    return { x: L.flowerX[f.i] + pl[0] * sc, y: L.gy[f.i] + 10 + pl[1] * sc, sc: sc };
+  }
+
+  function placeFlower(f) {
+    var s = flowerSlot(f);
+    f.flower.setAttribute('transform',
+      'translate(' + s.x + ',' + s.y + ') scale(' + s.sc + ')');
   }
 
   function paintFlower(f) {
@@ -1136,6 +1161,7 @@
   // The parent's one control: the ears, on or off.
   // ------------------------------------------------------------------
   var micRing = null, resetRing = null, resetCirc = 1;
+  var resetBig = null, bigRing = null, bigCirc = 1;
   var resetting = false, resetHold = 0;
   var RESET_HOLD = 2.4;
 
@@ -1230,6 +1256,30 @@
       + '" height="' + (rs * 1.4) + '" data-ui="reset"/>';
     g.appendChild(rst);
     resetRing = rst.querySelector('.rring');
+
+    // The countdown belongs in the middle of the screen. On the button it
+    // is directly underneath the thumb holding the button down, which is
+    // the one place it cannot be seen. This one is for me, so it says so
+    // in words.
+    var R = clamp(Math.min(L.W, L.H) * 0.19, 96, 260);
+    bigCirc = 2 * Math.PI * R;
+    resetBig = el('g', {
+      'class': 'plain', opacity: 0,
+      transform: 'translate(' + (L.W / 2) + ',' + (L.H / 2) + ')'
+    });
+    resetBig.innerHTML =
+      '<circle cx="0" cy="0" r="' + (R * 1.32) + '" fill="#1b2718" opacity="0.66"/>'
+      + '<circle cx="0" cy="0" r="' + R + '" fill="none" stroke="#ffffff" stroke-width="'
+      + (R * 0.15) + '" opacity="0.28"/>'
+      + '<circle class="bigring" cx="0" cy="0" r="' + R + '" fill="none" stroke="#f2c141"'
+      + ' stroke-width="' + (R * 0.15) + '" stroke-linecap="round" stroke-dasharray="' + bigCirc
+      + '" stroke-dashoffset="' + bigCirc + '" transform="rotate(-90)"/>'
+      + '<text x="0" y="' + (R * 0.12) + '" text-anchor="middle" fill="#ffffff"'
+      + ' font-family="ui-rounded, Segoe UI, system-ui, -apple-system, sans-serif"'
+      + ' font-size="' + (R * 0.3) + '" font-weight="800"'
+      + ' letter-spacing="' + (R * 0.03) + '">RESET</text>';
+    g.appendChild(resetBig);
+    bigRing = resetBig.querySelector('.bigring');
   }
 
   // Targets, in the order they are stacked: empty ground first, then the
@@ -1427,8 +1477,8 @@
     f.celebrate = 1.5;
     f.excite = 1;
     sparkleSound();
-    burst(L.flowerX[f.i], L.gy[f.i] - 150 * clamp(L.scale * 0.85, 0.3, 1.25),
-      f.spec.petal, reduced ? 0 : 18, 250);
+    var at = flowerSlot(f);
+    burst(at.x, at.y - FULL_H * at.sc, f.spec.petal, reduced ? 0 : 18, 250);
     ask.next = clock + 4;
   }
 
@@ -1440,6 +1490,9 @@
     f.done++;
     save.done[f.i] = f.done;
     save.flowers++;
+    // The next bud starts in the next slot along, so the one just planted
+    // is left standing exactly where she grew it.
+    placeFlower(f);
     if (save.flowers % 5 === 0) { addMark(); drawMarks(); }
     if (save.garden.length > 90) { save.garden.shift(); }
     persist();
@@ -1527,9 +1580,13 @@
       micRing.setAttribute('opacity', MIC.state === 'on' ? (0.12 + lv * 0.6) : 0);
       micRing.setAttribute('transform', 'scale(' + (0.86 + lv * 0.3) + ')');
     }
+    var p = clamp(resetHold / RESET_HOLD, 0, 1);
     if (resetRing) {
-      resetRing.setAttribute('stroke-dashoffset',
-        resetCirc * (1 - clamp(resetHold / RESET_HOLD, 0, 1)));
+      resetRing.setAttribute('stroke-dashoffset', resetCirc * (1 - p));
+    }
+    if (resetBig) {
+      resetBig.setAttribute('opacity', resetting ? 1 : 0);
+      if (bigRing) { bigRing.setAttribute('stroke-dashoffset', bigCirc * (1 - p)); }
     }
   }
 
