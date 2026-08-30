@@ -959,7 +959,7 @@
     var html = '<g class="plain">'
       + '<rect x="' + (left - 18) + '" y="' + (s.y - 10) + '" width="' + (right - left + 36)
       + '" height="' + (s.h + 20) + '" rx="' + (s.h * 0.3) + '" fill="#ffffff" opacity="0.34"/>';
-    var k, i, fi, cx, cy, done, cur;
+    var k, i, fi, cx, cy, done, cur, discs = [];
     for (k = 0; k < 3; k++) {
       html += '<path d="M ' + left + ' ' + lineY[k] + ' H ' + right + '" stroke="' + SPECS[k].petal
         + '" stroke-width="3" opacity="0.38" stroke-linecap="round"/>';
@@ -972,7 +972,8 @@
       cy = lineY[fi];
       done = i < tune.pos;
       cur = (i === tune.pos);
-      html += '<g data-friend="' + fi + '">';
+      html += '<g>';
+      discs.push({ x: cx, y: cy - r * 2.6 });
       if (cur) {
         html += '<circle cx="' + cx + '" cy="' + cy + '" r="' + (r * 2) + '" fill="url(#glowg)"/>';
         bee.tx = cx;
@@ -987,7 +988,10 @@
       html += '</g>';
     }
     if (tune.pos >= n) { bee.tx = right; bee.ty = lineY[1] - r * 2.6; }
+    tune.discs = discs;
     html += '<g class="plain" id="beeg">' + beeArt(r) + '</g>';
+    html += '<rect class="hit" x="' + (left - 18) + '" y="' + (s.y - 10) + '" width="'
+      + (right - left + 36) + '" height="' + (s.h + 20) + '" data-ui="tune"/>';
     g.innerHTML = html;
     beeNode = g.querySelector('#beeg');
     if (!bee.set) { bee.x = bee.tx; bee.y = bee.ty; bee.set = true; }
@@ -1084,9 +1088,13 @@
   function paintFriend(f) {
     var p = friendPos(f);
     var bobY = reduced ? 0 : Math.sin(f.bob) * 3 * L.scale;
-    var sc = L.scale * (1 + f.excite * 0.05);
+    var sc = L.scale * (1 + f.excite * 0.09);
+    // A tilt on top of the jump, so it reads as delight rather than as
+    // something simply moving up and down.
+    var tilt = reduced ? 0 : f.excite * Math.sin(clock * 6.9) * 6;
     f.node.setAttribute('transform',
-      'translate(' + p.x + ',' + (p.y - p.hop + bobY) + ') scale(' + sc + ')');
+      'translate(' + p.x + ',' + (p.y - p.hop + bobY) + ') rotate(' + tilt.toFixed(2)
+      + ') scale(' + sc + ')');
     if (f.halo) { f.halo.setAttribute('opacity', clamp(f.sing * 0.55 + f.excite * 0.45, 0, 0.9)); }
     if (f.mouth) {
       var cx = +f.mouth.getAttribute('data-cx'), cy = +f.mouth.getAttribute('data-cy');
@@ -1189,7 +1197,7 @@
     save.marks = [];
     save.tune = 0;
     save.pos = 0;
-    tune.idx = 0; tune.pos = 0; tune.playing = false;
+    tune.idx = 0; tune.pos = 0; tune.playing = false; tune.advance = true;
     tuneLast = null; tuneHeld = 0; tuneGiven = 0;
     visQ.length = 0;
     bee.set = false;
@@ -1367,7 +1375,7 @@
   // before - the friend answers, the flower grows - while the song moves
   // along underneath whenever the note happens to be the next one.
   // ------------------------------------------------------------------
-  var tune = { idx: 0, pos: 0, playing: false, nextAt: 0 };
+  var tune = { idx: 0, pos: 0, playing: false, advance: true, nextAt: 0, discs: [] };
   var tuneLast = null, tuneHeld = 0, tuneGiven = 0, tuneGap = 0;
   var visQ = [];
 
@@ -1414,20 +1422,39 @@
     if (tune.pos >= notes.length) { finishTune(); } else { persist(); }
   }
 
-  function finishTune() {
-    var notes = TUNES[tune.idx].notes, i, f, at = 0.3, step = 0.42;
+  function playThrough(notes, tail) {
+    var i, f, at = 0.3, step = 0.42;
     tune.playing = true;
-    addMark();
-    drawMarks();
     for (i = 0; i < notes.length; i++) {
       f = friends[noteIndex(notes[i])];
       recorderNote(at, mtof(f.spec.midi), step * 0.92, 0.4);
-      if (AC) { visQ.push({ at: AC.currentTime + at, i: f.i, dur: step * 0.82 }); }
+      if (AC) { visQ.push({ at: AC.currentTime + at, i: f.i, dur: step * 0.82, k: i }); }
       at += step;
     }
-    tune.nextAt = clock + at + 1.7;
+    tune.nextAt = clock + at + tail;
+  }
+
+  function finishTune() {
+    addMark();
+    drawMarks();
+    tune.advance = true;
+    playThrough(TUNES[tune.idx].notes, 1.7);
     burst(L.W * 0.5, L.strip ? L.strip.y + L.strip.h : L.gy[0], '#ffd45c', reduced ? 0 : 22, 260);
     persist();
+  }
+
+  // Tapping the tune itself plays it through and puts her back at the
+  // start of it. She can hear what she is aiming at as often as she likes,
+  // which is what anyone learning a song does.
+  function replayTune() {
+    if (tune.playing || !tunesOn()) { return; }
+    tune.pos = 0;
+    save.pos = 0;
+    persist();
+    bee.set = false;
+    drawTuneStrip();
+    tune.advance = false;
+    playThrough(TUNES[tune.idx].notes, 0.8);
   }
 
   function nextTune() {
@@ -1448,6 +1475,10 @@
       var v = visQ.shift();
       friends[v.i].singUntil = clock + v.dur;
       friends[v.i].excite = 1;
+      if (typeof v.k === 'number' && tune.discs[v.k]) {
+        bee.tx = tune.discs[v.k].x;
+        bee.ty = tune.discs[v.k].y;
+      }
     }
   }
 
@@ -1537,7 +1568,7 @@
 
     f.excite += ((mine ? 1 : 0) - f.excite) * clamp(dt * 5, 0, 1);
     f.hop = ((mine || f.celebrate > 0) && !reduced)
-      ? Math.abs(Math.sin(clock * 5.5)) * 9 * L.scale : f.hop * 0.9;
+      ? Math.abs(Math.sin(clock * 6.2)) * 26 * L.scale : f.hop * 0.88;
 
     // Blowing too hard covers everyone's ears. It costs her nothing.
     var wantShy = (micMine && hold.shrill) ? 1 : 0;
@@ -1612,7 +1643,15 @@
 
     drainVis();
     tuneTick(dt);
-    if (tune.playing && clock > tune.nextAt) { nextTune(); }
+    if (tune.playing && clock > tune.nextAt) {
+      if (tune.advance) {
+        nextTune();
+      } else {
+        tune.playing = false;
+        bee.set = false;
+        drawTuneStrip();
+      }
+    }
     if (tunesOn() && !tune.playing) {
       ask.idx = noteIndex(TUNES[tune.idx].notes[tune.pos] || 'B');
     }
@@ -1670,6 +1709,7 @@
     if (ui) {
       var which = ui.getAttribute('data-ui');
       if (which === 'reset') { resetting = true; resetHold = 0; return; }
+      if (which === 'tune') { replayTune(); return; }
       if (which === 'mic') {
         if (MIC.state === 'on') { stopMic(); }
         else if (MIC.state !== 'asking') { startMic(); }
