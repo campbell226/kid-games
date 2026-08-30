@@ -1039,14 +1039,46 @@
       }
     };
     var table = SPREAD[wide ? 'wide' : 'tall'][slots] || SPREAD[wide ? 'wide' : 'tall'][3];
-    var slotY = [], slotX = [], k;
-    for (k = 0; k < table.y.length; k++) {
-      slotY.push(floor * table.y[k]);
-      slotX.push(W * table.x[k]);
+    var k;
+
+    // The tallest friend, which is what a row has to be able to hold, and
+    // the friend that will stand on the top terrace, which is what has to
+    // clear the controls along the top of the screen.
+    var tallest = 0, topTop = 0, tk;
+    for (tk = 0; tk < SPECS.length; tk++) {
+      if (SPECS[tk].top > tallest) { tallest = SPECS[tk].top; }
+      if (SPECS[tk].row === rows[0]) { topTop = SPECS[tk].top; }
     }
-    var rowH = slots > 1
-      ? floor * (table.y[slots - 1] - table.y[0]) / (slots - 1)
-      : floor * 0.3;
+
+    // The hill starts below the microphone and its neighbours. Only as far
+    // below as it has to: the highest friend was disappearing behind the
+    // fast forward button, and a fixed margin would have cost portrait
+    // height it does not need to give up. Four passes settle it.
+    var band = uiSizeFor(W, 1000 / vw) + 24;
+    var hillTop = 0, slotY, slotX, rowH, scale, signScale, pass, want;
+    for (pass = 0; pass < 4; pass++) {
+      slotY = []; slotX = [];
+      for (k = 0; k < table.y.length; k++) {
+        slotY.push(hillTop + (floor - hillTop) * table.y[k]);
+        slotX.push(W * table.x[k]);
+      }
+      rowH = slots > 1
+        ? (floor - hillTop) * (table.y[slots - 1] - table.y[0]) / (slots - 1)
+        : (floor - hillTop) * 0.3;
+      scale = clamp(Math.min(W * 0.30 / 200, (rowH - 16) / tallest), 0.17, 1.5);
+      signScale = wide
+        ? clamp(Math.min((W * 0.26) / 430, (rowH * 0.62) / 180), 0.16, 0.8)
+        : clamp(Math.min((W * 0.19) / 170, (rowH * 0.92) / 514), 0.14, 1.0);
+      // It is the signpost, not the friend, that has to clear the buttons:
+      // it stands higher to begin with, and swells by a fifth again while
+      // its friend is listening.
+      want = band - Math.min(
+        slotY[0] - topTop * scale,
+        slotY[0] + 6 - (wide ? 230 : 530) * signScale * 1.22
+      );
+      if (want <= 0) { break; }
+      hillTop = Math.min(hillTop + want, floor * 0.45);
+    }
 
     // Indexed by friend, not by row, so saved gardens and every existing
     // lookup keep working. A friend that is not here is parked on the
@@ -1060,25 +1092,23 @@
       xs.push(slotX[k]);
     }
     var strip = songs ? { y: stripTop, h: stripH } : null;
-    // A friend has to fit inside its own row. Sized at rowH/230 it did
-    // not: the rabbit is 240 tall, so it always stood a little higher
-    // than one row gap and its ears ended up inside the signpost of
-    // whoever was above. Portrait never showed it because the size hits
-    // its ceiling first there; landscape shows it every time.
-    var tallest = 0, tk;
-    for (tk = 0; tk < SPECS.length; tk++) {
-      if (SPECS[tk].top > tallest) { tallest = SPECS[tk].top; }
-    }
-    var scale = clamp(Math.min(W * 0.30 / 200, (rowH - 16) / tallest), 0.17, 1.5);
-    var signScale = wide
-      ? clamp(Math.min((W * 0.26) / 430, (rowH * 0.62) / 180), 0.16, 0.8)
-      : clamp(Math.min((W * 0.19) / 170, (rowH * 0.92) / 514), 0.14, 1.0);
 
-    var signX = [], flowerX = [], side = [], i, sd;
+    var signX = [], flowerX = [], side = [], i, sd, off, half;
+    half = (wide ? 226 : 106) * signScale;
+    off = 88 * scale + half + 16;
     for (i = 0; i < SPECS.length; i++) {
-      sd = xs[i] > W * 0.5 ? -1 : 1;
+      // Portrait puts the signpost on the outer side of its friend. Pushed
+      // toward the middle instead, all five of them line up in a column
+      // down the centre of the screen, each one nearer the next sign than
+      // the friend it belongs to. Landscape keeps them inboard, where the
+      // columns march across and the outer side is the screen edge.
+      sd = wide ? (xs[i] > W * 0.5 ? -1 : 1) : (xs[i] > W * 0.5 ? 1 : -1);
+      // Except the highest one, whose signpost stands taller than anything
+      // else and would otherwise reach up into the corner controls. That
+      // one turns inward, where the top of the screen is empty.
+      if (SPECS[i].row === rows[0]) { sd = xs[i] > W * 0.5 ? -1 : 1; }
       side.push(sd);
-      signX.push(xs[i] + sd * (92 * scale + (wide ? 210 : 86) * signScale + 14));
+      signX.push(clamp(xs[i] + sd * off, half + 10, W - half - 10));
       flowerX.push(xs[i] - sd * (100 * scale + 44 * scale));
     }
 
@@ -1631,7 +1661,8 @@
     })['catch'](function () { wakeAsking = false; wakeLock = null; });
   }
 
-  function uiSize() { return clamp(Math.max(L.W * 0.08, 54 * L.perPx), 58, 190); }
+  function uiSizeFor(w, perPx) { return clamp(Math.max(w * 0.08, 54 * perPx), 58, 190); }
+  function uiSize() { return uiSizeFor(L.W, L.perPx); }
 
   var micRing = null, resetRing = null, resetCirc = 1;
   var resetBig = null, bigRing = null, bigCirc = 1;
@@ -1728,7 +1759,8 @@
     var sz = uiSize();
     // Top corners: the tune has the bottom of the screen now, and out
     // of the way of a hand resting on the edge of the tablet.
-    var cx = 22 + sz / 2, cy = 22 + sz / 2;
+    var edge = Math.max(22, sz * 0.2);
+    var cx = edge + sz / 2, cy = 22 + sz / 2;
     var on = MIC.state === 'on';
     var busy = MIC.state === 'asking';
     var ink = on ? '#3f7c36' : '#948d82';
@@ -1753,7 +1785,7 @@
     var rs = sz, rr = rs * 0.6;
     resetCirc = 2 * Math.PI * rr;
     var rst = el('g', {
-      transform: 'translate(' + (L.W - 22 - rs / 2) + ',' + (22 + rs / 2) + ')'
+      transform: 'translate(' + (L.W - edge - rs / 2) + ',' + (22 + rs / 2) + ')'
     });
     rst.innerHTML =
       '<rect x="' + (-rs / 2) + '" y="' + (-rs / 2) + '" width="' + rs + '" height="' + rs
@@ -1768,7 +1800,7 @@
     resetRing = rst.querySelector('.rring');
 
     if (save.finished && !pickerOpen) {
-      var lsx = 22 + sz + 14 + sz / 2;
+      var lsx = edge + sz + 14 + sz / 2;
       var ls = el('g', { transform: 'translate(' + lsx + ',' + (22 + sz / 2) + ')' });
       ls.innerHTML =
         '<rect x="' + (-sz / 2) + '" y="' + (-sz / 2) + '" width="' + sz + '" height="' + sz
@@ -1787,7 +1819,7 @@
     }
 
     if (cheatOn) {
-      var chx = L.W - 22 - rs - 14 - rs / 2;
+      var chx = L.W - edge - rs - 14 - rs / 2;
       var ch = el('g', { transform: 'translate(' + chx + ',' + (22 + rs / 2) + ')' });
       ch.innerHTML =
         '<rect x="' + (-rs / 2) + '" y="' + (-rs / 2) + '" width="' + rs + '" height="' + rs
@@ -2420,6 +2452,12 @@
   tune.pos = clamp(save.pos | 0, 0, TUNES[tune.idx].notes.length - 1);
   buildFriends();
   computeLayout();
+  // A phone is still settling when the page first draws - the address bar
+  // has not finished sliding away - so the first measurement is of a size
+  // that is about to change, and everything lands somewhere it will not
+  // stay. Measure again once it has stopped moving.
+  requestAnimationFrame(function () { computeLayout(); });
+  setTimeout(computeLayout, 400);
   requestAnimationFrame(frame);
 })();
 </script>
