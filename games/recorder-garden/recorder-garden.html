@@ -22,6 +22,9 @@
     width: 100dvw; height: 100dvh;
   }
   .hit { fill: transparent; cursor: pointer; }
+  /* Scenery and sparks are not targets, and neither are the two glows,
+     which are far bigger than the things they light up. */
+  #garden, #effects, .halo, .signglow { pointer-events: none; }
 </style>
 </head>
 <body>
@@ -65,11 +68,11 @@
   <g id="sky"></g>
   <g id="hills"></g>
   <g id="garden"></g>
+  <g id="hits"></g>
   <g id="signs"></g>
   <g id="friends"></g>
   <g id="flowers"></g>
   <g id="effects"></g>
-  <g id="hits"></g>
   <g id="ui"></g>
 </svg>
 
@@ -775,9 +778,9 @@
     var i;
     for (i = 0; i < SPECS.length; i++) {
       var s = SPECS[i];
-      var node = el('g', {});
+      var node = el('g', { 'data-friend': i });
       node.innerHTML = '<circle class="halo" cx="0" cy="-95" r="135" fill="url(#sung)" opacity="0"/>' + ART[s.animal](s);
-      var flower = el('g', {});
+      var flower = el('g', { 'data-friend': i });
       flower.innerHTML = flowerArt(s.petal);
       G('friends').appendChild(node);
       G('flowers').appendChild(flower);
@@ -803,7 +806,7 @@
     clear(g);
     for (i = 0; i < friends.length; i++) {
       var f = friends[i];
-      var sign = el('g', {});
+      var sign = el('g', { 'data-friend': i });
       sign.innerHTML = signArt(f.spec.holes, f.spec.petal, L.wide);
       g.appendChild(sign);
       f.sign = sign;
@@ -912,7 +915,52 @@
   // ------------------------------------------------------------------
   // The parent's one control: the ears, on or off.
   // ------------------------------------------------------------------
-  var micRing = null;
+  var micRing = null, resetRing = null, resetCirc = 1;
+  var resetting = false, resetHold = 0;
+  var RESET_HOLD = 2.4;
+
+  // Emptying the garden. Two and a half seconds of held finger, which she
+  // will not manage by accident and I will not do twice. Everything goes:
+  // the flowers, the count, and the two friends who had arrived.
+  function doReset() {
+    resetting = false;
+    resetHold = 0;
+    var i, f;
+    for (i = 0; i < friends.length; i++) {
+      f = friends[i];
+      if (f.present && !reduced) {
+        burst(L.flowerX[i], L.gy[i] - 70 * L.scale, f.spec.petal, 10, 210);
+      }
+      f.growth = 0; f.celebrate = 0; f.done = 0;
+      f.present = (i === 0);
+      f.arriving = false; f.arriveT = 0;
+      f.sing = 0; f.excite = 0; f.shy = 0; f.hop = 0; f.pulse = 0;
+      f.singUntil = 0; f.gigUntil = 0;
+    }
+    save.flowers = 0;
+    save.done = [0, 0, 0];
+    save.garden = [];
+    persist();
+    ask.idx = 0;
+    ask.next = clock + 1.8;
+    [12, 9, 7, 4, 0].forEach(function (s, k) {
+      bell(0.02 + k * 0.06, 523.25 * Math.pow(2, s / 12), 0.2, 0.4);
+    });
+    drawGarden();
+    drawHills();
+    placeAll();
+    drawHits();
+    drawUI();
+  }
+
+  function flowerIcon(rs) {
+    var r = rs * 0.2, s = '<g opacity="0.8">', i;
+    for (i = 0; i < 5; i++) {
+      s += '<ellipse cx="0" cy="' + (-r) + '" rx="' + (r * 0.5) + '" ry="' + r
+        + '" fill="#b7b0a4" transform="rotate(' + (i * 72) + ')"/>';
+    }
+    return s + '<circle cx="0" cy="0" r="' + (r * 0.5) + '" fill="#8f887c"/></g>';
+  }
 
   function drawUI() {
     if (!L.W) { return; }
@@ -940,17 +988,68 @@
       + '" height="' + (sz * 1.36) + '" data-ui="mic"/>';
     g.appendChild(body);
     micRing = body.querySelector('.ring');
+
+    var rs = sz * 0.8, rr = rs * 0.6;
+    resetCirc = 2 * Math.PI * rr;
+    var rst = el('g', {
+      transform: 'translate(' + (L.W - 22 - rs / 2) + ',' + (L.H - 22 - rs / 2) + ')'
+    });
+    rst.innerHTML =
+      '<rect x="' + (-rs / 2) + '" y="' + (-rs / 2) + '" width="' + rs + '" height="' + rs
+      + '" rx="' + (rs * 0.3) + '" fill="#fdf6e3" opacity="0.5" stroke="#c99a5e" stroke-width="3"/>'
+      + flowerIcon(rs)
+      + '<circle class="rring" cx="0" cy="0" r="' + rr + '" fill="none" stroke="#c2564f" stroke-width="'
+      + (rs * 0.11) + '" stroke-linecap="round" stroke-dasharray="' + resetCirc
+      + '" stroke-dashoffset="' + resetCirc + '" transform="rotate(-90)"/>'
+      + '<rect class="hit" x="' + (-rs * 0.7) + '" y="' + (-rs * 0.7) + '" width="' + (rs * 1.4)
+      + '" height="' + (rs * 1.4) + '" data-ui="reset"/>';
+    g.appendChild(rst);
+    resetRing = rst.querySelector('.rring');
+  }
+
+  // Targets, in the order they are stacked: empty ground first, then the
+  // signpost, then the animal on top.
+  //
+  // Horizontal bands alone were wrong, and wrong in a way that felt like
+  // bad aim. A rabbit's ears reach the height of the bird's feet, so the
+  // whole top of the rabbit sat inside the bird's band. Now each friend
+  // owns the space it actually occupies, and the bands only ever catch a
+  // tap on empty sky or grass.
+  function hitRect(g, i, x, y, w, h) {
+    g.appendChild(el('rect', { 'class': 'hit', 'data-friend': i, x: x, y: y, width: w, height: h }));
   }
 
   function drawHits() {
-    var g = G('hits'), i;
+    var g = G('hits'), i, ss, fs, sc, halfW, top;
     clear(g);
+
+    // Empty sky and grass first. These only ever catch a miss.
     for (i = 0; i < 3; i++) {
       if (!friends[i] || !friends[i].present) { continue; }
-      g.appendChild(el('rect', {
-        'class': 'hit', x: 0, y: L.bands[i], width: L.W,
-        height: L.bands[i + 1] - L.bands[i], 'data-friend': i
-      }));
+      hitRect(g, i, 0, L.bands[i], L.W, L.bands[i + 1] - L.bands[i]);
+    }
+
+    // Then row by row, back to front, in the order the artwork itself is
+    // painted: a friend's signpost, then its flower, then the animal on
+    // top of both. Grouping all the signs and then all the animals put
+    // one friend's whole body over its neighbour's signpost.
+    for (i = 0; i < 3; i++) {
+      if (!friends[i] || !friends[i].present) { continue; }
+      sc = L.scale;
+      ss = L.signScale;
+      fs = clamp(sc * 0.85, 0.3, 1.25);
+
+      halfW = (L.wide ? 226 : 106) * ss;
+      top = (L.wide ? 256 : 556) * ss;
+      hitRect(g, i, L.signX[i] - halfW, L.gy[i] - top, halfW * 2, top + 14);
+
+      hitRect(g, i, L.flowerX[i] - 98 * fs, L.gy[i] - 200 * fs, 196 * fs, 300 * fs);
+
+      // Each animal's own height, not the tallest one's: a box sized for
+      // the rabbit's ears would have the bird and the badger claiming a
+      // strip of empty air their neighbour's signpost hangs in.
+      top = (friends[i].spec.top + 14) * sc;
+      hitRect(g, i, L.xs[i] - 124 * sc, L.gy[i] - top, 248 * sc, top + 14 * sc);
     }
   }
 
@@ -1098,10 +1197,15 @@
   }
 
   function updateUI() {
-    if (!micRing) { return; }
-    var lv = clamp(MIC.smooth * 6, 0, 1);
-    micRing.setAttribute('opacity', MIC.state === 'on' ? (0.12 + lv * 0.6) : 0);
-    micRing.setAttribute('transform', 'scale(' + (0.86 + lv * 0.3) + ')');
+    if (micRing) {
+      var lv = clamp(MIC.smooth * 6, 0, 1);
+      micRing.setAttribute('opacity', MIC.state === 'on' ? (0.12 + lv * 0.6) : 0);
+      micRing.setAttribute('transform', 'scale(' + (0.86 + lv * 0.3) + ')');
+    }
+    if (resetRing) {
+      resetRing.setAttribute('stroke-dashoffset',
+        resetCirc * (1 - clamp(resetHold / RESET_HOLD, 0, 1)));
+    }
   }
 
   // ------------------------------------------------------------------
@@ -1118,6 +1222,11 @@
     if (detectTick >= 0.033) { listen(); updateHold(detectTick); detectTick = 0; }
     MIC.smooth += (MIC.level - MIC.smooth) * clamp(dt * 9, 0, 1);
     lookAt = computeLook();
+
+    if (resetting) {
+      resetHold += dt;
+      if (resetHold >= RESET_HOLD) { doReset(); }
+    }
 
     // Anything she plays that is not one of the three still stirs the
     // grass, so the recorder never once makes nothing happen.
@@ -1161,15 +1270,23 @@
     initAudio();
     if (!firstTouch) { firstTouch = true; startMic(); }
     var t = ev.target;
-    if (!t || !t.getAttribute) { return; }
-    if (t.getAttribute('data-ui') === 'mic') {
-      if (MIC.state === 'on') { stopMic(); }
-      else if (MIC.state !== 'asking') { startMic(); }
+    if (!t || !t.closest) { return; }
+    var ui = t.closest('[data-ui]');
+    if (ui) {
+      var which = ui.getAttribute('data-ui');
+      if (which === 'reset') { resetting = true; resetHold = 0; return; }
+      if (which === 'mic') {
+        if (MIC.state === 'on') { stopMic(); }
+        else if (MIC.state !== 'asking') { startMic(); }
+      }
       return;
     }
-    var fi = t.getAttribute('data-friend');
-    if (fi === null) { return; }
-    var f = friends[+fi];
+    // The animal, its signpost and its flower answer for themselves
+    // wherever they are actually drawn; the boxes underneath catch
+    // everything that lands on the bare ground around them.
+    var owner = t.closest('[data-friend]');
+    if (!owner) { return; }
+    var f = friends[+owner.getAttribute('data-friend')];
     if (!f || !f.present) { return; }
     sing(f, 1.2);
     ask.next = clock + 13;
@@ -1177,7 +1294,7 @@
     if (MIC.state !== 'on') { touchHold = f.i; }
   });
 
-  function release() { touchHold = -1; }
+  function release() { touchHold = -1; resetting = false; resetHold = 0; }
   window.addEventListener('pointerup', release);
   window.addEventListener('pointercancel', release);
   svg.addEventListener('contextmenu', function (ev) { ev.preventDefault(); });
