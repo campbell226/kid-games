@@ -699,24 +699,33 @@
   // ------------------------------------------------------------------
   // The clock, which is the whole point of the game.
   //
-  // Two devices cannot talk to each other, but they already share a
-  // clock: the wall clock, which both of them keep disciplined against
-  // network time and neither of them lets drift. So the beat grid is
-  // not counted out locally - it is a function of the actual time of
-  // day. Step n happens at n * stepDur + offset seconds past the epoch,
-  // on every device in the room.
+  // Two devices cannot talk to each other, but they can both be told
+  // the time. So the beat grid is not counted out locally - it is a
+  // function of the actual date and time. Step n happens at n * stepDur
+  // seconds past the epoch, so two devices that agree on what time it is
+  // are already playing the same beat of the same loop, with nothing to
+  // count in and nothing to press together.
   //
-  // What is left over is the difference between the two system clocks
-  // and between the two devices' audio output latencies. That is what
-  // the arrows take out, and once it is out it stays out, because
-  // neither clock is free-running. A session can last all afternoon.
+  // Three layers, coarsest first:
   //
-  // The audio clock is a different, free-running clock, so it is slewed
-  // onto the wall clock rather than trusted: at most a millisecond a
-  // second, which is far more than crystal drift ever needs and slow
-  // enough to be inaudible. A real jump - the phone picking up network
-  // time for the first time - is taken in one go instead, because being
-  // a second out is worse than one flinch.
+  //   clockAdjust  what this device is told the time is, when its own
+  //                clock is wrong. Set by hand, in years down to
+  //                seconds, until every device reads the same.
+  //   offset       the milliseconds left over: the sub-second gap
+  //                between two system clocks, plus the difference in
+  //                how long each device takes to get a sound out of its
+  //                speaker. Nudged by ear.
+  //   skew         not a control. The audio clock is a separate,
+  //                free-running clock, so it is slewed onto the wall
+  //                clock rather than trusted: at most a millisecond a
+  //                second, far more than crystal drift ever needs and
+  //                slow enough to be inaudible. A real jump - the phone
+  //                picking up network time for the first time - is taken
+  //                in one go instead, because being a second out is
+  //                worse than one flinch.
+  //
+  // Only the first two are ever set, and once set they stay set, because
+  // no clock in this is free-running. A session can last all afternoon.
   // ------------------------------------------------------------------
   var STEPS_PER_BEAT = 4, BEATS_PER_LOOP = 16;
   var STEPS_PER_LOOP = STEPS_PER_BEAT * BEATS_PER_LOOP;
@@ -724,14 +733,17 @@
 
   var bpm = clamp(load('bpm', 90), 60, 160);
   var offset = load('offset', 0);
+  var clockAdjust = load('clock', 0);
   var skew = 0, skewSet = false, stepN = 0, visQ = [], mode = 'tune';
 
   function wallNow() { return Date.now() / 1000; }
+  function tellNow() { return wallNow() + clockAdjust; }
   function stepDur() { return 60 / bpm / STEPS_PER_BEAT; }
   function beatDur() { return 60 / bpm; }
 
-  // Audio time of a step, via the wall clock it is really pinned to.
-  function stepTime(n) { return n * stepDur() + offset + skew; }
+  // Audio time of the grid's zero, which is where all three layers meet.
+  function gridZero() { return offset - clockAdjust + skew; }
+  function stepTime(n) { return n * stepDur() + gridZero(); }
 
   function trackWallClock(dt) {
     if (!AC) { return; }
@@ -745,30 +757,58 @@
 
   function curStep() {
     if (!AC || !skewSet) { return 0; }
-    return (AC.currentTime - offset - skew) / stepDur();
+    return (AC.currentTime - gridZero()) / stepDur();
   }
 
-  // Changing the tempo must not shunt the beat sideways as well, and the
-  // grid is absolute, so the offset is rewritten to hold the current
-  // position still.
+  // The beat jumps when the tempo changes, and that is right: the grid
+  // is worked out from the clock every time, so two devices that change
+  // tempo minutes apart still land on the same grid. Holding the old
+  // position would be the thing that pulled them apart.
   function setBpm(v) {
     var next = clamp(Math.round(v), 60, 160);
     if (next === bpm) { return; }
-    if (AC && skewSet) {
-      var here = curStep();
-      bpm = next;
-      offset = AC.currentTime - skew - here * stepDur();
-    } else {
-      bpm = next;
-    }
+    bpm = next;
     save('bpm', bpm);
-    save('offset', offset);
     paintBpm();
   }
 
   function nudge(seconds) {
     offset += seconds;
     save('offset', offset);
+  }
+
+  // Told the time by hand, in whole calendar units, so a device whose
+  // own clock is wrong can be brought onto the others. Done through Date
+  // rather than by adding seconds, so a month is the month it actually
+  // is and the year knows about February.
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+
+  var FIELDS = [
+    { w: 1.8, read: function (d) { return String(d.getFullYear()); },
+      bump: function (d, n) { d.setFullYear(d.getFullYear() + n); } },
+    { w: 1, read: function (d) { return pad2(d.getMonth() + 1); },
+      bump: function (d, n) { d.setMonth(d.getMonth() + n); } },
+    { w: 1, read: function (d) { return pad2(d.getDate()); },
+      bump: function (d, n) { d.setDate(d.getDate() + n); } },
+    { w: 1, read: function (d) { return pad2(d.getHours()); },
+      bump: function (d, n) { d.setHours(d.getHours() + n); } },
+    { w: 1, read: function (d) { return pad2(d.getMinutes()); },
+      bump: function (d, n) { d.setMinutes(d.getMinutes() + n); } },
+    { w: 1, read: function (d) { return pad2(d.getSeconds()); },
+      bump: function (d, n) { d.setSeconds(d.getSeconds() + n); } }
+  ];
+
+  function bumpField(i, n) {
+    var d = new Date(tellNow() * 1000);
+    FIELDS[i].bump(d, n);
+    clockAdjust = d.getTime() / 1000 - wallNow();
+    save('clock', clockAdjust);
+  }
+
+  function clockText() {
+    var d = new Date(tellNow() * 1000);
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate())
+      + '  ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
   }
 
   var pads = [], byId = {};
@@ -781,7 +821,7 @@
     var now = AC.currentTime, sd = stepDur(), i, j;
 
     // Coming back from a locked screen must not replay the whole loop.
-    var behind = Math.floor((now - offset - skew) / sd) - 1;
+    var behind = Math.floor((now - gridZero()) / sd) - 1;
     if (stepN < behind) { stepN = behind; }
 
     while (stepTime(stepN) < now + LOOK) {
@@ -806,10 +846,6 @@
 
       if (mode === 'tune') {
         if (onBeat) { play('click', 69, t, 1); }
-        // Once every sixteen beats, so the top of the loop can be heard
-        // from across the room and not only seen. Not an accent: it is a
-        // different instrument, once, and every click stays identical.
-        if (inLoop === 0) { play('marimba', 84, t, 0.5); }
       } else {
         for (i = 0; i < pads.length; i++) {
           var p = pads[i];
@@ -954,27 +990,11 @@
       + '<g transform="scale(-1,1) translate(14,0)">' + chevron(0) + '</g>';
   }
 
-  // ------------------------------------------------------------------
-  // The loop bar: sixteen dots for the sixteen beats, and a single
-  // chevron at each end that shunts the loop round by exactly one beat.
-  //
-  // The clicks are identical and one beat apart, so two devices whose
-  // clocks are further apart than half a beat will be tuned onto the
-  // wrong click - together to the ear, a whole beat out in the loop, and
-  // nothing on the ring would say so. Adding one beat to the offset
-  // moves every click by exactly one click period, which leaves the
-  // click train unchanged and moves only which beat of the loop is
-  // which. So the coarse control cannot undo the fine one: watch the
-  // lit dot jump a place and match the other device.
-  // ------------------------------------------------------------------
-  function makeLoopBar() {
+  // Sixteen dots for the sixteen beats of the loop. Nothing to press:
+  // where you are in the loop follows from the time, so this is a thing
+  // to read, and two devices showing the same dot are together.
+  function makeDotRow() {
     var bar = { g: el('g'), dots: [] };
-    bar.minus = bigButton('#3f4a7d', '<g transform="scale(-1,1)">' + chevron(-13) + '</g>');
-    bar.plus = bigButton('#3f4a7d', chevron(-13));
-    bar.minus.setAttribute('data-act', 'beat-');
-    bar.plus.setAttribute('data-act', 'beat+');
-    bar.g.appendChild(bar.minus);
-    bar.g.appendChild(bar.plus);
     for (var i = 0; i < BEATS_PER_LOOP; i++) {
       var d = el('circle', { cx: 0, cy: 0, r: 8, fill: '#8ea0d8' });
       bar.g.appendChild(d);
@@ -983,7 +1003,7 @@
     return bar;
   }
 
-  function layoutLoopBar(bar, cx, cy, span, maxR, maxH) {
+  function layoutDotRow(bar, cx, cy, span, maxR) {
     var gap = span / (BEATS_PER_LOOP - 1);
     var r = Math.min(gap * 0.32, maxR);
     for (var i = 0; i < BEATS_PER_LOOP; i++) {
@@ -991,29 +1011,14 @@
       bar.dots[i].setAttribute('cy', cy.toFixed(1));
       bar.dots[i].setAttribute('r', r.toFixed(1));
     }
-    // The dots are only something to read; the chevrons are something to
-    // hit, so they get a target of their own rather than the dots' size.
-    var bh = Math.min(Math.max(r * 5, 96), maxH);
-    var bw = Math.max(bh * 1.25, r * 6);
-    sizeButton(bar.minus, bw, bh);
-    sizeButton(bar.plus, bw, bh);
-    place(bar.minus, cx - span / 2 - bw * 0.62, cy);
-    place(bar.plus, cx + span / 2 + bw * 0.62, cy);
   }
 
-  function paintLoopBar(bar) {
+  function paintDotRow(bar) {
     for (var i = 0; i < BEATS_PER_LOOP; i++) {
       var on = (i === beatIdx);
       bar.dots[i].setAttribute('fill', on && beatFlash > 0.2 ? '#ffe9a0' : '#8ea0d8');
       bar.dots[i].setAttribute('opacity', (0.3 + (on ? beatFlash * 0.7 : 0)).toFixed(2));
     }
-  }
-
-  function showBarButtons(bar, on) {
-    bar.minus.setAttribute('opacity', on ? 1 : 0);
-    bar.plus.setAttribute('opacity', on ? 1 : 0);
-    bar.minus.setAttribute('pointer-events', on ? 'auto' : 'none');
-    bar.plus.setAttribute('pointer-events', on ? 'auto' : 'none');
   }
 
   // ------------------------------------------------------------------
@@ -1022,15 +1027,32 @@
   // about which click is which.
   // ------------------------------------------------------------------
   var T = {};
+  var MINUS = '<rect x="-34" y="-8" width="68" height="16" rx="8" fill="#ffffff"/>';
+  var PLUS = MINUS + '<rect x="-8" y="-34" width="16" height="68" rx="8" fill="#ffffff"/>';
 
   function buildTune() {
     var g = document.getElementById('tune');
     clear(g);
 
-    T.minus = bigButton('#3f4a7d', '<rect x="-34" y="-8" width="68" height="16" rx="8" fill="#ffffff"/>');
-    T.plus = bigButton('#3f4a7d',
-      '<rect x="-34" y="-8" width="68" height="16" rx="8" fill="#ffffff"/>'
-      + '<rect x="-8" y="-34" width="16" height="68" rx="8" fill="#ffffff"/>');
+    // The only words in the game, and they are for whoever sets it up.
+    T.hint = el('g');
+    T.hintA = el('text', { 'text-anchor': 'middle', fill: '#aab6e0' });
+    T.hintB = el('text', { 'text-anchor': 'middle', fill: '#aab6e0' });
+    T.hintA.textContent = 'Same time, same tempo on every device.';
+    T.hintB.textContent = 'Then nudge until the clicks land together.';
+    T.hint.appendChild(T.hintA);
+    T.hint.appendChild(T.hintB);
+
+    T.clockBtn = bigButton('#2b3466', '');
+    T.clockBtn.setAttribute('data-act', 'clock');
+    T.clockLabel = el('text', {
+      'text-anchor': 'middle', fill: '#ffffff', 'font-weight': '600',
+      'font-family': 'ui-monospace, "SF Mono", Menlo, Consolas, monospace'
+    });
+    T.clockBtn.insertBefore(T.clockLabel, T.clockBtn.querySelector('.hit'));
+
+    T.minus = bigButton('#3f4a7d', MINUS);
+    T.plus = bigButton('#3f4a7d', PLUS);
     T.minus.setAttribute('data-act', 'bpm-');
     T.plus.setAttribute('data-act', 'bpm+');
 
@@ -1038,14 +1060,22 @@
       'text-anchor': 'middle', fill: '#ffffff', 'font-weight': '700', 'font-size': '120'
     });
 
+    // One turn per loop, not per beat. A beat is under two thirds of a
+    // second and the eye cannot follow a dot round in that; sixteen
+    // beats it can, and where in the loop you are is the thing two
+    // devices actually need to agree about.
     T.ring = el('g');
     T.ringLine = el('circle', {
       cx: 0, cy: 0, r: 200, fill: 'none',
       stroke: 'rgba(255,255,255,0.16)', 'stroke-width': 14
     });
     T.ring.appendChild(T.ringLine);
-    T.pip = el('circle', { cx: 0, cy: 0, r: 16, fill: '#8ea0d8' });
-    T.ring.appendChild(T.pip);
+    T.pips = [];
+    for (var i = 0; i < BEATS_PER_LOOP; i++) {
+      var pip = el('circle', { cx: 0, cy: 0, r: 10, fill: '#8ea0d8' });
+      T.ring.appendChild(pip);
+      T.pips.push(pip);
+    }
     T.orbit = el('circle', { cx: 0, cy: 0, r: 26, fill: '#ffe9a0' });
     T.ring.appendChild(T.orbit);
 
@@ -1065,95 +1095,231 @@
       '<path d="M -22 -34 L 38 0 L -22 34 Z" fill="#ffffff"/>');
     T.play.setAttribute('data-act', 'play');
 
+    g.appendChild(T.hint);
+    g.appendChild(T.clockBtn);
     g.appendChild(T.minus);
     g.appendChild(T.plus);
     g.appendChild(T.bpmText);
     g.appendChild(T.condGlow);
     g.appendChild(T.ring);
     g.appendChild(T.cond);
-    T.bar = makeLoopBar();
-
     g.appendChild(T.left);
     g.appendChild(T.right);
-    g.appendChild(T.bar.g);
     g.appendChild(T.play);
+
+    buildClockPanel(g);
     paintBpm();
+  }
+
+  // ------------------------------------------------------------------
+  // Telling the device the time. Six columns, coarsest first, each one
+  // a plus above a number above a minus - so a device whose own clock is
+  // wrong can be walked onto the others one unit at a time.
+  // ------------------------------------------------------------------
+  var C = {};
+
+  function buildClockPanel(g) {
+    C.panel = el('g', { display: 'none' });
+    C.back = el('rect', { x: 0, y: 0, width: 10, height: 10, fill: '#0d1230' });
+    C.panel.appendChild(C.back);
+    C.readout = el('text', {
+      'text-anchor': 'middle', fill: '#aab6e0', 'font-weight': '600',
+      'font-family': 'ui-monospace, "SF Mono", Menlo, Consolas, monospace'
+    });
+    C.panel.appendChild(C.readout);
+
+    C.cols = [];
+    FIELDS.forEach(function (f, i) {
+      var col = {};
+      col.up = bigButton('#3f4a7d', PLUS);
+      col.down = bigButton('#3f4a7d', MINUS);
+      col.up.setAttribute('data-act', 'f+' + i);
+      col.down.setAttribute('data-act', 'f-' + i);
+      col.value = el('text', {
+        'text-anchor': 'middle', fill: '#ffffff', 'font-weight': '700',
+        'font-family': 'ui-monospace, "SF Mono", Menlo, Consolas, monospace'
+      });
+      C.panel.appendChild(col.up);
+      C.panel.appendChild(col.value);
+      C.panel.appendChild(col.down);
+      C.cols.push(col);
+    });
+
+    C.done = bigButton('#3fa564',
+      '<path d="M -30 2 L -10 24 L 32 -22" fill="none" stroke="#ffffff"'
+      + ' stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>');
+    C.done.setAttribute('data-act', 'clock-done');
+    C.panel.appendChild(C.done);
+    g.appendChild(C.panel);
+  }
+
+  function layoutClockPanel() {
+    var W = L.W, H = L.H;
+    C.back.setAttribute('width', W);
+    C.back.setAttribute('height', H);
+
+    var total = 0;
+    FIELDS.forEach(function (f) { total += f.w; });
+    var span = W * 0.94, unit = span / total, x = (W - span) / 2;
+    var cy = H * 0.45;
+    var bh = Math.min(H * 0.1, 120);
+    var fh = Math.min(unit * 0.62, H * 0.075, 86);
+    var vs = bh * 0.5 + fh * 0.5 + H * 0.022;
+
+    C.readout.setAttribute('x', W * 0.5);
+    C.readout.setAttribute('y', H * 0.2);
+    C.readout.setAttribute('font-size', Math.min(H * 0.05, 70).toFixed(0));
+
+    FIELDS.forEach(function (f, i) {
+      var colW = unit * f.w, cx = x + colW / 2;
+      x += colW;
+      var bw = Math.min(colW * 0.82, 170);
+      var col = C.cols[i];
+      sizeButton(col.up, bw, bh);
+      sizeButton(col.down, bw, bh);
+      place(col.up, cx, cy - vs);
+      place(col.down, cx, cy + vs);
+      col.value.setAttribute('x', cx.toFixed(1));
+      col.value.setAttribute('y', (cy + fh * 0.36).toFixed(1));
+      col.value.setAttribute('font-size', fh.toFixed(0));
+    });
+
+    sizeButton(C.done, Math.min(W * 0.32, 320), Math.min(H * 0.11, 130));
+    place(C.done, W * 0.5, H * 0.79);
+  }
+
+  function paintClockPanel() {
+    var d = new Date(tellNow() * 1000);
+    C.readout.textContent = clockText();
+    for (var i = 0; i < FIELDS.length; i++) {
+      C.cols[i].value.textContent = FIELDS[i].read(d);
+    }
+  }
+
+  var clockOpen = false;
+  function setClockPanel(open) {
+    clockOpen = open;
+    C.panel.setAttribute('display', open ? 'inline' : 'none');
+    if (open) { paintClockPanel(); }
   }
 
   function paintBpm() {
     if (T.bpmText) { T.bpmText.textContent = String(bpm); }
   }
 
+  function layoutHint(x, y, size, lead) {
+    T.hintA.setAttribute('x', x); T.hintA.setAttribute('y', y);
+    T.hintB.setAttribute('x', x); T.hintB.setAttribute('y', y + lead);
+    T.hintA.setAttribute('font-size', size.toFixed(0));
+    T.hintB.setAttribute('font-size', size.toFixed(0));
+  }
+
+  function layoutClockBtn(cx, cy, w, h) {
+    sizeButton(T.clockBtn, w, h);
+    place(T.clockBtn, cx, cy);
+    var fs = Math.min(w / 13, h * 0.55);
+    T.clockLabel.setAttribute('x', 0);
+    T.clockLabel.setAttribute('y', fs * 0.36);
+    T.clockLabel.setAttribute('font-size', fs.toFixed(0));
+  }
+
   function layoutTune() {
     var W = L.W, H = L.H;
+    // The browser's own full screen button sits in the middle of the top
+    // of the screen until it is pressed, and it is a fixed size in real
+    // pixels. So the room kept for it is measured in real pixels and
+    // converted, rather than guessed as a fraction of the world - a
+    // guess is right on one screen and wrong on the next.
+    var perPx = W / Math.max(1, svg.getBoundingClientRect().width || W);
+    var reserve = 58 * perPx;
+
     if (L.wide) {
-      var bw = Math.min(W * 0.15, 160), bh = Math.min(H * 0.2, 130);
+      var hf0 = Math.min(H * 0.05, 46), lead0 = Math.min(H * 0.065, 58);
+      layoutHint(W * 0.5, Math.max(H * 0.2, reserve + hf0 * 0.85), hf0, lead0);
+      layoutClockBtn(W * 0.75, H * 0.37, W * 0.46, Math.min(H * 0.13, 100));
+
+      var bw = Math.min(W * 0.13, 150), bh = Math.min(H * 0.15, 115);
       sizeButton(T.minus, bw, bh);
       sizeButton(T.plus, bw, bh);
-      place(T.minus, W * 0.60, H * 0.22);
-      place(T.plus, W * 0.92, H * 0.22);
-      T.bpmText.setAttribute('x', W * 0.76);
-      T.bpmText.setAttribute('y', H * 0.22 + bh * 0.34);
+      place(T.minus, W * 0.57, H * 0.53);
+      place(T.plus, W * 0.93, H * 0.53);
+      T.bpmText.setAttribute('x', W * 0.75);
+      T.bpmText.setAttribute('y', H * 0.53 + bh * 0.34);
       T.bpmText.setAttribute('font-size', (bh * 0.95).toFixed(0));
 
-      var aw = Math.min(W * 0.17, 190), ah = Math.min(H * 0.24, 150);
+      var aw = Math.min(W * 0.16, 180), ah = Math.min(H * 0.15, 120);
       sizeButton(T.left, aw, ah);
       sizeButton(T.right, aw, ah);
-      place(T.left, W * 0.63, H * 0.55);
-      place(T.right, W * 0.89, H * 0.55);
+      place(T.left, W * 0.63, H * 0.71);
+      place(T.right, W * 0.87, H * 0.71);
 
-      var pw = Math.min(W * 0.24, 250), ph = Math.min(H * 0.22, 130);
+      var pw = Math.min(W * 0.24, 250), ph = Math.min(H * 0.13, 120);
       sizeButton(T.play, pw, ph);
-      place(T.play, W * 0.76, H * 0.85);
+      place(T.play, W * 0.75, H * 0.9);
 
-      T.ringX = W * 0.27; T.ringY = H * 0.42;
-      T.ringR = clamp(Math.min(H * 0.3, W * 0.22), 50, 320);
-      layoutLoopBar(T.bar, W * 0.27, H * 0.87, W * 0.3, H * 0.05, H * 0.18);
+      T.ringX = W * 0.26; T.ringY = H * 0.62;
+      T.ringR = clamp(Math.min(H * 0.3, W * 0.21), 50, 320);
     } else {
-      var bw2 = Math.min(W * 0.23, 240), bh2 = Math.min(H * 0.09, 170);
+      // Clear of the browser's own full screen button, which sits in the
+      // middle of the top of the screen until it is pressed.
+      // Portrait stacks, so each band is placed under the one above it
+      // rather than at a fixed fraction: whatever the reserve does to the
+      // hint, nothing below it collides.
+      var hf = Math.min(H * 0.019, 46), lead = Math.min(H * 0.026, 58);
+      var hintY = Math.max(H * 0.095, reserve + hf * 0.85);
+      layoutHint(W * 0.5, hintY, hf, lead);
+
+      var ch = Math.min(H * 0.065, 130);
+      var clockY = hintY + lead + ch * 0.5 + H * 0.022;
+      layoutClockBtn(W * 0.5, clockY, W * 0.82, ch);
+
+      var bw2 = Math.min(W * 0.22, 240), bh2 = Math.min(H * 0.075, 150);
+      var bpmY = clockY + ch * 0.5 + bh2 * 0.5 + H * 0.025;
       sizeButton(T.minus, bw2, bh2);
       sizeButton(T.plus, bw2, bh2);
-      place(T.minus, W * 0.16, H * 0.11);
-      place(T.plus, W * 0.84, H * 0.11);
+      place(T.minus, W * 0.16, bpmY);
+      place(T.plus, W * 0.84, bpmY);
       T.bpmText.setAttribute('x', W * 0.5);
-      T.bpmText.setAttribute('y', H * 0.11 + bh2 * 0.36);
+      T.bpmText.setAttribute('y', bpmY + bh2 * 0.36);
       T.bpmText.setAttribute('font-size', bh2.toFixed(0));
 
-      var aw2 = Math.min(W * 0.38, 380), ah2 = Math.min(H * 0.13, 200);
+      var aw2 = Math.min(W * 0.38, 380), ah2 = Math.min(H * 0.12, 200);
       sizeButton(T.left, aw2, ah2);
       sizeButton(T.right, aw2, ah2);
-      place(T.left, W * 0.28, H * 0.68);
-      place(T.right, W * 0.72, H * 0.68);
+      place(T.left, W * 0.28, H * 0.72);
+      place(T.right, W * 0.72, H * 0.72);
 
-      var pw2 = Math.min(W * 0.46, 460), ph2 = Math.min(H * 0.12, 180);
+      var pw2 = Math.min(W * 0.46, 460), ph2 = Math.min(H * 0.11, 180);
       sizeButton(T.play, pw2, ph2);
-      place(T.play, W * 0.5, H * 0.87);
+      place(T.play, W * 0.5, H * 0.89);
 
-      var barY = H * 0.68 - ah2 * 0.5 - H * 0.045;
-      layoutLoopBar(T.bar, W * 0.5, barY, W * 0.62, H * 0.012, H * 0.075);
-
-      // The ring takes whatever is left between the tempo and the loop
-      // bar, so a stubby portrait window shrinks it instead of running
-      // the number through it.
-      var bandTop = H * 0.11 + bh2 * 0.5 + H * 0.035;
-      var bandBot = barY - H * 0.035;
+      // The ring takes whatever is left between the tempo and the
+      // arrows, so a stubby portrait window shrinks it instead of
+      // running the number through it.
+      var bandTop = bpmY + bh2 * 0.5 + H * 0.03;
+      var bandBot = H * 0.72 - ah2 * 0.5 - H * 0.03;
       T.ringX = W * 0.5;
       T.ringY = (bandTop + bandBot) / 2;
       T.ringR = clamp(Math.min(W * 0.32, (bandBot - bandTop) / 2), 50, 340);
     }
 
     T.ringLine.setAttribute('r', T.ringR);
-    T.ringLine.setAttribute('stroke-width', Math.max(8, T.ringR * 0.07));
+    T.ringLine.setAttribute('stroke-width', Math.max(8, T.ringR * 0.055));
     T.ring.setAttribute('transform', 'translate(' + T.ringX + ',' + T.ringY + ')');
-    T.pip.setAttribute('cx', 0);
-    T.pip.setAttribute('cy', -T.ringR);
-    T.pip.setAttribute('r', (T.ringR * 0.1).toFixed(1));
-    T.orbit.setAttribute('r', (T.ringR * 0.13).toFixed(1));
+    for (var i = 0; i < BEATS_PER_LOOP; i++) {
+      var a = (-90 + i * (360 / BEATS_PER_LOOP)) * Math.PI / 180;
+      T.pips[i].setAttribute('cx', (Math.cos(a) * T.ringR).toFixed(1));
+      T.pips[i].setAttribute('cy', (Math.sin(a) * T.ringR).toFixed(1));
+      T.pips[i].setAttribute('r', (T.ringR * 0.055).toFixed(1));
+    }
+    T.orbit.setAttribute('r', (T.ringR * 0.1).toFixed(1));
 
     T.condGlow.setAttribute('cx', T.ringX);
     T.condGlow.setAttribute('cy', T.ringY);
     T.condGlow.setAttribute('r', T.ringR * 0.9);
-    fitAnimal(T.cond, MOUSE_SPEC, T.ringX, T.ringY, T.ringR * 1.5, T.ringR * 1.25);
+    fitAnimal(T.cond, MOUSE_SPEC, T.ringX, T.ringY, T.ringR * 1.4, T.ringR * 1.15);
+
+    layoutClockPanel();
   }
 
   // ------------------------------------------------------------------
@@ -1200,12 +1366,9 @@
       byId[spec.id] = p;
     });
 
-    // Sixteen beats, sixteen dots, along the bottom where the browser's
-    // own full screen button cannot sit on them. Two devices showing the
-    // same dot are on the same beat of the same loop. The chevrons that
-    // move it come out with the arrows and stay away otherwise, so no
-    // stray press can turn the loop round mid-tune.
-    J.bar = makeLoopBar();
+    // Along the bottom, where the browser's own full screen button
+    // cannot sit on them.
+    J.bar = makeDotRow();
     g.appendChild(J.bar.g);
 
     J.tuneBtn = bigButton('#3f4a7d', spreadGlyph());
@@ -1235,7 +1398,7 @@
     var W = L.W, H = L.H;
     var cols = L.wide ? 3 : 2, rows = L.wide ? 2 : 3;
     var topBar = Math.min(L.wide ? H * 0.16 : H * 0.09, 130);
-    var botBar = Math.min(L.wide ? H * 0.16 : H * 0.075, 110);
+    var botBar = Math.min(L.wide ? H * 0.09 : H * 0.05, 70);
     var gap = 14;
     var padW = (W - gap * (cols + 1)) / cols;
     // A card taller than it is wide leaves the character stranded in a
@@ -1264,7 +1427,7 @@
       p.scale = fitAnimal(p.art, p.spec, 0, 0, padW * 0.88, padH * 0.84);
     });
 
-    layoutLoopBar(J.bar, W * 0.5, H - botBar * 0.52, W * 0.62, botBar * 0.22, botBar * 0.95);
+    layoutDotRow(J.bar, W * 0.5, H - botBar * 0.5, W * 0.88, botBar * 0.3);
 
     var tb = Math.min(topBar * 0.8, 92);
     sizeButton(J.tuneBtn, tb * 1.5, tb);
@@ -1295,7 +1458,6 @@
     stripOpen = open;
     J.strip.setAttribute('opacity', open ? 1 : 0);
     J.strip.setAttribute('pointer-events', open ? 'auto' : 'none');
-    showBarButtons(J.bar, open);
   }
 
   // One note of whichever sound was just chosen, straight away, so the
@@ -1319,8 +1481,7 @@
     else if (act === 'bpm+') { setBpm(bpm + 5); }
     else if (act === 'nudge-') { nudge(-0.003); }
     else if (act === 'nudge+') { nudge(0.003); }
-    else if (act === 'beat-') { nudge(-beatDur()); }
-    else if (act === 'beat+') { nudge(beatDur()); }
+    else if (act.charAt(0) === 'f') { bumpField(+act.charAt(2), act.charAt(1) === '+' ? 1 : -1); }
   }
 
   svg.addEventListener('pointerdown', function (ev) {
@@ -1341,6 +1502,10 @@
         showMode();
       } else if (act === 'strip') {
         setStrip(!stripOpen);
+      } else if (act === 'clock') {
+        setClockPanel(true);
+      } else if (act === 'clock-done') {
+        setClockPanel(false);
       } else {
         held = act;
         heldNode = btn;
@@ -1446,13 +1611,20 @@
 
   var condFace = { mouth: null, eyes: null, mouthT: 0, mouthAge: 99, blink: 3, blinkV: 1 };
 
-  function updateTune(dt, beatPos) {
-    paintLoopBar(T.bar);
-    var a = (-90 + beatPos * 360) * Math.PI / 180;
+  function updateTune(dt, loopPos) {
+    var a = (-90 + loopPos * 360) * Math.PI / 180;
     T.orbit.setAttribute('cx', (Math.cos(a) * T.ringR).toFixed(1));
     T.orbit.setAttribute('cy', (Math.sin(a) * T.ringR).toFixed(1));
-    T.pip.setAttribute('fill', beatFlash > 0.25 ? '#ffe9a0' : '#8ea0d8');
-    T.pip.setAttribute('opacity', (0.45 + beatFlash * 0.55).toFixed(2));
+    for (var i = 0; i < BEATS_PER_LOOP; i++) {
+      var on = (i === beatIdx);
+      T.pips[i].setAttribute('fill', on && beatFlash > 0.2 ? '#ffe9a0' : '#8ea0d8');
+      T.pips[i].setAttribute('opacity', (0.35 + (on ? beatFlash * 0.65 : 0)).toFixed(2));
+    }
+
+    // The readout only has to change when the second does.
+    var shown = clockText();
+    if (shown !== T.clockShown) { T.clockShown = shown; T.clockLabel.textContent = shown; }
+    if (clockOpen) { paintClockPanel(); }
 
     var hop = 0, squash = 1;
     if (!reduced) {
@@ -1471,7 +1643,7 @@
   }
 
   function updateJam(dt) {
-    paintLoopBar(J.bar);
+    paintDotRow(J.bar);
 
     for (var k = 0; k < pads.length; k++) {
       var p = pads[k];
@@ -1519,9 +1691,9 @@
     beatFlash = Math.max(0, beatFlash - dt * 3.4);
 
     var s = curStep();
-    var beatPos = (((s % STEPS_PER_BEAT) + STEPS_PER_BEAT) % STEPS_PER_BEAT) / STEPS_PER_BEAT;
+    var loopPos = (((s % STEPS_PER_LOOP) + STEPS_PER_LOOP) % STEPS_PER_LOOP) / STEPS_PER_LOOP;
 
-    if (mode === 'tune') { updateTune(dt, beatPos); }
+    if (mode === 'tune') { updateTune(dt, loopPos); }
     else { updateJam(dt); }
 
     requestAnimationFrame(frame);
