@@ -142,6 +142,7 @@
         <button data-v="3" aria-pressed="false">9</button>
         <button data-v="4" aria-pressed="true">16</button>
         <button data-v="5" aria-pressed="false">25</button>
+        <button data-v="7" aria-pressed="false">49</button>
       </div>
       <span class="seglabel">Speed</span>
       <div class="seg" id="seg-speed">
@@ -365,15 +366,29 @@ const COLOUR_TRICKS = [
   "sepia(1) contrast(1.1)",
   "invert(1) hue-rotate(180deg)"
 ];
+const NO_TWIST = {rot:0, flip:1, colour:"none", zoom:1, cx:S/2, cy:S/2};
 function makeTwist(){
-  if(twistLevel===0) return {rot:0, flip:1, colour:"none"};
+  if(twistLevel===0) return NO_TWIST;
   const heavy = twistLevel===2;
   const rot = pick(heavy ? [0,90,180,270] : [0,0,90,180,270]);
   const flip = (heavy ? Math.random()<0.5 : Math.random()<0.3) ? -1 : 1;
   const colour = (heavy ? Math.random()<0.75 : Math.random()<0.45)
       ? pick(COLOUR_TRICKS.slice(1)) : "none";
-  return {rot, flip, colour};
+  // a close crop: one part of the picture, blown up. Any centre keeps the
+  // window inside the picture, so it can wander anywhere but the far corners.
+  let zoom=1, cx=S/2, cy=S/2;
+  if(heavy ? Math.random()<0.55 : Math.random()<0.25){
+    zoom = heavy ? 1.8+Math.random()*1.2 : 1.6+Math.random()*0.6;
+    cx = S*(0.15+Math.random()*0.70);
+    cy = S*(0.15+Math.random()*0.70);
+  }
+  return {rot, flip, colour, zoom, cx, cy};
 }
+// zoom first, then turn and mirror the whole thing about the centre
+const imgTransform = t =>
+  `translate(${S/2} ${S/2}) rotate(${t.rot}) scale(${t.flip} 1) translate(${-S/2} ${-S/2}) ` +
+  `translate(${t.cx.toFixed(1)} ${t.cy.toFixed(1)}) scale(${t.zoom.toFixed(3)}) ` +
+  `translate(${(-t.cx).toFixed(1)} ${(-t.cy).toFixed(1)})`;
 
 /* ---------- play ---------- */
 let answer=null, lastId=null, revealed=0, totalPieces=0, timer=null, score=0, locked=false, wrongs=0, playing=false;
@@ -408,7 +423,7 @@ function nextRound(){
   svg.style.filter = "drop-shadow(0 12px 26px rgba(9,16,30,.45)) " + (t.colour==="none"?"":t.colour);
   svg.innerHTML =
     `<defs><pattern id="ph" patternUnits="userSpaceOnUse" width="${S}" height="${S}">
-       <g id="img" transform="translate(${S/2} ${S/2}) rotate(${t.rot}) scale(${t.flip} 1) translate(${-S/2} ${-S/2})">
+       <g id="img" transform="${imgTransform(t)}">
          <image href="${answer.data}" width="${S}" height="${S}" preserveAspectRatio="xMidYMid slice"></image>
        </g>
      </pattern></defs>
@@ -460,9 +475,10 @@ function finish(){
   clearTimeout(timer); locked=true;
   const svg=$("puzzle");
   svg.querySelectorAll(".pc").forEach(p=>p.classList.add("in"));
-  // straighten the picture out as the reward
+  // straighten and pull back out of the crop as the reward. Same list of
+  // primitives as the twisted one, so it animates part by part.
   const g = svg.querySelector("#img");
-  if(g) g.setAttribute("transform", `translate(${S/2} ${S/2}) rotate(0) scale(1 1) translate(${-S/2} ${-S/2})`);
+  if(g) g.setAttribute("transform", imgTransform(NO_TWIST));
   svg.style.filter = "drop-shadow(0 12px 26px rgba(9,16,30,.45))";
 
   score += starsFor();
