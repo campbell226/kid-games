@@ -76,9 +76,6 @@
   svg.puzzle .pc.in{opacity:1;transform:none;transition:opacity .26s ease, transform .34s cubic-bezier(.3,1.5,.5,1)}
   svg.puzzle #img{transition:transform .55s cubic-bezier(.4,.9,.3,1)}
   .frame{position:absolute;inset:-10px;border-radius:22px;border:4px solid rgba(251,243,226,.16)}
-  .stars{display:flex;gap:8px;justify-content:center;font-size:32px;line-height:1}
-  .stars i{filter:grayscale(1) brightness(1.6);opacity:.35;transition:.3s;font-style:normal}
-  .stars i.lit{filter:none;opacity:1}
   .choices{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .chip{font:inherit;font-size:clamp(17px,4.6vw,21px);border:0;border-radius:20px;padding:20px 12px;
     background:var(--paper);color:var(--ink);box-shadow:0 6px 0 #C9BFA6;cursor:pointer;
@@ -142,6 +139,7 @@
         <button data-v="3" aria-pressed="false">9</button>
         <button data-v="4" aria-pressed="true">16</button>
         <button data-v="5" aria-pressed="false">25</button>
+        <button data-v="6" aria-pressed="false">36</button>
         <button data-v="7" aria-pressed="false">49</button>
       </div>
       <span class="seglabel">Speed</span>
@@ -177,8 +175,7 @@
   <!-- PLAY -->
   <section id="s-play" class="screen">
     <div class="topbar">
-      <div class="pill" id="score-pill">&#9733; 0</div>
-      <div class="stars" id="stars"><i>&#9733;</i><i>&#9733;</i><i>&#9733;</i></div>
+      <div class="pill" id="score-pill">0</div>
       <button class="iconbtn" id="play-quit">&#10005;</button>
     </div>
     <div class="playgrid">
@@ -378,7 +375,9 @@ function makeTwist(){
   // window inside the picture, so it can wander anywhere but the far corners.
   let zoom=1, cx=S/2, cy=S/2;
   if(heavy ? Math.random()<0.55 : Math.random()<0.25){
-    zoom = heavy ? 1.8+Math.random()*1.2 : 1.6+Math.random()*0.6;
+    // never past 2x: the window is S/zoom across, so 2x is a quarter of
+    // the picture by area, and that is as tight as the crop ever goes
+    zoom = heavy ? 1.7+Math.random()*0.3 : 1.5+Math.random()*0.3;
     cx = S*(0.15+Math.random()*0.70);
     cy = S*(0.15+Math.random()*0.70);
   }
@@ -391,19 +390,10 @@ const imgTransform = t =>
   `translate(${(-t.cx).toFixed(1)} ${(-t.cy).toFixed(1)})`;
 
 /* ---------- play ---------- */
-let answer=null, revealed=0, totalPieces=0, timer=null, score=0, locked=false, wrongs=0, playing=false;
+let answer=null, revealed=0, timer=null, score=0, locked=false, playing=false;
 
-function startGame(){ audio(); score=0; playing=true; $("score-pill").textContent="★ 0"; nextRound(); }
+function startGame(){ audio(); score=0; playing=true; $("score-pill").textContent="0"; nextRound(); }
 function stopGame(){ playing=false; clearTimeout(timer); locked=true; }
-
-function starsFor(){
-  const frac = revealed/totalPieces;
-  if(wrongs>=2) return 1;
-  if(frac<=0.34 && wrongs===0) return 3;
-  if(frac<=0.70 && wrongs<=1) return 2;
-  return 1;
-}
-const paintStars = (el,n) => { el.innerHTML = "★★★".split("").map((s,i)=>`<i class="${i<n?"lit":""}">★</i>`).join(""); };
 
 function nextRound(){
   if(!playing) return;
@@ -414,8 +404,7 @@ function nextRound(){
   // barred the last picture, which with two or three of them was a rota.
   answer = pick(photos);
 
-  revealed=0; wrongs=0; locked=false; totalPieces=gridN*gridN;
-  paintStars($("stars"),3);
+  revealed=0; locked=false;
 
   const t = makeTwist();
   const svg = $("puzzle");
@@ -454,7 +443,6 @@ function revealNext(){
   pcs[revealed].classList.add("in");
   sfx.piece(revealed,pcs.length);
   revealed++;
-  paintStars($("stars"), starsFor());
   if(revealed<pcs.length) timer=setTimeout(revealNext, stepMs);
 }
 
@@ -465,8 +453,7 @@ function guess(choice, btn){
     btn.classList.add("right"); sfx.right();
     setTimeout(finish, 650);
   }else{
-    wrongs++; btn.classList.add("wrong"); sfx.wrong();
-    paintStars($("stars"), starsFor());
+    btn.classList.add("wrong"); sfx.wrong();
   }
 }
 
@@ -480,8 +467,8 @@ function finish(){
   if(g) g.setAttribute("transform", imgTransform(NO_TWIST));
   svg.style.filter = "drop-shadow(0 12px 26px rgba(9,16,30,.45))";
 
-  score += starsFor();
-  $("score-pill").textContent = "★ " + score;
+  score += 1;
+  $("score-pill").textContent = String(score);
 
   const ban=$("banner");
   ban.classList.remove("hide");
