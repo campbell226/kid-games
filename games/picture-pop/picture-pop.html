@@ -391,9 +391,9 @@ const imgTransform = t =>
   `translate(${(-t.cx).toFixed(1)} ${(-t.cy).toFixed(1)})`;
 
 /* ---------- play ---------- */
-let answer=null, lastId=null, revealed=0, totalPieces=0, timer=null, score=0, locked=false, wrongs=0, playing=false;
+let answer=null, revealed=0, totalPieces=0, timer=null, score=0, locked=false, wrongs=0, playing=false;
 
-function startGame(){ audio(); score=0; lastId=null; playing=true; $("score-pill").textContent="★ 0"; nextRound(); }
+function startGame(){ audio(); score=0; playing=true; $("score-pill").textContent="★ 0"; nextRound(); }
 function stopGame(){ playing=false; clearTimeout(timer); locked=true; }
 
 function starsFor(){
@@ -410,10 +410,9 @@ function nextRound(){
   clearTimeout(timer);
   $("banner").classList.add("hide");
 
-  // pick a picture, never the same one twice running
-  let pool = photos.filter(p=>p.id!==lastId);
-  if(!pool.length) pool = photos.slice();
-  answer = pick(pool); lastId = answer.id;
+  // a fresh roll of the dice every round, repeats and all. The old rule
+  // barred the last picture, which with two or three of them was a rota.
+  answer = pick(photos);
 
   revealed=0; wrongs=0; locked=false; totalPieces=gridN*gridN;
   paintStars($("stars"),3);
