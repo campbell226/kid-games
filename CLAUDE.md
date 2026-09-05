@@ -67,6 +67,24 @@ on a permission like that needs a fallback that still works without it.
 ## Working method
 
 For anything beyond a small tweak, give me the plan first and wait — a
-message is cheaper than a rebuild. Check the JavaScript parses before
-calling a change done. When a file changes, say what changed and what
-knock-on effects to watch for, not what the file contains.
+message is cheaper than a rebuild. When a file changes, say what changed and
+what knock-on effects to watch for, not what the file contains.
+
+Write game files with the Write and Edit tools, never by piping content
+through a shell command. The shell truncates a command at about 8 KB and then
+reports a syntax error naming whatever quote fell either side of the cut —
+usually an innocent apostrophe hundreds of lines away — so the error tells you
+nothing about the real problem. A quoted heredoc does not save you; the
+content was never at fault. The shell is for running things: git, node, wc.
+
+## Before calling a change done
+
+- The JavaScript parses. Pull the `<script>` blocks out of the game and run
+  `node --check` over them.
+- If a tile was added or edited, `index.html` still holds unique SVG ids and
+  every `url(#…)` resolves. Every tile lives in one document and shares one id
+  namespace, so a clash is silent — Picture Pop spent weeks drawing its sky
+  with Post a Letter's gradient because both had defined `p-sky`.
+- To actually look at a tile, write a throwaway page holding the SVGs at about
+  640px wide and put it **inside this folder** — the browser pane will not
+  screenshot a file outside the project. Delete it before committing.
