@@ -317,6 +317,77 @@
       </svg>
       <span>Recorder Garden</span>
     </a>
+    <a class="game" href="games/picture-pop/picture-pop.html">
+      <svg viewBox="0 0 320 200" role="img" aria-label="Picture Pop">
+        <defs>
+          <linearGradient id="p-night" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#2B3F63"/><stop offset="1" stop-color="#16233A"/>
+          </linearGradient>
+          <linearGradient id="p-sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#9ec9f0"/><stop offset="1" stop-color="#7FB2E8"/>
+          </linearGradient>
+          <clipPath id="p-photo"><rect x="-54" y="-60" width="108" height="108" rx="2"/></clipPath>
+        </defs>
+        <rect width="320" height="200" fill="url(#p-night)"/>
+
+        <!-- the picture, most of the way built -->
+        <g transform="translate(150,96) rotate(-4)">
+          <rect x="-66" y="-72" width="132" height="156" rx="4" fill="#0d1526" opacity="0.4"/>
+          <rect x="-64" y="-70" width="128" height="152" rx="4" fill="#FBF3E2"/>
+
+          <g clip-path="url(#p-photo)">
+            <rect x="-54" y="-60" width="108" height="108" fill="url(#p-sky)"/>
+            <path d="M-54 26c22-8 42 6 60 0s34-6 48-2v24h-108z" fill="#46C2A0"/>
+            <circle cx="0" cy="-10" r="38" fill="#FFC53D"/>
+            <circle cx="-13" cy="-20" r="6" fill="#fff"/><circle cx="13" cy="-20" r="6" fill="#fff"/>
+            <circle cx="-12" cy="-19" r="3" fill="#23212f"/><circle cx="14" cy="-19" r="3" fill="#23212f"/>
+            <ellipse cx="-25" cy="-4" rx="7" ry="5" fill="#FF6B57" opacity="0.45"/>
+            <ellipse cx="25" cy="-4" rx="7" ry="5" fill="#FF6B57" opacity="0.45"/>
+            <path d="M-15 2q15 15 30 0" stroke="#C4402F" stroke-width="3.6" fill="none" stroke-linecap="round"/>
+
+            <!-- seams and tabs -->
+            <g stroke="rgba(21,34,56,.3)" stroke-width="1.6" fill="none">
+              <path d="M-18-60v108M18-60v108M-54-24h108M-54 12h108"/>
+              <circle cx="-18" cy="-42" r="5"/><circle cx="-18" cy="30" r="5"/>
+              <circle cx="18" cy="-6" r="5"/>
+              <circle cx="-36" cy="-24" r="5"/><circle cx="36" cy="-24" r="5"/>
+              <circle cx="0" cy="12" r="5"/>
+            </g>
+
+            <!-- two gaps still to fill -->
+            <path d="M18-60h36v36H18z" fill="#16233A"/>
+            <circle cx="36" cy="-24" r="5" fill="#16233A"/>
+            <path d="M-54 12h36v36h-36z" fill="#16233A"/>
+            <circle cx="-18" cy="30" r="5" fill="#16233A"/>
+            <g stroke="rgba(9,16,30,.55)" stroke-width="2" fill="none">
+              <path d="M18-60v36h36M-54 12h36v36"/>
+            </g>
+          </g>
+        </g>
+
+        <!-- a piece on its way in -->
+        <path d="M252 82q-26-30-56-26" stroke="#FFC53D" stroke-width="3" stroke-linecap="round"
+              stroke-dasharray="2 9" fill="none" opacity="0.7"/>
+        <g transform="translate(266,104) rotate(13)">
+          <g transform="translate(3,5)" opacity="0.4">
+            <rect x="-18" y="-18" width="36" height="36" rx="3" fill="#0d1526"/>
+          </g>
+          <rect x="-18" y="-18" width="36" height="36" rx="3" fill="#9ec9f0"/>
+          <circle cx="-18" cy="0" r="5" fill="#9ec9f0"/>
+          <circle cx="0" cy="18" r="5" fill="#9ec9f0"/>
+          <g stroke="rgba(21,34,56,.3)" stroke-width="1.6" fill="none">
+            <path d="M-18-18h36v36h-36z"/><circle cx="-18" cy="0" r="5"/>
+          </g>
+        </g>
+
+        <g fill="#FFC53D">
+          <path d="M50 46l3 9 9 3-9 3-3 9-3-9-9-3 9-3z"/>
+          <path d="M292 40l2.5 7 7 2.5-7 2.5-2.5 7-2.5-7-7-2.5 7-2.5z" opacity="0.8"/>
+          <path d="M42 162l2 6 6 2-6 2-2 6-2-6-6-2 6-2z" opacity="0.7"/>
+        </g>
+      </svg>
+      <span>Picture Pop</span>
+    </a>
   </div>
 </body>
 </html>
