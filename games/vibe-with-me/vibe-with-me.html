@@ -711,10 +711,24 @@
   //   clockAdjust  what this device is told the time is, when its own
   //                clock is wrong. Set by hand, in years down to
   //                seconds, until every device reads the same.
+  //   beatShift    which beat of the sixteen this device calls the
+  //                first. The clock cannot settle this and it is worth
+  //                being clear why: the readout goes to the second, and
+  //                a second is a beat and a half at ninety. Two devices
+  //                showing the same second can still be most of a
+  //                second apart underneath, which is a whole beat or
+  //                two out of the loop - and because every click is
+  //                identical and one beat apart, nudging lands you on
+  //                the nearest one and leaves the loop rotated. So this
+  //                is a rotation of the pattern only. It moves no
+  //                timing whatever, and therefore cannot disturb an
+  //                alignment already found.
   //   offset       the milliseconds left over: the sub-second gap
   //                between two system clocks, plus the difference in
   //                how long each device takes to get a sound out of its
-  //                speaker. Nudged by ear.
+  //                speaker. Nudged by ear, and wrapped to half a beat
+  //                either way - anything past that is a loop rotation
+  //                wearing a disguise, and rotation is not its job.
   //   skew         not a control. The audio clock is a separate,
   //                free-running clock, so it is slewed onto the wall
   //                clock rather than trusted: at most a millisecond a
@@ -734,6 +748,7 @@
   var bpm = clamp(load('bpm', 90), 60, 160);
   var offset = load('offset', 0);
   var clockAdjust = load('clock', 0);
+  var beatShift = ((Math.round(load('shift', 0)) % BEATS_PER_LOOP) + BEATS_PER_LOOP) % BEATS_PER_LOOP;
   var skew = 0, skewSet = false, stepN = 0, visQ = [], mode = 'tune';
 
   function wallNow() { return Date.now() / 1000; }
@@ -772,9 +787,32 @@
     paintBpm();
   }
 
+  // Wrapped every time, including whatever was saved by an older version
+  // of this game: a stored offset of several beats would rotate the loop
+  // for good, invisibly, and no amount of agreeing the time would undo
+  // it.
+  //
+  // Taking a whole beat out of the offset does rotate the loop by a
+  // beat, so while somebody is sliding the arrows the rotation is put
+  // back and the wrap is invisible - a slide stays a slide. On load it
+  // is not put back, because there the whole point is to throw the old
+  // rotation away.
+  function wrapOffset(keepPlace) {
+    var b = beatDur(), k = Math.round(offset / b);
+    if (!k) { return; }
+    offset -= k * b;
+    if (keepPlace) { shiftBeats(-k); }
+  }
+
   function nudge(seconds) {
     offset += seconds;
+    wrapOffset(true);
     save('offset', offset);
+  }
+
+  function shiftBeats(n) {
+    beatShift = ((beatShift + n) % BEATS_PER_LOOP + BEATS_PER_LOOP) % BEATS_PER_LOOP;
+    save('shift', beatShift);
   }
 
   // Told the time by hand, in whole calendar units, so a device whose
@@ -822,14 +860,20 @@
 
     // Coming back from a locked screen must not replay the whole loop.
     var behind = Math.floor((now - gridZero()) / sd) - 1;
-    if (stepN < behind) { stepN = behind; }
+    // Corrected in both directions. Putting the clock back moves every
+    // step into the future, and a counter that only ever caught up would
+    // sit there in silence until real time reached it.
+    if (stepN < behind || stepN - behind > 8) { stepN = behind; }
 
     while (stepTime(stepN) < now + LOOK) {
       var t = stepTime(stepN), n = stepN;
       stepN += 1;
       if (t <= now + 0.002) { continue; }
 
-      var inLoop = ((n % STEPS_PER_LOOP) + STEPS_PER_LOOP) % STEPS_PER_LOOP;
+      // The rotation goes in here and nowhere else: it is a whole number
+      // of beats, so it moves which part of the pattern is playing
+      // without moving when anything sounds.
+      var inLoop = ((n + beatShift * STEPS_PER_BEAT) % STEPS_PER_LOOP + STEPS_PER_LOOP) % STEPS_PER_LOOP;
       var onBeat = (inLoop % STEPS_PER_BEAT) === 0;
 
       // Coming in, going out and changing sound all happen on a beat, so
@@ -1086,10 +1130,21 @@
     T.cond.appendChild(T.condBob);
     T.condEyes = T.condBob.querySelector('.eyes');
 
+    // Flanking the ring, because what they move is the ring: one press,
+    // one pip.
+    T.shiftL = bigButton('#3f4a7d', '<g transform="scale(-1,1)">' + chevron(-13) + '</g>');
+    T.shiftR = bigButton('#3f4a7d', chevron(-13));
+    T.shiftL.setAttribute('data-act', 'shift-');
+    T.shiftR.setAttribute('data-act', 'shift+');
+
     T.left = bigButton('#2f6f8f', arrowGlyph(-1));
     T.right = bigButton('#2f6f8f', arrowGlyph(1));
     T.left.setAttribute('data-act', 'nudge-');
     T.right.setAttribute('data-act', 'nudge+');
+
+    // Hidden state is what made a stale offset so hard to find, so it is
+    // not hidden any more.
+    T.offText = el('text', { 'text-anchor': 'middle', fill: '#8ea0d8' });
 
     T.play = bigButton('#3fa564',
       '<path d="M -22 -34 L 38 0 L -22 34 Z" fill="#ffffff"/>');
@@ -1103,8 +1158,11 @@
     g.appendChild(T.condGlow);
     g.appendChild(T.ring);
     g.appendChild(T.cond);
+    g.appendChild(T.shiftL);
+    g.appendChild(T.shiftR);
     g.appendChild(T.left);
     g.appendChild(T.right);
+    g.appendChild(T.offText);
     g.appendChild(T.play);
 
     buildClockPanel(g);
@@ -1247,15 +1305,19 @@
       T.bpmText.setAttribute('y', H * 0.53 + bh * 0.34);
       T.bpmText.setAttribute('font-size', (bh * 0.95).toFixed(0));
 
-      var aw = Math.min(W * 0.16, 180), ah = Math.min(H * 0.15, 120);
+      var aw = Math.min(W * 0.16, 180), ah = Math.min(H * 0.13, 110);
       sizeButton(T.left, aw, ah);
       sizeButton(T.right, aw, ah);
       place(T.left, W * 0.63, H * 0.71);
       place(T.right, W * 0.87, H * 0.71);
+      var fs = Math.min(H * 0.042, 38);
+      T.offText.setAttribute('x', W * 0.75);
+      T.offText.setAttribute('y', H * 0.71 + ah * 0.5 + fs * 0.95);
+      T.offText.setAttribute('font-size', fs.toFixed(0));
 
-      var pw = Math.min(W * 0.24, 250), ph = Math.min(H * 0.13, 120);
+      var pw = Math.min(W * 0.24, 250), ph = Math.min(H * 0.12, 120);
       sizeButton(T.play, pw, ph);
-      place(T.play, W * 0.75, H * 0.9);
+      place(T.play, W * 0.75, H * 0.92);
 
       T.ringX = W * 0.26; T.ringY = H * 0.62;
       T.ringR = clamp(Math.min(H * 0.3, W * 0.21), 50, 320);
@@ -1288,6 +1350,10 @@
       sizeButton(T.right, aw2, ah2);
       place(T.left, W * 0.28, H * 0.72);
       place(T.right, W * 0.72, H * 0.72);
+      var fs2 = Math.min(H * 0.016, 38);
+      T.offText.setAttribute('x', W * 0.5);
+      T.offText.setAttribute('y', H * 0.72 + ah2 * 0.5 + fs2 * 0.95);
+      T.offText.setAttribute('font-size', fs2.toFixed(0));
 
       var pw2 = Math.min(W * 0.46, 460), ph2 = Math.min(H * 0.11, 180);
       sizeButton(T.play, pw2, ph2);
@@ -1318,6 +1384,15 @@
     T.condGlow.setAttribute('cy', T.ringY);
     T.condGlow.setAttribute('r', T.ringR * 0.9);
     fitAnimal(T.cond, MOUSE_SPEC, T.ringX, T.ringY, T.ringR * 1.4, T.ringR * 1.15);
+
+    // The rotation chevrons take whatever room is left beside the ring,
+    // so a wide ring shrinks them rather than pushing them off the edge.
+    var room = Math.min(T.ringX, W - T.ringX) - T.ringR - 22;
+    var sw = clamp(room * 0.92, 58, 150), sh = Math.min(sw * 1.1, H * 0.16, 130);
+    sizeButton(T.shiftL, sw, sh);
+    sizeButton(T.shiftR, sw, sh);
+    place(T.shiftL, T.ringX - T.ringR - 22 - sw * 0.5, T.ringY);
+    place(T.shiftR, T.ringX + T.ringR + 22 + sw * 0.5, T.ringY);
 
     layoutClockPanel();
   }
@@ -1481,6 +1556,8 @@
     else if (act === 'bpm+') { setBpm(bpm + 5); }
     else if (act === 'nudge-') { nudge(-0.003); }
     else if (act === 'nudge+') { nudge(0.003); }
+    else if (act === 'shift-') { shiftBeats(-1); }
+    else if (act === 'shift+') { shiftBeats(1); }
     else if (act.charAt(0) === 'f') { bumpField(+act.charAt(2), act.charAt(1) === '+' ? 1 : -1); }
   }
 
@@ -1621,9 +1698,11 @@
       T.pips[i].setAttribute('opacity', (0.35 + (on ? beatFlash * 0.65 : 0)).toFixed(2));
     }
 
-    // The readout only has to change when the second does.
+    // The readouts only have to change when they change.
     var shown = clockText();
     if (shown !== T.clockShown) { T.clockShown = shown; T.clockLabel.textContent = shown; }
+    var ms = (offset >= 0 ? '+' : '−') + Math.round(Math.abs(offset) * 1000) + ' ms';
+    if (ms !== T.offShown) { T.offShown = ms; T.offText.textContent = ms; }
     if (clockOpen) { paintClockPanel(); }
 
     var hop = 0, squash = 1;
@@ -1690,7 +1769,7 @@
     if (AC) { drainVis(AC.currentTime); }
     beatFlash = Math.max(0, beatFlash - dt * 3.4);
 
-    var s = curStep();
+    var s = curStep() + beatShift * STEPS_PER_BEAT;
     var loopPos = (((s % STEPS_PER_LOOP) + STEPS_PER_LOOP) % STEPS_PER_LOOP) / STEPS_PER_LOOP;
 
     if (mode === 'tune') { updateTune(dt, loopPos); }
@@ -1709,6 +1788,7 @@
     resizeTimer = setTimeout(computeLayout, 220);
   });
 
+  wrapOffset();
   buildTune();
   buildJam();
   computeLayout();
