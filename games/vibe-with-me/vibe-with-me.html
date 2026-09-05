@@ -806,6 +806,10 @@
 
       if (mode === 'tune') {
         if (onBeat) { play('click', 69, t, 1); }
+        // Once every sixteen beats, so the top of the loop can be heard
+        // from across the room and not only seen. Not an accent: it is a
+        // different instrument, once, and every click stays identical.
+        if (inLoop === 0) { play('marimba', 84, t, 0.5); }
       } else {
         for (i = 0; i < pads.length; i++) {
           var p = pads[i];
@@ -951,6 +955,68 @@
   }
 
   // ------------------------------------------------------------------
+  // The loop bar: sixteen dots for the sixteen beats, and a single
+  // chevron at each end that shunts the loop round by exactly one beat.
+  //
+  // The clicks are identical and one beat apart, so two devices whose
+  // clocks are further apart than half a beat will be tuned onto the
+  // wrong click - together to the ear, a whole beat out in the loop, and
+  // nothing on the ring would say so. Adding one beat to the offset
+  // moves every click by exactly one click period, which leaves the
+  // click train unchanged and moves only which beat of the loop is
+  // which. So the coarse control cannot undo the fine one: watch the
+  // lit dot jump a place and match the other device.
+  // ------------------------------------------------------------------
+  function makeLoopBar() {
+    var bar = { g: el('g'), dots: [] };
+    bar.minus = bigButton('#3f4a7d', '<g transform="scale(-1,1)">' + chevron(-13) + '</g>');
+    bar.plus = bigButton('#3f4a7d', chevron(-13));
+    bar.minus.setAttribute('data-act', 'beat-');
+    bar.plus.setAttribute('data-act', 'beat+');
+    bar.g.appendChild(bar.minus);
+    bar.g.appendChild(bar.plus);
+    for (var i = 0; i < BEATS_PER_LOOP; i++) {
+      var d = el('circle', { cx: 0, cy: 0, r: 8, fill: '#8ea0d8' });
+      bar.g.appendChild(d);
+      bar.dots.push(d);
+    }
+    return bar;
+  }
+
+  function layoutLoopBar(bar, cx, cy, span, maxR, maxH) {
+    var gap = span / (BEATS_PER_LOOP - 1);
+    var r = Math.min(gap * 0.32, maxR);
+    for (var i = 0; i < BEATS_PER_LOOP; i++) {
+      bar.dots[i].setAttribute('cx', (cx - span / 2 + gap * i).toFixed(1));
+      bar.dots[i].setAttribute('cy', cy.toFixed(1));
+      bar.dots[i].setAttribute('r', r.toFixed(1));
+    }
+    // The dots are only something to read; the chevrons are something to
+    // hit, so they get a target of their own rather than the dots' size.
+    var bh = Math.min(Math.max(r * 5, 96), maxH);
+    var bw = Math.max(bh * 1.25, r * 6);
+    sizeButton(bar.minus, bw, bh);
+    sizeButton(bar.plus, bw, bh);
+    place(bar.minus, cx - span / 2 - bw * 0.62, cy);
+    place(bar.plus, cx + span / 2 + bw * 0.62, cy);
+  }
+
+  function paintLoopBar(bar) {
+    for (var i = 0; i < BEATS_PER_LOOP; i++) {
+      var on = (i === beatIdx);
+      bar.dots[i].setAttribute('fill', on && beatFlash > 0.2 ? '#ffe9a0' : '#8ea0d8');
+      bar.dots[i].setAttribute('opacity', (0.3 + (on ? beatFlash * 0.7 : 0)).toFixed(2));
+    }
+  }
+
+  function showBarButtons(bar, on) {
+    bar.minus.setAttribute('opacity', on ? 1 : 0);
+    bar.plus.setAttribute('opacity', on ? 1 : 0);
+    bar.minus.setAttribute('pointer-events', on ? 'auto' : 'none');
+    bar.plus.setAttribute('pointer-events', on ? 'auto' : 'none');
+  }
+
+  // ------------------------------------------------------------------
   // Tuning up. One number to match and two arrows to slide with, and
   // one click a beat - no bar, no strong and weak, nothing to work out
   // about which click is which.
@@ -1005,8 +1071,11 @@
     g.appendChild(T.condGlow);
     g.appendChild(T.ring);
     g.appendChild(T.cond);
+    T.bar = makeLoopBar();
+
     g.appendChild(T.left);
     g.appendChild(T.right);
+    g.appendChild(T.bar.g);
     g.appendChild(T.play);
     paintBpm();
   }
@@ -1037,8 +1106,9 @@
       sizeButton(T.play, pw, ph);
       place(T.play, W * 0.76, H * 0.85);
 
-      T.ringX = W * 0.27; T.ringY = H * 0.5;
-      T.ringR = clamp(Math.min(H * 0.38, W * 0.22), 50, 320);
+      T.ringX = W * 0.27; T.ringY = H * 0.42;
+      T.ringR = clamp(Math.min(H * 0.3, W * 0.22), 50, 320);
+      layoutLoopBar(T.bar, W * 0.27, H * 0.87, W * 0.3, H * 0.05, H * 0.18);
     } else {
       var bw2 = Math.min(W * 0.23, 240), bh2 = Math.min(H * 0.09, 170);
       sizeButton(T.minus, bw2, bh2);
@@ -1059,11 +1129,14 @@
       sizeButton(T.play, pw2, ph2);
       place(T.play, W * 0.5, H * 0.87);
 
-      // The ring takes whatever is left between the tempo and the
-      // arrows, so a stubby portrait window shrinks it instead of
-      // running the number through it.
-      var bandTop = H * 0.11 + bh2 * 0.5 + H * 0.04;
-      var bandBot = H * 0.68 - ah2 * 0.5 - H * 0.04;
+      var barY = H * 0.68 - ah2 * 0.5 - H * 0.045;
+      layoutLoopBar(T.bar, W * 0.5, barY, W * 0.62, H * 0.012, H * 0.075);
+
+      // The ring takes whatever is left between the tempo and the loop
+      // bar, so a stubby portrait window shrinks it instead of running
+      // the number through it.
+      var bandTop = H * 0.11 + bh2 * 0.5 + H * 0.035;
+      var bandBot = barY - H * 0.035;
       T.ringX = W * 0.5;
       T.ringY = (bandTop + bandBot) / 2;
       T.ringR = clamp(Math.min(W * 0.32, (bandBot - bandTop) / 2), 50, 340);
@@ -1129,15 +1202,11 @@
 
     // Sixteen beats, sixteen dots, along the bottom where the browser's
     // own full screen button cannot sit on them. Two devices showing the
-    // same dot are together.
-    J.dots = [];
-    J.dotG = el('g');
-    for (var i = 0; i < BEATS_PER_LOOP; i++) {
-      var d = el('circle', { cx: 0, cy: 0, r: 8, fill: '#8ea0d8' });
-      J.dotG.appendChild(d);
-      J.dots.push(d);
-    }
-    g.appendChild(J.dotG);
+    // same dot are on the same beat of the same loop. The chevrons that
+    // move it come out with the arrows and stay away otherwise, so no
+    // stray press can turn the loop round mid-tune.
+    J.bar = makeLoopBar();
+    g.appendChild(J.bar.g);
 
     J.tuneBtn = bigButton('#3f4a7d', spreadGlyph());
     J.tuneBtn.setAttribute('data-act', 'strip');
@@ -1166,7 +1235,7 @@
     var W = L.W, H = L.H;
     var cols = L.wide ? 3 : 2, rows = L.wide ? 2 : 3;
     var topBar = Math.min(L.wide ? H * 0.16 : H * 0.09, 130);
-    var botBar = Math.min(L.wide ? H * 0.11 : H * 0.055, 80);
+    var botBar = Math.min(L.wide ? H * 0.16 : H * 0.075, 110);
     var gap = 14;
     var padW = (W - gap * (cols + 1)) / cols;
     // A card taller than it is wide leaves the character stranded in a
@@ -1195,15 +1264,7 @@
       p.scale = fitAnimal(p.art, p.spec, 0, 0, padW * 0.88, padH * 0.84);
     });
 
-    var span = W * 0.9;
-    var dgap = span / (BEATS_PER_LOOP - 1);
-    var dr = Math.min(dgap * 0.3, botBar * 0.26, 15);
-    for (var i2 = 0; i2 < BEATS_PER_LOOP; i2++) {
-      J.dots[i2].setAttribute('cx', (-span / 2 + dgap * i2).toFixed(1));
-      J.dots[i2].setAttribute('cy', 0);
-      J.dots[i2].setAttribute('r', dr.toFixed(1));
-    }
-    place(J.dotG, W * 0.5, H - botBar * 0.5);
+    layoutLoopBar(J.bar, W * 0.5, H - botBar * 0.52, W * 0.62, botBar * 0.22, botBar * 0.95);
 
     var tb = Math.min(topBar * 0.8, 92);
     sizeButton(J.tuneBtn, tb * 1.5, tb);
@@ -1234,6 +1295,7 @@
     stripOpen = open;
     J.strip.setAttribute('opacity', open ? 1 : 0);
     J.strip.setAttribute('pointer-events', open ? 'auto' : 'none');
+    showBarButtons(J.bar, open);
   }
 
   // One note of whichever sound was just chosen, straight away, so the
@@ -1257,6 +1319,8 @@
     else if (act === 'bpm+') { setBpm(bpm + 5); }
     else if (act === 'nudge-') { nudge(-0.003); }
     else if (act === 'nudge+') { nudge(0.003); }
+    else if (act === 'beat-') { nudge(-beatDur()); }
+    else if (act === 'beat+') { nudge(beatDur()); }
   }
 
   svg.addEventListener('pointerdown', function (ev) {
@@ -1383,6 +1447,7 @@
   var condFace = { mouth: null, eyes: null, mouthT: 0, mouthAge: 99, blink: 3, blinkV: 1 };
 
   function updateTune(dt, beatPos) {
+    paintLoopBar(T.bar);
     var a = (-90 + beatPos * 360) * Math.PI / 180;
     T.orbit.setAttribute('cx', (Math.cos(a) * T.ringR).toFixed(1));
     T.orbit.setAttribute('cy', (Math.sin(a) * T.ringR).toFixed(1));
@@ -1406,11 +1471,7 @@
   }
 
   function updateJam(dt) {
-    for (var i = 0; i < BEATS_PER_LOOP; i++) {
-      var on = (i === beatIdx);
-      J.dots[i].setAttribute('fill', on && beatFlash > 0.2 ? '#ffe9a0' : '#8ea0d8');
-      J.dots[i].setAttribute('opacity', (0.3 + (on ? beatFlash * 0.7 : 0)).toFixed(2));
-    }
+    paintLoopBar(J.bar);
 
     for (var k = 0; k < pads.length; k++) {
       var p = pads[k];
