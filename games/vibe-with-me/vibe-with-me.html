@@ -153,6 +153,16 @@
   }
   function clear(n) { while (n.firstChild) { n.removeChild(n.firstChild); } }
 
+  function load(key, dflt) {
+    try {
+      var v = window.localStorage.getItem('vibe-' + key);
+      return v === null ? dflt : parseFloat(v);
+    } catch (e) { return dflt; }
+  }
+  function save(key, v) {
+    try { window.localStorage.setItem('vibe-' + key, String(v)); } catch (e) { /* private mode */ }
+  }
+
   var reduceQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
   var reduced = reduceQuery.matches;
   if (reduceQuery.addEventListener) {
@@ -162,10 +172,10 @@
   // ------------------------------------------------------------------
   // Music theory, such as it is.
   //
-  // Every animal draws from one C major pentatonic scale, in its own
-  // octave. That is the whole trick: no combination of animals - on this
-  // device or the one across the room - can sound wrong, so there is
-  // nothing to get wrong.
+  // Every pitched part draws from one C major pentatonic scale, in its
+  // own octave, and chords are built by stacking every other degree of
+  // it. That is the whole trick: no combination of characters - on this
+  // device or the one across the room - can sound wrong.
   // ------------------------------------------------------------------
   var PENT = [0, 2, 4, 7, 9];
 
@@ -176,11 +186,26 @@
   }
   function mtof(m) { return 440 * Math.pow(2, (m - 69) / 12); }
 
+  // Patterns are written as strings, one character to a sixteenth. A dot
+  // is a rest; a hex digit is a scale degree, or just "play it" for the
+  // unpitched ones. Anything shorter than the loop tiles into it, so a
+  // drum figure can be one bar while a tune is all sixteen beats.
+  function deg(ch) {
+    if (ch === '.') { return null; }
+    if (ch === 'x') { return 0; }
+    var n = parseInt(ch, 16);
+    return isNaN(n) ? null : n;
+  }
+
   // ------------------------------------------------------------------
-  // Audio, synthesised from nothing so the game is never silent and
-  // never waits on a download.
+  // Audio.
+  //
+  // Nothing is downloaded. The instruments are worked out sample by
+  // sample into buffers the first time one is asked for, then triggered
+  // like any other sample - which is what lets them sound like struck
+  // and plucked things rather than like beeps.
   // ------------------------------------------------------------------
-  var AC = null, master = null, noiseBuf = null;
+  var AC = null, master = null;
 
   function initAudio() {
     if (AC) {
@@ -191,192 +216,342 @@
     if (!Ctx) { return; }
     AC = new Ctx();
 
-    // Six animals at once should get louder, not turn into clipped mush.
+    // Six characters at once should get louder, not turn into clipped mush.
     var comp = AC.createDynamicsCompressor();
-    comp.threshold.setValueAtTime(-16, AC.currentTime);
+    comp.threshold.setValueAtTime(-15, AC.currentTime);
     comp.ratio.setValueAtTime(6, AC.currentTime);
     comp.attack.setValueAtTime(0.004, AC.currentTime);
     comp.release.setValueAtTime(0.2, AC.currentTime);
 
     master = AC.createGain();
-    master.gain.setValueAtTime(0.55, AC.currentTime);
+    master.gain.setValueAtTime(0.5, AC.currentTime);
     master.connect(comp);
     comp.connect(AC.destination);
 
-    var n = Math.floor(AC.sampleRate * 0.5);
-    noiseBuf = AC.createBuffer(1, n, AC.sampleRate);
-    var data = noiseBuf.getChannelData(0);
-    for (var i = 0; i < n; i++) { data[i] = Math.random() * 2 - 1; }
-
     if (AC.state === 'suspended') { AC.resume(); }
-
-    // Step 0 lands a moment from now, and every step after it is worked
-    // out from that one instant. Nudging moves this and nothing else.
-    origin = AC.currentTime + 0.2;
-    stepN = 0;
   }
 
-  // Each voice schedules itself at absolute time t and returns how long
-  // it will sound, so the mouth stays open for exactly that long.
-  var VOICES = {};
+  // --- the workshop the instruments are built in ---------------------
 
-  VOICES.frog = function (t, f, spb) {
-    var dur = Math.min(0.42, spb * 0.9);
-    var o = AC.createOscillator(), g = AC.createGain(), lp = AC.createBiquadFilter();
-    o.type = 'triangle';
-    o.frequency.setValueAtTime(f * 1.8, t);
-    o.frequency.exponentialRampToValueAtTime(f, t + 0.09);
-    lp.type = 'lowpass';
-    lp.frequency.setValueAtTime(1400, t);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.9, t + 0.008);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(lp); lp.connect(g); g.connect(master);
-    o.start(t); o.stop(t + dur + 0.05);
-    return dur;
-  };
-
-  VOICES.cow = function (t, f, spb) {
-    var dur = Math.min(1.6, spb * 1.7);
-    var g = AC.createGain(), lp = AC.createBiquadFilter();
-    lp.type = 'lowpass';
-    lp.frequency.setValueAtTime(380, t);
-    lp.frequency.linearRampToValueAtTime(950, t + dur * 0.35);
-    lp.frequency.linearRampToValueAtTime(420, t + dur);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.linearRampToValueAtTime(0.42, t + 0.16);
-    g.gain.setValueAtTime(0.42, t + dur * 0.6);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    [[0, 'sine'], [-8, 'triangle'], [8, 'triangle']].forEach(function (v) {
-      var o = AC.createOscillator();
-      o.type = v[1];
-      o.frequency.setValueAtTime(f, t);
-      o.detune.setValueAtTime(v[0], t);
-      o.connect(lp);
-      o.start(t); o.stop(t + dur + 0.05);
-    });
-    lp.connect(g); g.connect(master);
-    return dur;
-  };
-
-  VOICES.bird = function (t, f, spb) {
-    var dur = Math.min(0.4, spb * 0.8);
-    var o = AC.createOscillator(), g = AC.createGain();
-    o.type = 'sine';
-    o.frequency.setValueAtTime(f * 0.86, t);
-    o.frequency.exponentialRampToValueAtTime(f, t + 0.05);
-    o.frequency.exponentialRampToValueAtTime(f * 1.07, t + dur);
-    var lfo = AC.createOscillator(), lg = AC.createGain();
-    lfo.type = 'sine';
-    lfo.frequency.setValueAtTime(7.5, t);
-    lg.gain.setValueAtTime(f * 0.022, t);
-    lfo.connect(lg); lg.connect(o.frequency);
-    lfo.start(t); lfo.stop(t + dur + 0.05);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.42, t + 0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(master);
-    o.start(t); o.stop(t + dur + 0.05);
-    return dur;
-  };
-
-  VOICES.cat = function (t, f, spb) {
-    var dur = Math.min(0.55, spb * 0.95);
-    var o = AC.createOscillator(), bp = AC.createBiquadFilter(), g = AC.createGain();
-    o.type = 'sawtooth';
-    o.frequency.setValueAtTime(f * 0.78, t);
-    o.frequency.exponentialRampToValueAtTime(f * 1.12, t + dur * 0.3);
-    o.frequency.exponentialRampToValueAtTime(f * 0.82, t + dur);
-    bp.type = 'bandpass';
-    bp.Q.setValueAtTime(3.2, t);
-    bp.frequency.setValueAtTime(700, t);
-    bp.frequency.linearRampToValueAtTime(1600, t + dur * 0.3);
-    bp.frequency.linearRampToValueAtTime(620, t + dur);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.6, t + 0.05);
-    g.gain.setValueAtTime(0.6, t + dur * 0.5);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(bp); bp.connect(g); g.connect(master);
-    o.start(t); o.stop(t + dur + 0.05);
-    return dur;
-  };
-
-  VOICES.dog = function (t, f, spb) {
-    var dur = 0.2;
-    var src = AC.createBufferSource();
-    src.buffer = noiseBuf;
-    var bp = AC.createBiquadFilter(), ng = AC.createGain();
-    bp.type = 'bandpass';
-    bp.Q.setValueAtTime(1.1, t);
-    bp.frequency.setValueAtTime(1100, t);
-    bp.frequency.exponentialRampToValueAtTime(480, t + dur);
-    ng.gain.setValueAtTime(0.0001, t);
-    ng.gain.exponentialRampToValueAtTime(0.5, t + 0.012);
-    ng.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    src.connect(bp); bp.connect(ng); ng.connect(master);
-    src.start(t); src.stop(t + dur + 0.05);
-
-    var o = AC.createOscillator(), g = AC.createGain();
-    o.type = 'triangle';
-    o.frequency.setValueAtTime(f, t);
-    o.frequency.exponentialRampToValueAtTime(f * 0.55, t + dur);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.55, t + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(master);
-    o.start(t); o.stop(t + dur + 0.05);
-    return dur;
-  };
-
-  VOICES.mouse = function (t, f, spb) {
-    var dur = 0.12;
-    var o = AC.createOscillator(), g = AC.createGain();
-    o.type = 'sine';
-    o.frequency.setValueAtTime(f, t);
-    o.frequency.exponentialRampToValueAtTime(f * 1.5, t + dur * 0.45);
-    o.frequency.exponentialRampToValueAtTime(f * 1.15, t + dur);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.3, t + 0.006);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(master);
-    o.start(t); o.stop(t + dur + 0.05);
-    return dur;
-  };
-
-  // The metronome. A woodblock, higher on the first beat of the bar, so
-  // two rooms can hear which click is which and slide onto each other.
-  function click(t, first, level) {
-    if (!AC) { return; }
-    var src = AC.createBufferSource();
-    src.buffer = noiseBuf;
-    var bp = AC.createBiquadFilter(), ng = AC.createGain();
-    bp.type = 'bandpass';
-    bp.Q.setValueAtTime(6, t);
-    bp.frequency.setValueAtTime(first ? 2400 : 1500, t);
-    ng.gain.setValueAtTime(0.0001, t);
-    ng.gain.exponentialRampToValueAtTime(level * 0.7, t + 0.002);
-    ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
-    src.connect(bp); bp.connect(ng); ng.connect(master);
-    src.start(t); src.stop(t + 0.09);
-
-    var o = AC.createOscillator(), g = AC.createGain();
-    o.type = 'square';
-    o.frequency.setValueAtTime(first ? 1320 : 880, t);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(level * 0.5, t + 0.002);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.045);
-    o.connect(g); g.connect(master);
-    o.start(t); o.stop(t + 0.09);
+  function buffer(seconds, fill) {
+    var sr = AC.sampleRate, n = Math.max(1, Math.floor(seconds * sr));
+    var b = AC.createBuffer(1, n, sr), d = b.getChannelData(0);
+    fill(d, sr, n);
+    var f = Math.min(n, Math.floor(sr * 0.004));
+    for (var i = 0; i < f; i++) { d[n - f + i] *= 1 - i / f; }
+    return b;
   }
 
-  // A tap answers back at once rather than waiting for the next bar.
-  function chirp(spec) {
-    if (!AC) { return; }
-    VOICES[spec.voice](AC.currentTime + 0.01, mtof(pentMidi(spec.base, 3)), 0.4);
+  function noise(d, n) {
+    for (var i = 0; i < n; i++) { d[i] = Math.random() * 2 - 1; }
+  }
+
+  // One biquad, written out, because the buffers are built by hand and
+  // there is no node graph here to borrow one from.
+  function filter(d, n, sr, type, f, Q) {
+    var w = 2 * Math.PI * f / sr, cs = Math.cos(w), sn = Math.sin(w), al = sn / (2 * Q);
+    var b0, b1, b2, a0, a1, a2;
+    if (type === 'lp') { b0 = (1 - cs) / 2; b1 = 1 - cs; b2 = b0; }
+    else if (type === 'hp') { b0 = (1 + cs) / 2; b1 = -(1 + cs); b2 = b0; }
+    else { b0 = al; b1 = 0; b2 = -al; }
+    a0 = 1 + al; a1 = -2 * cs; a2 = 1 - al;
+    b0 /= a0; b1 /= a0; b2 /= a0; a1 /= a0; a2 /= a0;
+    var x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+    for (var i = 0; i < n; i++) {
+      var x = d[i], y = b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
+      x2 = x1; x1 = x; y2 = y1; y1 = y; d[i] = y;
+    }
+  }
+
+  function envelope(d, n, sr, attack, decay) {
+    for (var i = 0; i < n; i++) {
+      var t = i / sr;
+      var a = Math.exp(-t / decay);
+      if (attack > 0) { a *= Math.min(1, t / attack); }
+      d[i] *= a;
+    }
+  }
+
+  // A plucked string, the old delay-line way: a burst of noise fed back
+  // through itself a wavelength late, losing a little each time round.
+  function pluckString(d, sr, n, f, damp, soft) {
+    var N = Math.max(2, Math.round(sr / f));
+    var line = new Float32Array(N), i, lp = 0;
+    for (i = 0; i < N; i++) { line[i] = Math.random() * 2 - 1; }
+    for (i = 0; i < N; i++) { lp += (line[i] - lp) * soft; line[i] = lp; }
+    var idx = 0, prev = 0;
+    for (i = 0; i < n; i++) {
+      var cur = line[idx];
+      d[i] = cur;
+      line[idx] = (cur + prev) * 0.5 * damp;
+      prev = cur;
+      idx = (idx + 1) % N;
+    }
+  }
+
+  // Two sines, one bending the other. Nearly every struck or rung metal
+  // and wooden thing in here is this with different numbers.
+  function fm(d, sr, n, f, ratio, index, bend, decay, attack) {
+    var ph = 0, mph = 0, two = Math.PI * 2, i;
+    for (i = 0; i < n; i++) {
+      var t = i / sr;
+      var a = Math.exp(-t / decay);
+      if (attack > 0) { a *= Math.min(1, t / attack); }
+      var I = index * Math.exp(-t / bend);
+      mph += two * f * ratio / sr;
+      ph += two * f / sr;
+      d[i] = Math.sin(ph + I * Math.sin(mph)) * a;
+    }
+  }
+
+  function additive(d, sr, n, f, harmonics, decay, attack) {
+    var two = Math.PI * 2, i, h;
+    for (i = 0; i < n; i++) {
+      var t = i / sr, s = 0;
+      for (h = 0; h < harmonics.length; h++) {
+        s += Math.sin(two * f * harmonics[h][0] * t) * harmonics[h][1];
+      }
+      var a = Math.exp(-t / decay);
+      if (attack > 0) { a *= Math.min(1, t / attack); }
+      d[i] = s * a;
+    }
+  }
+
+  function sweep(d, sr, n, f0, f1, bendTime, decay) {
+    var ph = 0, two = Math.PI * 2;
+    for (var i = 0; i < n; i++) {
+      var t = i / sr;
+      var f = f1 + (f0 - f1) * Math.exp(-t / bendTime);
+      ph += two * f / sr;
+      d[i] = Math.sin(ph) * Math.exp(-t / decay);
+    }
+  }
+
+  // --- the instruments ----------------------------------------------
+  //
+  // ref is the pitch each one was built at; a note is that buffer played
+  // faster or slower. gain evens them out against each other.
+
+  var TONES = {
+    kick: { gain: 0.95, make: function () {
+      return buffer(0.42, function (d, sr, n) {
+        sweep(d, sr, n, 132, 46, 0.035, 0.16);
+        var c = Math.floor(sr * 0.004);
+        for (var i = 0; i < c; i++) { d[i] += (Math.random() * 2 - 1) * 0.55 * (1 - i / c); }
+      });
+    } },
+    snare: { gain: 0.5, make: function () {
+      return buffer(0.26, function (d, sr, n) {
+        var body = new Float32Array(n);
+        sweep(body, sr, n, 330, 185, 0.02, 0.075);
+        noise(d, n);
+        filter(d, n, sr, 'bp', 1850, 0.8);
+        envelope(d, n, sr, 0.001, 0.075);
+        for (var i = 0; i < n; i++) { d[i] = d[i] * 0.85 + body[i] * 0.5; }
+      });
+    } },
+    tom: { gain: 0.55, make: function () {
+      return buffer(0.4, function (d, sr, n) { sweep(d, sr, n, 230, 96, 0.06, 0.13); });
+    } },
+    clap: { gain: 0.5, make: function () {
+      return buffer(0.3, function (d, sr, n) {
+        noise(d, n);
+        filter(d, n, sr, 'bp', 1250, 1.1);
+        var burst = [0, 0.011, 0.022, 0.034];
+        for (var i = 0; i < n; i++) {
+          var t = i / sr, a = 0;
+          for (var b = 0; b < burst.length; b++) {
+            if (t >= burst[b]) { a = Math.max(a, Math.exp(-(t - burst[b]) / (b === 3 ? 0.07 : 0.008))); }
+          }
+          d[i] *= a;
+        }
+      });
+    } },
+    hatC: { gain: 0.24, make: function () {
+      return buffer(0.09, function (d, sr, n) {
+        noise(d, n); filter(d, n, sr, 'hp', 7200, 0.8); envelope(d, n, sr, 0.0005, 0.016);
+      });
+    } },
+    hatO: { gain: 0.2, make: function () {
+      return buffer(0.36, function (d, sr, n) {
+        noise(d, n); filter(d, n, sr, 'hp', 6600, 0.8); envelope(d, n, sr, 0.0005, 0.1);
+      });
+    } },
+    shaker: { gain: 0.26, make: function () {
+      return buffer(0.14, function (d, sr, n) {
+        noise(d, n); filter(d, n, sr, 'bp', 5800, 0.9); envelope(d, n, sr, 0.008, 0.028);
+      });
+    } },
+    tamb: { gain: 0.24, make: function () {
+      return buffer(0.3, function (d, sr, n) {
+        noise(d, n); filter(d, n, sr, 'bp', 8600, 0.7);
+        for (var i = 0; i < n; i++) {
+          var t = i / sr;
+          d[i] *= Math.exp(-t / 0.055) * (0.75 + 0.25 * Math.sin(t * 260));
+        }
+      });
+    } },
+    clave: { gain: 0.32, make: function () {
+      return buffer(0.09, function (d, sr, n) {
+        fm(d, sr, n, 2500, 1.5, 1.2, 0.006, 0.018, 0);
+      });
+    } },
+
+    bassPluck: { ref: 82.41, gain: 0.8, make: function () {
+      return buffer(1.4, function (d, sr, n) {
+        pluckString(d, sr, n, 82.41, 0.9955, 0.35);
+        filter(d, n, sr, 'lp', 900, 0.7);
+        envelope(d, n, sr, 0, 0.6);
+      });
+    } },
+    bassSynth: { ref: 82.41, gain: 0.7, make: function () {
+      return buffer(1, function (d, sr, n) {
+        fm(d, sr, n, 82.41, 1, 3.2, 0.09, 0.28, 0.002);
+        filter(d, n, sr, 'lp', 1400, 0.9);
+      });
+    } },
+    pluck: { ref: 220, gain: 0.5, make: function () {
+      return buffer(1.8, function (d, sr, n) {
+        pluckString(d, sr, n, 220, 0.9965, 0.55);
+        envelope(d, n, sr, 0, 0.85);
+      });
+    } },
+    epiano: { ref: 220, gain: 0.45, make: function () {
+      return buffer(1.5, function (d, sr, n) {
+        var tine = new Float32Array(n);
+        fm(tine, sr, n, 220, 14, 1.6, 0.02, 0.07, 0);
+        fm(d, sr, n, 220, 1, 2.4, 0.16, 0.55, 0.002);
+        for (var i = 0; i < n; i++) { d[i] += tine[i] * 0.3; }
+      });
+    } },
+    marimba: { ref: 440, gain: 0.45, make: function () {
+      return buffer(0.7, function (d, sr, n) {
+        fm(d, sr, n, 440, 4, 2.6, 0.02, 0.16, 0.001);
+      });
+    } },
+    glock: { ref: 880, gain: 0.32, make: function () {
+      return buffer(1.6, function (d, sr, n) {
+        fm(d, sr, n, 880, 3.5, 3.4, 0.05, 0.5, 0.001);
+      });
+    } },
+    kalimba: { ref: 440, gain: 0.4, make: function () {
+      return buffer(1, function (d, sr, n) {
+        fm(d, sr, n, 440, 1, 1.5, 0.05, 0.32, 0.001);
+      });
+    } },
+    organ: { ref: 220, gain: 0.3, make: function () {
+      return buffer(2.2, function (d, sr, n) {
+        additive(d, sr, n, 220, [[1, 1], [2, 0.5], [3, 0.22], [4, 0.16], [6, 0.08], [8, 0.05]], 1.1, 0.03);
+      });
+    } },
+    click: { gain: 0.9, make: function () {
+      return buffer(0.06, function (d, sr, n) {
+        var body = new Float32Array(n);
+        fm(body, sr, n, 1180, 1.4, 1.1, 0.005, 0.014, 0);
+        noise(d, n);
+        filter(d, n, sr, 'bp', 3200, 1.4);
+        envelope(d, n, sr, 0.0004, 0.006);
+        for (var i = 0; i < n; i++) { d[i] = d[i] * 0.45 + body[i] * 0.85; }
+      });
+    } }
+  };
+
+  // Built the first time each one is wanted, so opening the game does
+  // not stop to make seventeen instruments nobody has chosen yet.
+  var BANK = {};
+  function toneBuffer(name) {
+    if (!BANK[name]) {
+      if (!AC || !TONES[name]) { return null; }
+      BANK[name] = TONES[name].make();
+    }
+    return BANK[name];
+  }
+
+  function play(name, midi, t, level) {
+    if (!AC || !master) { return 0; }
+    var b = toneBuffer(name);
+    if (!b) { return 0; }
+    var spec = TONES[name];
+    var rate = spec.ref ? mtof(midi) / spec.ref : 1;
+    var src = AC.createBufferSource();
+    src.buffer = b;
+    src.playbackRate.setValueAtTime(rate, t);
+    var g = AC.createGain();
+    g.gain.setValueAtTime(spec.gain * (level === undefined ? 1 : level), t);
+    src.connect(g); g.connect(master);
+    src.start(t);
+    return b.duration / rate;
   }
 
   // ------------------------------------------------------------------
-  // Drawing helpers shared by every animal
+  // The band. Each character keeps one instrument for good and offers
+  // six ways of playing it, so however the two children choose, there is
+  // still a bottom, a middle and a top to the music.
+  //
+  // The six colours mean the same thing on every card: red is the first
+  // sound, purple the sixth. A child learns "the green one" once.
+  // ------------------------------------------------------------------
+  var SOUND_COLOURS = ['#e05a5a', '#ef8f3c', '#f0c33c', '#5fbb63', '#4aa3d8', '#a97ad8'];
+
+  function P() { return Array.prototype.join.call(arguments, ''); }
+
+  var KITS = {
+    dog: [
+      { lanes: [{ t: 'kick', p: 'x...x...x...x...' }, { t: 'snare', p: '....x.......x...' }] },
+      { lanes: [
+        { t: 'kick', p: P('x.....x...x.....', 'x.....x...x.....', 'x.....x...x.....', 'x.....x...x.x.x.') },
+        { t: 'snare', p: '....x.......x...' }] },
+      { lanes: [{ t: 'kick', p: 'x...............' }, { t: 'snare', p: '........x.......' }] },
+      { lanes: [{ t: 'kick', p: 'x..x..x...x.x...' }, { t: 'snare', p: '....x..x....x..x' }] },
+      { lanes: [
+        { t: 'kick', p: 'x.......x.......' },
+        { t: 'tom', p: P('..x...x.....x...', '..x...x.....x...', '..x...x.....x...', '..x.x.x.x.x.x.x.') }] },
+      { lanes: [{ t: 'kick', p: 'x..x....x..x....' }, { t: 'clap', p: '....x.......x...' }] }
+    ],
+    mouse: [
+      { lanes: [{ t: 'hatC', p: 'x.x.x.x.x.x.x.x.' }] },
+      { lanes: [{ t: 'hatC', p: 'x.xxx.x.x.xxx.x.' }] },
+      { lanes: [{ t: 'shaker', p: '..x...x...x...x.' }] },
+      { lanes: [{ t: 'tamb', p: '....x.......x...' }] },
+      { lanes: [{ t: 'clave', p: 'x..x..x...x.x...' }] },
+      { lanes: [{ t: 'hatC', p: 'x.x.x.x.x.x.x.x.' }, { t: 'hatO', p: '......x.......x.' }] }
+    ],
+    frog: [
+      { base: 36, lanes: [{ t: 'bassPluck', p: '0.......0.......' }] },
+      { base: 36, lanes: [{ t: 'bassPluck', p: P('0...0...2...0...', '4...4...2...0...', '0...0...2...4...', '3...3...2...0...') }] },
+      { base: 36, lanes: [{ t: 'bassSynth', p: '0.0.0.0.2.2.0.0.' }] },
+      { base: 36, lanes: [{ t: 'bassSynth', p: P('0.......3.......', '2.......0.......', '0.......3.......', '4.......2.......') }] },
+      { base: 36, lanes: [{ t: 'bassPluck', p: '0.....5.0.....5.' }] },
+      { base: 36, lanes: [{ t: 'bassSynth', p: P('0..0..2...0.....', '3..3..2...0.....') }] }
+    ],
+    cow: [
+      { base: 48, chord: true, lanes: [{ t: 'organ', p: P('0...............', '0...............', '3...............', '2...............') }] },
+      { base: 48, chord: true, lanes: [{ t: 'epiano', p: P('0.......2.......', '4.......2.......', '0.......2.......', '3.......2.......') }] },
+      { base: 48, chord: true, lanes: [{ t: 'pluck', p: '0..0..0...0..0..' }] },
+      { base: 48, chord: true, lanes: [{ t: 'organ', p: P('0...............', '4...............', '2...............', '3...............') }] },
+      { base: 48, chord: true, lanes: [{ t: 'epiano', p: '..0...0...0...0.' }] },
+      { base: 48, chord: true, lanes: [{ t: 'pluck', p: P('0...0...2...0...', '3...3...2...0...', '0...0...2...4...', '2...2...0.......') }] }
+    ],
+    cat: [
+      { base: 60, lanes: [{ t: 'pluck', p: P('4...2...4...5...', '4...2...0.......', '4...2...4...5...', '7...5...4.......') }] },
+      { base: 60, lanes: [{ t: 'marimba', p: P('0.2.4...2.0.....', '4.2.0...2.......', '0.2.4...5.4.....', '2...0...........') }] },
+      { base: 60, lanes: [{ t: 'epiano', p: P('..4...2...4...5.', '..4...2...0.....') }] },
+      { base: 60, lanes: [{ t: 'pluck', p: P('4...............', '....2...........', '........5.......', '............4...') }] },
+      { base: 60, lanes: [{ t: 'marimba', p: '4.5.4.2.0.2.4...' }] },
+      { base: 60, lanes: [{ t: 'epiano', p: P('2...4...5...4...', '2...0...2.......', '2...4...5...7...', '5...4...2.......') }] }
+    ],
+    bird: [
+      { base: 72, lanes: [{ t: 'glock', p: P('........7.......', '........9.......', '........7.......', '........a.......') }] },
+      { base: 72, lanes: [{ t: 'kalimba', p: P('7.9.a...9.7.....', '5.7.9...7.......') }] },
+      { base: 72, lanes: [{ t: 'marimba', p: '..7...9...7...5.' }] },
+      { base: 72, lanes: [{ t: 'glock', p: P('a...............', '................', '7...............', '................') }] },
+      { base: 72, lanes: [{ t: 'kalimba', p: P('7...9...a...9...', '7...5...7.......', '7...9...a...c...', 'a...9...7.......') }] },
+      { base: 72, lanes: [{ t: 'marimba', p: P('7.....9.....a...', '9.....7.....5...') }] }
+    ]
+  };
+
+  // ------------------------------------------------------------------
+  // Drawing helpers shared by every character
   // ------------------------------------------------------------------
   function eyePair(cx, cy, sp, r, pr) {
     var s = '<g class="eyes" data-cx="' + cx + '" data-cy="' + cy + '">';
@@ -404,19 +579,11 @@
     return '<g class="mouth" data-cx="' + cx + '" data-cy="' + cy + '">' + inner + '</g>';
   }
 
-  // ------------------------------------------------------------------
-  // The band. Drawn front-on so both eyes and the mouth read clearly.
-  // Feet sit on y = 0; everything else is above it.
-  //
-  // Every loop is exactly one bar of sixteenths. That is deliberate: two
-  // devices that agree on where the bar starts therefore agree on where
-  // the loop starts too, with no second bar to be out of.
-  // ------------------------------------------------------------------
+  // Drawn front-on so both eyes and the mouth read clearly. Feet sit on
+  // y = 0; everything else is above it.
   var SPECS = [
     {
-      id: 'dog', voice: 'dog', colour: '#b57a49', dark: '#8d5a32',
-      base: 48, top: -186,
-      loop: [0, null, null, null, null, null, 0, null, null, null, null, null, 0, null, null, null],
+      id: 'dog', colour: '#b57a49', dark: '#8d5a32', top: -186,
       art: function (s) {
         return '<path d="M 52 -62 Q 104 -78 96 -134" stroke="' + s.dark + '" stroke-width="19" fill="none" stroke-linecap="round"/>'
           + legPair(40, 24, 18, s.dark)
@@ -434,9 +601,7 @@
       }
     },
     {
-      id: 'mouse', voice: 'mouse', colour: '#bab7c6', dark: '#9592a4',
-      base: 84, top: -172,
-      loop: [0, null, 3, null, 0, null, 3, null, 0, null, 3, null, 0, null, 3, 5],
+      id: 'mouse', colour: '#bab7c6', dark: '#9592a4', top: -172,
       art: function (s) {
         return '<path d="M 40 -40 Q 96 -34 88 -96" stroke="#e3b7c2" stroke-width="9" fill="none" stroke-linecap="round"/>'
           + legPair(28, 18, 12, s.dark)
@@ -455,9 +620,7 @@
       }
     },
     {
-      id: 'frog', voice: 'frog', colour: '#5fae4a', dark: '#3f8232',
-      base: 48, top: -132,
-      loop: [0, null, null, null, 2, null, null, 0, null, null, 2, null, 4, null, 2, null],
+      id: 'frog', colour: '#5fae4a', dark: '#3f8232', top: -132,
       art: function (s) {
         return legPair(58, 26, 16, s.dark)
           + '<ellipse cx="-68" cy="-38" rx="27" ry="37" fill="' + s.dark + '"/>'
@@ -471,9 +634,7 @@
       }
     },
     {
-      id: 'cow', voice: 'cow', colour: '#f2f0ec', dark: '#3a3a46',
-      base: 36, top: -188,
-      loop: [0, null, null, null, null, null, null, null, 4, null, null, null, null, null, null, null],
+      id: 'cow', colour: '#f2f0ec', dark: '#3a3a46', top: -188,
       art: function (s) {
         return legPair(44, 24, 22, '#3a3a46')
           + '<ellipse cx="0" cy="-74" rx="76" ry="58" fill="' + s.colour + '"/>'
@@ -492,9 +653,7 @@
       }
     },
     {
-      id: 'cat', voice: 'cat', colour: '#93949c', dark: '#6d6e77',
-      base: 60, top: -194,
-      loop: [4, null, null, null, 3, null, 2, null, null, null, 4, null, 5, null, null, 4],
+      id: 'cat', colour: '#93949c', dark: '#6d6e77', top: -194,
       art: function (s) {
         return '<path d="M 48 -50 Q 104 -60 92 -120" stroke="' + s.dark + '" stroke-width="17" fill="none" stroke-linecap="round"/>'
           + legPair(36, 22, 16, s.dark)
@@ -517,9 +676,7 @@
       }
     },
     {
-      id: 'bird', voice: 'bird', colour: '#f2b134', dark: '#d68d1d',
-      base: 72, top: -182,
-      loop: [null, null, 7, null, null, 6, null, null, 8, null, null, 7, null, null, 9, null],
+      id: 'bird', colour: '#f2b134', dark: '#d68d1d', top: -182,
       art: function (s) {
         return '<path d="M -6 -60 L -44 -6 L 30 -22 Z" fill="' + s.dark + '"/>'
           + legPair(20, 9, 18, '#e07a1f')
@@ -540,67 +697,105 @@
   var MOUSE_SPEC = SPECS[1];
 
   // ------------------------------------------------------------------
-  // The clock.
+  // The clock, which is the whole point of the game.
   //
-  // Sixteen steps to the bar, four steps to the beat. Every step's time
-  // is worked out from one origin instant rather than by adding up, so
-  // nothing accumulates error and a nudge is simply a move of the
-  // origin. Two phones left alone on the same tempo wander apart by a
-  // few milliseconds a minute; the arrows are for after that.
+  // Two devices cannot talk to each other, but they already share a
+  // clock: the wall clock, which both of them keep disciplined against
+  // network time and neither of them lets drift. So the beat grid is
+  // not counted out locally - it is a function of the actual time of
+  // day. Step n happens at n * stepDur + offset seconds past the epoch,
+  // on every device in the room.
+  //
+  // What is left over is the difference between the two system clocks
+  // and between the two devices' audio output latencies. That is what
+  // the arrows take out, and once it is out it stays out, because
+  // neither clock is free-running. A session can last all afternoon.
+  //
+  // The audio clock is a different, free-running clock, so it is slewed
+  // onto the wall clock rather than trusted: at most a millisecond a
+  // second, which is far more than crystal drift ever needs and slow
+  // enough to be inaudible. A real jump - the phone picking up network
+  // time for the first time - is taken in one go instead, because being
+  // a second out is worse than one flinch.
   // ------------------------------------------------------------------
-  var STEPS_PER_BAR = 16, STEPS_PER_BEAT = 4;
-  var LOOK = 0.14;
-  var bpm = 90, origin = 0, stepN = 0, visQ = [];
-  var mode = 'tune';
+  var STEPS_PER_BEAT = 4, BEATS_PER_LOOP = 16;
+  var STEPS_PER_LOOP = STEPS_PER_BEAT * BEATS_PER_LOOP;
+  var LOOK = 0.14, MAX_SLEW = 0.001, JUMP = 0.25;
 
+  var bpm = clamp(load('bpm', 90), 60, 160);
+  var offset = load('offset', 0);
+  var skew = 0, skewSet = false, stepN = 0, visQ = [], mode = 'tune';
+
+  function wallNow() { return Date.now() / 1000; }
   function stepDur() { return 60 / bpm / STEPS_PER_BEAT; }
   function beatDur() { return 60 / bpm; }
-  function stepTime(n) { return origin + n * stepDur(); }
-  function curStep() {
-    if (!AC) { return 0; }
-    return (AC.currentTime - origin) / stepDur();
+
+  // Audio time of a step, via the wall clock it is really pinned to.
+  function stepTime(n) { return n * stepDur() + offset + skew; }
+
+  function trackWallClock(dt) {
+    if (!AC) { return; }
+    var measured = AC.currentTime - wallNow();
+    if (!skewSet) { skew = measured; skewSet = true; return; }
+    var err = measured - skew;
+    if (err > JUMP || err < -JUMP) { skew = measured; return; }
+    var step = MAX_SLEW * dt;
+    skew += clamp(err, -step, step);
   }
 
-  // Changing the tempo must not shunt the beat sideways as well, or the
-  // two children would have to line up again from scratch every time.
+  function curStep() {
+    if (!AC || !skewSet) { return 0; }
+    return (AC.currentTime - offset - skew) / stepDur();
+  }
+
+  // Changing the tempo must not shunt the beat sideways as well, and the
+  // grid is absolute, so the offset is rewritten to hold the current
+  // position still.
   function setBpm(v) {
-    var next = clamp(v, 60, 160);
+    var next = clamp(Math.round(v), 60, 160);
     if (next === bpm) { return; }
-    if (AC) {
+    if (AC && skewSet) {
       var here = curStep();
       bpm = next;
-      origin = AC.currentTime - here * stepDur();
+      offset = AC.currentTime - skew - here * stepDur();
     } else {
       bpm = next;
     }
+    save('bpm', bpm);
+    save('offset', offset);
     paintBpm();
   }
 
   function nudge(seconds) {
-    origin += seconds;
+    offset += seconds;
+    save('offset', offset);
   }
 
   var pads = [], byId = {};
 
   function scheduler() {
     if (!AC || !master) { return; }
-    var now = AC.currentTime, sd = stepDur(), spb = beatDur();
+    // Tracked here rather than in the frame loop, because a backgrounded
+    // tab stops drawing but must not stop keeping time.
+    trackWallClock(0.025);
+    var now = AC.currentTime, sd = stepDur(), i, j;
 
-    // Coming back from a locked screen must not replay ten minutes of
-    // loop at once.
-    var behind = Math.floor((now - origin) / sd) - 2;
+    // Coming back from a locked screen must not replay the whole loop.
+    var behind = Math.floor((now - offset - skew) / sd) - 1;
     if (stepN < behind) { stepN = behind; }
 
     while (stepTime(stepN) < now + LOOK) {
-      var t = stepTime(stepN), n = stepN, i;
+      var t = stepTime(stepN), n = stepN;
       stepN += 1;
       if (t <= now + 0.002) { continue; }
 
-      var inBar = ((n % STEPS_PER_BAR) + STEPS_PER_BAR) % STEPS_PER_BAR;
+      var inLoop = ((n % STEPS_PER_LOOP) + STEPS_PER_LOOP) % STEPS_PER_LOOP;
+      var onBeat = (inLoop % STEPS_PER_BEAT) === 0;
 
-      // Animals join and leave on the bar line only, so a late tap can
-      // never land out of time.
-      if (inBar === 0) {
+      // Coming in, going out and changing sound all happen on a beat, so
+      // nothing a child does can land off it. A beat is under a second's
+      // wait, so nothing feels ignored either.
+      if (onBeat) {
         for (i = 0; i < pads.length; i++) {
           if (pads[i].playing !== pads[i].want) {
             pads[i].playing = pads[i].want;
@@ -609,25 +804,36 @@
         }
       }
 
-      if (mode === 'jam') {
+      if (mode === 'tune') {
+        if (onBeat) { play('click', 69, t, 1); }
+      } else {
         for (i = 0; i < pads.length; i++) {
           var p = pads[i];
-          if (!p.playing) { continue; }
-          var idx = p.spec.loop[inBar];
-          if (idx === null || idx === undefined) { continue; }
-          var dur = VOICES[p.spec.voice](t, mtof(pentMidi(p.spec.base, idx)), spb);
-          visQ.push({ t: t, id: p.id, hit: dur });
+          if (p.playing < 0) { continue; }
+          var v = p.kit[p.playing], hit = 0;
+          for (j = 0; j < v.lanes.length; j++) {
+            var lane = v.lanes[j];
+            var ch = lane.p.charAt(inLoop % lane.p.length);
+            var d = deg(ch);
+            if (d === null) { continue; }
+            if (v.base === undefined) {
+              hit = Math.max(hit, play(lane.t, 69, t, 1));
+            } else if (v.chord) {
+              hit = Math.max(hit, play(lane.t, pentMidi(v.base, d), t, 1));
+              play(lane.t, pentMidi(v.base, d + 2), t, 0.8);
+              play(lane.t, pentMidi(v.base, d + 4), t, 0.7);
+            } else {
+              hit = Math.max(hit, play(lane.t, pentMidi(v.base, d), t, 1));
+            }
+          }
+          if (hit > 0) { visQ.push({ t: t, id: p.id, hit: Math.min(hit, 0.5) }); }
         }
-        // One quiet woodblock a bar keeps the room's count audible even
-        // when every animal is off, and gives something to slide onto.
-        if (inBar === 0) { click(t, true, 0.22); }
-      } else if (inBar % STEPS_PER_BEAT === 0) {
-        click(t, inBar === 0, 1);
+        // Only while somebody is holding the arrows, when a reference to
+        // slide onto is the entire point and the music can put up with it.
+        if (onBeat && stripOpen) { play('click', 69, t, 0.3); }
       }
 
-      if (inBar % STEPS_PER_BEAT === 0) {
-        visQ.push({ t: t, beat: inBar / STEPS_PER_BEAT });
-      }
+      if (onBeat) { visQ.push({ t: t, beat: inLoop / STEPS_PER_BEAT }); }
     }
   }
   setInterval(scheduler, 25);
@@ -715,9 +921,9 @@
     g.setAttribute('transform', 'translate(' + x.toFixed(1) + ',' + y.toFixed(1) + ')');
   }
 
-  // Animal art is drawn with its feet on y = 0 and its head at spec.top,
-  // so it has to be lifted by half its own height to sit in the middle
-  // of anything.
+  // Character art is drawn with its feet on y = 0 and its head at
+  // spec.top, so it has to be lifted by half its own height to sit in
+  // the middle of anything.
   function fitAnimal(node, spec, cx, cy, w, h) {
     var hh = (-spec.top) + 18;
     var s = Math.min(w / 236, h / hh);
@@ -726,9 +932,28 @@
     return s;
   }
 
+  // Two chevrons, because one triangle alone reads as "play". Drawn
+  // pointing right and mirrored for the other one, so the pair can never
+  // drift apart.
+  function chevron(x) {
+    return '<path d="M ' + x + ' -30 L ' + (x + 26) + ' 0 L ' + x + ' 30" fill="none"'
+      + ' stroke="#ffffff" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>';
+  }
+
+  function arrowGlyph(dir) {
+    var inner = chevron(-30) + chevron(4);
+    return dir < 0 ? '<g transform="scale(-1,1)">' + inner + '</g>' : inner;
+  }
+
+  function spreadGlyph() {
+    return '<g transform="translate(14,0)">' + chevron(0) + '</g>'
+      + '<g transform="scale(-1,1) translate(14,0)">' + chevron(0) + '</g>';
+  }
+
   // ------------------------------------------------------------------
-  // Tuning up. Two numbers to match and two arrows to slide with - the
-  // whole of getting two rooms together, and nothing else on screen.
+  // Tuning up. One number to match and two arrows to slide with, and
+  // one click a beat - no bar, no strong and weak, nothing to work out
+  // about which click is which.
   // ------------------------------------------------------------------
   var T = {};
 
@@ -753,12 +978,8 @@
       stroke: 'rgba(255,255,255,0.16)', 'stroke-width': 14
     });
     T.ring.appendChild(T.ringLine);
-    T.pips = [];
-    for (var i = 0; i < 4; i++) {
-      var pip = el('circle', { cx: 0, cy: 0, r: 14, fill: '#8ea0d8' });
-      T.ring.appendChild(pip);
-      T.pips.push(pip);
-    }
+    T.pip = el('circle', { cx: 0, cy: 0, r: 16, fill: '#8ea0d8' });
+    T.ring.appendChild(T.pip);
     T.orbit = el('circle', { cx: 0, cy: 0, r: 26, fill: '#ffe9a0' });
     T.ring.appendChild(T.orbit);
 
@@ -788,26 +1009,6 @@
     g.appendChild(T.right);
     g.appendChild(T.play);
     paintBpm();
-  }
-
-  // Two chevrons, because one triangle alone reads as "play". Drawn
-  // pointing right and mirrored for the other one, so the pair can never
-  // drift apart.
-  function chevron(x) {
-    return '<path d="M ' + x + ' -30 L ' + (x + 26) + ' 0 L ' + x + ' 30" fill="none"'
-      + ' stroke="#ffffff" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>';
-  }
-
-  function arrowGlyph(dir) {
-    var inner = chevron(-30) + chevron(4);
-    return dir < 0 ? '<g transform="scale(-1,1)">' + inner + '</g>' : inner;
-  }
-
-  // The corner button that fetches the arrows back: one chevron each
-  // way, pointing apart.
-  function spreadGlyph() {
-    return '<g transform="translate(14,0)">' + chevron(0) + '</g>'
-      + '<g transform="scale(-1,1) translate(14,0)">' + chevron(0) + '</g>';
   }
 
   function paintBpm() {
@@ -871,12 +1072,9 @@
     T.ringLine.setAttribute('r', T.ringR);
     T.ringLine.setAttribute('stroke-width', Math.max(8, T.ringR * 0.07));
     T.ring.setAttribute('transform', 'translate(' + T.ringX + ',' + T.ringY + ')');
-    for (var i = 0; i < 4; i++) {
-      var a = (-90 + i * 90) * Math.PI / 180;
-      T.pips[i].setAttribute('cx', (Math.cos(a) * T.ringR).toFixed(1));
-      T.pips[i].setAttribute('cy', (Math.sin(a) * T.ringR).toFixed(1));
-      T.pips[i].setAttribute('r', (T.ringR * (i === 0 ? 0.1 : 0.075)).toFixed(1));
-    }
+    T.pip.setAttribute('cx', 0);
+    T.pip.setAttribute('cy', -T.ringR);
+    T.pip.setAttribute('r', (T.ringR * 0.1).toFixed(1));
     T.orbit.setAttribute('r', (T.ringR * 0.13).toFixed(1));
 
     T.condGlow.setAttribute('cx', T.ringX);
@@ -886,10 +1084,11 @@
   }
 
   // ------------------------------------------------------------------
-  // The jam. Every animal on every device, so nobody is waiting for a
-  // turn and two children can double each other up if they want to.
+  // The jam. Every character on every device, six sounds each. A short
+  // press moves to the next sound, a long press puts the character away.
   // ------------------------------------------------------------------
   var J = {};
+  var HOLD = 0.5;
 
   function buildJam() {
     var g = document.getElementById('jam');
@@ -915,11 +1114,12 @@
       g.appendChild(node);
 
       var p = {
-        id: spec.id, spec: spec, node: node, card: card, glow: glow, art: art, bob: bob, hit: hit,
+        id: spec.id, spec: spec, kit: KITS[spec.id],
+        node: node, card: card, glow: glow, art: art, bob: bob, hit: hit,
         mouth: bob.querySelector('.mouth'),
         eyes: bob.querySelector('.eyes'),
-        want: false, playing: false, lit: false,
-        bounceV: 0, mouthT: 0, mouthAge: 99, pulse: 0,
+        want: -1, playing: -1, lit: -1,
+        bounceV: 0, mouthT: 0, mouthAge: 99, pulse: 0, pressT: 0,
         blink: 2 + Math.random() * 5, blinkV: 1,
         idle: Math.random() * 6.28
       };
@@ -927,10 +1127,13 @@
       byId[spec.id] = p;
     });
 
+    // Sixteen beats, sixteen dots, along the bottom where the browser's
+    // own full screen button cannot sit on them. Two devices showing the
+    // same dot are together.
     J.dots = [];
     J.dotG = el('g');
-    for (var i = 0; i < 4; i++) {
-      var d = el('circle', { cx: 0, cy: 0, r: 12, fill: '#8ea0d8' });
+    for (var i = 0; i < BEATS_PER_LOOP; i++) {
+      var d = el('circle', { cx: 0, cy: 0, r: 8, fill: '#8ea0d8' });
       J.dotG.appendChild(d);
       J.dots.push(d);
     }
@@ -962,13 +1165,14 @@
   function layoutJam() {
     var W = L.W, H = L.H;
     var cols = L.wide ? 3 : 2, rows = L.wide ? 2 : 3;
-    var topBar = L.wide ? H * 0.15 : H * 0.11;
+    var topBar = Math.min(L.wide ? H * 0.16 : H * 0.09, 130);
+    var botBar = Math.min(L.wide ? H * 0.11 : H * 0.055, 80);
     var gap = 14;
     var padW = (W - gap * (cols + 1)) / cols;
-    // A card taller than it is wide leaves the animal stranded in a sea
-    // of empty pad, so the height is capped and the block is centred in
+    // A card taller than it is wide leaves the character stranded in a
+    // sea of empty pad, so the height is capped and the block centred in
     // whatever is left.
-    var availH = H - topBar;
+    var availH = H - topBar - botBar;
     var padH = Math.min((availH - gap * (rows + 1)) / rows, padW * 1.15);
     var top0 = topBar + (availH - (padH * rows + gap * (rows - 1))) / 2;
 
@@ -991,24 +1195,22 @@
       p.scale = fitAnimal(p.art, p.spec, 0, 0, padW * 0.88, padH * 0.84);
     });
 
-    // The dots hug the left edge and the arrows button the right, because
-    // the browser's own full screen button sits in the middle of the top
-    // of the screen until it is pressed.
-    var dr = Math.min(topBar * 0.16, 20);
-    var dgap = dr * 3.4;
-    for (var i2 = 0; i2 < 4; i2++) {
-      J.dots[i2].setAttribute('cx', (-dgap * 1.5 + dgap * i2).toFixed(1));
+    var span = W * 0.9;
+    var dgap = span / (BEATS_PER_LOOP - 1);
+    var dr = Math.min(dgap * 0.3, botBar * 0.26, 15);
+    for (var i2 = 0; i2 < BEATS_PER_LOOP; i2++) {
+      J.dots[i2].setAttribute('cx', (-span / 2 + dgap * i2).toFixed(1));
       J.dots[i2].setAttribute('cy', 0);
       J.dots[i2].setAttribute('r', dr.toFixed(1));
     }
-    place(J.dotG, dgap * 1.5 + dr + 24, topBar * 0.5);
+    place(J.dotG, W * 0.5, H - botBar * 0.5);
 
-    var tb = Math.min(topBar * 0.78, 92);
+    var tb = Math.min(topBar * 0.8, 92);
     sizeButton(J.tuneBtn, tb * 1.5, tb);
     place(J.tuneBtn, W - tb * 0.9, topBar * 0.5);
 
     var sw = Math.min(W * 0.26, 260), sh = Math.min(H * 0.13, 150);
-    var sy = H - sh * 0.85;
+    var sy = H - botBar - sh * 0.78;
     sizeButton(J.stripLeft, sw, sh);
     sizeButton(J.stripRight, sw, sh);
     sizeButton(J.stripHome, sw * 0.7, sh);
@@ -1034,17 +1236,27 @@
     J.strip.setAttribute('pointer-events', open ? 'auto' : 'none');
   }
 
+  // One note of whichever sound was just chosen, straight away, so the
+  // press is answered before the beat comes round to answer it properly.
+  function taste(p) {
+    if (!AC || p.want < 0) { return; }
+    var v = p.kit[p.want], lane = v.lanes[0];
+    var midi = v.base === undefined ? 69 : pentMidi(v.base, 0);
+    play(lane.t, midi, AC.currentTime + 0.02, 1);
+  }
+
   // ------------------------------------------------------------------
-  // Input. Every control is press-and-hold as well as tap: the arrows
-  // slide the beat while held, the tempo runs while held.
+  // Input. Buttons are press-and-hold as well as tap; cards tell a short
+  // press from a long one.
   // ------------------------------------------------------------------
-  var held = null, heldSince = 0, repeatAt = 0, didRepeat = false;
+  var held = null, heldNode = null, repeatAt = 0, didRepeat = false, slideRate = 0;
+  var pressPad = null;
 
   function doOnce(act) {
     if (act === 'bpm-') { setBpm(bpm - 5); }
     else if (act === 'bpm+') { setBpm(bpm + 5); }
-    else if (act === 'nudge-') { nudge(-stepDur() * 0.25); }
-    else if (act === 'nudge+') { nudge(stepDur() * 0.25); }
+    else if (act === 'nudge-') { nudge(-0.003); }
+    else if (act === 'nudge+') { nudge(0.003); }
   }
 
   svg.addEventListener('pointerdown', function (ev) {
@@ -1067,30 +1279,27 @@
         setStrip(!stripOpen);
       } else {
         held = act;
-        heldSince = performance.now();
-        repeatAt = heldSince + 420;
-        didRepeat = false;
-        btn.setAttribute('opacity', 0.72);
         heldNode = btn;
+        repeatAt = performance.now() + 380;
+        didRepeat = false;
+        slideRate = 0;
+        btn.setAttribute('opacity', 0.72);
       }
       return;
     }
 
     if (mode === 'jam') {
-      // A tap anywhere off a pad puts the arrows away again.
       var pn = t.closest('.pad');
       if (pn) {
-        var p = byId[pn.getAttribute('data-id')];
-        p.want = !p.want;
-        p.pulse = 1;
-        chirp(p.spec);
+        pressPad = byId[pn.getAttribute('data-id')];
+        pressPad.pressT = 0;
       } else if (stripOpen) {
+        // A tap anywhere off a pad puts the arrows away again.
         setStrip(false);
       }
     }
   });
 
-  var heldNode = null;
   function release() {
     if (held) {
       if (!didRepeat) { doOnce(held); }
@@ -1098,19 +1307,40 @@
       held = null;
       heldNode = null;
     }
+    if (pressPad) {
+      var p = pressPad;
+      pressPad = null;
+      if (p.pressT < HOLD) {
+        // A short press moves along the six, starting at the first.
+        p.want = p.want < 0 ? 0 : (p.want + 1) % p.kit.length;
+        p.pulse = 1;
+        taste(p);
+      }
+      p.pressT = 0;
+    }
   }
   window.addEventListener('pointerup', release);
   window.addEventListener('pointercancel', release);
 
   function runHeld(nowMs, dt) {
+    if (pressPad) {
+      pressPad.pressT += dt;
+      if (pressPad.pressT >= HOLD) {
+        // Held long enough: the character goes quiet at the next beat.
+        pressPad.want = -1;
+        pressPad.pressT = 0;
+        pressPad = null;
+      }
+    }
     if (!held) { return; }
     if (nowMs < repeatAt) { return; }
     didRepeat = true;
     if (held === 'nudge-' || held === 'nudge+') {
-      // A smooth slide rather than a stutter of steps, so a child can
-      // hear the two rooms closing on each other.
-      var dir = held === 'nudge+' ? 1 : -1;
-      nudge(dir * stepDur() * 2.4 * dt);
+      // Holding accelerates. A tap is three milliseconds, which is fine
+      // enough to sit exactly on the other device; holding gets you
+      // across a big gap without a hundred taps.
+      slideRate = Math.min(0.25, slideRate + dt * 0.22);
+      nudge((held === 'nudge+' ? 1 : -1) * Math.max(0.03, slideRate) * dt);
     } else {
       repeatAt = nowMs + 130;
       doOnce(held);
@@ -1152,16 +1382,12 @@
 
   var condFace = { mouth: null, eyes: null, mouthT: 0, mouthAge: 99, blink: 3, blinkV: 1 };
 
-  function updateTune(dt, barPos) {
-    var a = (-90 + barPos * 360) * Math.PI / 180;
+  function updateTune(dt, beatPos) {
+    var a = (-90 + beatPos * 360) * Math.PI / 180;
     T.orbit.setAttribute('cx', (Math.cos(a) * T.ringR).toFixed(1));
     T.orbit.setAttribute('cy', (Math.sin(a) * T.ringR).toFixed(1));
-
-    for (var i = 0; i < 4; i++) {
-      var near = (i === beatIdx) ? beatFlash : 0;
-      T.pips[i].setAttribute('fill', near > 0.25 ? '#ffe9a0' : '#8ea0d8');
-      T.pips[i].setAttribute('opacity', (0.45 + near * 0.55).toFixed(2));
-    }
+    T.pip.setAttribute('fill', beatFlash > 0.25 ? '#ffe9a0' : '#8ea0d8');
+    T.pip.setAttribute('opacity', (0.45 + beatFlash * 0.55).toFixed(2));
 
     var hop = 0, squash = 1;
     if (!reduced) {
@@ -1180,10 +1406,10 @@
   }
 
   function updateJam(dt) {
-    for (var i = 0; i < 4; i++) {
-      var lit = (i === beatIdx) ? beatFlash : 0;
-      J.dots[i].setAttribute('fill', lit > 0.25 ? '#ffe9a0' : '#8ea0d8');
-      J.dots[i].setAttribute('opacity', (0.4 + lit * 0.6).toFixed(2));
+    for (var i = 0; i < BEATS_PER_LOOP; i++) {
+      var on = (i === beatIdx);
+      J.dots[i].setAttribute('fill', on && beatFlash > 0.2 ? '#ffe9a0' : '#8ea0d8');
+      J.dots[i].setAttribute('opacity', (0.3 + (on ? beatFlash * 0.7 : 0)).toFixed(2));
     }
 
     for (var k = 0; k < pads.length; k++) {
@@ -1194,26 +1420,31 @@
 
       var open = faceUpdate(p, dt);
       var armed = (p.want !== p.lit);
+      var colour = p.lit >= 0 ? SOUND_COLOURS[p.lit] : 'rgba(255,255,255,0.1)';
 
-      // Armed but not yet in: the card breathes until the bar comes
-      // round, so a child can see their tap was heard.
+      // While a press is being held the colour drains away, so a child
+      // can see the character going quiet before it does.
+      var drain = p.pressT > 0 ? clamp(p.pressT / HOLD, 0, 1) : 0;
+      // Armed but not yet in: the card breathes until the beat comes
+      // round, so a tap is visibly heard.
       var breathe = armed && !reduced ? (0.5 + 0.5 * Math.sin(p.idle * 6)) : (armed ? 1 : 0);
-      p.card.setAttribute('fill', p.lit ? '#33407a' : '#212a52');
-      p.card.setAttribute('stroke', p.lit ? p.spec.colour : 'rgba(255,255,255,0.1)');
-      p.card.setAttribute('stroke-width', (p.lit ? 7 : 3) + breathe * 6);
-      p.card.setAttribute('opacity', (0.72 + (p.lit ? 0.28 : 0) + breathe * 0.2).toFixed(2));
+
+      p.card.setAttribute('fill', p.lit >= 0 ? '#33407a' : '#212a52');
+      p.card.setAttribute('stroke', colour);
+      p.card.setAttribute('stroke-width', ((p.lit >= 0 ? 9 : 3) + breathe * 6) * (1 - drain * 0.8));
+      p.card.setAttribute('opacity', (0.72 + (p.lit >= 0 ? 0.28 : 0) + breathe * 0.2 - drain * 0.3).toFixed(2));
 
       var hop = 0, squash = 1;
       if (!reduced) {
         var b = Math.sin(Math.PI * (1 - p.bounceV));
         hop = -b * 26;
         squash = 1 + b * 0.07;
-        if (!p.lit) { hop += Math.sin(p.idle * 1.4) * 3; }
+        if (p.lit < 0) { hop += Math.sin(p.idle * 1.4) * 3; }
       }
       p.bob.setAttribute('transform',
         'translate(0,' + hop.toFixed(2) + ') scale(1,' + squash.toFixed(4) + ')');
-      p.art.setAttribute('opacity', (p.lit ? 1 : 0.42).toFixed(2));
-      p.glow.setAttribute('opacity', (Math.max(p.bounceV, open, p.pulse) * (p.lit ? 0.55 : 0.3)).toFixed(3));
+      p.art.setAttribute('opacity', ((p.lit >= 0 ? 1 : 0.42) - drain * 0.4).toFixed(2));
+      p.glow.setAttribute('opacity', (Math.max(p.bounceV, open, p.pulse) * (p.lit >= 0 ? 0.55 : 0.3)).toFixed(3));
     }
   }
 
@@ -1227,9 +1458,9 @@
     beatFlash = Math.max(0, beatFlash - dt * 3.4);
 
     var s = curStep();
-    var barPos = (((s % STEPS_PER_BAR) + STEPS_PER_BAR) % STEPS_PER_BAR) / STEPS_PER_BAR;
+    var beatPos = (((s % STEPS_PER_BEAT) + STEPS_PER_BEAT) % STEPS_PER_BEAT) / STEPS_PER_BEAT;
 
-    if (mode === 'tune') { updateTune(dt, barPos); }
+    if (mode === 'tune') { updateTune(dt, beatPos); }
     else { updateJam(dt); }
 
     requestAnimationFrame(frame);
