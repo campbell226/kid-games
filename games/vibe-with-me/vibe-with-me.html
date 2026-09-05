@@ -1,0 +1,1257 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#141d3a">
+<title>Vibe With Me</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #141d3a;
+    overflow: hidden;
+    touch-action: manipulation;
+    overscroll-behavior: none;
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #stage {
+    display: block;
+    width: 100vw; height: 100vh;
+    width: 100dvw; height: 100dvh;
+  }
+  .hit { fill: transparent; cursor: pointer; }
+  text { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+</style>
+</head>
+<body>
+<script>
+// Full screen on the first touch, and a way back if it is off.
+//
+// A browser will not do this by itself: the request has to come out of a
+// gesture the browser counts as user activation, and that list is fussier
+// than it looks. pointerdown only counts when the pointer is a mouse - on
+// a touchscreen it grants nothing at all, which is why listening for it
+// worked on a laptop and did nothing whatever on a tablet. For a finger it
+// is pointerup and touchend that count.
+//
+// Once full screen is on, the automatic asking stops, so leaving it stays
+// left. But leaving it used to mean reloading to get it back, so there is
+// now a small button at the top of the screen that is only there while
+// full screen is off, and takes itself away the moment it is on.
+//
+// An iPhone ignores the lot, because Safari there gives full screen to
+// video and nothing else, so no button is offered. That is what the home
+// screen tags above are for.
+(function () {
+  var el = document.documentElement;
+  var go = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (!go) { return; }
+  var EVENTS = ['pointerup', 'touchend', 'click', 'mousedown'];
+  var asking = false, done = false, btn = null, i;
+
+  function isFull() {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement);
+  }
+
+  function request() {
+    if (asking || isFull()) { return; }
+    asking = true;
+    try {
+      var p = go.call(el);
+      if (p && p.then) { p.then(function () { asking = false; }, function () { asking = false; }); }
+      else { setTimeout(function () { asking = false; }, 500); }
+    } catch (e) { asking = false; }
+  }
+
+  function stopAuto() {
+    done = true;
+    for (var k = 0; k < EVENTS.length; k++) {
+      document.removeEventListener(EVENTS[k], autoTry, true);
+    }
+  }
+
+  function autoTry() {
+    if (done) { return; }
+    if (isFull()) { stopAuto(); sync(); return; }
+    request();
+  }
+
+  function sync() {
+    var want = !isFull();
+    if (want && !btn && document.body) {
+      btn = document.createElement('button');
+      btn.setAttribute('aria-label', 'Full screen');
+      btn.style.cssText = 'position:fixed;top:5px;left:50%;transform:translateX(-50%);'
+        + 'z-index:30;width:46px;height:46px;padding:0;line-height:0;border:0;'
+        + 'border-radius:14px;background:rgba(255,255,255,0.68);cursor:pointer;'
+        + 'box-shadow:0 1px 5px rgba(0,0,0,0.22);-webkit-tap-highlight-color:transparent;';
+      btn.innerHTML = '<svg width="46" height="46" viewBox="0 0 46 46" aria-hidden="true">'
+        + '<g fill="none" stroke="#3a3f6a" stroke-width="3.4" stroke-linecap="round"'
+        + ' stroke-linejoin="round">'
+        + '<path d="M19 14 H14 V19 M27 14 H32 V19 M19 32 H14 V27 M27 32 H32 V27"/>'
+        + '</g></svg>';
+      btn.addEventListener('click', function (e) { e.stopPropagation(); request(); });
+      document.body.appendChild(btn);
+    }
+    if (btn) { btn.style.display = want ? 'block' : 'none'; }
+  }
+
+  document.addEventListener('fullscreenchange', function () {
+    if (isFull()) { stopAuto(); }
+    sync();
+  });
+  document.addEventListener('webkitfullscreenchange', function () {
+    if (isFull()) { stopAuto(); }
+    sync();
+  });
+  for (i = 0; i < EVENTS.length; i++) {
+    document.addEventListener(EVENTS[i], autoTry, true);
+  }
+  sync();
+})();
+</script>
+
+<svg id="stage" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 640" preserveAspectRatio="xMidYMid meet" aria-label="Vibe With Me">
+  <defs>
+    <linearGradient id="vsky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#141d3a"/>
+      <stop offset="1" stop-color="#3a2a5c"/>
+    </linearGradient>
+    <radialGradient id="vspot" cx="0.5" cy="0.35" r="0.75">
+      <stop offset="0" stop-color="#9fd8ff" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#9fd8ff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="vglow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fffbe6" stop-opacity="0.85"/>
+      <stop offset="0.6" stop-color="#ffe9a0" stop-opacity="0.3"/>
+      <stop offset="1" stop-color="#ffe9a0" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <g id="backdrop"></g>
+  <g id="tune"></g>
+  <g id="jam"></g>
+</svg>
+
+<script>
+(function () {
+  'use strict';
+
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  var svg = document.getElementById('stage');
+
+  function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+  function el(tag, attrs) {
+    var n = document.createElementNS(SVGNS, tag);
+    if (attrs) { for (var k in attrs) { n.setAttribute(k, attrs[k]); } }
+    return n;
+  }
+  function clear(n) { while (n.firstChild) { n.removeChild(n.firstChild); } }
+
+  var reduceQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+  var reduced = reduceQuery.matches;
+  if (reduceQuery.addEventListener) {
+    reduceQuery.addEventListener('change', function (e) { reduced = e.matches; });
+  }
+
+  // ------------------------------------------------------------------
+  // Music theory, such as it is.
+  //
+  // Every animal draws from one C major pentatonic scale, in its own
+  // octave. That is the whole trick: no combination of animals - on this
+  // device or the one across the room - can sound wrong, so there is
+  // nothing to get wrong.
+  // ------------------------------------------------------------------
+  var PENT = [0, 2, 4, 7, 9];
+
+  function pentMidi(base, i) {
+    var oct = Math.floor(i / 5);
+    var d = ((i % 5) + 5) % 5;
+    return base + PENT[d] + 12 * oct;
+  }
+  function mtof(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+
+  // ------------------------------------------------------------------
+  // Audio, synthesised from nothing so the game is never silent and
+  // never waits on a download.
+  // ------------------------------------------------------------------
+  var AC = null, master = null, noiseBuf = null;
+
+  function initAudio() {
+    if (AC) {
+      if (AC.state === 'suspended') { AC.resume(); }
+      return;
+    }
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) { return; }
+    AC = new Ctx();
+
+    // Six animals at once should get louder, not turn into clipped mush.
+    var comp = AC.createDynamicsCompressor();
+    comp.threshold.setValueAtTime(-16, AC.currentTime);
+    comp.ratio.setValueAtTime(6, AC.currentTime);
+    comp.attack.setValueAtTime(0.004, AC.currentTime);
+    comp.release.setValueAtTime(0.2, AC.currentTime);
+
+    master = AC.createGain();
+    master.gain.setValueAtTime(0.55, AC.currentTime);
+    master.connect(comp);
+    comp.connect(AC.destination);
+
+    var n = Math.floor(AC.sampleRate * 0.5);
+    noiseBuf = AC.createBuffer(1, n, AC.sampleRate);
+    var data = noiseBuf.getChannelData(0);
+    for (var i = 0; i < n; i++) { data[i] = Math.random() * 2 - 1; }
+
+    if (AC.state === 'suspended') { AC.resume(); }
+
+    // Step 0 lands a moment from now, and every step after it is worked
+    // out from that one instant. Nudging moves this and nothing else.
+    origin = AC.currentTime + 0.2;
+    stepN = 0;
+  }
+
+  // Each voice schedules itself at absolute time t and returns how long
+  // it will sound, so the mouth stays open for exactly that long.
+  var VOICES = {};
+
+  VOICES.frog = function (t, f, spb) {
+    var dur = Math.min(0.42, spb * 0.9);
+    var o = AC.createOscillator(), g = AC.createGain(), lp = AC.createBiquadFilter();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(f * 1.8, t);
+    o.frequency.exponentialRampToValueAtTime(f, t + 0.09);
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(1400, t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.9, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(lp); lp.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.05);
+    return dur;
+  };
+
+  VOICES.cow = function (t, f, spb) {
+    var dur = Math.min(1.6, spb * 1.7);
+    var g = AC.createGain(), lp = AC.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(380, t);
+    lp.frequency.linearRampToValueAtTime(950, t + dur * 0.35);
+    lp.frequency.linearRampToValueAtTime(420, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.42, t + 0.16);
+    g.gain.setValueAtTime(0.42, t + dur * 0.6);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    [[0, 'sine'], [-8, 'triangle'], [8, 'triangle']].forEach(function (v) {
+      var o = AC.createOscillator();
+      o.type = v[1];
+      o.frequency.setValueAtTime(f, t);
+      o.detune.setValueAtTime(v[0], t);
+      o.connect(lp);
+      o.start(t); o.stop(t + dur + 0.05);
+    });
+    lp.connect(g); g.connect(master);
+    return dur;
+  };
+
+  VOICES.bird = function (t, f, spb) {
+    var dur = Math.min(0.4, spb * 0.8);
+    var o = AC.createOscillator(), g = AC.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(f * 0.86, t);
+    o.frequency.exponentialRampToValueAtTime(f, t + 0.05);
+    o.frequency.exponentialRampToValueAtTime(f * 1.07, t + dur);
+    var lfo = AC.createOscillator(), lg = AC.createGain();
+    lfo.type = 'sine';
+    lfo.frequency.setValueAtTime(7.5, t);
+    lg.gain.setValueAtTime(f * 0.022, t);
+    lfo.connect(lg); lg.connect(o.frequency);
+    lfo.start(t); lfo.stop(t + dur + 0.05);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.42, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.05);
+    return dur;
+  };
+
+  VOICES.cat = function (t, f, spb) {
+    var dur = Math.min(0.55, spb * 0.95);
+    var o = AC.createOscillator(), bp = AC.createBiquadFilter(), g = AC.createGain();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(f * 0.78, t);
+    o.frequency.exponentialRampToValueAtTime(f * 1.12, t + dur * 0.3);
+    o.frequency.exponentialRampToValueAtTime(f * 0.82, t + dur);
+    bp.type = 'bandpass';
+    bp.Q.setValueAtTime(3.2, t);
+    bp.frequency.setValueAtTime(700, t);
+    bp.frequency.linearRampToValueAtTime(1600, t + dur * 0.3);
+    bp.frequency.linearRampToValueAtTime(620, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.6, t + 0.05);
+    g.gain.setValueAtTime(0.6, t + dur * 0.5);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(bp); bp.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.05);
+    return dur;
+  };
+
+  VOICES.dog = function (t, f, spb) {
+    var dur = 0.2;
+    var src = AC.createBufferSource();
+    src.buffer = noiseBuf;
+    var bp = AC.createBiquadFilter(), ng = AC.createGain();
+    bp.type = 'bandpass';
+    bp.Q.setValueAtTime(1.1, t);
+    bp.frequency.setValueAtTime(1100, t);
+    bp.frequency.exponentialRampToValueAtTime(480, t + dur);
+    ng.gain.setValueAtTime(0.0001, t);
+    ng.gain.exponentialRampToValueAtTime(0.5, t + 0.012);
+    ng.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(bp); bp.connect(ng); ng.connect(master);
+    src.start(t); src.stop(t + dur + 0.05);
+
+    var o = AC.createOscillator(), g = AC.createGain();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(f, t);
+    o.frequency.exponentialRampToValueAtTime(f * 0.55, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.55, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.05);
+    return dur;
+  };
+
+  VOICES.mouse = function (t, f, spb) {
+    var dur = 0.12;
+    var o = AC.createOscillator(), g = AC.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(f, t);
+    o.frequency.exponentialRampToValueAtTime(f * 1.5, t + dur * 0.45);
+    o.frequency.exponentialRampToValueAtTime(f * 1.15, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.3, t + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.05);
+    return dur;
+  };
+
+  // The metronome. A woodblock, higher on the first beat of the bar, so
+  // two rooms can hear which click is which and slide onto each other.
+  function click(t, first, level) {
+    if (!AC) { return; }
+    var src = AC.createBufferSource();
+    src.buffer = noiseBuf;
+    var bp = AC.createBiquadFilter(), ng = AC.createGain();
+    bp.type = 'bandpass';
+    bp.Q.setValueAtTime(6, t);
+    bp.frequency.setValueAtTime(first ? 2400 : 1500, t);
+    ng.gain.setValueAtTime(0.0001, t);
+    ng.gain.exponentialRampToValueAtTime(level * 0.7, t + 0.002);
+    ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+    src.connect(bp); bp.connect(ng); ng.connect(master);
+    src.start(t); src.stop(t + 0.09);
+
+    var o = AC.createOscillator(), g = AC.createGain();
+    o.type = 'square';
+    o.frequency.setValueAtTime(first ? 1320 : 880, t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(level * 0.5, t + 0.002);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.045);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + 0.09);
+  }
+
+  // A tap answers back at once rather than waiting for the next bar.
+  function chirp(spec) {
+    if (!AC) { return; }
+    VOICES[spec.voice](AC.currentTime + 0.01, mtof(pentMidi(spec.base, 3)), 0.4);
+  }
+
+  // ------------------------------------------------------------------
+  // Drawing helpers shared by every animal
+  // ------------------------------------------------------------------
+  function eyePair(cx, cy, sp, r, pr) {
+    var s = '<g class="eyes" data-cx="' + cx + '" data-cy="' + cy + '">';
+    [-1, 1].forEach(function (d) {
+      var ex = cx + sp * d;
+      s += '<ellipse cx="' + ex + '" cy="' + cy + '" rx="' + r + '" ry="' + r + '" fill="#ffffff"/>'
+        + '<circle cx="' + ex + '" cy="' + (cy + 1) + '" r="' + pr + '" fill="#22203a"/>'
+        + '<circle cx="' + (ex + pr * 0.38) + '" cy="' + (cy - pr * 0.5) + '" r="' + (pr * 0.34) + '" fill="#ffffff"/>';
+    });
+    return s + '</g>';
+  }
+
+  function legPair(spread, w, h, fill) {
+    var s = '<g class="legset">';
+    [-1, 1].forEach(function (d) {
+      var px = spread * d, py = -h;
+      s += '<g class="leg" data-side="' + d + '" data-px="' + px + '" data-py="' + py + '">'
+        + '<rect x="' + (px - w / 2) + '" y="' + py + '" width="' + w + '" height="' + (h + 2) + '" rx="' + (w / 2) + '" fill="' + fill + '"/>'
+        + '</g>';
+    });
+    return s + '</g>';
+  }
+
+  function mouthG(cx, cy, inner) {
+    return '<g class="mouth" data-cx="' + cx + '" data-cy="' + cy + '">' + inner + '</g>';
+  }
+
+  // ------------------------------------------------------------------
+  // The band. Drawn front-on so both eyes and the mouth read clearly.
+  // Feet sit on y = 0; everything else is above it.
+  //
+  // Every loop is exactly one bar of sixteenths. That is deliberate: two
+  // devices that agree on where the bar starts therefore agree on where
+  // the loop starts too, with no second bar to be out of.
+  // ------------------------------------------------------------------
+  var SPECS = [
+    {
+      id: 'dog', voice: 'dog', colour: '#b57a49', dark: '#8d5a32',
+      base: 48, top: -186,
+      loop: [0, null, null, null, null, null, 0, null, null, null, null, null, 0, null, null, null],
+      art: function (s) {
+        return '<path d="M 52 -62 Q 104 -78 96 -134" stroke="' + s.dark + '" stroke-width="19" fill="none" stroke-linecap="round"/>'
+          + legPair(40, 24, 18, s.dark)
+          + '<ellipse cx="0" cy="-72" rx="58" ry="56" fill="' + s.colour + '"/>'
+          + '<ellipse cx="0" cy="-58" rx="32" ry="36" fill="#e0bf99"/>'
+          + '<rect x="-40" y="-114" width="80" height="15" rx="7" fill="#d24b4b"/>'
+          + '<circle cx="0" cy="-100" r="10" fill="#f5c542"/>'
+          + '<ellipse cx="-54" cy="-142" rx="17" ry="38" fill="' + s.dark + '"/>'
+          + '<ellipse cx="54" cy="-142" rx="17" ry="38" fill="' + s.dark + '"/>'
+          + '<ellipse cx="0" cy="-146" rx="48" ry="42" fill="' + s.colour + '"/>'
+          + '<ellipse cx="0" cy="-122" rx="31" ry="23" fill="#f0ddc4"/>'
+          + '<ellipse cx="0" cy="-136" rx="13" ry="10" fill="#3b2f2a"/>'
+          + eyePair(0, -160, 21, 14, 8)
+          + mouthG(0, -112, '<path d="M -18 -112 Q 0 -100 18 -112 Q 0 -106 -18 -112 Z" fill="#5d3a24"/>');
+      }
+    },
+    {
+      id: 'mouse', voice: 'mouse', colour: '#bab7c6', dark: '#9592a4',
+      base: 84, top: -172,
+      loop: [0, null, 3, null, 0, null, 3, null, 0, null, 3, null, 0, null, 3, 5],
+      art: function (s) {
+        return '<path d="M 40 -40 Q 96 -34 88 -96" stroke="#e3b7c2" stroke-width="9" fill="none" stroke-linecap="round"/>'
+          + legPair(28, 18, 12, s.dark)
+          + '<ellipse cx="0" cy="-58" rx="46" ry="48" fill="' + s.colour + '"/>'
+          + '<ellipse cx="0" cy="-48" rx="26" ry="30" fill="#ded9e6"/>'
+          + '<circle cx="-33" cy="-138" r="28" fill="' + s.colour + '"/>'
+          + '<circle cx="33" cy="-138" r="28" fill="' + s.colour + '"/>'
+          + '<circle cx="-33" cy="-138" r="18" fill="#f0b7c3"/>'
+          + '<circle cx="33" cy="-138" r="18" fill="#f0b7c3"/>'
+          + '<ellipse cx="0" cy="-112" rx="35" ry="31" fill="' + s.colour + '"/>'
+          + '<path d="M -66 -96 L -26 -92" stroke="#efeaf2" stroke-width="3" stroke-linecap="round"/>'
+          + '<path d="M 66 -96 L 26 -92" stroke="#efeaf2" stroke-width="3" stroke-linecap="round"/>'
+          + '<ellipse cx="0" cy="-94" rx="9" ry="7" fill="#e88fa2"/>'
+          + eyePair(0, -120, 15, 11, 6)
+          + mouthG(0, -84, '<path d="M -12 -84 Q 0 -76 12 -84 Q 0 -80 -12 -84 Z" fill="#6d6a7a"/>');
+      }
+    },
+    {
+      id: 'frog', voice: 'frog', colour: '#5fae4a', dark: '#3f8232',
+      base: 48, top: -132,
+      loop: [0, null, null, null, 2, null, null, 0, null, null, 2, null, 4, null, 2, null],
+      art: function (s) {
+        return legPair(58, 26, 16, s.dark)
+          + '<ellipse cx="-68" cy="-38" rx="27" ry="37" fill="' + s.dark + '"/>'
+          + '<ellipse cx="68" cy="-38" rx="27" ry="37" fill="' + s.dark + '"/>'
+          + '<ellipse cx="0" cy="-54" rx="74" ry="56" fill="' + s.colour + '"/>'
+          + '<ellipse cx="0" cy="-34" rx="48" ry="30" fill="#d7ecab"/>'
+          + '<circle cx="-34" cy="-98" r="30" fill="' + s.colour + '"/>'
+          + '<circle cx="34" cy="-98" r="30" fill="' + s.colour + '"/>'
+          + eyePair(0, -100, 34, 20, 11)
+          + mouthG(0, -56, '<path d="M -48 -58 Q 0 -32 48 -58 Q 0 -48 -48 -58 Z" fill="#2c5a22"/>');
+      }
+    },
+    {
+      id: 'cow', voice: 'cow', colour: '#f2f0ec', dark: '#3a3a46',
+      base: 36, top: -188,
+      loop: [0, null, null, null, null, null, null, null, 4, null, null, null, null, null, null, null],
+      art: function (s) {
+        return legPair(44, 24, 22, '#3a3a46')
+          + '<ellipse cx="0" cy="-74" rx="76" ry="58" fill="' + s.colour + '"/>'
+          + '<ellipse cx="-40" cy="-96" rx="26" ry="20" fill="' + s.dark + '"/>'
+          + '<ellipse cx="42" cy="-56" rx="21" ry="16" fill="' + s.dark + '"/>'
+          + '<ellipse cx="-54" cy="-150" rx="21" ry="12" fill="' + s.dark + '"/>'
+          + '<ellipse cx="54" cy="-150" rx="21" ry="12" fill="' + s.dark + '"/>'
+          + '<ellipse cx="-24" cy="-176" rx="9" ry="12" fill="#e6d8b6"/>'
+          + '<ellipse cx="24" cy="-176" rx="9" ry="12" fill="#e6d8b6"/>'
+          + '<ellipse cx="0" cy="-142" rx="47" ry="41" fill="' + s.colour + '"/>'
+          + '<ellipse cx="0" cy="-118" rx="33" ry="23" fill="#eda9b2"/>'
+          + '<ellipse cx="-13" cy="-122" rx="5" ry="7" fill="#c07f89"/>'
+          + '<ellipse cx="13" cy="-122" rx="5" ry="7" fill="#c07f89"/>'
+          + eyePair(0, -154, 22, 14, 8)
+          + mouthG(0, -104, '<path d="M -20 -104 Q 0 -94 20 -104 Q 0 -100 -20 -104 Z" fill="#b5717c"/>');
+      }
+    },
+    {
+      id: 'cat', voice: 'cat', colour: '#93949c', dark: '#6d6e77',
+      base: 60, top: -194,
+      loop: [4, null, null, null, 3, null, 2, null, null, null, 4, null, 5, null, null, 4],
+      art: function (s) {
+        return '<path d="M 48 -50 Q 104 -60 92 -120" stroke="' + s.dark + '" stroke-width="17" fill="none" stroke-linecap="round"/>'
+          + legPair(36, 22, 16, s.dark)
+          + '<ellipse cx="0" cy="-72" rx="54" ry="58" fill="' + s.colour + '"/>'
+          + '<ellipse cx="0" cy="-58" rx="30" ry="38" fill="#ccced4"/>'
+          + '<path d="M -46 -168 L -14 -186 L -12 -146 Z" fill="' + s.colour + '"/>'
+          + '<path d="M 46 -168 L 14 -186 L 12 -146 Z" fill="' + s.colour + '"/>'
+          + '<path d="M -38 -166 L -20 -176 L -19 -152 Z" fill="#eda6b0"/>'
+          + '<path d="M 38 -166 L 20 -176 L 19 -152 Z" fill="#eda6b0"/>'
+          + '<circle cx="0" cy="-142" r="44" fill="' + s.colour + '"/>'
+          + '<path d="M -74 -128 L -34 -122" stroke="#e6e7ea" stroke-width="3" stroke-linecap="round"/>'
+          + '<path d="M -74 -114 L -34 -114" stroke="#e6e7ea" stroke-width="3" stroke-linecap="round"/>'
+          + '<path d="M 74 -128 L 34 -122" stroke="#e6e7ea" stroke-width="3" stroke-linecap="round"/>'
+          + '<path d="M 74 -114 L 34 -114" stroke="#e6e7ea" stroke-width="3" stroke-linecap="round"/>'
+          + '<ellipse cx="-14" cy="-118" rx="16" ry="12" fill="#c9cad0"/>'
+          + '<ellipse cx="14" cy="-118" rx="16" ry="12" fill="#c9cad0"/>'
+          + '<path d="M -9 -134 L 9 -134 L 0 -126 Z" fill="#eda6b0"/>'
+          + eyePair(0, -152, 20, 14, 8)
+          + mouthG(0, -120, '<path d="M -14 -120 Q 0 -110 14 -120 Q 0 -116 -14 -120 Z" fill="#4a4b52"/>');
+      }
+    },
+    {
+      id: 'bird', voice: 'bird', colour: '#f2b134', dark: '#d68d1d',
+      base: 72, top: -182,
+      loop: [null, null, 7, null, null, 6, null, null, 8, null, null, 7, null, null, 9, null],
+      art: function (s) {
+        return '<path d="M -6 -60 L -44 -6 L 30 -22 Z" fill="' + s.dark + '"/>'
+          + legPair(20, 9, 18, '#e07a1f')
+          + '<ellipse cx="0" cy="-74" rx="50" ry="56" fill="' + s.colour + '"/>'
+          + '<ellipse cx="0" cy="-60" rx="30" ry="34" fill="#fbe0a2"/>'
+          + '<ellipse cx="-46" cy="-76" rx="17" ry="32" fill="' + s.dark + '"/>'
+          + '<ellipse cx="46" cy="-76" rx="17" ry="32" fill="' + s.dark + '"/>'
+          + '<ellipse cx="-14" cy="-168" rx="8" ry="16" fill="' + s.dark + '"/>'
+          + '<ellipse cx="2" cy="-174" rx="8" ry="19" fill="' + s.dark + '"/>'
+          + '<ellipse cx="18" cy="-166" rx="8" ry="15" fill="' + s.dark + '"/>'
+          + '<circle cx="0" cy="-134" r="39" fill="' + s.colour + '"/>'
+          + eyePair(0, -142, 17, 13, 7)
+          + mouthG(0, -114, '<path d="M -17 -118 L 17 -118 L 0 -104 Z" fill="#ef7d29"/>');
+      }
+    }
+  ];
+
+  var MOUSE_SPEC = SPECS[1];
+
+  // ------------------------------------------------------------------
+  // The clock.
+  //
+  // Sixteen steps to the bar, four steps to the beat. Every step's time
+  // is worked out from one origin instant rather than by adding up, so
+  // nothing accumulates error and a nudge is simply a move of the
+  // origin. Two phones left alone on the same tempo wander apart by a
+  // few milliseconds a minute; the arrows are for after that.
+  // ------------------------------------------------------------------
+  var STEPS_PER_BAR = 16, STEPS_PER_BEAT = 4;
+  var LOOK = 0.14;
+  var bpm = 90, origin = 0, stepN = 0, visQ = [];
+  var mode = 'tune';
+
+  function stepDur() { return 60 / bpm / STEPS_PER_BEAT; }
+  function beatDur() { return 60 / bpm; }
+  function stepTime(n) { return origin + n * stepDur(); }
+  function curStep() {
+    if (!AC) { return 0; }
+    return (AC.currentTime - origin) / stepDur();
+  }
+
+  // Changing the tempo must not shunt the beat sideways as well, or the
+  // two children would have to line up again from scratch every time.
+  function setBpm(v) {
+    var next = clamp(v, 60, 160);
+    if (next === bpm) { return; }
+    if (AC) {
+      var here = curStep();
+      bpm = next;
+      origin = AC.currentTime - here * stepDur();
+    } else {
+      bpm = next;
+    }
+    paintBpm();
+  }
+
+  function nudge(seconds) {
+    origin += seconds;
+  }
+
+  var pads = [], byId = {};
+
+  function scheduler() {
+    if (!AC || !master) { return; }
+    var now = AC.currentTime, sd = stepDur(), spb = beatDur();
+
+    // Coming back from a locked screen must not replay ten minutes of
+    // loop at once.
+    var behind = Math.floor((now - origin) / sd) - 2;
+    if (stepN < behind) { stepN = behind; }
+
+    while (stepTime(stepN) < now + LOOK) {
+      var t = stepTime(stepN), n = stepN, i;
+      stepN += 1;
+      if (t <= now + 0.002) { continue; }
+
+      var inBar = ((n % STEPS_PER_BAR) + STEPS_PER_BAR) % STEPS_PER_BAR;
+
+      // Animals join and leave on the bar line only, so a late tap can
+      // never land out of time.
+      if (inBar === 0) {
+        for (i = 0; i < pads.length; i++) {
+          if (pads[i].playing !== pads[i].want) {
+            pads[i].playing = pads[i].want;
+            visQ.push({ t: t, id: pads[i].id, lit: pads[i].playing });
+          }
+        }
+      }
+
+      if (mode === 'jam') {
+        for (i = 0; i < pads.length; i++) {
+          var p = pads[i];
+          if (!p.playing) { continue; }
+          var idx = p.spec.loop[inBar];
+          if (idx === null || idx === undefined) { continue; }
+          var dur = VOICES[p.spec.voice](t, mtof(pentMidi(p.spec.base, idx)), spb);
+          visQ.push({ t: t, id: p.id, hit: dur });
+        }
+        // One quiet woodblock a bar keeps the room's count audible even
+        // when every animal is off, and gives something to slide onto.
+        if (inBar === 0) { click(t, true, 0.22); }
+      } else if (inBar % STEPS_PER_BEAT === 0) {
+        click(t, inBar === 0, 1);
+      }
+
+      if (inBar % STEPS_PER_BEAT === 0) {
+        visQ.push({ t: t, beat: inBar / STEPS_PER_BEAT });
+      }
+    }
+  }
+  setInterval(scheduler, 25);
+
+  function drainVis(now) {
+    while (visQ.length && visQ[0].t <= now) {
+      var e = visQ.shift(), p;
+      if (e.beat !== undefined) {
+        beatFlash = 1;
+        beatIdx = e.beat;
+      } else if (e.lit !== undefined) {
+        p = byId[e.id];
+        p.lit = e.lit;
+      } else if (e.hit !== undefined) {
+        p = byId[e.id];
+        p.bounceV = 1;
+        p.mouthT = e.hit;
+        p.mouthAge = 0;
+      }
+    }
+  }
+
+  var beatFlash = 0, beatIdx = 0;
+
+  // ------------------------------------------------------------------
+  // Layout. The world is 1000 units wide and however many tall the
+  // viewport needs, so nothing is ever letterboxed or cropped.
+  // ------------------------------------------------------------------
+  var L = {};
+
+  function computeLayout() {
+    var vw = Math.max(1, window.innerWidth), vh = Math.max(1, window.innerHeight);
+    var W = 1000;
+    var H = clamp(Math.round(1000 * vh / vw), 380, 2400);
+    L = { W: W, H: H, wide: (vw / vh) >= 1.15 };
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    drawBackdrop();
+    layoutTune();
+    layoutJam();
+  }
+
+  function drawBackdrop() {
+    var g = document.getElementById('backdrop');
+    clear(g);
+    g.appendChild(el('rect', { x: 0, y: 0, width: L.W, height: L.H, fill: 'url(#vsky)' }));
+    g.appendChild(el('rect', { x: 0, y: 0, width: L.W, height: L.H, fill: 'url(#vspot)' }));
+  }
+
+  // ------------------------------------------------------------------
+  // Shared furniture
+  // ------------------------------------------------------------------
+  function bigButton(fill, inner) {
+    var g = el('g', { class: 'btn' });
+    var body = el('rect', {
+      x: -100, y: -60, width: 200, height: 120, rx: 34,
+      fill: fill, stroke: 'rgba(255,255,255,0.28)', 'stroke-width': 3
+    });
+    g.appendChild(body);
+    var art = el('g');
+    art.innerHTML = inner;
+    g.appendChild(art);
+    g.appendChild(el('rect', { class: 'hit', x: -100, y: -60, width: 200, height: 120 }));
+    g._body = body;
+    g._art = art;
+    return g;
+  }
+
+  function sizeButton(g, w, h) {
+    var r = Math.min(w, h) * 0.3;
+    g._body.setAttribute('x', -w / 2);
+    g._body.setAttribute('y', -h / 2);
+    g._body.setAttribute('width', w);
+    g._body.setAttribute('height', h);
+    g._body.setAttribute('rx', r);
+    var hit = g.querySelector('.hit');
+    hit.setAttribute('x', -w / 2);
+    hit.setAttribute('y', -h / 2);
+    hit.setAttribute('width', w);
+    hit.setAttribute('height', h);
+    var s = Math.min(w, h) / 120;
+    g._art.setAttribute('transform', 'scale(' + s.toFixed(4) + ')');
+  }
+
+  function place(g, x, y) {
+    g.setAttribute('transform', 'translate(' + x.toFixed(1) + ',' + y.toFixed(1) + ')');
+  }
+
+  // Animal art is drawn with its feet on y = 0 and its head at spec.top,
+  // so it has to be lifted by half its own height to sit in the middle
+  // of anything.
+  function fitAnimal(node, spec, cx, cy, w, h) {
+    var hh = (-spec.top) + 18;
+    var s = Math.min(w / 236, h / hh);
+    node.setAttribute('transform',
+      'translate(' + cx.toFixed(1) + ',' + (cy + hh * s * 0.5).toFixed(1) + ') scale(' + s.toFixed(4) + ')');
+    return s;
+  }
+
+  // ------------------------------------------------------------------
+  // Tuning up. Two numbers to match and two arrows to slide with - the
+  // whole of getting two rooms together, and nothing else on screen.
+  // ------------------------------------------------------------------
+  var T = {};
+
+  function buildTune() {
+    var g = document.getElementById('tune');
+    clear(g);
+
+    T.minus = bigButton('#3f4a7d', '<rect x="-34" y="-8" width="68" height="16" rx="8" fill="#ffffff"/>');
+    T.plus = bigButton('#3f4a7d',
+      '<rect x="-34" y="-8" width="68" height="16" rx="8" fill="#ffffff"/>'
+      + '<rect x="-8" y="-34" width="16" height="68" rx="8" fill="#ffffff"/>');
+    T.minus.setAttribute('data-act', 'bpm-');
+    T.plus.setAttribute('data-act', 'bpm+');
+
+    T.bpmText = el('text', {
+      'text-anchor': 'middle', fill: '#ffffff', 'font-weight': '700', 'font-size': '120'
+    });
+
+    T.ring = el('g');
+    T.ringLine = el('circle', {
+      cx: 0, cy: 0, r: 200, fill: 'none',
+      stroke: 'rgba(255,255,255,0.16)', 'stroke-width': 14
+    });
+    T.ring.appendChild(T.ringLine);
+    T.pips = [];
+    for (var i = 0; i < 4; i++) {
+      var pip = el('circle', { cx: 0, cy: 0, r: 14, fill: '#8ea0d8' });
+      T.ring.appendChild(pip);
+      T.pips.push(pip);
+    }
+    T.orbit = el('circle', { cx: 0, cy: 0, r: 26, fill: '#ffe9a0' });
+    T.ring.appendChild(T.orbit);
+
+    T.condGlow = el('circle', { cx: 0, cy: 0, r: 120, fill: 'url(#vglow)', opacity: 0 });
+    T.cond = el('g');
+    T.condBob = el('g');
+    T.condBob.innerHTML = MOUSE_SPEC.art(MOUSE_SPEC);
+    T.cond.appendChild(T.condBob);
+    T.condEyes = T.condBob.querySelector('.eyes');
+
+    T.left = bigButton('#2f6f8f', arrowGlyph(-1));
+    T.right = bigButton('#2f6f8f', arrowGlyph(1));
+    T.left.setAttribute('data-act', 'nudge-');
+    T.right.setAttribute('data-act', 'nudge+');
+
+    T.play = bigButton('#3fa564',
+      '<path d="M -22 -34 L 38 0 L -22 34 Z" fill="#ffffff"/>');
+    T.play.setAttribute('data-act', 'play');
+
+    g.appendChild(T.minus);
+    g.appendChild(T.plus);
+    g.appendChild(T.bpmText);
+    g.appendChild(T.condGlow);
+    g.appendChild(T.ring);
+    g.appendChild(T.cond);
+    g.appendChild(T.left);
+    g.appendChild(T.right);
+    g.appendChild(T.play);
+    paintBpm();
+  }
+
+  // Two chevrons, because one triangle alone reads as "play". Drawn
+  // pointing right and mirrored for the other one, so the pair can never
+  // drift apart.
+  function chevron(x) {
+    return '<path d="M ' + x + ' -30 L ' + (x + 26) + ' 0 L ' + x + ' 30" fill="none"'
+      + ' stroke="#ffffff" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>';
+  }
+
+  function arrowGlyph(dir) {
+    var inner = chevron(-30) + chevron(4);
+    return dir < 0 ? '<g transform="scale(-1,1)">' + inner + '</g>' : inner;
+  }
+
+  // The corner button that fetches the arrows back: one chevron each
+  // way, pointing apart.
+  function spreadGlyph() {
+    return '<g transform="translate(14,0)">' + chevron(0) + '</g>'
+      + '<g transform="scale(-1,1) translate(14,0)">' + chevron(0) + '</g>';
+  }
+
+  function paintBpm() {
+    if (T.bpmText) { T.bpmText.textContent = String(bpm); }
+  }
+
+  function layoutTune() {
+    var W = L.W, H = L.H;
+    if (L.wide) {
+      var bw = Math.min(W * 0.15, 160), bh = Math.min(H * 0.2, 130);
+      sizeButton(T.minus, bw, bh);
+      sizeButton(T.plus, bw, bh);
+      place(T.minus, W * 0.60, H * 0.22);
+      place(T.plus, W * 0.92, H * 0.22);
+      T.bpmText.setAttribute('x', W * 0.76);
+      T.bpmText.setAttribute('y', H * 0.22 + bh * 0.34);
+      T.bpmText.setAttribute('font-size', (bh * 0.95).toFixed(0));
+
+      var aw = Math.min(W * 0.17, 190), ah = Math.min(H * 0.24, 150);
+      sizeButton(T.left, aw, ah);
+      sizeButton(T.right, aw, ah);
+      place(T.left, W * 0.63, H * 0.55);
+      place(T.right, W * 0.89, H * 0.55);
+
+      var pw = Math.min(W * 0.24, 250), ph = Math.min(H * 0.22, 130);
+      sizeButton(T.play, pw, ph);
+      place(T.play, W * 0.76, H * 0.85);
+
+      T.ringX = W * 0.27; T.ringY = H * 0.5;
+      T.ringR = clamp(Math.min(H * 0.38, W * 0.22), 50, 320);
+    } else {
+      var bw2 = Math.min(W * 0.23, 240), bh2 = Math.min(H * 0.09, 170);
+      sizeButton(T.minus, bw2, bh2);
+      sizeButton(T.plus, bw2, bh2);
+      place(T.minus, W * 0.16, H * 0.11);
+      place(T.plus, W * 0.84, H * 0.11);
+      T.bpmText.setAttribute('x', W * 0.5);
+      T.bpmText.setAttribute('y', H * 0.11 + bh2 * 0.36);
+      T.bpmText.setAttribute('font-size', bh2.toFixed(0));
+
+      var aw2 = Math.min(W * 0.38, 380), ah2 = Math.min(H * 0.13, 200);
+      sizeButton(T.left, aw2, ah2);
+      sizeButton(T.right, aw2, ah2);
+      place(T.left, W * 0.28, H * 0.68);
+      place(T.right, W * 0.72, H * 0.68);
+
+      var pw2 = Math.min(W * 0.46, 460), ph2 = Math.min(H * 0.12, 180);
+      sizeButton(T.play, pw2, ph2);
+      place(T.play, W * 0.5, H * 0.87);
+
+      // The ring takes whatever is left between the tempo and the
+      // arrows, so a stubby portrait window shrinks it instead of
+      // running the number through it.
+      var bandTop = H * 0.11 + bh2 * 0.5 + H * 0.04;
+      var bandBot = H * 0.68 - ah2 * 0.5 - H * 0.04;
+      T.ringX = W * 0.5;
+      T.ringY = (bandTop + bandBot) / 2;
+      T.ringR = clamp(Math.min(W * 0.32, (bandBot - bandTop) / 2), 50, 340);
+    }
+
+    T.ringLine.setAttribute('r', T.ringR);
+    T.ringLine.setAttribute('stroke-width', Math.max(8, T.ringR * 0.07));
+    T.ring.setAttribute('transform', 'translate(' + T.ringX + ',' + T.ringY + ')');
+    for (var i = 0; i < 4; i++) {
+      var a = (-90 + i * 90) * Math.PI / 180;
+      T.pips[i].setAttribute('cx', (Math.cos(a) * T.ringR).toFixed(1));
+      T.pips[i].setAttribute('cy', (Math.sin(a) * T.ringR).toFixed(1));
+      T.pips[i].setAttribute('r', (T.ringR * (i === 0 ? 0.1 : 0.075)).toFixed(1));
+    }
+    T.orbit.setAttribute('r', (T.ringR * 0.13).toFixed(1));
+
+    T.condGlow.setAttribute('cx', T.ringX);
+    T.condGlow.setAttribute('cy', T.ringY);
+    T.condGlow.setAttribute('r', T.ringR * 0.9);
+    fitAnimal(T.cond, MOUSE_SPEC, T.ringX, T.ringY, T.ringR * 1.5, T.ringR * 1.25);
+  }
+
+  // ------------------------------------------------------------------
+  // The jam. Every animal on every device, so nobody is waiting for a
+  // turn and two children can double each other up if they want to.
+  // ------------------------------------------------------------------
+  var J = {};
+
+  function buildJam() {
+    var g = document.getElementById('jam');
+    clear(g);
+    pads = []; byId = {};
+
+    SPECS.forEach(function (spec) {
+      var node = el('g', { class: 'pad', 'data-id': spec.id });
+      var card = el('rect', {
+        x: -100, y: -60, width: 200, height: 120, rx: 30,
+        fill: '#212a52', stroke: 'rgba(255,255,255,0.1)', 'stroke-width': 3
+      });
+      node.appendChild(card);
+      var glow = el('circle', { cx: 0, cy: 0, r: 100, fill: 'url(#vglow)', opacity: 0 });
+      node.appendChild(glow);
+      var art = el('g');
+      var bob = el('g');
+      bob.innerHTML = spec.art(spec);
+      art.appendChild(bob);
+      node.appendChild(art);
+      var hit = el('rect', { class: 'hit', x: -100, y: -60, width: 200, height: 120 });
+      node.appendChild(hit);
+      g.appendChild(node);
+
+      var p = {
+        id: spec.id, spec: spec, node: node, card: card, glow: glow, art: art, bob: bob, hit: hit,
+        mouth: bob.querySelector('.mouth'),
+        eyes: bob.querySelector('.eyes'),
+        want: false, playing: false, lit: false,
+        bounceV: 0, mouthT: 0, mouthAge: 99, pulse: 0,
+        blink: 2 + Math.random() * 5, blinkV: 1,
+        idle: Math.random() * 6.28
+      };
+      pads.push(p);
+      byId[spec.id] = p;
+    });
+
+    J.dots = [];
+    J.dotG = el('g');
+    for (var i = 0; i < 4; i++) {
+      var d = el('circle', { cx: 0, cy: 0, r: 12, fill: '#8ea0d8' });
+      J.dotG.appendChild(d);
+      J.dots.push(d);
+    }
+    g.appendChild(J.dotG);
+
+    J.tuneBtn = bigButton('#3f4a7d', spreadGlyph());
+    J.tuneBtn.setAttribute('data-act', 'strip');
+    g.appendChild(J.tuneBtn);
+
+    J.strip = el('g', { opacity: 0, 'pointer-events': 'none' });
+    J.stripBack = el('rect', { x: 0, y: 0, width: 10, height: 10, rx: 40, fill: 'rgba(12,16,38,0.86)' });
+    J.strip.appendChild(J.stripBack);
+    J.stripLeft = bigButton('#2f6f8f', arrowGlyph(-1));
+    J.stripLeft.setAttribute('data-act', 'nudge-');
+    J.stripRight = bigButton('#2f6f8f', arrowGlyph(1));
+    J.stripRight.setAttribute('data-act', 'nudge+');
+    // The way back is drawn as the tuning ring itself, so the button
+    // shows where it goes rather than saying so.
+    J.stripHome = bigButton('#3f4a7d',
+      '<circle cx="0" cy="0" r="26" fill="none" stroke="#ffffff" stroke-width="7" opacity="0.55"/>'
+      + '<circle cx="0" cy="-26" r="10" fill="#ffe9a0"/>');
+    J.stripHome.setAttribute('data-act', 'home');
+    J.strip.appendChild(J.stripLeft);
+    J.strip.appendChild(J.stripHome);
+    J.strip.appendChild(J.stripRight);
+    g.appendChild(J.strip);
+  }
+
+  function layoutJam() {
+    var W = L.W, H = L.H;
+    var cols = L.wide ? 3 : 2, rows = L.wide ? 2 : 3;
+    var topBar = L.wide ? H * 0.15 : H * 0.11;
+    var gap = 14;
+    var padW = (W - gap * (cols + 1)) / cols;
+    // A card taller than it is wide leaves the animal stranded in a sea
+    // of empty pad, so the height is capped and the block is centred in
+    // whatever is left.
+    var availH = H - topBar;
+    var padH = Math.min((availH - gap * (rows + 1)) / rows, padW * 1.15);
+    var top0 = topBar + (availH - (padH * rows + gap * (rows - 1))) / 2;
+
+    pads.forEach(function (p, i) {
+      var c = i % cols, r = Math.floor(i / cols);
+      var x = gap + padW * (c + 0.5) + gap * c;
+      var y = top0 + padH * (r + 0.5) + gap * r;
+      p.cx = x; p.cy = y; p.w = padW; p.h = padH;
+      p.card.setAttribute('x', -padW / 2);
+      p.card.setAttribute('y', -padH / 2);
+      p.card.setAttribute('width', padW);
+      p.card.setAttribute('height', padH);
+      p.card.setAttribute('rx', Math.min(padW, padH) * 0.16);
+      p.hit.setAttribute('x', -padW / 2);
+      p.hit.setAttribute('y', -padH / 2);
+      p.hit.setAttribute('width', padW);
+      p.hit.setAttribute('height', padH);
+      p.glow.setAttribute('r', Math.min(padW, padH) * 0.62);
+      place(p.node, x, y);
+      p.scale = fitAnimal(p.art, p.spec, 0, 0, padW * 0.88, padH * 0.84);
+    });
+
+    // The dots hug the left edge and the arrows button the right, because
+    // the browser's own full screen button sits in the middle of the top
+    // of the screen until it is pressed.
+    var dr = Math.min(topBar * 0.16, 20);
+    var dgap = dr * 3.4;
+    for (var i2 = 0; i2 < 4; i2++) {
+      J.dots[i2].setAttribute('cx', (-dgap * 1.5 + dgap * i2).toFixed(1));
+      J.dots[i2].setAttribute('cy', 0);
+      J.dots[i2].setAttribute('r', dr.toFixed(1));
+    }
+    place(J.dotG, dgap * 1.5 + dr + 24, topBar * 0.5);
+
+    var tb = Math.min(topBar * 0.78, 92);
+    sizeButton(J.tuneBtn, tb * 1.5, tb);
+    place(J.tuneBtn, W - tb * 0.9, topBar * 0.5);
+
+    var sw = Math.min(W * 0.26, 260), sh = Math.min(H * 0.13, 150);
+    var sy = H - sh * 0.85;
+    sizeButton(J.stripLeft, sw, sh);
+    sizeButton(J.stripRight, sw, sh);
+    sizeButton(J.stripHome, sw * 0.7, sh);
+    place(J.stripLeft, W * 0.2, sy);
+    place(J.stripHome, W * 0.5, sy);
+    place(J.stripRight, W * 0.8, sy);
+    J.stripBack.setAttribute('x', W * 0.04);
+    J.stripBack.setAttribute('y', sy - sh * 0.72);
+    J.stripBack.setAttribute('width', W * 0.92);
+    J.stripBack.setAttribute('height', sh * 1.44);
+    J.stripBack.setAttribute('rx', sh * 0.5);
+  }
+
+  function showMode() {
+    document.getElementById('tune').setAttribute('display', mode === 'tune' ? 'inline' : 'none');
+    document.getElementById('jam').setAttribute('display', mode === 'jam' ? 'inline' : 'none');
+  }
+
+  var stripOpen = false;
+  function setStrip(open) {
+    stripOpen = open;
+    J.strip.setAttribute('opacity', open ? 1 : 0);
+    J.strip.setAttribute('pointer-events', open ? 'auto' : 'none');
+  }
+
+  // ------------------------------------------------------------------
+  // Input. Every control is press-and-hold as well as tap: the arrows
+  // slide the beat while held, the tempo runs while held.
+  // ------------------------------------------------------------------
+  var held = null, heldSince = 0, repeatAt = 0, didRepeat = false;
+
+  function doOnce(act) {
+    if (act === 'bpm-') { setBpm(bpm - 5); }
+    else if (act === 'bpm+') { setBpm(bpm + 5); }
+    else if (act === 'nudge-') { nudge(-stepDur() * 0.25); }
+    else if (act === 'nudge+') { nudge(stepDur() * 0.25); }
+  }
+
+  svg.addEventListener('pointerdown', function (ev) {
+    initAudio();
+    var t = ev.target;
+    if (!t || !t.closest) { return; }
+
+    var btn = t.closest('.btn');
+    if (btn) {
+      var act = btn.getAttribute('data-act');
+      if (act === 'play') {
+        mode = 'jam';
+        setStrip(false);
+        showMode();
+      } else if (act === 'home') {
+        mode = 'tune';
+        setStrip(false);
+        showMode();
+      } else if (act === 'strip') {
+        setStrip(!stripOpen);
+      } else {
+        held = act;
+        heldSince = performance.now();
+        repeatAt = heldSince + 420;
+        didRepeat = false;
+        btn.setAttribute('opacity', 0.72);
+        heldNode = btn;
+      }
+      return;
+    }
+
+    if (mode === 'jam') {
+      // A tap anywhere off a pad puts the arrows away again.
+      var pn = t.closest('.pad');
+      if (pn) {
+        var p = byId[pn.getAttribute('data-id')];
+        p.want = !p.want;
+        p.pulse = 1;
+        chirp(p.spec);
+      } else if (stripOpen) {
+        setStrip(false);
+      }
+    }
+  });
+
+  var heldNode = null;
+  function release() {
+    if (held) {
+      if (!didRepeat) { doOnce(held); }
+      if (heldNode) { heldNode.removeAttribute('opacity'); }
+      held = null;
+      heldNode = null;
+    }
+  }
+  window.addEventListener('pointerup', release);
+  window.addEventListener('pointercancel', release);
+
+  function runHeld(nowMs, dt) {
+    if (!held) { return; }
+    if (nowMs < repeatAt) { return; }
+    didRepeat = true;
+    if (held === 'nudge-' || held === 'nudge+') {
+      // A smooth slide rather than a stutter of steps, so a child can
+      // hear the two rooms closing on each other.
+      var dir = held === 'nudge+' ? 1 : -1;
+      nudge(dir * stepDur() * 2.4 * dt);
+    } else {
+      repeatAt = nowMs + 130;
+      doOnce(held);
+    }
+  }
+
+  svg.addEventListener('contextmenu', function (ev) { ev.preventDefault(); });
+
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden && AC && AC.state === 'suspended') { AC.resume(); }
+  });
+
+  // ------------------------------------------------------------------
+  // Frame loop
+  // ------------------------------------------------------------------
+  function faceUpdate(o, dt) {
+    var open = 0;
+    o.mouthAge += dt;
+    if (o.mouthT > 0) {
+      var k = 1 - o.mouthAge / o.mouthT;
+      open = k > 0 ? k : 0;
+    }
+    if (o.mouth) {
+      var mx = +o.mouth.getAttribute('data-cx'), my = +o.mouth.getAttribute('data-cy');
+      o.mouth.setAttribute('transform',
+        'translate(' + mx + ',' + my + ') scale(1,' + (1 + open * 2.6).toFixed(3) + ') translate(' + (-mx) + ',' + (-my) + ')');
+    }
+    o.blink -= dt;
+    if (o.blink <= 0) { o.blink = 2.5 + Math.random() * 5; o.blinkV = 0; }
+    o.blinkV = Math.min(1, o.blinkV + dt * 7);
+    if (o.eyes) {
+      var ex = +o.eyes.getAttribute('data-cx'), ey = +o.eyes.getAttribute('data-cy');
+      var bk = reduced ? 1 : clamp(o.blinkV, 0.08, 1);
+      o.eyes.setAttribute('transform',
+        'translate(' + ex + ',' + ey + ') scale(1,' + bk.toFixed(3) + ') translate(' + (-ex) + ',' + (-ey) + ')');
+    }
+    return open;
+  }
+
+  var condFace = { mouth: null, eyes: null, mouthT: 0, mouthAge: 99, blink: 3, blinkV: 1 };
+
+  function updateTune(dt, barPos) {
+    var a = (-90 + barPos * 360) * Math.PI / 180;
+    T.orbit.setAttribute('cx', (Math.cos(a) * T.ringR).toFixed(1));
+    T.orbit.setAttribute('cy', (Math.sin(a) * T.ringR).toFixed(1));
+
+    for (var i = 0; i < 4; i++) {
+      var near = (i === beatIdx) ? beatFlash : 0;
+      T.pips[i].setAttribute('fill', near > 0.25 ? '#ffe9a0' : '#8ea0d8');
+      T.pips[i].setAttribute('opacity', (0.45 + near * 0.55).toFixed(2));
+    }
+
+    var hop = 0, squash = 1;
+    if (!reduced) {
+      var b = Math.sin(Math.PI * (1 - clamp(beatFlash, 0, 1)));
+      hop = -b * 22;
+      squash = 1 + b * 0.06;
+    }
+    T.condBob.setAttribute('transform',
+      'translate(0,' + hop.toFixed(2) + ') scale(1,' + squash.toFixed(4) + ')');
+    T.condGlow.setAttribute('opacity', (beatFlash * 0.5).toFixed(3));
+
+    condFace.mouth = T.condBob.querySelector('.mouth');
+    condFace.eyes = T.condEyes;
+    if (beatFlash > 0.9) { condFace.mouthT = 0.12; condFace.mouthAge = 0; }
+    faceUpdate(condFace, dt);
+  }
+
+  function updateJam(dt) {
+    for (var i = 0; i < 4; i++) {
+      var lit = (i === beatIdx) ? beatFlash : 0;
+      J.dots[i].setAttribute('fill', lit > 0.25 ? '#ffe9a0' : '#8ea0d8');
+      J.dots[i].setAttribute('opacity', (0.4 + lit * 0.6).toFixed(2));
+    }
+
+    for (var k = 0; k < pads.length; k++) {
+      var p = pads[k];
+      p.bounceV = Math.max(0, p.bounceV - dt * 3.2);
+      p.pulse = Math.max(0, p.pulse - dt * 2);
+      p.idle += dt;
+
+      var open = faceUpdate(p, dt);
+      var armed = (p.want !== p.lit);
+
+      // Armed but not yet in: the card breathes until the bar comes
+      // round, so a child can see their tap was heard.
+      var breathe = armed && !reduced ? (0.5 + 0.5 * Math.sin(p.idle * 6)) : (armed ? 1 : 0);
+      p.card.setAttribute('fill', p.lit ? '#33407a' : '#212a52');
+      p.card.setAttribute('stroke', p.lit ? p.spec.colour : 'rgba(255,255,255,0.1)');
+      p.card.setAttribute('stroke-width', (p.lit ? 7 : 3) + breathe * 6);
+      p.card.setAttribute('opacity', (0.72 + (p.lit ? 0.28 : 0) + breathe * 0.2).toFixed(2));
+
+      var hop = 0, squash = 1;
+      if (!reduced) {
+        var b = Math.sin(Math.PI * (1 - p.bounceV));
+        hop = -b * 26;
+        squash = 1 + b * 0.07;
+        if (!p.lit) { hop += Math.sin(p.idle * 1.4) * 3; }
+      }
+      p.bob.setAttribute('transform',
+        'translate(0,' + hop.toFixed(2) + ') scale(1,' + squash.toFixed(4) + ')');
+      p.art.setAttribute('opacity', (p.lit ? 1 : 0.42).toFixed(2));
+      p.glow.setAttribute('opacity', (Math.max(p.bounceV, open, p.pulse) * (p.lit ? 0.55 : 0.3)).toFixed(3));
+    }
+  }
+
+  var lastFrame = 0;
+  function frame(now) {
+    var dt = lastFrame ? Math.min(0.05, (now - lastFrame) / 1000) : 0.016;
+    lastFrame = now;
+
+    runHeld(now, dt);
+    if (AC) { drainVis(AC.currentTime); }
+    beatFlash = Math.max(0, beatFlash - dt * 3.4);
+
+    var s = curStep();
+    var barPos = (((s % STEPS_PER_BAR) + STEPS_PER_BAR) % STEPS_PER_BAR) / STEPS_PER_BAR;
+
+    if (mode === 'tune') { updateTune(dt, barPos); }
+    else { updateJam(dt); }
+
+    requestAnimationFrame(frame);
+  }
+
+  var resizeTimer = 0;
+  window.addEventListener('resize', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(computeLayout, 120);
+  });
+  window.addEventListener('orientationchange', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(computeLayout, 220);
+  });
+
+  buildTune();
+  buildJam();
+  computeLayout();
+  showMode();
+  setStrip(false);
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
