@@ -39,6 +39,8 @@
   .btn:active{transform:translateY(5px);box-shadow:0 1px 0 #C88F13, 0 4px 10px var(--shadow)}
   .btn.coral{background:var(--coral);box-shadow:0 6px 0 #C4402F, 0 12px 22px var(--shadow)}
   .btn.coral:active{box-shadow:0 1px 0 #C4402F, 0 4px 10px var(--shadow)}
+  .btn.sky{background:var(--sky);box-shadow:0 6px 0 #4A7FB5, 0 12px 22px var(--shadow)}
+  .btn.sky:active{box-shadow:0 1px 0 #4A7FB5, 0 4px 10px var(--shadow)}
   .btn.ghost{background:transparent;color:var(--paper);box-shadow:inset 0 0 0 3px rgba(251,243,226,.28);font-size:17px;padding:14px 18px}
   .btn.ghost:active{transform:translateY(2px)}
   .btn[disabled]{opacity:.4;pointer-events:none}
@@ -128,8 +130,10 @@
     <div id="board" class="board"></div>
     <div id="empty" class="empty">No pictures yet.<br>Add two or more, then play.</div>
 
-    <button class="btn" id="btn-add">&#128247; Add a picture</button>
-    <input type="file" id="file" accept="image/*" class="hide">
+    <button class="btn" id="btn-camera">&#128247; Take a picture</button>
+    <button class="btn sky" id="btn-gallery">&#128444;&#65039; Add one from the gallery</button>
+    <input type="file" id="file-camera" accept="image/*" capture="environment" class="hide">
+    <input type="file" id="file-gallery" accept="image/*" class="hide">
 
     <div class="settings">
       <span class="seglabel">Pieces</span>
@@ -474,11 +478,16 @@ function finish(){
 }
 
 /* ---------- wiring ---------- */
-$("btn-add").addEventListener("click", ()=>{
-  if(photos.length>=MAX_PHOTOS){ say("Ten pictures is the limit. Take one off to add another."); return; }
-  hush(); $("file").click();
-});
-$("file").addEventListener("change", e=>{ if(e.target.files[0]) fromFile(e.target.files[0]); e.target.value=""; });
+// two ways in, because a phone will not let us ask which one you wanted
+function wireAdd(btnId, inputId){
+  $(btnId).addEventListener("click", ()=>{
+    if(photos.length>=MAX_PHOTOS){ say("Ten pictures is the limit. Take one off to add another."); return; }
+    hush(); $(inputId).click();
+  });
+  $(inputId).addEventListener("change", e=>{ if(e.target.files[0]) fromFile(e.target.files[0]); e.target.value=""; });
+}
+wireAdd("btn-camera","file-camera");
+wireAdd("btn-gallery","file-gallery");
 
 $("btn-save").addEventListener("click", saveLabel);
 $("label-input").addEventListener("keydown", e=>{ if(e.key==="Enter") saveLabel(); });
