@@ -118,7 +118,7 @@ explanation comes from Anthropic's API, which is billed per word.
 
 **Setting it up, once.** At <https://console.anthropic.com>:
 
-1. **Billing → buy credits.** $5 is the minimum and buys roughly 7,000 words.
+1. **Billing → buy credits.** $5 is the minimum and buys roughly 13,000 words.
    **Turn auto-reload off** — that switch is the whole safety net, because it
    makes the balance a hard ceiling rather than a direction of travel.
 2. **Settings → Workspaces → create one** called `kid-games`, and give it a
@@ -140,8 +140,22 @@ caps the damage, which is what steps 1 and 2 are for.
 **If it ever leaks,** revoke the key in the console, make another, and repeat
 step 4. It costs an evening of the game, nothing more.
 
-**Running costs.** Roughly 40p per thousand words. The game also stops itself
-at 200 words a day per device — Hoot yawns and goes to sleep until tomorrow.
+**Running costs.** Measured, not guessed: a 165-token prompt and a 30-to-70
+token answer on Haiku 4.5 comes to about **0.03p a word**, so roughly 30 words
+per penny and 30p per thousand. The game also stops itself at 200 words a day
+per device — Hoot yawns and goes to sleep until tomorrow.
+
+**The prompt is cheap to lengthen.** It is far too short to be cacheable, and
+input is a fifth the price of output, so tuning the wording costs almost
+nothing. What actually moves the bill is the word cap, which scales with the
+reading-age slider.
+
+**Speech is free and is not Anthropic.** The listening and the talking are both
+the browser's own, so they never touch the key. Worth knowing: the recogniser
+is not on-device — Chrome sends the audio to Google, the same as the tablet's
+own dictation does. To improve the voice, download an Enhanced or Premium
+English (UK) voice on the device itself: iOS under Settings → Accessibility →
+Spoken Content → Voices. It is free and it makes a large difference.
 
 ---
 

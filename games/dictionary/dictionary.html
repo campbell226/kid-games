@@ -61,6 +61,23 @@
     background: #e8edf1; border-radius: 4px; padding: 1px 4px;
   }
 
+  /* Typing a word. A laptop can simply start typing, but a tablet has no
+     keyboard until something asks for one, and a long press on Hoot is
+     not a thing anybody discovers. So: a button, top left, away from
+     both the full screen button and the parent corner. */
+  #typeBtn {
+    position: fixed;
+    top: max(8px, env(safe-area-inset-top));
+    left: max(8px, env(safe-area-inset-left));
+    width: 58px; height: 58px; padding: 0; border: 0;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 18px; background: rgba(12, 18, 38, 0.5);
+    box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.16);
+    cursor: pointer; z-index: 6;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #typeBtn svg { width: 36px; height: 26px; display: block; }
+
   /* The reading-age slider lives on the screen itself, not behind the
      long press. It is the one setting that changes between the two of
      them, so it has to be a reach away rather than a secret. */
@@ -244,6 +261,24 @@
   <g id="sparks"></g>
   <g id="corner"></g>
 </svg>
+
+<button type="button" id="typeBtn" aria-label="Type a word">
+  <svg viewBox="0 0 44 32" aria-hidden="true">
+    <rect x="1.6" y="1.6" width="40.8" height="28.8" rx="5"
+          fill="none" stroke="#f4d69a" stroke-width="3"/>
+    <g fill="#f4d69a">
+      <rect x="7" y="8" width="5" height="5" rx="1.4"/>
+      <rect x="15" y="8" width="5" height="5" rx="1.4"/>
+      <rect x="23" y="8" width="5" height="5" rx="1.4"/>
+      <rect x="31" y="8" width="6" height="5" rx="1.4"/>
+      <rect x="7" y="16" width="6" height="5" rx="1.4"/>
+      <rect x="16" y="16" width="5" height="5" rx="1.4"/>
+      <rect x="24" y="16" width="5" height="5" rx="1.4"/>
+      <rect x="32" y="16" width="5" height="5" rx="1.4"/>
+      <rect x="12" y="23" width="20" height="4" rx="2"/>
+    </g>
+  </svg>
+</button>
 
 <div id="agebar">
   <input type="range" id="age" min="3" max="11" step="1" value="5" aria-label="Reading age">
@@ -1037,9 +1072,13 @@
   // ------------------------------------------------------------------
   // The ear.
   //
-  // The browser's own recogniser, not a recording sent anywhere: it is
-  // free, it is quick, and the child's voice never leaves the device.
-  // It does need https and it does need the microphone, so when either
+  // The browser's own recogniser, which costs nothing and is quick. Do
+  // not mistake that for private: Chrome uploads the audio to Google,
+  // and Safari's behaviour varies by version. It is the same pipeline as
+  // the tablet's own dictation, and no worse - but the child's voice
+  // does leave the device, so say so rather than implying otherwise.
+  //
+  // It needs https and it needs the microphone, so when either
   // is missing the game falls back to a grown-up typing the word, which
   // is slower but never a dead end.
   // ------------------------------------------------------------------
@@ -1144,7 +1183,7 @@
     return 'You are a kind, twinkly owl called Hoot who explains words to a British child ' +
       'of about ' + age + ' years old.\n' +
       'Reply with one or two very short sentences and nothing else: first what the word means, ' +
-      'then a everyday example that starts with "Like when".\n' +
+      'then an everyday example that starts with "Like when".\n' +
       'Use only words a ' + age + '-year-old already knows. Never use the word itself, or any ' +
       'form of it, inside the explanation.\n' +
       'British English. No markdown, no quotation marks, no lists, no greeting, no sign-off.\n' +
@@ -1442,6 +1481,13 @@
     closeTyping();
     if (w) { hoot(true); lookUp(w); }
   }
+
+  document.getElementById('typeBtn').addEventListener('click', function (ev) {
+    ev.stopPropagation();
+    initAudio();
+    warmVoice();
+    openTyping();
+  });
 
   document.getElementById('typeGo').addEventListener('click', goTyping);
   document.getElementById('typeCancel').addEventListener('click', closeTyping);
