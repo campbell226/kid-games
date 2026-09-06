@@ -205,6 +205,15 @@
     { id: 'adventure', leader: 'frog', key: 9, scale: SCALES.minor, bpm: 112,
       colour: '#4aa3d8',
       chords: [{ root: 0 }, { root: 6 }, { root: 5 }, { root: 4, raise: { 6: 1 } }] },
+    // A drummer or a percussionist can lead a band without stating a
+    // chord in their life. The song still carries the key; the leader
+    // just never leaves.
+    { id: 'stomp', leader: 'dog', key: 4, scale: SCALES.minor, bpm: 124,
+      colour: '#ef8f3c',
+      chords: [{ root: 0 }, { root: 6 }, { root: 3 }, { root: 6 }] },
+    { id: 'scamper', leader: 'mouse', key: 5, scale: SCALES.major, bpm: 136,
+      colour: '#a97ad8',
+      chords: [{ root: 5 }, { root: 3 }, { root: 0 }, { root: 4 }] },
     // Straight mixolydian gives a major seventh on the fourth and a
     // minor one on the fifth, which is folk, not blues. Flattening the
     // one and raising the other makes all three chords dominant, which
@@ -554,7 +563,7 @@
   // The six colours mean the same thing on every card: red is the first
   // sound, purple the sixth. A child learns "the green one" once.
   // ------------------------------------------------------------------
-  var SOUND_COLOURS = ['#e05a5a', '#ef8f3c', '#f0c33c', '#5fbb63', '#4aa3d8', '#a97ad8'];
+  var SOUND_COLOURS = ['#e05a5a', '#ef8f3c', '#f0c33c', '#5fbb63', '#4aa3d8', '#a97ad8', '#e878b0'];
 
   function P() { return Array.prototype.join.call(arguments, ''); }
 
@@ -569,7 +578,8 @@
       { lanes: [
         { t: 'kick', p: 'x.......x.......' },
         { t: 'tom', p: P('..x...x.....x...', '..x...x.....x...', '..x...x.....x...', '..x.x.x.x.x.x.x.') }] },
-      { lanes: [{ t: 'kick', p: 'x..x....x..x....' }, { t: 'clap', p: '....x.......x...' }] }
+      { lanes: [{ t: 'kick', p: 'x..x....x..x....' }, { t: 'clap', p: '....x.......x...' }] },
+      { lanes: [{ t: 'kick', p: 'x.....x...x.....' }, { t: 'tom', p: '............x.x.' }, { t: 'clap', p: '....x.......x...' }] }
     ],
     mouse: [
       { lanes: [{ t: 'hatC', p: 'x.x.x.x.x.x.x.x.' }] },
@@ -577,7 +587,8 @@
       { lanes: [{ t: 'shaker', p: '..x...x...x...x.' }] },
       { lanes: [{ t: 'tamb', p: '....x.......x...' }] },
       { lanes: [{ t: 'clave', p: 'x..x..x...x.x...' }] },
-      { lanes: [{ t: 'hatC', p: 'x.x.x.x.x.x.x.x.' }, { t: 'hatO', p: '......x.......x.' }] }
+      { lanes: [{ t: 'hatC', p: 'x.x.x.x.x.x.x.x.' }, { t: 'hatO', p: '......x.......x.' }] },
+      { lanes: [{ t: 'tamb', p: '..x...x...x...x.' }, { t: 'shaker', p: 'x.x.x.x.x.x.x.x.' }] }
     ],
     frog: [
       { base: 36, lanes: [{ t: 'bassPluck', p: '0.......0.......' }] },
@@ -585,7 +596,8 @@
       { base: 36, lanes: [{ t: 'bassSynth', p: '0.0.0.0.4.4.0.0.' }] },
       { base: 36, lanes: [{ t: 'bassSynth', p: P('0.......4.......', '0.......7.......', '0.......4.......', '4...2...0.......') }] },
       { base: 36, lanes: [{ t: 'bassPluck', p: '0.....7.0.....7.' }] },
-      { base: 36, lanes: [{ t: 'bassSynth', p: P('0..0..4...0.....', '0..0..2...4.....') }] }
+      { base: 36, lanes: [{ t: 'bassSynth', p: P('0..0..4...0.....', '0..0..2...4.....') }] },
+      { base: 36, lanes: [{ t: 'bassSynth', p: '0.0.4.0.7.0.4.0.' }] }
     ],
     cow: [
       { base: 48, chord: true, lanes: [{ t: 'organ', p: '0...............' }] },
@@ -593,7 +605,8 @@
       { base: 48, chord: true, lanes: [{ t: 'pluck', p: '0..0..0...0..0..' }] },
       { base: 48, chord: true, lanes: [{ t: 'clav', p: '..0...0...0...0.' }] },
       { base: 48, lanes: [{ t: 'pluck', p: '0.2.4.2.0.2.4.6.' }] },
-      { base: 48, chord: true, lanes: [{ t: 'organ', p: P('0.......0.......', '0...............', '0.......0.......', '0...0...0...0...') }] }
+      { base: 48, chord: true, lanes: [{ t: 'organ', p: P('0.......0.......', '0...............', '0.......0.......', '0...0...0...0...') }] },
+      { base: 48, chord: true, lanes: [{ t: 'clav', p: '..0..0..0..0..0.' }] }
     ],
     cat: [
       { base: 60, lanes: [{ t: 'pluck', p: P('4...2...0...2...', '4...2...4.......', '2...4...7...4...', '2...0...........') }] },
@@ -601,7 +614,8 @@
       { base: 60, lanes: [{ t: 'epiano', p: P('..4...2...0...2.', '..4...2...0.....') }] },
       { base: 60, lanes: [{ t: 'saw', p: P('4...............', '....2...........', '........7.......', '....6...4.......') }] },
       { base: 60, lanes: [{ t: 'saw', p: '4.7.4.2.0.2.4...' }] },
-      { base: 60, lanes: [{ t: 'epiano', p: P('2...4...6...4...', '2...0...2.......', '2...4...6...7...', '6...4...2.......') }] }
+      { base: 60, lanes: [{ t: 'epiano', p: P('2...4...6...4...', '2...0...2.......', '2...4...6...7...', '6...4...2.......') }] },
+      { base: 60, lanes: [{ t: 'saw', p: P('0.2.4.7.4.2.0.2.', '4.2.0.2.4.7.4.2.') }] }
     ],
     bird: [
       { base: 72, lanes: [{ t: 'glock', p: P('........4.......', '........7.......', '........4.......', '........6.......') }] },
@@ -609,7 +623,8 @@
       { base: 72, lanes: [{ t: 'marimba', p: '..4...6...4...2.' }] },
       { base: 72, lanes: [{ t: 'glock', p: P('7...............', '................', '4...............', '................') }] },
       { base: 72, lanes: [{ t: 'kalimba', p: P('4...6...7...6...', '4...2...4.......', '4...6...7...9...', '7...6...4.......') }] },
-      { base: 72, lanes: [{ t: 'marimba', p: P('4.....6.....7...', '6.....4.....2...') }] }
+      { base: 72, lanes: [{ t: 'marimba', p: P('4.....6.....7...', '6.....4.....2...') }] },
+      { base: 72, lanes: [{ t: 'glock', p: P('....7.....9.....', '....6.....4.....', '....7.....9.....', '....b.....9.....') }] }
     ]
   };
 
@@ -674,7 +689,7 @@
   // y = 0; everything else is above it.
   var SPECS = [
     {
-      id: 'dog', colour: '#b57a49', dark: '#8d5a32', top: -186,
+      id: 'dog', colour: '#b57a49', dark: '#8d5a32', top: -186, crownY: -186,
       art: function (s) {
         return '<path d="M 52 -62 Q 104 -78 96 -134" stroke="' + s.dark + '" stroke-width="19" fill="none" stroke-linecap="round"/>'
           + legPair(40, 24, 18, s.dark)
@@ -692,7 +707,7 @@
       }
     },
     {
-      id: 'mouse', colour: '#bab7c6', dark: '#9592a4', top: -172,
+      id: 'mouse', colour: '#bab7c6', dark: '#9592a4', top: -172, crownY: -168,
       art: function (s) {
         return '<g class="tail"><path d="M 40 -40 Q 96 -34 88 -96" stroke="#e3b7c2" stroke-width="9" fill="none" stroke-linecap="round"/></g>'
           + legPair(28, 18, 12, s.dark)
@@ -711,7 +726,7 @@
       }
     },
     {
-      id: 'frog', colour: '#5fae4a', dark: '#3f8232', top: -132,
+      id: 'frog', colour: '#5fae4a', dark: '#3f8232', top: -132, crownY: -126,
       art: function (s) {
         return legPair(58, 26, 16, s.dark)
           + '<ellipse cx="-68" cy="-38" rx="27" ry="37" fill="' + s.dark + '"/>'
@@ -725,7 +740,7 @@
       }
     },
     {
-      id: 'cow', colour: '#f2f0ec', dark: '#3a3a46', top: -188,
+      id: 'cow', colour: '#f2f0ec', dark: '#3a3a46', top: -188, crownY: -184,
       art: function (s) {
         return legPair(44, 24, 22, '#3a3a46')
           + '<ellipse cx="0" cy="-74" rx="76" ry="58" fill="' + s.colour + '"/>'
@@ -744,7 +759,7 @@
       }
     },
     {
-      id: 'cat', colour: '#93949c', dark: '#6d6e77', top: -194,
+      id: 'cat', colour: '#93949c', dark: '#6d6e77', top: -194, crownY: -184,
       art: function (s) {
         return '<path d="M 48 -50 Q 104 -60 92 -120" stroke="' + s.dark + '" stroke-width="17" fill="none" stroke-linecap="round"/>'
           + legPair(36, 22, 16, s.dark)
@@ -767,7 +782,7 @@
       }
     },
     {
-      id: 'bird', colour: '#f2b134', dark: '#d68d1d', top: -182,
+      id: 'bird', colour: '#f2b134', dark: '#d68d1d', top: -182, crownY: -178,
       art: function (s) {
         return '<path d="M -6 -60 L -44 -6 L 30 -22 Z" fill="' + s.dark + '"/>'
           + legPair(20, 9, 18, '#e07a1f')
@@ -836,6 +851,11 @@
   var LOOK = 0.14, MAX_SLEW = 0.001, JUMP = 0.25, NUDGE_STEP = 0.003;
 
   var SIDEMEN = 3;
+  // Seconds a character keeps dancing after it stops playing, how long
+  // it takes to wind down, when it starts fidgeting and when it drops off.
+  var DANCE_FOR = 20, WIND_DOWN = 20, FIDGET_AT = 40, SLEEP_AT = 60;
+  // Notes closer together than this get every other hop skipped.
+  var BOUNCE_FLOOR = 0.19;
   var songIdx = clamp(Math.round(load('song', 0)), 0, SONGS.length - 1);
   var joinCount = 1;
   var bpm = clamp(load('bpm', 90), 60, 160);
@@ -875,7 +895,19 @@
     if (next === bpm) { return; }
     bpm = next;
     save('bpm', bpm);
+    resyncGrid();
     paintBpm();
+  }
+
+  // The grid is a function of the clock, so a tempo change lands both
+  // devices in the same place whenever each of them makes it. What used
+  // to smear was the step counter: it kept counting in the old step size
+  // until the scheduler noticed it had drifted, which left up to a
+  // lookahead of notes placed on the old grid and the new one at once.
+  // Re-deriving it on the spot costs nothing and takes the smear out.
+  function resyncGrid() {
+    if (!AC || !skewSet) { return; }
+    stepN = Math.floor((AC.currentTime - gridZero()) / stepDur());
   }
 
   // Wrapped every time, including whatever was saved by an older version
@@ -920,6 +952,7 @@
     save('song', songIdx);
     bpm = clamp(SONGS[songIdx].bpm, 60, 160);
     save('bpm', bpm);
+    resyncGrid();
     paintBpm();
     applyLeader();
     paintSongs();
@@ -1056,13 +1089,24 @@
         p.lit = e.lit;
       } else if (e.hit !== undefined) {
         p = byId[e.id];
-        p.bounceV = 1;
-        // How big a hop the gap earned. A kick every two beats gets the
-        // full jump; sixteenths get a bob.
-        p.hopScale = clamp((e.t - p.lastHit) / 0.45, 0.22, 1);
-        p.lastHit = e.t;
         p.mouthT = e.hit;
         p.mouthAge = 0;
+        // How big a hop the gap earned. A kick every two beats gets the
+        // full jump; sixteenths get a bob. And once the notes are coming
+        // faster than the eye wants to watch, only every other one is
+        // hopped at all: half as often reads as dancing where every note
+        // read as twitching.
+        var gap = e.t - p.lastHit;
+        p.lastHit = e.t;
+        if (gap < BOUNCE_FLOOR) {
+          p.bounceGate = !p.bounceGate;
+          if (!p.bounceGate) { continue; }
+          gap *= 2;
+        } else {
+          p.bounceGate = false;
+        }
+        p.bounceV = 1;
+        p.hopScale = clamp(gap / 0.45, 0.22, 1);
       }
     }
   }
@@ -1383,7 +1427,7 @@
       T.bpmLabel.setAttribute('y', bpmY + bh * 0.5 + lf * 1.3);
       T.bpmLabel.setAttribute('font-size', lf.toFixed(0));
 
-      layoutSongRow(W * 0.78, H * 0.68, W * 0.38, Math.min(H * 0.2, 130));
+      layoutSongRow(W * 0.74, H * 0.68, W * 0.46, Math.min(H * 0.2, 130));
 
       T.ringX = W * 0.27;
       bandTop = hintY0 + lead0 + H * 0.04;
@@ -1505,14 +1549,16 @@
       var art = el('g');
       var bob = el('g');
       bob.innerHTML = spec.art(spec);
-      art.appendChild(bob);
-      node.appendChild(art);
-      // Who is running the band, drawn on rather than said.
+      // Who is running the band, worn rather than labelled - inside the
+      // group that bobs and sways, so it goes where the head goes.
       var crown = el('path', {
         d: 'M -26 8 L -30 -14 L -13 -3 L 0 -18 L 13 -3 L 30 -14 L 26 8 Z',
-        fill: '#ffd75e', stroke: '#a97a12', 'stroke-width': 2, opacity: 0
+        fill: '#ffd75e', stroke: '#a97a12', 'stroke-width': 2.5, opacity: 0,
+        transform: 'translate(0,' + spec.crownY + ') scale(0.95)'
       });
-      node.appendChild(crown);
+      bob.appendChild(crown);
+      art.appendChild(bob);
+      node.appendChild(art);
       var hit = el('rect', { class: 'hit', x: -100, y: -60, width: 200, height: 120 });
       node.appendChild(hit);
       g.appendChild(node);
@@ -1521,6 +1567,7 @@
         id: spec.id, spec: spec, kit: KITS[spec.id],
         node: node, card: card, tint: tint, glow: glow, art: art, bob: bob, hit: hit,
         crown: crown, leads: false, since: 0,
+        quiet: 0, look: 0, lookTo: 0, lookIn: 1 + Math.random() * 3, bounceGate: false,
         mouth: bob.querySelector('.mouth'),
         eyes: bob.querySelector('.eyes'),
         legs: Array.prototype.slice.call(bob.querySelectorAll('.leg')),
@@ -1583,9 +1630,6 @@
       p.hit.setAttribute('width', padW);
       p.hit.setAttribute('height', padH);
       p.glow.setAttribute('r', Math.min(padW, padH) * 0.62);
-      var cs = Math.min(padW, padH) * 0.011;
-      p.crown.setAttribute('transform', 'translate(' + (-padW * 0.34).toFixed(1) + ','
-        + (-padH * 0.36).toFixed(1) + ') scale(' + cs.toFixed(3) + ')');
       place(p.node, x, y);
       p.scale = fitAnimal(p.art, p.spec, 0, 0, padW * 0.88, padH * 0.84);
     });
@@ -1784,6 +1828,7 @@
     if (o.eyes) {
       var ex = +o.eyes.getAttribute('data-cx'), ey = +o.eyes.getAttribute('data-cy');
       var bk = reduced ? 1 : clamp(o.blinkV, 0.08, 1);
+      if (o.asleep) { bk = 0.07; }
       o.eyes.setAttribute('transform',
         'translate(' + ex + ',' + ey + ') scale(1,' + bk.toFixed(3) + ') translate(' + (-ex) + ',' + (-ey) + ')');
     }
@@ -1849,25 +1894,49 @@
       p.card.setAttribute('opacity', (0.72 + (p.lit >= 0 ? 0.28 : 0) + breathe * 0.2 - drain * 0.3).toFixed(2));
       if (p.lit >= 0) {
         p.tint.setAttribute('fill', colour);
-        p.tint.setAttribute('opacity', (0.22 * (1 - drain)).toFixed(3));
+        p.tint.setAttribute('opacity', (0.44 * (1 - drain)).toFixed(3));
       } else {
         p.tint.setAttribute('opacity', 0);
       }
 
-      // Two beats to a sway, with the legs stepping along it, so a
-      // character that is playing looks like it is playing between its
-      // notes as well as on them. The hop is only as big as the gap it
-      // had to gather itself in, which is what stops a run of sixteenths
-      // looking like a panic.
+      // A character left out does not stop dead. It keeps dancing for
+      // twenty seconds, winds down over the next twenty, spends twenty
+      // looking about and fidgeting, and is asleep after a minute - and
+      // wakes the moment it is tapped back in.
+      if (p.lit >= 0) { p.quiet = 0; } else { p.quiet += dt; }
+      var dance = p.lit >= 0 ? 1 : 1 - clamp((p.quiet - DANCE_FOR) / WIND_DOWN, 0, 1);
+      p.asleep = p.quiet > SLEEP_AT;
+
       var lean = 0, hop = 0, squash = 1, step = 0;
       if (!reduced) {
+        // Two beats to a sway, with the legs stepping along it, so a
+        // character that is playing looks like it is playing between its
+        // notes as well as on them.
         var swing = Math.sin(Math.PI * beats + p.sway);
-        var alive = p.lit >= 0 ? 1 : 0.3;
-        lean = swing * 4.5 * alive;
-        step = swing * 11 * alive;
+        lean = swing * 4.5 * dance;
+        step = swing * 11 * dance;
         var b = Math.sin(Math.PI * (1 - p.bounceV));
         hop = -b * 26 * p.hopScale;
         squash = 1 + b * 0.07 * p.hopScale;
+
+        if (p.asleep) {
+          // Slumped and breathing.
+          hop += 5;
+          squash *= 1 + Math.sin(p.idle * 1.1) * 0.022;
+          p.look += (0 - p.look) * Math.min(1, dt * 2);
+        } else if (p.quiet > FIDGET_AT) {
+          // Looking about: a new direction every few seconds, eased into
+          // rather than snapped to.
+          p.lookIn -= dt;
+          if (p.lookIn <= 0) {
+            p.lookTo = (Math.random() * 2 - 1) * 13;
+            p.lookIn = 1.4 + Math.random() * 2.8;
+          }
+          p.look += (p.lookTo - p.look) * Math.min(1, dt * 3);
+        } else {
+          p.look += (0 - p.look) * Math.min(1, dt * 3);
+        }
+        lean += p.look;
       }
       p.bob.setAttribute('transform', 'translate(0,' + hop.toFixed(2) + ') rotate('
         + lean.toFixed(2) + ' 0 0) scale(1,' + squash.toFixed(4) + ')');
