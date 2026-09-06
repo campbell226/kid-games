@@ -639,6 +639,17 @@
         + '<circle cx="' + ex + '" cy="' + (cy + 1) + '" r="' + pr + '" fill="#22203a"/>'
         + '<circle cx="' + (ex + pr * 0.38) + '" cy="' + (cy - pr * 0.5) + '" r="' + (pr * 0.34) + '" fill="#ffffff"/>';
     });
+    s += '</g>';
+    // Asleep, the eye is swapped for a lid rather than squashed flat: a
+    // flattened eyeball leaves a sliver of white showing, which is the
+    // one thing that does not read as sleeping.
+    s += '<g class="lids" opacity="0">';
+    [-1, 1].forEach(function (d) {
+      var ex = cx + sp * d;
+      s += '<path d="M ' + (ex - r) + ' ' + cy + ' Q ' + ex + ' ' + (cy + r * 0.85) + ' '
+        + (ex + r) + ' ' + cy + '" fill="none" stroke="#22203a" stroke-width="'
+        + Math.max(2.6, r * 0.26).toFixed(1) + '" stroke-linecap="round"/>';
+    });
     return s + '</g>';
   }
 
@@ -851,9 +862,12 @@
   var LOOK = 0.14, MAX_SLEW = 0.001, JUMP = 0.25, NUDGE_STEP = 0.003;
 
   var SIDEMEN = 3;
-  // Seconds a character keeps dancing after it stops playing, how long
-  // it takes to wind down, when it starts fidgeting and when it drops off.
-  var DANCE_FOR = 20, WIND_DOWN = 20, FIDGET_AT = 40, SLEEP_AT = 60;
+  // How long a character keeps dancing after it stops playing, and how
+  // long it then spends looking about before it drops off. Somewhere
+  // between ten and thirty seconds each, drawn fresh every time it stops
+  // and drawn per character, so six of them do not all nod off together.
+  var WIND_DOWN = 6;
+  function idleSpan() { return 10 + Math.random() * 20; }
   // Notes closer together than this get every other hop skipped.
   var BOUNCE_FLOOR = 0.19;
   var songIdx = clamp(Math.round(load('song', 0)), 0, SONGS.length - 1);
@@ -948,7 +962,13 @@
   // Both devices choosing the same song therefore land on the same
   // number as well, which is one less thing to agree by hand.
   function setSong(i) {
+    var was = songIdx;
     songIdx = clamp(i, 0, SONGS.length - 1);
+    // A different leader is a different tune, so the band starts again
+    // from just them rather than carrying the last one's players over.
+    if (songIdx !== was) {
+      for (var k = 0; k < pads.length; k++) { pads[k].want = -1; }
+    }
     save('song', songIdx);
     bpm = clamp(SONGS[songIdx].bpm, 60, 160);
     save('bpm', bpm);
@@ -1413,8 +1433,12 @@
       var hintY0 = Math.max(H * 0.2, reserve + hf0 * 0.85);
       layoutHint(W * 0.5, hintY0, hf0, lead0);
 
+      // Who leads comes first: it settles the key, the chords and the
+      // tempo, so the number underneath is a consequence of it.
+      layoutSongRow(W * 0.74, H * 0.4, W * 0.46, Math.min(H * 0.2, 130));
+
       var bw = Math.min(W * 0.14, 160), bh = Math.min(H * 0.17, 125);
-      var bpmY = H * 0.385;
+      var bpmY = H * 0.75;
       sizeButton(T.minus, bw, bh);
       sizeButton(T.plus, bw, bh);
       place(T.minus, W * 0.61, bpmY);
@@ -1426,8 +1450,6 @@
       T.bpmLabel.setAttribute('x', W * 0.77);
       T.bpmLabel.setAttribute('y', bpmY + bh * 0.5 + lf * 1.3);
       T.bpmLabel.setAttribute('font-size', lf.toFixed(0));
-
-      layoutSongRow(W * 0.74, H * 0.68, W * 0.46, Math.min(H * 0.2, 130));
 
       T.ringX = W * 0.27;
       bandTop = hintY0 + lead0 + H * 0.04;
@@ -1442,8 +1464,14 @@
       var hintY = Math.max(H * 0.095, reserve + hf * 0.85, corner * 1.1 + hf * 0.85);
       layoutHint(W * 0.5, hintY, hf, lead);
 
+      // Who leads comes first: it settles the key, the chords and the
+      // tempo, so the number underneath is a consequence of it.
+      var sh2 = Math.min(H * 0.085, 190);
+      var songY = hintY + lead + sh2 * 0.5 + H * 0.03;
+      layoutSongRow(W * 0.5, songY, W * 0.9, sh2);
+
       var bw2 = Math.min(W * 0.22, 240), bh2 = Math.min(H * 0.08, 160);
-      var bpmY2 = hintY + lead + bh2 * 0.5 + H * 0.04;
+      var bpmY2 = songY + sh2 * 0.5 + Math.min(sh2 * 0.34, 34) * 1.6 + bh2 * 0.5 + H * 0.03;
       sizeButton(T.minus, bw2, bh2);
       sizeButton(T.plus, bw2, bh2);
       place(T.minus, W * 0.16, bpmY2);
@@ -1456,12 +1484,8 @@
       T.bpmLabel.setAttribute('y', bpmY2 + bh2 * 0.5 + lf2 * 1.3);
       T.bpmLabel.setAttribute('font-size', lf2.toFixed(0));
 
-      var sh2 = Math.min(H * 0.085, 190);
-      var songY = bpmY2 + bh2 * 0.5 + lf2 * 1.6 + sh2 * 0.5 + H * 0.025;
-      layoutSongRow(W * 0.5, songY, W * 0.9, sh2);
-
       T.ringX = W * 0.5;
-      bandTop = songY + sh2 * 0.5 + Math.min(sh2 * 0.34, 34) * 1.6 + H * 0.025;
+      bandTop = bpmY2 + bh2 * 0.5 + lf2 * 1.6 + H * 0.025;
       widest = W * 0.34;
       nw = Math.min(W * 0.2, 200); nh = Math.min(H * 0.075, 150);
       fs = Math.min(H * 0.016, 38);
@@ -1557,6 +1581,16 @@
         transform: 'translate(0,' + spec.crownY + ') scale(0.95)'
       });
       bob.appendChild(crown);
+      // Three z's drifting off the head. Not a word - a picture of one.
+      var zzz = el('g', { class: 'zzz', opacity: 0 });
+      for (var zi = 0; zi < 3; zi++) {
+        zzz.appendChild(el('path', {
+          d: 'M -8 -8 L 8 -8 L -8 8 L 8 8', fill: 'none', stroke: '#cfe0ff',
+          'stroke-width': 4, 'stroke-linecap': 'round', 'stroke-linejoin': 'round'
+        }));
+      }
+      zzz.setAttribute('transform', 'translate(52,' + (spec.crownY + 10) + ')');
+      bob.appendChild(zzz);
       art.appendChild(bob);
       node.appendChild(art);
       var hit = el('rect', { class: 'hit', x: -100, y: -60, width: 200, height: 120 });
@@ -1568,8 +1602,11 @@
         node: node, card: card, tint: tint, glow: glow, art: art, bob: bob, hit: hit,
         crown: crown, leads: false, since: 0,
         quiet: 0, look: 0, lookTo: 0, lookIn: 1 + Math.random() * 3, bounceGate: false,
+        tDance: idleSpan(), tFidget: idleSpan(),
         mouth: bob.querySelector('.mouth'),
         eyes: bob.querySelector('.eyes'),
+        lids: bob.querySelector('.lids'),
+        zzz: zzz, zs: Array.prototype.slice.call(zzz.childNodes),
         legs: Array.prototype.slice.call(bob.querySelectorAll('.leg')),
         want: -1, playing: -1, lit: -1,
         bounceV: 0, hopScale: 1, lastHit: -9, mouthT: 0, mouthAge: 99,
@@ -1600,7 +1637,7 @@
     var W = L.W, H = L.H;
     var cols = L.wide ? 3 : 2, rows = L.wide ? 2 : 3;
     var topBar = Math.min(L.wide ? H * 0.16 : H * 0.09, 130);
-    var botBar = Math.min(L.wide ? H * 0.13 : H * 0.07, 110);
+    var botBar = Math.min(L.wide ? H * 0.18 : H * 0.1, 160);
     var gap = 14;
     var padW = (W - gap * (cols + 1)) / cols;
     // A card taller than it is wide leaves the character stranded in a
@@ -1634,7 +1671,10 @@
       p.scale = fitAnimal(p.art, p.spec, 0, 0, padW * 0.88, padH * 0.84);
     });
 
-    layoutDotRow(J.bar, W * 0.5, H - botBar * 0.5, W * 0.88, botBar * 0.3);
+    // Lifted off the very bottom edge and given a fatter dot, because it
+    // is a button as well as a reading and it was neither big enough nor
+    // far enough from the edge of the glass to hit reliably.
+    layoutDotRow(J.bar, W * 0.5, H - botBar * 0.56, W * 0.88, botBar * 0.34);
     J.barHit.setAttribute('x', 0);
     J.barHit.setAttribute('y', H - botBar);
     J.barHit.setAttribute('width', W);
@@ -1828,10 +1868,11 @@
     if (o.eyes) {
       var ex = +o.eyes.getAttribute('data-cx'), ey = +o.eyes.getAttribute('data-cy');
       var bk = reduced ? 1 : clamp(o.blinkV, 0.08, 1);
-      if (o.asleep) { bk = 0.07; }
       o.eyes.setAttribute('transform',
         'translate(' + ex + ',' + ey + ') scale(1,' + bk.toFixed(3) + ') translate(' + (-ex) + ',' + (-ey) + ')');
+      o.eyes.setAttribute('opacity', o.asleep ? 0 : 1);
     }
+    if (o.lids) { o.lids.setAttribute('opacity', o.asleep ? 1 : 0); }
     return open;
   }
 
@@ -1903,9 +1944,15 @@
       // twenty seconds, winds down over the next twenty, spends twenty
       // looking about and fidgeting, and is asleep after a minute - and
       // wakes the moment it is tapped back in.
-      if (p.lit >= 0) { p.quiet = 0; } else { p.quiet += dt; }
-      var dance = p.lit >= 0 ? 1 : 1 - clamp((p.quiet - DANCE_FOR) / WIND_DOWN, 0, 1);
-      p.asleep = p.quiet > SLEEP_AT;
+      if (p.lit >= 0) {
+        if (p.quiet > 0) { p.tDance = idleSpan(); p.tFidget = idleSpan(); }
+        p.quiet = 0;
+      } else {
+        p.quiet += dt;
+      }
+      var dance = p.lit >= 0 ? 1
+        : 1 - clamp((p.quiet - (p.tDance - WIND_DOWN)) / WIND_DOWN, 0, 1);
+      p.asleep = p.quiet > p.tDance + p.tFidget;
 
       var lean = 0, hop = 0, squash = 1, step = 0;
       if (!reduced) {
@@ -1924,7 +1971,7 @@
           hop += 5;
           squash *= 1 + Math.sin(p.idle * 1.1) * 0.022;
           p.look += (0 - p.look) * Math.min(1, dt * 2);
-        } else if (p.quiet > FIDGET_AT) {
+        } else if (p.quiet > p.tDance) {
           // Looking about: a new direction every few seconds, eased into
           // rather than snapped to.
           p.lookIn -= dt;
@@ -1946,6 +1993,17 @@
           + ' ' + lg.getAttribute('data-px') + ' ' + lg.getAttribute('data-py') + ')');
       }
       p.crown.setAttribute('opacity', p.leads ? 1 : 0);
+      // Three z's on one drift, staggered, each rising and fading out.
+      p.zzz.setAttribute('opacity', p.asleep && !reduced ? 1 : (p.asleep ? 0.75 : 0));
+      if (p.asleep) {
+        for (var z = 0; z < p.zs.length; z++) {
+          var u = reduced ? (z + 0.5) / p.zs.length : ((p.idle * 0.3 + z / p.zs.length) % 1);
+          p.zs[z].setAttribute('transform',
+            'translate(' + (u * 16).toFixed(1) + ',' + (-u * 58).toFixed(1)
+            + ') scale(' + (0.55 + u * 0.75).toFixed(3) + ')');
+          p.zs[z].setAttribute('opacity', Math.sin(Math.PI * u).toFixed(3));
+        }
+      }
       p.art.setAttribute('opacity', ((p.lit >= 0 ? 1 : 0.42) - drain * 0.4).toFixed(2));
       p.glow.setAttribute('opacity', (Math.max(p.bounceV, open, p.pulse) * (p.lit >= 0 ? 0.55 : 0.3)).toFixed(3));
     }
