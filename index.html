@@ -1014,12 +1014,14 @@
     <a class="game" href="games/dictionary/dictionary.html">
       <svg viewBox="0 0 320 200" role="img" aria-label="Dictionary">
         <defs>
-          <linearGradient id="dic-t-sky" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="#101838"/><stop offset="1" stop-color="#3d3663"/>
+          <linearGradient id="dic-t-wall" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#241812"/><stop offset="1" stop-color="#402c1f"/>
           </linearGradient>
-          <linearGradient id="dic-t-bark" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0" stop-color="#4a3524"/><stop offset="0.45" stop-color="#6d4d33"/>
-            <stop offset="1" stop-color="#402d1f"/>
+          <linearGradient id="dic-t-wood" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#7a5230"/><stop offset="1" stop-color="#4a3120"/>
+          </linearGradient>
+          <linearGradient id="dic-t-desk" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#7c5330"/><stop offset="1" stop-color="#4e321c"/>
           </linearGradient>
           <linearGradient id="dic-t-page" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0" stop-color="#fffaee"/><stop offset="1" stop-color="#f0e3c6"/>
@@ -1029,23 +1031,77 @@
             <stop offset="1" stop-color="#ffd873" stop-opacity="0"/>
           </radialGradient>
         </defs>
-        <rect width="320" height="200" fill="url(#dic-t-sky)"/>
-        <circle cx="272" cy="34" r="16" fill="#f4ecc2"/>
-        <circle cx="46" cy="26" r="1.8" fill="#fff6d8" opacity="0.7"/>
-        <circle cx="120" cy="18" r="1.4" fill="#fff6d8" opacity="0.5"/>
-        <circle cx="196" cy="46" r="1.6" fill="#fff6d8" opacity="0.6"/>
-        <circle cx="88" cy="62" r="1.3" fill="#fff6d8" opacity="0.45"/>
-        <circle cx="238" cy="86" r="1.5" fill="#fff6d8" opacity="0.5"/>
+        <rect width="320" height="200" fill="url(#dic-t-wall)"/>
 
-        <path d="M22 108q88-6 150 2v11q-64-6-150 1z" fill="url(#dic-t-bark)"/>
-        <path d="M14 0h26v200H14z" fill="url(#dic-t-bark)"/>
-        <ellipse cx="60" cy="105" rx="12" ry="5" fill="#2f5540" opacity="0.75"
-                 transform="rotate(-16 60 105)"/>
-        <ellipse cx="150" cy="103" rx="11" ry="5" fill="#2f5540" opacity="0.75"
-                 transform="rotate(20 150 103)"/>
+        <g>
+          <rect x="6" y="12" width="11" height="34" rx="2" fill="#a8433c"/>
+          <rect x="19" y="18" width="9" height="28" rx="2" fill="#c47a2e"/>
+          <rect x="30" y="10" width="13" height="36" rx="2" fill="#4f7a53"/>
+          <rect x="45" y="16" width="10" height="30" rx="2" fill="#35618a"/>
+          <rect x="57" y="13" width="12" height="33" rx="2" fill="#7a4a86"/>
+          <rect x="71" y="19" width="9" height="27" rx="2" fill="#b8933f"/>
+          <rect x="82" y="11" width="12" height="35" rx="2" fill="#8c5a3a"/>
+          <rect x="96" y="17" width="10" height="29" rx="2" fill="#5d6b7a"/>
+          <rect x="108" y="12" width="13" height="34" rx="2" fill="#96412f"/>
+          <rect x="123" y="18" width="9" height="28" rx="2" fill="#3f6b62"/>
+          <rect x="134" y="10" width="11" height="36" rx="2" fill="#c47a2e"/>
+          <rect x="147" y="15" width="12" height="31" rx="2" fill="#4f7a53"/>
+          <rect x="161" y="12" width="10" height="34" rx="2" fill="#a8433c"/>
+          <rect x="173" y="19" width="13" height="27" rx="2" fill="#35618a"/>
+          <rect x="188" y="11" width="9" height="35" rx="2" fill="#b8933f"/>
+          <rect x="199" y="16" width="12" height="30" rx="2" fill="#7a4a86"/>
+          <rect x="213" y="13" width="10" height="33" rx="2" fill="#8c5a3a"/>
+          <rect x="225" y="18" width="13" height="28" rx="2" fill="#3f6b62"/>
+          <rect x="240" y="10" width="10" height="36" rx="2" fill="#96412f"/>
+          <rect x="252" y="17" width="12" height="29" rx="2" fill="#5d6b7a"/>
+          <rect x="266" y="12" width="9" height="34" rx="2" fill="#c47a2e"/>
+          <rect x="277" y="15" width="13" height="31" rx="2" fill="#4f7a53"/>
+          <rect x="292" y="11" width="10" height="35" rx="2" fill="#a8433c"/>
+          <rect x="304" y="18" width="11" height="28" rx="2" fill="#b8933f"/>
+        </g>
+        <rect x="0" y="46" width="320" height="7" fill="url(#dic-t-wood)"/>
+        <g>
+          <rect x="8" y="60" width="12" height="32" rx="2" fill="#35618a"/>
+          <rect x="22" y="66" width="10" height="26" rx="2" fill="#96412f"/>
+          <rect x="34" y="58" width="13" height="34" rx="2" fill="#b8933f"/>
+          <rect x="49" y="64" width="9" height="28" rx="2" fill="#4f7a53"/>
+          <rect x="60" y="61" width="12" height="31" rx="2" fill="#8c5a3a"/>
+          <rect x="74" y="67" width="10" height="25" rx="2" fill="#7a4a86"/>
+          <rect x="86" y="59" width="13" height="33" rx="2" fill="#a8433c"/>
+          <rect x="101" y="65" width="9" height="27" rx="2" fill="#3f6b62"/>
+          <rect x="112" y="60" width="12" height="32" rx="2" fill="#c47a2e"/>
+          <rect x="126" y="63" width="11" height="29" rx="2" fill="#5d6b7a"/>
+          <rect x="139" y="58" width="10" height="34" rx="2" fill="#4f7a53"/>
+          <rect x="151" y="66" width="13" height="26" rx="2" fill="#96412f"/>
+          <rect x="166" y="60" width="9" height="32" rx="2" fill="#35618a"/>
+          <rect x="177" y="62" width="12" height="30" rx="2" fill="#b8933f"/>
+          <rect x="191" y="59" width="10" height="33" rx="2" fill="#8c5a3a"/>
+          <rect x="203" y="65" width="13" height="27" rx="2" fill="#a8433c"/>
+          <rect x="218" y="61" width="9" height="31" rx="2" fill="#7a4a86"/>
+          <rect x="229" y="58" width="12" height="34" rx="2" fill="#3f6b62"/>
+          <rect x="243" y="64" width="11" height="28" rx="2" fill="#c47a2e"/>
+          <rect x="256" y="60" width="10" height="32" rx="2" fill="#5d6b7a"/>
+          <rect x="268" y="63" width="13" height="29" rx="2" fill="#4f7a53"/>
+          <rect x="283" y="59" width="9" height="33" rx="2" fill="#96412f"/>
+          <rect x="294" y="66" width="12" height="26" rx="2" fill="#35618a"/>
+          <rect x="308" y="61" width="9" height="31" rx="2" fill="#b8933f"/>
+        </g>
+        <rect x="0" y="92" width="320" height="7" fill="url(#dic-t-wood)"/>
 
-        <circle cx="106" cy="72" r="46" fill="url(#dic-t-glow)"/>
-        <g transform="translate(106,108) scale(0.29)">
+        <rect x="0" y="99" width="320" height="101" fill="url(#dic-t-desk)"/>
+        <rect x="0" y="99" width="320" height="3" fill="#3a2415" opacity="0.55"/>
+        <ellipse cx="214" cy="152" rx="112" ry="52" fill="url(#dic-t-glow)"/>
+
+        <g>
+          <rect x="52" y="120" width="46" height="7" rx="2" fill="#c47a2e"/>
+          <rect x="55" y="121.5" width="40" height="4" rx="1" fill="#f2e6c8" opacity="0.85"/>
+          <rect x="54" y="113" width="44" height="7" rx="2" fill="#35618a"/>
+          <rect x="57" y="114.5" width="38" height="4" rx="1" fill="#f2e6c8" opacity="0.85"/>
+          <rect x="53" y="106" width="43" height="7" rx="2" fill="#4f7a53"/>
+          <rect x="56" y="107.5" width="37" height="4" rx="1" fill="#f2e6c8" opacity="0.85"/>
+        </g>
+
+        <g transform="translate(75,106) scale(0.27)">
           <path d="M-46-6h32M-30-20v16M-59-4l-6 6M-33-4l6 6" stroke="#e2a33c"
                 stroke-width="9" stroke-linecap="round" fill="none"/>
           <path d="M14-6h32M30-20v16M1-4l-6 6M27-4l6 6" stroke="#e2a33c"
@@ -1063,19 +1119,21 @@
             <ellipse cx="0" cy="-14" rx="66" ry="58" fill="#e5cda6"/>
             <circle cx="-32" cy="-24" r="30" fill="#fffdf6"/>
             <circle cx="32" cy="-24" r="30" fill="#fffdf6"/>
-            <circle cx="-32" cy="-24" r="15" fill="#241f34"/>
-            <circle cx="32" cy="-24" r="15" fill="#241f34"/>
-            <circle cx="-26" cy="-30" r="5" fill="#fff"/>
-            <circle cx="38" cy="-30" r="5" fill="#fff"/>
+            <circle cx="-25" cy="-15" r="15" fill="#241f34"/>
+            <circle cx="39" cy="-15" r="15" fill="#241f34"/>
+            <circle cx="-19" cy="-21" r="5" fill="#fff"/>
+            <circle cx="45" cy="-21" r="5" fill="#fff"/>
             <path d="M-13-6L13-6L0 24Z" fill="#e2a33c"/>
           </g>
         </g>
 
-        <rect x="150" y="126" width="158" height="60" rx="10" fill="#5a3a2c" opacity="0.9"/>
-        <rect x="154" y="130" width="150" height="52" rx="8" fill="url(#dic-t-page)"/>
-        <rect x="176" y="142" width="106" height="12" rx="6" fill="#8a4a1a"/>
-        <rect x="170" y="162" width="118" height="6" rx="3" fill="#3c3326" opacity="0.5"/>
-        <rect x="184" y="172" width="90" height="6" rx="3" fill="#3c3326" opacity="0.5"/>
+        <rect x="140" y="126" width="164" height="62" rx="8" fill="#6d3f27"/>
+        <rect x="143" y="128" width="158" height="58" rx="7" fill="#e6d6b0"/>
+        <rect x="146" y="130" width="152" height="54" rx="6" fill="url(#dic-t-page)"/>
+        <rect x="213" y="130" width="18" height="54" fill="#8a6f42" opacity="0.16"/>
+        <rect x="170" y="140" width="104" height="12" rx="6" fill="#8a4a1a"/>
+        <rect x="164" y="160" width="116" height="6" rx="3" fill="#3c3326" opacity="0.5"/>
+        <rect x="178" y="170" width="88" height="6" rx="3" fill="#3c3326" opacity="0.5"/>
       </svg>
       <span>Dictionary</span>
     </a>

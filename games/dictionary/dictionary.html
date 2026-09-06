@@ -6,13 +6,13 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
-<meta name="theme-color" content="#17203c">
+<meta name="theme-color" content="#2b1f16">
 <title>Dictionary</title>
 <style>
   * { box-sizing: border-box; }
   html, body {
     margin: 0; padding: 0; height: 100%;
-    background: #17203c;
+    background: #2b1f16;
     overflow: hidden;
     touch-action: manipulation;
     overscroll-behavior: none;
@@ -38,7 +38,7 @@
     position: fixed; inset: 0;
     display: none;
     align-items: center; justify-content: center;
-    background: rgba(9, 14, 30, 0.6);
+    background: rgba(24, 15, 9, 0.62);
     font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     padding: 20px;
   }
@@ -71,8 +71,8 @@
     left: max(8px, env(safe-area-inset-left));
     width: 58px; height: 58px; padding: 0; border: 0;
     display: flex; align-items: center; justify-content: center;
-    border-radius: 18px; background: rgba(12, 18, 38, 0.5);
-    box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.16);
+    border-radius: 18px; background: rgba(24, 15, 9, 0.55);
+    box-shadow: inset 0 0 0 1.5px rgba(255, 226, 168, 0.22);
     cursor: pointer; z-index: 6;
     -webkit-tap-highlight-color: transparent;
   }
@@ -86,8 +86,8 @@
     transform: translateX(-50%);
     display: flex; align-items: center; gap: 14px;
     width: min(400px, 76vw); padding: 6px 18px 6px 20px;
-    border-radius: 30px; background: rgba(12, 18, 38, 0.5);
-    box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.14);
+    border-radius: 30px; background: rgba(24, 15, 9, 0.55);
+    box-shadow: inset 0 0 0 1.5px rgba(255, 226, 168, 0.22);
     z-index: 5;
   }
   #agebar input {
@@ -224,15 +224,24 @@
 
 <svg id="stage" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" aria-label="Dictionary">
   <defs>
-    <linearGradient id="dic-sky" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#101838"/>
-      <stop offset="0.55" stop-color="#222b52"/>
-      <stop offset="1" stop-color="#3d3663"/>
+    <linearGradient id="dic-wall" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#241812"/>
+      <stop offset="0.6" stop-color="#33231a"/>
+      <stop offset="1" stop-color="#402c1f"/>
     </linearGradient>
-    <linearGradient id="dic-bark" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#4a3524"/>
-      <stop offset="0.45" stop-color="#6d4d33"/>
-      <stop offset="1" stop-color="#402d1f"/>
+    <linearGradient id="dic-wood" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7a5230"/>
+      <stop offset="1" stop-color="#4a3120"/>
+    </linearGradient>
+    <linearGradient id="dic-desk" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7c5330"/>
+      <stop offset="0.5" stop-color="#6a4526"/>
+      <stop offset="1" stop-color="#4e321c"/>
+    </linearGradient>
+    <linearGradient id="dic-crease" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#8a6f42" stop-opacity="0"/>
+      <stop offset="0.5" stop-color="#8a6f42" stop-opacity="0.30"/>
+      <stop offset="1" stop-color="#8a6f42" stop-opacity="0"/>
     </linearGradient>
     <linearGradient id="dic-page" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#fffaee"/>
@@ -246,10 +255,6 @@
       <stop offset="0" stop-color="#ffe9a8" stop-opacity="0.55"/>
       <stop offset="0.55" stop-color="#ffd873" stop-opacity="0.18"/>
       <stop offset="1" stop-color="#ffd873" stop-opacity="0"/>
-    </radialGradient>
-    <radialGradient id="dic-moon" cx="0.42" cy="0.36" r="0.7">
-      <stop offset="0" stop-color="#fffdf2"/>
-      <stop offset="1" stop-color="#ecdfae"/>
     </radialGradient>
   </defs>
 
@@ -621,18 +626,27 @@
     // Hoot is about 300 units tall and 200 wide at scale 1, and he is the
     // thing she aims at, so he is sized off whichever of the two
     // dimensions would crop him first rather than off one of them.
-    var hootP, book, treeX;
+    // deskY is the desk's back edge, where it meets the bookcases. Both
+    // Hoot's feet and the book have to end up below it, or one of them
+    // is standing in the wall.
+    var hootP, book, deskY;
     if (wide) {
-      treeX = W * 0.045;
-      hootP = { x: W * 0.20, y: H * 0.83, s: clamp(H * 0.0018, 0.5, 1.9) };
-      book = { x: W * 0.66, y: H * 0.47, w: W * 0.58, h: H * 0.70 };
+      deskY = H * 0.40;
+      hootP = { x: W * 0.20, y: H * 0.66, s: clamp(H * 0.0017, 0.5, 1.9) };
+      book = { x: W * 0.65, y: H * 0.64, w: W * 0.56, h: H * 0.46 };
     } else {
-      treeX = W * 0.15;
-      hootP = { x: W * 0.54, y: H * 0.43, s: clamp(Math.min(W * 0.0024, H * 0.0011), 0.5, 2.6) };
-      book = { x: W * 0.5, y: H * 0.71, w: W * 0.92, h: H * 0.40 };
+      deskY = H * 0.46;
+      hootP = { x: W * 0.5, y: H * 0.53, s: clamp(Math.min(W * 0.0024, H * 0.00095), 0.5, 2.6) };
+      book = { x: W * 0.5, y: H * 0.75, w: W * 0.92, h: H * 0.38 };
     }
 
-    L = { W: W, H: H, wide: wide, hoot: hootP, book: book, branch: hootP.y, treeX: treeX };
+    // The age slider is an HTML bar sitting over the bottom of the SVG,
+    // so the drawing has to know how tall it is in its own units and
+    // keep the page clear of it. Chasing this in percentages instead
+    // meant re-tuning it for every screen shape that came along.
+    var barVb = (74 / Math.max(1, vh)) * H;
+
+    L = { W: W, H: H, wide: wide, hoot: hootP, book: book, deskY: deskY, barVb: barVb };
 
     svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
     drawScenery();
@@ -644,86 +658,128 @@
   }
 
   // ------------------------------------------------------------------
-  // The wood at night. Deliberately still: everything that moves in this
-  // game is Hoot, so that a movement anywhere means he is answering.
+  // The room.
+  //
+  // Bookcases up the wall, one broad desk across the lower part, and a
+  // stack of books for Hoot to stand on. Deliberately still: everything
+  // that moves in this game is Hoot, so that a movement anywhere means
+  // he is answering.
   // ------------------------------------------------------------------
-  var stars = [];
+  var motes = [];
+
+  var SPINES = ['#a8433c', '#c47a2e', '#4f7a53', '#35618a', '#7a4a86',
+                '#b8933f', '#8c5a3a', '#5d6b7a', '#96412f', '#3f6b62'];
 
   function drawScenery() {
     var g = document.getElementById('scenery');
     clear(g);
-    var W = L.W, H = L.H, i;
+    var W = L.W, H = L.H, dy = L.deskY, i;
 
-    g.appendChild(el('rect', { x: 0, y: 0, width: W, height: H, fill: 'url(#dic-sky)' }));
+    g.appendChild(el('rect', { x: 0, y: 0, width: W, height: H, fill: 'url(#dic-wall)' }));
 
-    var moon = el('circle', { cx: W * 0.86, cy: H * 0.11, r: Math.min(W, H) * 0.062, fill: 'url(#dic-moon)' });
-    g.appendChild(moon);
+    // The bookcases. Rows are sized to the space rather than counted, so
+    // a tall phone gets more shelves and a squat laptop fewer, and the
+    // books stay the same size in both.
+    var rowH = clamp(dy * 0.30, 74, Math.min(W, H) * 0.20);
+    var rows = Math.max(1, Math.round(dy / rowH));
+    rowH = dy / rows;
+    var plank = Math.max(7, rowH * 0.10);
 
-    stars = [];
-    var n = Math.round(W * H / 26000);
-    for (i = 0; i < n; i++) {
-      var s = el('circle', {
-        cx: rand(0, W), cy: rand(0, H * 0.62), r: rand(1.2, 3.1),
-        fill: '#fff6d8', opacity: rand(0.2, 0.7)
-      });
-      g.appendChild(s);
-      stars.push({ n: s, p: rand(0, 6.28), sp: rand(0.5, 1.4), base: +s.getAttribute('opacity') });
-    }
+    for (i = 0; i < rows; i++) {
+      var base = (i + 1) * rowH;            // the shelf the books stand on
+      var space = rowH - plank;
+      var x = rand(W * 0.005, W * 0.03);
 
-    // The tree Hoot sits in.
-    var hx = L.hoot.x, by = L.branch, tx = L.treeX;
-    var tw = Math.max(52, Math.min(W, H) * 0.085);
+      while (x < W - 8) {
+        var bw = rand(Math.max(13, W * 0.016), Math.max(30, W * 0.038));
+        var bh = space * rand(0.62, 0.94);
+        var lean = Math.random() < 0.09 ? rand(-11, 11) : 0;
+        var col = SPINES[Math.floor(Math.random() * SPINES.length)];
+        var by = base - plank;
 
-    // The perch goes down first so the trunk can be laid over the joint.
-    // Drawn the other way round there is a visible seam where the two
-    // gradients meet, and the branch looks stuck on rather than grown.
-    //
-    // Sized off Hoot rather than off the screen: a branch thinner than
-    // the bird standing on it is a branch that is about to give way, and
-    // it reaches past him because one stopping at his feet reads as
-    // snapped off there.
-    var thick = Math.max(18, 34 * L.hoot.s);
-    var tip = hx + (hx - tx) * 0.75;
-    g.appendChild(el('path', {
-      d: 'M ' + (tx - tw * 0.45) + ' ' + (by - thick * 1.4) +
-         ' C ' + ((tx + hx) / 2) + ' ' + (by - thick * 0.9) + ' ' + hx + ' ' + (by - thick * 0.1) +
-         ' ' + tip + ' ' + (by + thick * 0.25) +
-         ' L ' + tip + ' ' + (by + thick * 0.85) +
-         ' C ' + hx + ' ' + (by + thick * 0.9) + ' ' + ((tx + hx) / 2) + ' ' + (by + thick * 0.6) +
-         ' ' + (tx - tw * 0.45) + ' ' + (by + thick * 0.9) + ' Z',
-      fill: 'url(#dic-bark)'
-    }));
+        g.appendChild(el('rect', {
+          x: x, y: by - bh, width: bw, height: bh, rx: Math.min(3, bw * 0.16),
+          fill: col, opacity: 0.92,
+          transform: lean ? 'rotate(' + lean + ' ' + x + ' ' + by + ')' : null
+        }));
+        // Two pale bands: at this size that is all a title needs to be.
+        if (bw > 17 && !lean) {
+          g.appendChild(el('rect', {
+            x: x + bw * 0.22, y: by - bh * 0.72, width: bw * 0.56, height: Math.max(1.6, bh * 0.035),
+            fill: '#f3e3bd', opacity: 0.5
+          }));
+          g.appendChild(el('rect', {
+            x: x + bw * 0.22, y: by - bh * 0.28, width: bw * 0.56, height: Math.max(1.6, bh * 0.035),
+            fill: '#f3e3bd', opacity: 0.35
+          }));
+        }
+        x += bw + rand(1, 4);
+      }
 
-    // The trunk runs off the top of the frame rather than coming to a
-    // point - a tree that ends in mid-air reads as a spear, which took
-    // one look at it to discover.
-    g.appendChild(el('path', {
-      d: 'M ' + (tx - tw * 0.62) + ' ' + H +
-         ' C ' + (tx - tw * 0.52) + ' ' + (H * 0.5) + ' ' + (tx - tw * 0.40) + ' ' + (H * 0.25) +
-         ' ' + (tx - tw * 0.34) + ' -20' +
-         ' L ' + (tx + tw * 0.34) + ' -20' +
-         ' C ' + (tx + tw * 0.42) + ' ' + (H * 0.25) + ' ' + (tx + tw * 0.54) + ' ' + (H * 0.5) +
-         ' ' + (tx + tw * 0.66) + ' ' + H + ' Z',
-      fill: 'url(#dic-bark)'
-    }));
-
-    for (i = 0; i < 4; i++) {
-      var gy = H * (0.12 + i * 0.24);
-      g.appendChild(el('path', {
-        d: 'M ' + (tx - tw * 0.18) + ' ' + gy + ' q ' + (tw * 0.12) + ' ' + (H * 0.045) + ' 0 ' + (H * 0.09),
-        stroke: '#3b2a1c', 'stroke-width': Math.max(2, tw * 0.06), fill: 'none',
-        opacity: 0.5, 'stroke-linecap': 'round'
+      g.appendChild(el('rect', {
+        x: 0, y: base - plank, width: W, height: plank, fill: 'url(#dic-wood)'
+      }));
+      g.appendChild(el('rect', {
+        x: 0, y: base - plank, width: W, height: Math.max(1.5, plank * 0.22),
+        fill: '#a9773f', opacity: 0.5
       }));
     }
 
-    var span = tip - tx;
-    for (i = 0; i < 7; i++) {
-      var lx = tx + span * rand(0.18, 1.02);
-      var ly = by - rand(thick * 0.2, thick * 1.9);
-      g.appendChild(el('ellipse', {
-        cx: lx, cy: ly, rx: rand(thick * 0.42, thick * 0.86), ry: rand(thick * 0.2, thick * 0.36),
-        fill: '#2f5540', opacity: 0.75,
-        transform: 'rotate(' + rand(-38, 38) + ' ' + lx + ' ' + ly + ')'
+    // The desk. Its back edge is the line the shelves stand on, and its
+    // surface runs off the bottom of the screen, so both Hoot and the
+    // book have somewhere to be.
+    g.appendChild(el('rect', { x: 0, y: dy, width: W, height: H - dy, fill: 'url(#dic-desk)' }));
+    g.appendChild(el('rect', { x: 0, y: dy, width: W, height: Math.max(4, H * 0.008), fill: '#3a2415', opacity: 0.55 }));
+    g.appendChild(el('rect', {
+      x: 0, y: dy + Math.max(4, H * 0.008), width: W, height: Math.max(3, H * 0.005),
+      fill: '#c39a5e', opacity: 0.35
+    }));
+
+    // The pool of lamplight that makes it an evening rather than a room
+    // with the big light on. There is no lamp drawn: at either shape the
+    // only gap wide enough for one is the gap the book needs.
+    g.appendChild(el('ellipse', {
+      cx: L.book.x, cy: L.book.y, rx: L.book.w * 0.78, ry: L.book.h * 0.92,
+      fill: 'url(#dic-glow)', opacity: 0.75
+    }));
+
+    // The stack he stands on, drawn under his feet.
+    drawStack(g);
+
+    // Dust in the lamplight, which is the only thing in the room allowed
+    // to move besides him, and it only breathes.
+    motes = [];
+    var n = Math.round(W * H / 42000);
+    for (i = 0; i < n; i++) {
+      var m = el('circle', {
+        cx: rand(W * 0.04, W * 0.96), cy: rand(dy * 0.2, H * 0.96), r: rand(1.4, 3.4),
+        fill: '#ffe6ae', opacity: rand(0.12, 0.4)
+      });
+      g.appendChild(m);
+      motes.push({ n: m, p: rand(0, 6.28), sp: rand(0.4, 1.1), base: +m.getAttribute('opacity') });
+    }
+  }
+
+  // A short stack of books under Hoot's feet, so he is standing on
+  // something in a room where standing on the desk itself would look
+  // like he had got up on the furniture.
+  function drawStack(g) {
+    var hx = L.hoot.x, hy = L.hoot.y, s = L.hoot.s;
+    var w0 = 150 * s, h0 = 20 * s;
+    var i, n = 3;
+    for (i = 0; i < n; i++) {
+      var w = w0 * (1 - i * 0.07) * rand(0.97, 1.03);
+      var y = hy - (n - i) * h0;
+      var off = rand(-6, 6) * s;
+      g.appendChild(el('rect', {
+        x: hx - w / 2 + off, y: y, width: w, height: h0, rx: h0 * 0.22,
+        fill: SPINES[(i * 3 + 1) % SPINES.length]
+      }));
+      // The page block, so it reads as a book and not a coloured brick.
+      g.appendChild(el('rect', {
+        x: hx - w / 2 + off + w * 0.06, y: y + h0 * 0.24,
+        width: w * 0.88, height: h0 * 0.5, rx: h0 * 0.1,
+        fill: '#f2e6c8', opacity: 0.85
       }));
     }
   }
@@ -873,15 +929,36 @@
     var pageH = clamp(blockH + pad * 2, b.h * 0.34, b.h);
     var x = b.x - b.w / 2, y = b.y - pageH / 2;
 
+    // Keep the whole page above the slider, and off the top of the desk.
+    var floor = L.H - L.barVb - Math.max(6, L.H * 0.012);
+    if (y + pageH > floor) { y = floor - pageH; }
+    if (y < L.deskY + Math.max(4, L.H * 0.01)) { y = L.deskY + Math.max(4, L.H * 0.01); }
+
+    // An open book lying on the desk: covers standing a little proud of
+    // the pages on both sides, a block of page edges under each, and a
+    // crease down the middle. The crease is a soft band rather than the
+    // hard line it started as, which drew a stripe straight through the
+    // middle of the word.
+    var lip = Math.max(8, b.w * 0.016);
     g.appendChild(el('rect', {
-      x: x - 10, y: y - 10, width: b.w + 20, height: pageH + 20,
-      rx: 22, fill: '#5a3a2c', opacity: 0.9
+      x: x - lip, y: y - lip * 0.8, width: b.w + lip * 2, height: pageH + lip * 1.9,
+      rx: lip * 1.6, fill: '#6d3f27'
     }));
     g.appendChild(el('rect', {
-      x: x, y: y, width: b.w, height: pageH, rx: 16, fill: 'url(#dic-page)'
+      x: x - lip * 0.45, y: y - lip * 0.2, width: b.w + lip * 0.9, height: pageH + lip * 0.9,
+      rx: lip, fill: '#e6d6b0'
+    }));
+    g.appendChild(el('rect', {
+      x: x, y: y, width: b.w, height: pageH, rx: lip * 0.7, fill: 'url(#dic-page)'
+    }));
+    g.appendChild(el('rect', {
+      x: b.x - b.w * 0.055, y: y, width: b.w * 0.11, height: pageH,
+      fill: 'url(#dic-crease)'
     }));
 
-    var topY = b.y - blockH / 2;
+    // Text centred on the page as it actually ended up, not on where the
+    // page was asked to go.
+    var topY = y + (pageH - blockH) / 2;
     var word = el('text', {
       x: b.x, y: topY + wordSize * 0.82, 'text-anchor': 'middle',
       'font-family': FONT, 'font-size': wordSize, 'font-weight': '800', fill: '#8a4a1a'
@@ -994,7 +1071,7 @@
     var g = document.getElementById('sparks');
     var c = el('circle', {
       cx: L.hoot.x, cy: L.hoot.y - 150 * L.hoot.s, r: 40 * L.hoot.s,
-      fill: 'none', stroke: '#9fe8ff', 'stroke-width': 5, opacity: 0.55
+      fill: 'none', stroke: '#ffdfa2', 'stroke-width': 5, opacity: 0.55
     });
     g.appendChild(c);
     sparks.push({ n: c, t: 0, life: 1.5, kind: 'ring' });
@@ -1313,12 +1390,19 @@
       wantBob = Math.sin(time * 5) * 2;
       if (!reduced && Math.random() < dt * 2.6) { ripple(); }
     } else if (state === 'thinking') {
-      look.tx = Math.sin(time * 0.9) * 0.7; look.ty = -0.9;
-      wantTilt = Math.sin(time * 0.7) * 10;
+      // He consults the book: head down and turned towards it, eyes
+      // tracking along a line. The page-turn sound was always here; it
+      // is only now that there is a page for it to belong to.
+      var toBook = clamp((L.book.x - L.hoot.x) / (L.W * 0.35), -1, 1);
+      look.tx = toBook * 0.7 + Math.sin(time * 1.3) * 0.3;
+      look.ty = 0.95;
+      wantTilt = toBook * 9 + Math.sin(time * 0.7) * 4;
+      wantLean = 7;
       wantBob = Math.sin(time * 2.2) * 2;
       if (!reduced && Math.random() < dt * 1.6) { pageTurn(); }
     } else if (state === 'telling') {
-      look.tx = 0; look.ty = 0.2;
+      // And looks back up from it, at her.
+      look.tx = 0; look.ty = 0.15;
       wantBob = Math.sin(time * 7) * 3;
       wantLean = 3;
     } else if (state === 'choosing') {
@@ -1374,9 +1458,9 @@
     document.getElementById('book').setAttribute('opacity', bookOpen);
 
     var i;
-    for (i = 0; i < stars.length; i++) {
-      var s = stars[i];
-      s.n.setAttribute('opacity', s.base * (0.6 + 0.4 * Math.sin(time * s.sp + s.p)));
+    for (i = 0; i < motes.length; i++) {
+      var s = motes[i];
+      s.n.setAttribute('opacity', s.base * (0.55 + 0.45 * Math.sin(time * s.sp + s.p)));
     }
 
     stepSparks(dt);
