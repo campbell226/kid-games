@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="theme-color" content="#17203c">
-<title>Ask Hoot</title>
+<title>Dictionary</title>
 <style>
   * { box-sizing: border-box; }
   html, body {
@@ -54,11 +54,47 @@
   #panel h3 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
   #panel p.note { margin: 6px 0 0; font-size: 12.5px; color: #63727f; }
   .row { margin-bottom: 18px; }
-  .agewrap { display: flex; align-items: center; gap: 14px; }
-  .agewrap input { flex: 1 1 auto; height: 42px; }
-  .agenum {
-    flex: 0 0 auto; min-width: 66px; text-align: center;
-    font-size: 22px; font-weight: 700; color: #b4531c;
+  #blobnote { display: none; }
+  #blobnote.open { display: block; }
+  #blobnote code {
+    font: 12px/1 ui-monospace, Menlo, Consolas, monospace;
+    background: #e8edf1; border-radius: 4px; padding: 1px 4px;
+  }
+
+  /* The reading-age slider lives on the screen itself, not behind the
+     long press. It is the one setting that changes between the two of
+     them, so it has to be a reach away rather than a secret. */
+  #agebar {
+    position: fixed; left: 50%; bottom: max(10px, env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    display: flex; align-items: center; gap: 14px;
+    width: min(400px, 76vw); padding: 6px 18px 6px 20px;
+    border-radius: 30px; background: rgba(12, 18, 38, 0.5);
+    box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.14);
+    z-index: 5;
+  }
+  #agebar input {
+    flex: 1 1 auto; margin: 0; height: 44px; background: transparent;
+    -webkit-appearance: none; appearance: none; touch-action: none;
+  }
+  #agebar input::-webkit-slider-runnable-track {
+    height: 10px; border-radius: 5px; background: rgba(255, 255, 255, 0.26);
+  }
+  #agebar input::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 36px; height: 36px; margin-top: -13px;
+    border-radius: 50%; background: #e2a33c; box-shadow: 0 2px 7px rgba(0, 0, 0, 0.45);
+  }
+  #agebar input::-moz-range-track {
+    height: 10px; border-radius: 5px; background: rgba(255, 255, 255, 0.26);
+  }
+  #agebar input::-moz-range-thumb {
+    width: 36px; height: 36px; border: 0; border-radius: 50%;
+    background: #e2a33c; box-shadow: 0 2px 7px rgba(0, 0, 0, 0.45);
+  }
+  #ageNum {
+    flex: 0 0 auto; min-width: 34px; text-align: center;
+    font: 700 26px/1 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: #f4d69a;
   }
   .wide, .field {
     display: block; width: 100%; min-height: 46px;
@@ -169,32 +205,32 @@
 })();
 </script>
 
-<svg id="stage" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" aria-label="Ask Hoot">
+<svg id="stage" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" aria-label="Dictionary">
   <defs>
-    <linearGradient id="ah-sky" x1="0" y1="0" x2="0" y2="1">
+    <linearGradient id="dic-sky" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#101838"/>
       <stop offset="0.55" stop-color="#222b52"/>
       <stop offset="1" stop-color="#3d3663"/>
     </linearGradient>
-    <linearGradient id="ah-bark" x1="0" y1="0" x2="1" y2="0">
+    <linearGradient id="dic-bark" x1="0" y1="0" x2="1" y2="0">
       <stop offset="0" stop-color="#4a3524"/>
       <stop offset="0.45" stop-color="#6d4d33"/>
       <stop offset="1" stop-color="#402d1f"/>
     </linearGradient>
-    <linearGradient id="ah-page" x1="0" y1="0" x2="0" y2="1">
+    <linearGradient id="dic-page" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#fffaee"/>
       <stop offset="1" stop-color="#f0e3c6"/>
     </linearGradient>
-    <linearGradient id="ah-card" x1="0" y1="0" x2="0" y2="1">
+    <linearGradient id="dic-card" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#fff8e6"/>
       <stop offset="1" stop-color="#f5e2b8"/>
     </linearGradient>
-    <radialGradient id="ah-glow" cx="0.5" cy="0.5" r="0.5">
+    <radialGradient id="dic-glow" cx="0.5" cy="0.5" r="0.5">
       <stop offset="0" stop-color="#ffe9a8" stop-opacity="0.55"/>
       <stop offset="0.55" stop-color="#ffd873" stop-opacity="0.18"/>
       <stop offset="1" stop-color="#ffd873" stop-opacity="0"/>
     </radialGradient>
-    <radialGradient id="ah-moon" cx="0.42" cy="0.36" r="0.7">
+    <radialGradient id="dic-moon" cx="0.42" cy="0.36" r="0.7">
       <stop offset="0" stop-color="#fffdf2"/>
       <stop offset="1" stop-color="#ecdfae"/>
     </radialGradient>
@@ -209,6 +245,11 @@
   <g id="corner"></g>
 </svg>
 
+<div id="agebar">
+  <input type="range" id="age" min="3" max="11" step="1" value="5" aria-label="Reading age">
+  <span id="ageNum">5</span>
+</div>
+
 <div id="parent" role="dialog" aria-modal="true" aria-label="Parent controls">
   <div id="panel">
     <h2>Parent controls</h2>
@@ -217,19 +258,12 @@
     <p id="status"></p>
 
     <div class="row">
-      <h3>Reading age</h3>
-      <div class="agewrap">
-        <input type="range" id="age" min="3" max="11" step="1" value="5" aria-label="Reading age">
-        <span class="agenum" id="ageNum">5</span>
-      </div>
-      <p class="note">How simple the explanations are. It changes the next word, not the one on screen.</p>
-    </div>
-
-    <div class="row">
       <h3>API key</h3>
       <input type="password" class="field" id="key" autocomplete="off" spellcheck="false"
              placeholder="sk-ant-&hellip;">
       <p class="note">Kept on this device only. Leave it empty to use the one built into the file.</p>
+      <p class="note" id="blobnote">Paste this line into <code>dictionary.html</code>, replacing the
+        one that starts <code>var BAKED</code>, and every other device gets the key too.</p>
       <textarea id="blob" readonly spellcheck="false" aria-label="Scrambled key line"></textarea>
     </div>
 
@@ -243,7 +277,7 @@
     <h2>Which word?</h2>
     <input type="text" class="field" id="typeWord" autocomplete="off" autocapitalize="off"
            spellcheck="false" enterkeyhint="go">
-    <button type="button" id="typeGo" class="wide" style="margin-top:12px">Ask Hoot</button>
+    <button type="button" id="typeGo" class="wide" style="margin-top:12px">Look it up</button>
     <button type="button" id="typeCancel" class="wide">Never mind</button>
   </div>
 </div>
@@ -326,7 +360,7 @@
   // ------------------------------------------------------------------
   // Remembered settings, and the day's tally.
   // ------------------------------------------------------------------
-  var STORE = 'ask-hoot';
+  var STORE = 'dictionary';
   var prefs = { age: 5, key: '', day: '', used: 0 };
   var DAILY_CAP = 200;
 
@@ -555,12 +589,12 @@
     var hootP, book, treeX;
     if (wide) {
       treeX = W * 0.045;
-      hootP = { x: W * 0.20, y: H * 0.88, s: clamp(H * 0.0019, 0.5, 1.9) };
-      book = { x: W * 0.66, y: H * 0.50, w: W * 0.58, h: H * 0.74 };
+      hootP = { x: W * 0.20, y: H * 0.83, s: clamp(H * 0.0018, 0.5, 1.9) };
+      book = { x: W * 0.66, y: H * 0.47, w: W * 0.58, h: H * 0.70 };
     } else {
       treeX = W * 0.15;
-      hootP = { x: W * 0.54, y: H * 0.44, s: clamp(Math.min(W * 0.0024, H * 0.0011), 0.5, 2.6) };
-      book = { x: W * 0.5, y: H * 0.745, w: W * 0.92, h: H * 0.42 };
+      hootP = { x: W * 0.54, y: H * 0.43, s: clamp(Math.min(W * 0.0024, H * 0.0011), 0.5, 2.6) };
+      book = { x: W * 0.5, y: H * 0.71, w: W * 0.92, h: H * 0.40 };
     }
 
     L = { W: W, H: H, wide: wide, hoot: hootP, book: book, branch: hootP.y, treeX: treeX };
@@ -585,9 +619,9 @@
     clear(g);
     var W = L.W, H = L.H, i;
 
-    g.appendChild(el('rect', { x: 0, y: 0, width: W, height: H, fill: 'url(#ah-sky)' }));
+    g.appendChild(el('rect', { x: 0, y: 0, width: W, height: H, fill: 'url(#dic-sky)' }));
 
-    var moon = el('circle', { cx: W * 0.86, cy: H * 0.11, r: Math.min(W, H) * 0.062, fill: 'url(#ah-moon)' });
+    var moon = el('circle', { cx: W * 0.86, cy: H * 0.11, r: Math.min(W, H) * 0.062, fill: 'url(#dic-moon)' });
     g.appendChild(moon);
 
     stars = [];
@@ -622,7 +656,7 @@
          ' L ' + tip + ' ' + (by + thick * 0.85) +
          ' C ' + hx + ' ' + (by + thick * 0.9) + ' ' + ((tx + hx) / 2) + ' ' + (by + thick * 0.6) +
          ' ' + (tx - tw * 0.45) + ' ' + (by + thick * 0.9) + ' Z',
-      fill: 'url(#ah-bark)'
+      fill: 'url(#dic-bark)'
     }));
 
     // The trunk runs off the top of the frame rather than coming to a
@@ -635,7 +669,7 @@
          ' L ' + (tx + tw * 0.34) + ' -20' +
          ' C ' + (tx + tw * 0.42) + ' ' + (H * 0.25) + ' ' + (tx + tw * 0.54) + ' ' + (H * 0.5) +
          ' ' + (tx + tw * 0.66) + ' ' + H + ' Z',
-      fill: 'url(#ah-bark)'
+      fill: 'url(#dic-bark)'
     }));
 
     for (i = 0; i < 4; i++) {
@@ -809,7 +843,7 @@
       rx: 22, fill: '#5a3a2c', opacity: 0.9
     }));
     g.appendChild(el('rect', {
-      x: x, y: y, width: b.w, height: pageH, rx: 16, fill: 'url(#ah-page)'
+      x: x, y: y, width: b.w, height: pageH, rx: 16, fill: 'url(#dic-page)'
     }));
 
     var topY = b.y - blockH / 2;
@@ -880,7 +914,7 @@
       var grp = el('g', { 'class': 'card', 'data-i': i });
       grp.appendChild(el('rect', {
         x: cx - cw / 2, y: cy - ch / 2, width: cw, height: ch, rx: ch * 0.28,
-        fill: 'url(#ah-card)', stroke: '#c99a4e', 'stroke-width': 5
+        fill: 'url(#dic-card)', stroke: '#c99a4e', 'stroke-width': 5
       }));
       var t = el('text', {
         x: cx, y: cy + ch * 0.13, 'text-anchor': 'middle',
@@ -996,7 +1030,7 @@
     if (state !== 'idle' && state !== 'listening') { return; }
     var r = (state === 'listening' ? 300 : 230) * L.hoot.s;
     g.appendChild(el('circle', {
-      id: 'aura', cx: L.hoot.x, cy: L.hoot.y - 150 * L.hoot.s, r: r, fill: 'url(#ah-glow)'
+      id: 'aura', cx: L.hoot.x, cy: L.hoot.y - 150 * L.hoot.s, r: r, fill: 'url(#dic-glow)'
     }));
   }
 
@@ -1427,12 +1461,10 @@
   var keyEl = document.getElementById('key');
   var blobEl = document.getElementById('blob');
   var statusEl = document.getElementById('status');
+  var blobNote = document.getElementById('blobnote');
 
   function syncPanel() {
-    ageEl.value = prefs.age;
-    ageNum.textContent = prefs.age;
     keyEl.value = '';
-    blobEl.classList.remove('open');
 
     var bits = [];
     bits.push('<b>' + prefs.used + '</b> of ' + DAILY_CAP + ' words today');
@@ -1443,26 +1475,44 @@
     statusEl.innerHTML = bits.join('<br>');
   }
 
-  function openParent() { syncPanel(); parentEl.classList.add('open'); }
+  function hideBlob() {
+    blobEl.value = '';
+    blobEl.classList.remove('open');
+    blobNote.classList.remove('open');
+  }
+
+  function openParent() { hideBlob(); syncPanel(); parentEl.classList.add('open'); }
   function closeParent() { parentEl.classList.remove('open'); }
 
-  ageEl.addEventListener('input', function () { ageNum.textContent = ageEl.value; });
+  // The reading age, live on the screen. Dragging it does not disturb
+  // whatever is currently in the book - it is the next word that comes
+  // back at the new age.
+  function syncAge() {
+    ageEl.value = prefs.age;
+    ageNum.textContent = prefs.age;
+  }
+
+  ageEl.addEventListener('input', function () {
+    prefs.age = clamp(+ageEl.value || 5, 3, 11);
+    ageNum.textContent = prefs.age;
+    savePrefs();
+  });
 
   document.getElementById('save').addEventListener('click', function () {
-    prefs.age = clamp(+ageEl.value || 5, 3, 11);
     var typed = keyEl.value.trim();
-    if (typed) {
-      prefs.key = typed;
-      // Print the line to paste into this file, so the other devices get
-      // the key without it ever being typed on them - and without it
-      // ever being sent to anybody.
-      blobEl.value = "  var BAKED = '" + scramble(typed) + "';";
-      blobEl.classList.add('open');
-      blobEl.select();
-    }
+    if (!typed) { closeParent(); return; }
+
+    prefs.key = typed;
     savePrefs();
+    // syncPanel clears the key box, so the line to paste has to be
+    // written after it and not before - written first, the refresh wiped
+    // it and the panel just closed looking like nothing had happened.
     syncPanel();
-    if (!typed) { closeParent(); }
+    blobEl.value = "  var BAKED = '" + scramble(typed) + "';";
+    blobEl.classList.add('open');
+    blobNote.classList.add('open');
+    blobEl.focus();
+    blobEl.select();
   });
 
   document.getElementById('close').addEventListener('click', closeParent);
@@ -1471,7 +1521,45 @@
   });
 
   // ------------------------------------------------------------------
+  // A real keyboard.
+  //
+  // On a laptop the natural thing is to start typing the word, so that
+  // is what starting to type does: the first letter opens the box and is
+  // the first letter in it. Space or return opens the ear instead, and
+  // escape backs out of whatever is open.
+  // ------------------------------------------------------------------
+  document.addEventListener('keydown', function (ev) {
+    if (ev.metaKey || ev.ctrlKey || ev.altKey) { return; }
+    var open = typingEl.classList.contains('open') || parentEl.classList.contains('open');
+
+    if (ev.key === 'Escape') {
+      if (open) { closeTyping(); closeParent(); ev.preventDefault(); }
+      return;
+    }
+    if (open) { return; }
+
+    if (ev.key && ev.key.length === 1 && /[a-z]/i.test(ev.key)) {
+      initAudio(); warmVoice();
+      openTyping();
+      typeWord.value = ev.key.toLowerCase();
+      ev.preventDefault();
+      return;
+    }
+    if (ev.key === 'Enter' || ev.key === ' ') {
+      initAudio(); warmVoice();
+      ev.preventDefault();
+      if (state === 'listening') { stopListening(); }
+      else if (state === 'asleep') { snore(); }
+      else if (state === 'telling' || state === 'thinking') {
+        if (SS) { SS.cancel(); }
+        setState('idle');
+      } else { hoot(false); startListening(); }
+    }
+  });
+
+  // ------------------------------------------------------------------
   loadPrefs();
+  syncAge();
   computeLayout();
   if (spendLeft() <= 0) { setState('asleep'); }
   requestAnimationFrame(frame);

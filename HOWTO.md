@@ -110,9 +110,9 @@ oversight, and it is not to be "fixed". The rules govern new games.
 
 ---
 
-## Ask Hoot, and the one game that costs money
+## Dictionary, and the one game that costs money
 
-Ask Hoot is the only game that talks to anything outside itself. She says a
+Dictionary is the only game that talks to anything outside itself. She says a
 word, Hoot explains it at whatever reading age the slider is set to. The
 explanation comes from Anthropic's API, which is billed per word.
 
@@ -125,7 +125,7 @@ explanation comes from Anthropic's API, which is billed per word.
    monthly spend limit. This keeps the game away from anything else on the
    account, forever.
 3. **API keys → create a key *inside that workspace***. Copy it.
-4. Open Ask Hoot on the laptop, long-press the corner, paste the key in and
+4. Open Dictionary on the laptop, long-press the corner, paste the key in and
    press Save. It prints a scrambled line beginning `var BAKED =`. Hand that
    line to Claude, say which game it belongs to, and it goes into the file so
    every tablet has it.
