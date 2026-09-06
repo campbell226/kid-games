@@ -1877,6 +1877,25 @@
     }, 150);
   }
 
+  // The keyboard is the instrument while it is open, so the band stands
+  // down - all of them, the leader included. Only what each character
+  // was set to is remembered, so coming back restores the sounds
+  // themselves and not merely who was on; and because leaving and
+  // rejoining still happen on the beat, it stops and starts in time
+  // rather than being cut off.
+  function silenceBand() {
+    K.saved = pads.map(function (p) { return p.want; });
+    for (var i = 0; i < pads.length; i++) { pads[i].want = -1; }
+  }
+
+  function restoreBand() {
+    if (!K.saved) { return; }
+    for (var i = 0; i < pads.length && i < K.saved.length; i++) {
+      pads[i].want = K.saved[i];
+    }
+    K.saved = null;
+  }
+
   function pawGlyph() {
     return '<g fill="#ffffff">'
       + '<ellipse cx="0" cy="10" rx="17" ry="13"/>'
@@ -1965,9 +1984,11 @@
         showMode();
       } else if (act === 'keys') {
         mode = 'keys';
+        silenceBand();
         showMode();
       } else if (act === 'animals') {
         mode = 'jam';
+        restoreBand();
         showMode();
       } else if (act.indexOf('voice') === 0) {
         K.voice = +act.slice(5);
