@@ -595,12 +595,15 @@
       + '</g>';
   }
 
+  // A stick, not a beater: a thin shaft with a small bead of the same
+  // wood on the end, lying along the shaft rather than balled on it.
   function stickArt() {
     return '<g class="stick">'
-      + '<path d="M ' + STICK_X + ' ' + STICK_Y + ' L -90 -40" stroke="#e6cda2"'
-      + ' stroke-width="9" fill="none" stroke-linecap="round"/>'
-      + '<circle cx="-93" cy="-38" r="9" fill="#cfae7c"/>'
-      + '<circle cx="' + STICK_X + '" cy="' + STICK_Y + '" r="13" fill="#f0b7c3"/>'
+      + '<path d="M ' + STICK_X + ' ' + STICK_Y + ' L -84 -43" stroke="#e6cda2"'
+      + ' stroke-width="6" fill="none" stroke-linecap="round"/>'
+      + '<ellipse cx="-87" cy="-41.5" rx="5.6" ry="4.2"'
+      + ' transform="rotate(-27.6 -87 -41.5)" fill="#efdcb8"/>'
+      + '<circle cx="' + STICK_X + '" cy="' + STICK_Y + '" r="11" fill="#f0b7c3"/>'
       + '</g>';
   }
 
@@ -628,7 +631,7 @@
     {
       id: 'mouse', colour: '#bab7c6', dark: '#9592a4', top: -172,
       art: function (s) {
-        return '<path d="M 40 -40 Q 96 -34 88 -96" stroke="#e3b7c2" stroke-width="9" fill="none" stroke-linecap="round"/>'
+        return '<g class="tail"><path d="M 40 -40 Q 96 -34 88 -96" stroke="#e3b7c2" stroke-width="9" fill="none" stroke-linecap="round"/></g>'
           + legPair(28, 18, 12, s.dark)
           + '<ellipse cx="0" cy="-58" rx="46" ry="48" fill="' + s.colour + '"/>'
           + '<ellipse cx="0" cy="-48" rx="26" ry="30" fill="#ded9e6"/>'
@@ -731,29 +734,23 @@
   // are already playing the same beat of the same loop, with nothing to
   // count in and nothing to press together.
   //
-  // Three layers, coarsest first:
+  // The clock is never shown and never set. It is here for one job: it
+  // does not run fast or slow, so a grid pinned to it does not drift,
+  // and an afternoon-long session ends as together as it started. What
+  // it cannot do is tell one device where the other one is, because it
+  // is only ever read to the second and a second is a beat and a half at
+  // ninety. So where in the loop to be is set by hand, by pointing at
+  // it, and the clock's job is only to hold it there.
   //
-  //   clockAdjust  what this device is told the time is, when its own
-  //                clock is wrong. Set by hand, in years down to
-  //                seconds, until every device reads the same.
   //   beatShift    which beat of the sixteen this device calls the
-  //                first. The clock cannot settle this and it is worth
-  //                being clear why: the readout goes to the second, and
-  //                a second is a beat and a half at ninety. Two devices
-  //                showing the same second can still be most of a
-  //                second apart underneath, which is a whole beat or
-  //                two out of the loop - and because every click is
-  //                identical and one beat apart, nudging lands you on
-  //                the nearest one and leaves the loop rotated. So this
-  //                is a rotation of the pattern only. It moves no
-  //                timing whatever, and therefore cannot disturb an
-  //                alignment already found.
-  //   offset       the milliseconds left over: the sub-second gap
-  //                between two system clocks, plus the difference in
-  //                how long each device takes to get a sound out of its
-  //                speaker. Nudged by ear, and wrapped to half a beat
-  //                either way - anything past that is a loop rotation
-  //                wearing a disguise, and rotation is not its job.
+  //                first. Whole beats, so it rotates the pattern and
+  //                moves no timing at all.
+  //   offset       everything finer than a beat: the sub-second gap
+  //                between two system clocks, plus the difference in how
+  //                long each device takes to get a sound out of its
+  //                speaker. Wrapped to half a beat either way, because
+  //                past that it is a rotation in disguise and rotation
+  //                is beatShift's job.
   //   skew         not a control. The audio clock is a separate,
   //                free-running clock, so it is slewed onto the wall
   //                clock rather than trusted: at most a millisecond a
@@ -763,8 +760,8 @@
   //                in one go instead, because being a second out is
   //                worse than one flinch.
   //
-  // Only the first two are ever set, and once set they stay set, because
-  // no clock in this is free-running. A session can last all afternoon.
+  // Tapping the ring sets both of the first two at once, from wherever
+  // you point to wherever the playhead is.
   // ------------------------------------------------------------------
   var STEPS_PER_BEAT = 4, BEATS_PER_LOOP = 16;
   var STEPS_PER_LOOP = STEPS_PER_BEAT * BEATS_PER_LOOP;
@@ -772,17 +769,15 @@
 
   var bpm = clamp(load('bpm', 90), 60, 160);
   var offset = load('offset', 0);
-  var clockAdjust = load('clock', 0);
   var beatShift = ((Math.round(load('shift', 0)) % BEATS_PER_LOOP) + BEATS_PER_LOOP) % BEATS_PER_LOOP;
   var skew = 0, skewSet = false, stepN = 0, visQ = [], mode = 'tune';
 
   function wallNow() { return Date.now() / 1000; }
-  function tellNow() { return wallNow() + clockAdjust; }
   function stepDur() { return 60 / bpm / STEPS_PER_BEAT; }
   function beatDur() { return 60 / bpm; }
 
-  // Audio time of the grid's zero, which is where all three layers meet.
-  function gridZero() { return offset - clockAdjust + skew; }
+  // Audio time of the grid's zero, which is where the layers meet.
+  function gridZero() { return offset + skew; }
   function stepTime(n) { return n * stepDur() + gridZero(); }
 
   function trackWallClock(dt) {
@@ -845,38 +840,25 @@
     save('shift', beatShift);
   }
 
-  // Told the time by hand, in whole calendar units, so a device whose
-  // own clock is wrong can be brought onto the others. Done through Date
-  // rather than by adding seconds, so a month is the month it actually
-  // is and the year knows about February.
-  function pad2(n) { return (n < 10 ? '0' : '') + n; }
-
-  var FIELDS = [
-    { w: 1.8, read: function (d) { return String(d.getFullYear()); },
-      bump: function (d, n) { d.setFullYear(d.getFullYear() + n); } },
-    { w: 1, read: function (d) { return pad2(d.getMonth() + 1); },
-      bump: function (d, n) { d.setMonth(d.getMonth() + n); } },
-    { w: 1, read: function (d) { return pad2(d.getDate()); },
-      bump: function (d, n) { d.setDate(d.getDate() + n); } },
-    { w: 1, read: function (d) { return pad2(d.getHours()); },
-      bump: function (d, n) { d.setHours(d.getHours() + n); } },
-    { w: 1, read: function (d) { return pad2(d.getMinutes()); },
-      bump: function (d, n) { d.setMinutes(d.getMinutes() + n); } },
-    { w: 1, read: function (d) { return pad2(d.getSeconds()); },
-      bump: function (d, n) { d.setSeconds(d.getSeconds() + n); } }
-  ];
-
-  function bumpField(i, n) {
-    var d = new Date(tellNow() * 1000);
-    FIELDS[i].bump(d, n);
-    clockAdjust = d.getTime() / 1000 - wallNow();
-    save('clock', clockAdjust);
+  // Where the playhead is now, as a fraction of the loop. This is the
+  // thing two devices have to agree on, and the ring both shows it and
+  // sets it.
+  function loopPosNow() {
+    var s = curStep() + beatShift * STEPS_PER_BEAT;
+    return (((s % STEPS_PER_LOOP) + STEPS_PER_LOOP) % STEPS_PER_LOOP) / STEPS_PER_LOOP;
   }
 
-  function clockText() {
-    var d = new Date(tellNow() * 1000);
-    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate())
-      + '  ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
+  // Point at where the other device is and this one goes there. The
+  // whole beats become a rotation and the remainder becomes an offset,
+  // so a tap that lands a little early or late still leaves the loop on
+  // the right beat and only the fine part to nudge.
+  function setLoopPos(p) {
+    var d = p - loopPosNow();
+    d -= Math.round(d);
+    var beats = d * BEATS_PER_LOOP;
+    var whole = Math.round(beats);
+    shiftBeats(whole);
+    nudge(-(beats - whole) * beatDur());
   }
 
   var pads = [], byId = {};
@@ -961,6 +943,10 @@
       } else if (e.hit !== undefined) {
         p = byId[e.id];
         p.bounceV = 1;
+        // How big a hop the gap earned. A kick every two beats gets the
+        // full jump; sixteenths get a bob.
+        p.hopScale = clamp((e.t - p.lastHit) / 0.45, 0.22, 1);
+        p.lastHit = e.t;
         p.mouthT = e.hit;
         p.mouthAge = 0;
       }
@@ -1057,13 +1043,6 @@
     return dir < 0 ? '<g transform="scale(-1,1)">' + inner + '</g>' : inner;
   }
 
-  // The two corner buttons are the same button in two states: this one
-  // goes to the metronome, the green triangle goes back to playing.
-  function ringGlyph() {
-    return '<circle cx="0" cy="0" r="26" fill="none" stroke="#ffffff" stroke-width="7" opacity="0.55"/>'
-      + '<circle cx="0" cy="-26" r="10" fill="#ffe9a0"/>';
-  }
-
   function playGlyph() {
     return '<path d="M -18 -26 L 30 0 L -18 26 Z" fill="#ffffff"/>';
   }
@@ -1116,18 +1095,10 @@
     T.hint = el('g');
     T.hintA = el('text', { 'text-anchor': 'middle', fill: '#aab6e0' });
     T.hintB = el('text', { 'text-anchor': 'middle', fill: '#aab6e0' });
-    T.hintA.textContent = 'Same time, same tempo on every device.';
-    T.hintB.textContent = 'Then nudge until the clicks land together.';
+    T.hintA.textContent = 'Same tempo on every device. Tap the ring where';
+    T.hintB.textContent = 'the others are, then nudge until the clicks agree.';
     T.hint.appendChild(T.hintA);
     T.hint.appendChild(T.hintB);
-
-    T.clockBtn = bigButton('#2b3466', '');
-    T.clockBtn.setAttribute('data-act', 'clock');
-    T.clockLabel = el('text', {
-      'text-anchor': 'middle', fill: '#ffffff', 'font-weight': '600',
-      'font-family': 'ui-monospace, "SF Mono", Menlo, Consolas, monospace'
-    });
-    T.clockBtn.insertBefore(T.clockLabel, T.clockBtn.querySelector('.hit'));
 
     T.minus = bigButton('#3f4a7d', MINUS);
     T.plus = bigButton('#3f4a7d', PLUS);
@@ -1157,6 +1128,13 @@
     T.orbit = el('circle', { cx: 0, cy: 0, r: 26, fill: '#ffe9a0' });
     T.ring.appendChild(T.orbit);
 
+    // The ring is the control. Tapping it is a bearing, not a button, so
+    // the target is the whole band the dots run round and the middle is
+    // left alone - an angle taken from a tap near the centre would be
+    // whatever the finger happened to land on.
+    T.ringHit = el('circle', { class: 'hit ringhit', cx: 0, cy: 0, r: 240 });
+    T.ring.appendChild(T.ringHit);
+
     // Keeping time by hitting something, which is what keeping time
     // looks like. The stick swings about the paw and lands on the block
     // exactly on the beat.
@@ -1167,13 +1145,7 @@
     T.condEyes = T.condBob.querySelector('.eyes');
     T.stick = T.condBob.querySelector('.stick');
     T.block = T.condBob.querySelector('.block');
-
-    // Flanking the ring, because what they move is the ring: one press,
-    // one pip.
-    T.shiftL = bigButton('#3f4a7d', '<g transform="scale(-1,1)">' + chevron(-13) + '</g>');
-    T.shiftR = bigButton('#3f4a7d', chevron(-13));
-    T.shiftL.setAttribute('data-act', 'shift-');
-    T.shiftR.setAttribute('data-act', 'shift+');
+    T.tail = T.condBob.querySelector('.tail');
 
     T.left = bigButton('#2f6f8f', arrowGlyph(-1));
     T.right = bigButton('#2f6f8f', arrowGlyph(1));
@@ -1195,110 +1167,17 @@
     g.appendChild(T.plus);
     g.appendChild(T.bpmText);
     g.appendChild(T.bpmLabel);
-    g.appendChild(T.clockBtn);
-    g.appendChild(T.ring);
+    // The mouse goes under the ring so that the ring's tap area is on
+    // top of it: a tap on the mouse is then a tap near the centre, which
+    // is ignored, rather than a tap that lands on an ear and does
+    // nothing at all.
     g.appendChild(T.cond);
-    g.appendChild(T.shiftL);
-    g.appendChild(T.shiftR);
+    g.appendChild(T.ring);
     g.appendChild(T.left);
     g.appendChild(T.right);
     g.appendChild(T.offText);
     g.appendChild(T.play);
-
-    buildClockPanel(g);
     paintBpm();
-  }
-
-  // ------------------------------------------------------------------
-  // Telling the device the time. Six columns, coarsest first, each one
-  // a plus above a number above a minus - so a device whose own clock is
-  // wrong can be walked onto the others one unit at a time.
-  // ------------------------------------------------------------------
-  var C = {};
-
-  function buildClockPanel(g) {
-    C.panel = el('g', { display: 'none' });
-    C.back = el('rect', { x: 0, y: 0, width: 10, height: 10, fill: '#0d1230' });
-    C.panel.appendChild(C.back);
-    C.readout = el('text', {
-      'text-anchor': 'middle', fill: '#aab6e0', 'font-weight': '600',
-      'font-family': 'ui-monospace, "SF Mono", Menlo, Consolas, monospace'
-    });
-    C.panel.appendChild(C.readout);
-
-    C.cols = [];
-    FIELDS.forEach(function (f, i) {
-      var col = {};
-      col.up = bigButton('#3f4a7d', PLUS);
-      col.down = bigButton('#3f4a7d', MINUS);
-      col.up.setAttribute('data-act', 'f+' + i);
-      col.down.setAttribute('data-act', 'f-' + i);
-      col.value = el('text', {
-        'text-anchor': 'middle', fill: '#ffffff', 'font-weight': '700',
-        'font-family': 'ui-monospace, "SF Mono", Menlo, Consolas, monospace'
-      });
-      C.panel.appendChild(col.up);
-      C.panel.appendChild(col.value);
-      C.panel.appendChild(col.down);
-      C.cols.push(col);
-    });
-
-    C.done = bigButton('#3fa564',
-      '<path d="M -30 2 L -10 24 L 32 -22" fill="none" stroke="#ffffff"'
-      + ' stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>');
-    C.done.setAttribute('data-act', 'clock-done');
-    C.panel.appendChild(C.done);
-    g.appendChild(C.panel);
-  }
-
-  function layoutClockPanel() {
-    var W = L.W, H = L.H;
-    C.back.setAttribute('width', W);
-    C.back.setAttribute('height', H);
-
-    var total = 0;
-    FIELDS.forEach(function (f) { total += f.w; });
-    var span = W * 0.94, unit = span / total, x = (W - span) / 2;
-    var cy = H * 0.45;
-    var bh = Math.min(H * 0.1, 120);
-    var fh = Math.min(unit * 0.62, H * 0.075, 86);
-    var vs = bh * 0.5 + fh * 0.5 + H * 0.022;
-
-    C.readout.setAttribute('x', W * 0.5);
-    C.readout.setAttribute('y', H * 0.2);
-    C.readout.setAttribute('font-size', Math.min(H * 0.05, 70).toFixed(0));
-
-    FIELDS.forEach(function (f, i) {
-      var colW = unit * f.w, cx = x + colW / 2;
-      x += colW;
-      var bw = Math.min(colW * 0.82, 170);
-      var col = C.cols[i];
-      sizeButton(col.up, bw, bh);
-      sizeButton(col.down, bw, bh);
-      place(col.up, cx, cy - vs);
-      place(col.down, cx, cy + vs);
-      col.value.setAttribute('x', cx.toFixed(1));
-      col.value.setAttribute('y', (cy + fh * 0.36).toFixed(1));
-      col.value.setAttribute('font-size', fh.toFixed(0));
-    });
-
-    sizeButton(C.done, Math.min(W * 0.32, 320), Math.min(H * 0.11, 130));
-    place(C.done, W * 0.5, H * 0.79);
-  }
-
-  function paintClockPanel() {
-    var d = new Date(tellNow() * 1000);
-    C.readout.textContent = clockText();
-    for (var i = 0; i < FIELDS.length; i++) {
-      C.cols[i].value.textContent = FIELDS[i].read(d);
-    }
-  }
-
-  var clockOpen = false;
-  function setClockPanel(open) {
-    clockOpen = open;
-    C.panel.setAttribute('display', open ? 'inline' : 'none');
-    if (open) { paintClockPanel(); }
   }
 
   function paintBpm() {
@@ -1312,15 +1191,6 @@
     T.hintB.setAttribute('font-size', size.toFixed(0));
   }
 
-  function layoutClockBtn(cx, cy, w, h) {
-    sizeButton(T.clockBtn, w, h);
-    place(T.clockBtn, cx, cy);
-    var fs = Math.min(w / 13, h * 0.55);
-    T.clockLabel.setAttribute('x', 0);
-    T.clockLabel.setAttribute('y', fs * 0.36);
-    T.clockLabel.setAttribute('font-size', fs.toFixed(0));
-  }
-
   function layoutTune() {
     var W = L.W, H = L.H;
     // The browser's own full screen button sits in the middle of the top
@@ -1330,48 +1200,34 @@
     // guess is right on one screen and wrong on the next.
     var perPx = W / Math.max(1, svg.getBoundingClientRect().width || W);
     var reserve = 58 * perPx;
-
-    // The tempo comes first and the two clocks follow it, coarse then
-    // fine, because that is the order they are set in.
     var band = Math.min(L.wide ? H * 0.16 : H * 0.075, 110);
     var corner = cornerButton(T.play, W, band);
+    var bandTop, widest, nw, nh, fs;
 
     if (L.wide) {
       var hf0 = Math.min(H * 0.05, 46), lead0 = Math.min(H * 0.065, 58);
-      layoutHint(W * 0.5, Math.max(H * 0.2, reserve + hf0 * 0.85), hf0, lead0);
+      var hintY0 = Math.max(H * 0.2, reserve + hf0 * 0.85);
+      layoutHint(W * 0.5, hintY0, hf0, lead0);
 
-      var bw = Math.min(W * 0.13, 150), bh = Math.min(H * 0.15, 115);
-      var bpmY = H * 0.37;
+      var bw = Math.min(W * 0.14, 160), bh = Math.min(H * 0.17, 125);
+      var bpmY = H * 0.5;
       sizeButton(T.minus, bw, bh);
       sizeButton(T.plus, bw, bh);
-      // Clear of the ring's rotation chevron on the left of this column.
-      place(T.minus, W * 0.6, bpmY);
+      place(T.minus, W * 0.61, bpmY);
       place(T.plus, W * 0.93, bpmY);
-      T.bpmText.setAttribute('x', W * 0.765);
+      T.bpmText.setAttribute('x', W * 0.77);
       T.bpmText.setAttribute('y', bpmY + bh * 0.34);
       T.bpmText.setAttribute('font-size', (bh * 0.95).toFixed(0));
-      var lf = Math.min(H * 0.045, 34);
-      T.bpmLabel.setAttribute('x', W * 0.765);
-      T.bpmLabel.setAttribute('y', bpmY + bh * 0.5 + lf * 0.95);
+      var lf = Math.min(H * 0.05, 38);
+      T.bpmLabel.setAttribute('x', W * 0.77);
+      T.bpmLabel.setAttribute('y', bpmY + bh * 0.5 + lf * 1.3);
       T.bpmLabel.setAttribute('font-size', lf.toFixed(0));
 
-      var ch = Math.min(H * 0.13, 100);
-      var clockY = bpmY + bh * 0.5 + lf * 1.2 + ch * 0.5 + H * 0.025;
-      layoutClockBtn(W * 0.765, clockY, W * 0.44, ch);
-
-      var aw = Math.min(W * 0.16, 180), ah = Math.min(H * 0.13, 110);
-      var nudgeY = clockY + ch * 0.5 + ah * 0.5 + H * 0.035;
-      sizeButton(T.left, aw, ah);
-      sizeButton(T.right, aw, ah);
-      place(T.left, W * 0.63, nudgeY);
-      place(T.right, W * 0.87, nudgeY);
-      var fs = Math.min(H * 0.042, 38);
-      T.offText.setAttribute('x', W * 0.75);
-      T.offText.setAttribute('y', nudgeY + ah * 0.5 + fs * 0.95);
-      T.offText.setAttribute('font-size', fs.toFixed(0));
-
-      T.ringX = W * 0.26; T.ringY = H * 0.6;
-      T.ringR = clamp(Math.min(H * 0.3, W * 0.21), 50, 320);
+      T.ringX = W * 0.27;
+      bandTop = hintY0 + lead0 + H * 0.04;
+      widest = W * 0.23;
+      nw = Math.min(W * 0.1, 110); nh = Math.min(H * 0.14, 96);
+      fs = Math.min(H * 0.045, 38);
     } else {
       // Portrait stacks, so each band is placed under the one above it
       // rather than at a fixed fraction: whatever the reserve and the
@@ -1380,8 +1236,8 @@
       var hintY = Math.max(H * 0.095, reserve + hf * 0.85, corner * 1.1 + hf * 0.85);
       layoutHint(W * 0.5, hintY, hf, lead);
 
-      var bw2 = Math.min(W * 0.22, 240), bh2 = Math.min(H * 0.075, 150);
-      var bpmY2 = hintY + lead + bh2 * 0.5 + H * 0.035;
+      var bw2 = Math.min(W * 0.22, 240), bh2 = Math.min(H * 0.08, 160);
+      var bpmY2 = hintY + lead + bh2 * 0.5 + H * 0.04;
       sizeButton(T.minus, bw2, bh2);
       sizeButton(T.plus, bw2, bh2);
       place(T.minus, W * 0.16, bpmY2);
@@ -1389,34 +1245,36 @@
       T.bpmText.setAttribute('x', W * 0.5);
       T.bpmText.setAttribute('y', bpmY2 + bh2 * 0.36);
       T.bpmText.setAttribute('font-size', bh2.toFixed(0));
-      var lf2 = Math.min(H * 0.016, 34);
+      var lf2 = Math.min(H * 0.017, 36);
       T.bpmLabel.setAttribute('x', W * 0.5);
-      T.bpmLabel.setAttribute('y', bpmY2 + bh2 * 0.5 + lf2 * 0.95);
+      T.bpmLabel.setAttribute('y', bpmY2 + bh2 * 0.5 + lf2 * 1.3);
       T.bpmLabel.setAttribute('font-size', lf2.toFixed(0));
 
-      var ch2 = Math.min(H * 0.065, 130);
-      var clockY2 = bpmY2 + bh2 * 0.5 + lf2 * 1.2 + ch2 * 0.5 + H * 0.03;
-      layoutClockBtn(W * 0.5, clockY2, W * 0.82, ch2);
-
-      var aw2 = Math.min(W * 0.38, 380), ah2 = Math.min(H * 0.1, 200);
-      var nudgeY2 = clockY2 + ch2 * 0.5 + ah2 * 0.5 + H * 0.035;
-      sizeButton(T.left, aw2, ah2);
-      sizeButton(T.right, aw2, ah2);
-      place(T.left, W * 0.28, nudgeY2);
-      place(T.right, W * 0.72, nudgeY2);
-      var fs2 = Math.min(H * 0.016, 38);
-      T.offText.setAttribute('x', W * 0.5);
-      T.offText.setAttribute('y', nudgeY2 + ah2 * 0.5 + fs2 * 0.95);
-      T.offText.setAttribute('font-size', fs2.toFixed(0));
-
-      // The ring takes everything left below, which is a good deal more
-      // now the way back to playing is a corner button.
-      var bandTop = nudgeY2 + ah2 * 0.5 + fs2 * 1.4 + H * 0.03;
-      var bandBot = H * 0.985;
       T.ringX = W * 0.5;
-      T.ringY = (bandTop + bandBot) / 2;
-      T.ringR = clamp(Math.min(W * 0.32, (bandBot - bandTop) / 2), 50, 340);
+      bandTop = bpmY2 + bh2 * 0.5 + lf2 * 1.2 + H * 0.03;
+      widest = W * 0.34;
+      nw = Math.min(W * 0.2, 200); nh = Math.min(H * 0.075, 150);
+      fs = Math.min(H * 0.016, 38);
     }
+
+    // The ring, the two fine nudges under it and the reading under them
+    // are one block, and it is that block that gets centred in what is
+    // left - centring the ring alone left the nudges hanging halfway up
+    // an empty screen.
+    var bandBot = H * 0.985;
+    var below = nh * 1.12 + fs * 1.6;
+    T.ringR = clamp(Math.min(widest, (bandBot - bandTop - below) / 2), 50, 340);
+    var slack = (bandBot - bandTop) - (T.ringR * 2 + below);
+    T.ringY = bandTop + Math.max(0, slack) / 2 + T.ringR;
+    var nudgeY = T.ringY + T.ringR + nh * 0.62;
+
+    sizeButton(T.left, nw, nh);
+    sizeButton(T.right, nw, nh);
+    place(T.left, T.ringX - nw * 0.72, nudgeY);
+    place(T.right, T.ringX + nw * 0.72, nudgeY);
+    T.offText.setAttribute('x', T.ringX);
+    T.offText.setAttribute('y', nudgeY + nh * 0.5 + fs * 1.35);
+    T.offText.setAttribute('font-size', fs.toFixed(0));
 
     T.ringLine.setAttribute('r', T.ringR);
     T.ringLine.setAttribute('stroke-width', Math.max(8, T.ringR * 0.055));
@@ -1428,21 +1286,26 @@
       T.pips[i].setAttribute('r', (T.ringR * 0.055).toFixed(1));
     }
     T.orbit.setAttribute('r', (T.ringR * 0.1).toFixed(1));
+    T.ringHit.setAttribute('r', (T.ringR * 1.12).toFixed(1));
 
-    // Nudged right, because the block hangs off the mouse's left and the
-    // pair of them should sit in the middle of the ring, not the mouse.
-    fitAnimal(T.cond, MOUSE_SPEC, T.ringX, T.ringY, T.ringR * 1.4, T.ringR * 1.15, 22);
+    fitConductor(T.ringX, T.ringY, T.ringR * 1.5, T.ringR * 1.2);
+  }
 
-    // The rotation chevrons take whatever room is left beside the ring,
-    // so a wide ring shrinks them rather than pushing them off the edge.
-    var room = Math.min(T.ringX, W - T.ringX) - T.ringR - 22;
-    var sw = clamp(room * 0.92, 58, 150), sh = Math.min(sw * 1.1, H * 0.16, 130);
-    sizeButton(T.shiftL, sw, sh);
-    sizeButton(T.shiftR, sw, sh);
-    place(T.shiftL, T.ringX - T.ringR - 22 - sw * 0.5, T.ringY);
-    place(T.shiftR, T.ringX + T.ringR + 22 + sw * 0.5, T.ringY);
-
-    layoutClockPanel();
+  // Centred on what is actually drawn rather than on the mouse's own
+  // origin: the block hangs off one side and the tail off the other, so
+  // any fixed nudge is a guess. The measured box is the honest middle.
+  function fitConductor(cx, cy, w, h) {
+    var bb = null;
+    try { bb = T.condBob.getBBox(); } catch (e) { bb = null; }
+    if (!bb || !bb.width || !bb.height) {
+      fitAnimal(T.cond, MOUSE_SPEC, cx, cy, w, h, 20);
+      return;
+    }
+    var s = Math.min(w / bb.width, h / bb.height);
+    T.cond.setAttribute('transform',
+      'translate(' + (cx - (bb.x + bb.width / 2) * s).toFixed(1)
+      + ',' + (cy - (bb.y + bb.height / 2) * s).toFixed(1)
+      + ') scale(' + s.toFixed(4) + ')');
   }
 
   // ------------------------------------------------------------------
@@ -1464,6 +1327,13 @@
         fill: '#212a52', stroke: 'rgba(255,255,255,0.1)', 'stroke-width': 3
       });
       node.appendChild(card);
+      // A wash of the chosen sound's colour across the whole tile, under
+      // the character rather than over it, so which sound is on reads
+      // from across a room without the animal going murky.
+      var tint = el('rect', {
+        x: -100, y: -60, width: 200, height: 120, rx: 30, fill: '#000000', opacity: 0
+      });
+      node.appendChild(tint);
       var glow = el('circle', { cx: 0, cy: 0, r: 100, fill: 'url(#vglow)', opacity: 0 });
       node.appendChild(glow);
       var art = el('g');
@@ -1477,12 +1347,17 @@
 
       var p = {
         id: spec.id, spec: spec, kit: KITS[spec.id],
-        node: node, card: card, glow: glow, art: art, bob: bob, hit: hit,
+        node: node, card: card, tint: tint, glow: glow, art: art, bob: bob, hit: hit,
         mouth: bob.querySelector('.mouth'),
         eyes: bob.querySelector('.eyes'),
+        legs: Array.prototype.slice.call(bob.querySelectorAll('.leg')),
         want: -1, playing: -1, lit: -1,
-        bounceV: 0, mouthT: 0, mouthAge: 99, pulse: 0, pressT: 0,
+        bounceV: 0, hopScale: 1, lastHit: -9, mouthT: 0, mouthAge: 99,
+        pulse: 0, pressT: 0,
         blink: 2 + Math.random() * 5, blinkV: 1,
+        // Each one sways off its own phase, so six of them are a band
+        // rather than a chorus line.
+        sway: Math.random() * 6.28,
         idle: Math.random() * 6.28
       };
       pads.push(p);
@@ -1490,24 +1365,22 @@
     });
 
     // Along the bottom, where the browser's own full screen button
-    // cannot sit on them.
+    // cannot sit on them - and the row is itself the way back to the
+    // metronome, so there is no separate button for it. What it shows
+    // and what it takes you to are the same thing.
     J.bar = makeDotRow();
-    g.appendChild(J.bar.g);
-
-    // Straight to the metronome, drawn as the ring it takes you to. The
-    // arrows used to live in a drawer down here; there is no need to
-    // reach them mid-tune now the metronome view holds everything that
-    // sets the sync.
-    J.tuneBtn = bigButton('#3f4a7d', ringGlyph());
-    J.tuneBtn.setAttribute('data-act', 'home');
-    g.appendChild(J.tuneBtn);
+    J.barBtn = el('g', { class: 'btn', 'data-act': 'home' });
+    J.barHit = el('rect', { class: 'hit', x: 0, y: 0, width: 10, height: 10 });
+    J.barBtn.appendChild(J.bar.g);
+    J.barBtn.appendChild(J.barHit);
+    g.appendChild(J.barBtn);
   }
 
   function layoutJam() {
     var W = L.W, H = L.H;
     var cols = L.wide ? 3 : 2, rows = L.wide ? 2 : 3;
     var topBar = Math.min(L.wide ? H * 0.16 : H * 0.09, 130);
-    var botBar = Math.min(L.wide ? H * 0.09 : H * 0.05, 70);
+    var botBar = Math.min(L.wide ? H * 0.13 : H * 0.07, 110);
     var gap = 14;
     var padW = (W - gap * (cols + 1)) / cols;
     // A card taller than it is wide leaves the character stranded in a
@@ -1527,6 +1400,11 @@
       p.card.setAttribute('width', padW);
       p.card.setAttribute('height', padH);
       p.card.setAttribute('rx', Math.min(padW, padH) * 0.16);
+      p.tint.setAttribute('x', -padW / 2);
+      p.tint.setAttribute('y', -padH / 2);
+      p.tint.setAttribute('width', padW);
+      p.tint.setAttribute('height', padH);
+      p.tint.setAttribute('rx', Math.min(padW, padH) * 0.16);
       p.hit.setAttribute('x', -padW / 2);
       p.hit.setAttribute('y', -padH / 2);
       p.hit.setAttribute('width', padW);
@@ -1537,8 +1415,10 @@
     });
 
     layoutDotRow(J.bar, W * 0.5, H - botBar * 0.5, W * 0.88, botBar * 0.3);
-
-    cornerButton(J.tuneBtn, W, topBar);
+    J.barHit.setAttribute('x', 0);
+    J.barHit.setAttribute('y', H - botBar);
+    J.barHit.setAttribute('width', W);
+    J.barHit.setAttribute('height', botBar);
   }
 
   // Both screens carry the same corner button in the same place, so it
@@ -1569,7 +1449,6 @@
   // press from a long one.
   // ------------------------------------------------------------------
   var held = null, heldNode = null, repeatAt = 0, didRepeat = false;
-  var slideRate = 0, slideAcc = 0;
   var pressPad = null;
 
   function doOnce(act) {
@@ -1577,9 +1456,27 @@
     else if (act === 'bpm+') { setBpm(bpm + 5); }
     else if (act === 'nudge-') { nudge(-NUDGE_STEP); }
     else if (act === 'nudge+') { nudge(NUDGE_STEP); }
-    else if (act === 'shift-') { shiftBeats(-1); }
-    else if (act === 'shift+') { shiftBeats(1); }
-    else if (act.charAt(0) === 'f') { bumpField(+act.charAt(2), act.charAt(1) === '+' ? 1 : -1); }
+  }
+
+  // Tap coordinates in the world's own units, which is the only way to
+  // turn a finger into a bearing on the ring.
+  function svgPoint(ev) {
+    var m = svg.getScreenCTM();
+    if (!m) { return null; }
+    var pt = svg.createSVGPoint();
+    pt.x = ev.clientX; pt.y = ev.clientY;
+    return pt.matrixTransform(m.inverse());
+  }
+
+  function tapRing(ev) {
+    var p = svgPoint(ev);
+    if (!p) { return; }
+    var dx = p.x - T.ringX, dy = p.y - T.ringY;
+    // The middle is the mouse, and a bearing taken from there would be
+    // whatever the finger happened to land on.
+    if (dx * dx + dy * dy < (T.ringR * 0.45) * (T.ringR * 0.45)) { return; }
+    var deg = Math.atan2(dy, dx) * 180 / Math.PI + 90;
+    setLoopPos((((deg % 360) + 360) % 360) / 360);
   }
 
   svg.addEventListener('pointerdown', function (ev) {
@@ -1596,19 +1493,18 @@
       } else if (act === 'home') {
         mode = 'tune';
         showMode();
-      } else if (act === 'clock') {
-        setClockPanel(true);
-      } else if (act === 'clock-done') {
-        setClockPanel(false);
       } else {
         held = act;
         heldNode = btn;
         repeatAt = performance.now() + 380;
         didRepeat = false;
-        slideRate = 0;
-        slideAcc = 0;
         btn.setAttribute('opacity', 0.72);
       }
+      return;
+    }
+
+    if (mode === 'tune' && t.closest('.ringhit')) {
+      tapRing(ev);
       return;
     }
 
@@ -1655,25 +1551,12 @@
     }
     if (!held) { return; }
     if (nowMs < repeatAt) { return; }
+    // Every held control now repeats the same way, three milliseconds or
+    // five beats at a time. Nothing here has to cross a big gap any more:
+    // that is what pointing at the ring is for.
     didRepeat = true;
-    if (held === 'nudge-' || held === 'nudge+') {
-      // Holding accelerates. A tap is three milliseconds, which is fine
-      // enough to sit exactly on the other device; holding gets you
-      // across a big gap without a hundred taps. The remainder is
-      // carried so a slow slide still moves - rounding each frame's
-      // fraction to the nearest three would round it to nothing.
-      slideRate = Math.min(0.25, slideRate + dt * 0.22);
-      slideAcc += (held === 'nudge+' ? 1 : -1) * Math.max(0.03, slideRate) * dt;
-      var whole = slideAcc / NUDGE_STEP;
-      whole = whole < 0 ? Math.ceil(whole) : Math.floor(whole);
-      if (whole) {
-        slideAcc -= whole * NUDGE_STEP;
-        nudge(whole * NUDGE_STEP);
-      }
-    } else {
-      repeatAt = nowMs + 130;
-      doOnce(held);
-    }
+    repeatAt = nowMs + 130;
+    doOnce(held);
   }
 
   svg.addEventListener('contextmenu', function (ev) { ev.preventDefault(); });
@@ -1711,7 +1594,7 @@
 
   var condFace = { mouth: null, eyes: null, mouthT: 0, mouthAge: 99, blink: 3, blinkV: 1 };
 
-  function updateTune(dt, loopPos, beatPhase) {
+  function updateTune(dt, loopPos, beatPhase, tailPhase) {
     var a = (-90 + loopPos * 360) * Math.PI / 180;
     T.orbit.setAttribute('cx', (Math.cos(a) * T.ringR).toFixed(1));
     T.orbit.setAttribute('cy', (Math.sin(a) * T.ringR).toFixed(1));
@@ -1722,11 +1605,8 @@
     }
 
     // The readouts only have to change when they change.
-    var shown = clockText();
-    if (shown !== T.clockShown) { T.clockShown = shown; T.clockLabel.textContent = shown; }
     var ms = (offset >= 0 ? '+' : '−') + Math.round(Math.abs(offset) * 1000) + ' ms';
     if (ms !== T.offShown) { T.offShown = ms; T.offText.textContent = ms; }
-    if (clockOpen) { paintClockPanel(); }
 
     // Down on the beat and up between: sin is zero at both ends of the
     // beat, so the stick lands exactly when the click sounds.
@@ -1735,13 +1615,17 @@
       'rotate(' + lift.toFixed(2) + ' ' + STICK_X + ' ' + STICK_Y + ')');
     T.block.setAttribute('transform',
       'translate(0,' + (reduced ? 0 : beatFlash * 3).toFixed(2) + ')');
+    // The tail keeps a slower time than the stick - one sweep to four
+    // beats - so the two together read as a bar rather than a twitch.
+    T.tail.setAttribute('transform',
+      'rotate(' + (reduced ? 0 : 11 * Math.sin(Math.PI * 2 * tailPhase)).toFixed(2) + ' 40 -40)');
 
     condFace.mouth = T.condBob.querySelector('.mouth');
     condFace.eyes = T.condEyes;
     faceUpdate(condFace, dt);
   }
 
-  function updateJam(dt) {
+  function updateJam(dt, beats) {
     paintDotRow(J.bar);
 
     for (var k = 0; k < pads.length; k++) {
@@ -1761,20 +1645,39 @@
       // round, so a tap is visibly heard.
       var breathe = armed && !reduced ? (0.5 + 0.5 * Math.sin(p.idle * 6)) : (armed ? 1 : 0);
 
-      p.card.setAttribute('fill', p.lit >= 0 ? '#33407a' : '#212a52');
+      p.card.setAttribute('fill', p.lit >= 0 ? '#2b3568' : '#212a52');
       p.card.setAttribute('stroke', colour);
       p.card.setAttribute('stroke-width', ((p.lit >= 0 ? 9 : 3) + breathe * 6) * (1 - drain * 0.8));
       p.card.setAttribute('opacity', (0.72 + (p.lit >= 0 ? 0.28 : 0) + breathe * 0.2 - drain * 0.3).toFixed(2));
-
-      var hop = 0, squash = 1;
-      if (!reduced) {
-        var b = Math.sin(Math.PI * (1 - p.bounceV));
-        hop = -b * 26;
-        squash = 1 + b * 0.07;
-        if (p.lit < 0) { hop += Math.sin(p.idle * 1.4) * 3; }
+      if (p.lit >= 0) {
+        p.tint.setAttribute('fill', colour);
+        p.tint.setAttribute('opacity', (0.22 * (1 - drain)).toFixed(3));
+      } else {
+        p.tint.setAttribute('opacity', 0);
       }
-      p.bob.setAttribute('transform',
-        'translate(0,' + hop.toFixed(2) + ') scale(1,' + squash.toFixed(4) + ')');
+
+      // Two beats to a sway, with the legs stepping along it, so a
+      // character that is playing looks like it is playing between its
+      // notes as well as on them. The hop is only as big as the gap it
+      // had to gather itself in, which is what stops a run of sixteenths
+      // looking like a panic.
+      var lean = 0, hop = 0, squash = 1, step = 0;
+      if (!reduced) {
+        var swing = Math.sin(Math.PI * beats + p.sway);
+        var alive = p.lit >= 0 ? 1 : 0.3;
+        lean = swing * 4.5 * alive;
+        step = swing * 11 * alive;
+        var b = Math.sin(Math.PI * (1 - p.bounceV));
+        hop = -b * 26 * p.hopScale;
+        squash = 1 + b * 0.07 * p.hopScale;
+      }
+      p.bob.setAttribute('transform', 'translate(0,' + hop.toFixed(2) + ') rotate('
+        + lean.toFixed(2) + ' 0 0) scale(1,' + squash.toFixed(4) + ')');
+      for (var j = 0; j < p.legs.length; j++) {
+        var lg = p.legs[j];
+        lg.setAttribute('transform', 'rotate(' + (step * (+lg.getAttribute('data-side'))).toFixed(2)
+          + ' ' + lg.getAttribute('data-px') + ' ' + lg.getAttribute('data-py') + ')');
+      }
       p.art.setAttribute('opacity', ((p.lit >= 0 ? 1 : 0.42) - drain * 0.4).toFixed(2));
       p.glow.setAttribute('opacity', (Math.max(p.bounceV, open, p.pulse) * (p.lit >= 0 ? 0.55 : 0.3)).toFixed(3));
     }
@@ -1792,9 +1695,11 @@
     var s = curStep() + beatShift * STEPS_PER_BEAT;
     var loopPos = (((s % STEPS_PER_LOOP) + STEPS_PER_LOOP) % STEPS_PER_LOOP) / STEPS_PER_LOOP;
     var beatPhase = (((s % STEPS_PER_BEAT) + STEPS_PER_BEAT) % STEPS_PER_BEAT) / STEPS_PER_BEAT;
+    var beats = s / STEPS_PER_BEAT;
+    var tailPhase = (((beats % 4) + 4) % 4) / 4;
 
-    if (mode === 'tune') { updateTune(dt, loopPos, beatPhase); }
-    else { updateJam(dt); }
+    if (mode === 'tune') { updateTune(dt, loopPos, beatPhase, tailPhase); }
+    else { updateJam(dt, beats); }
 
     requestAnimationFrame(frame);
   }
