@@ -136,6 +136,7 @@
   <g id="backdrop"></g>
   <g id="tune"></g>
   <g id="jam"></g>
+  <g id="keys"></g>
 </svg>
 
 <script>
@@ -978,6 +979,7 @@
     paintBpm();
     applyLeader();
     paintSongs();
+    paintKeys();
   }
 
   // The leader is always playing. If the change of song hands the job to
@@ -1150,6 +1152,7 @@
     drawBackdrop();
     layoutTune();
     layoutJam();
+    layoutKeys();
   }
 
   function drawBackdrop() {
@@ -1221,6 +1224,17 @@
   function arrowGlyph(dir) {
     var inner = chevron(-30) + chevron(4);
     return dir < 0 ? '<g transform="scale(-1,1)">' + inner + '</g>' : inner;
+  }
+
+  // Three white keys and two black: a keyboard small enough to be a sign.
+  function keysGlyph() {
+    return '<g>'
+      + '<rect x="-30" y="-18" width="19" height="36" rx="3" fill="#ffffff"/>'
+      + '<rect x="-9.5" y="-18" width="19" height="36" rx="3" fill="#ffffff"/>'
+      + '<rect x="11" y="-18" width="19" height="36" rx="3" fill="#ffffff"/>'
+      + '<rect x="-16" y="-18" width="10" height="22" rx="2" fill="#2b3466"/>'
+      + '<rect x="5" y="-18" width="10" height="22" rx="2" fill="#2b3466"/>'
+      + '</g>';
   }
 
   function playGlyph() {
@@ -1627,6 +1641,12 @@
     // cannot sit on them - and the row is itself the way back to the
     // metronome, so there is no separate button for it. What it shows
     // and what it takes you to are the same thing.
+    // A keyboard for whoever wants to play over the top rather than
+    // switch loops on and off.
+    J.keysBtn = bigButton('#3f4a7d', keysGlyph());
+    J.keysBtn.setAttribute('data-act', 'keys');
+    g.appendChild(J.keysBtn);
+
     J.bar = makeDotRow();
     J.barBtn = el('g', { class: 'btn', 'data-act': 'home' });
     J.barHit = el('rect', { class: 'hit', x: 0, y: 0, width: 10, height: 10 });
@@ -1673,6 +1693,8 @@
       p.scale = fitAnimal(p.art, p.spec, 0, 0, padW * 0.88, padH * 0.84);
     });
 
+    cornerButton(J.keysBtn, W, topBar);
+
     // Lifted off the very bottom edge and given a fatter dot, because it
     // is a button as well as a reading and it was neither big enough nor
     // far enough from the edge of the glass to hit reliably.
@@ -1692,9 +1714,194 @@
     return h;
   }
 
+  // ------------------------------------------------------------------
+  // The keyboard.
+  //
+  // A normal one - the white and black of a piano, laid out from C - with
+  // every note the song has no use for drawn dead and deaf. Nothing new
+  // has to be learnt to see why: the gaps are where the black keys stop
+  // being available, and they move when the leader changes.
+  //
+  // Notes sound the instant they are touched. Everything else in this
+  // game waits for a beat, but an instrument that answers late is not an
+  // instrument, and the note cannot be wrong in pitch however wrong it
+  // is in time.
+  //
+  // It wants to be held the long way. Orientation locking works only
+  // inside full screen and Safari ignores it altogether, so where the
+  // lock will not take, the whole keyboard is drawn a quarter turn round
+  // instead. Turning the tablet then brings it upright, which says what
+  // is wanted without a word.
+  // ------------------------------------------------------------------
+  var K = { voice: 0, voices: [], keys: [], allowed: {} };
+  var KEY_VOICES = ['epiano', 'organ', 'pluck', 'marimba', 'glock'];
+  var WHITE_SEMI = [0, 2, 4, 5, 7, 9, 11];
+  var BLACK_AFTER = [1, 1, 0, 1, 1, 1, 0];
+  var KEY_LOW = 60;
+
+  function buildKeys() {
+    var g = document.getElementById('keys');
+    clear(g);
+    K.frame = el('g');
+    g.appendChild(K.frame);
+
+    K.bed = el('rect', { x: 0, y: 0, width: 10, height: 10, fill: '#161d3d' });
+    K.frame.appendChild(K.bed);
+    K.keyLayer = el('g');
+    K.frame.appendChild(K.keyLayer);
+
+    K.voices = [];
+    KEY_VOICES.forEach(function (t, i) {
+      var b = bigButton(SOUND_COLOURS[i], '');
+      b.setAttribute('data-act', 'voice' + i);
+      K.frame.appendChild(b);
+      K.voices.push(b);
+    });
+
+    K.back = bigButton('#3f4a7d', pawGlyph());
+    K.back.setAttribute('data-act', 'animals');
+    K.frame.appendChild(K.back);
+    paintVoices();
+  }
+
+  function paintVoices() {
+    for (var i = 0; i < K.voices.length; i++) {
+      var on = (i === K.voice);
+      K.voices[i].setAttribute('opacity', on ? 1 : 0.4);
+      K.voices[i]._body.setAttribute('stroke', on ? '#ffffff' : 'rgba(255,255,255,0.2)');
+      K.voices[i]._body.setAttribute('stroke-width', on ? 7 : 3);
+    }
+  }
+
+  // Which pitch classes the song will have. The scale, plus anything a
+  // chord raises - the leading tone of the minor song and the blues
+  // thirds are real notes of the tune and should not look broken.
+  function keySet() {
+    var song = SONGS[songIdx], set = {}, i, j;
+    for (i = 0; i < song.scale.length; i++) { set[song.scale[i] % 12] = 1; }
+    for (i = 0; i < song.chords.length; i++) {
+      var r = song.chords[i].raise;
+      if (!r) { continue; }
+      for (j in r) { set[((song.scale[j] + r[j]) % 12 + 12) % 12] = 1; }
+    }
+    K.allowed = set;
+  }
+
+  function inKey(midi) {
+    return !!K.allowed[((midi - SONGS[songIdx].key) % 12 + 12) % 12];
+  }
+
+  function layoutKeys() {
+    var W = L.W, H = L.H;
+    // The box is always the long way round, and the whole thing is
+    // turned a quarter if the screen is not.
+    var kw = L.wide ? W : H, kh = L.wide ? H : W;
+    K.frame.setAttribute('transform', L.wide ? 'translate(0,0)' : 'translate(' + W + ',0) rotate(90)');
+    K.bed.setAttribute('width', kw);
+    K.bed.setAttribute('height', kh);
+
+    var perPx = W / Math.max(1, svg.getBoundingClientRect().width || W);
+    var top = Math.min(kh * 0.22, 190);
+    var bw = Math.min(kw * 0.1, 150), bh = Math.min(top * 0.72, 110);
+    var i;
+    for (i = 0; i < K.voices.length; i++) {
+      sizeButton(K.voices[i], bw, bh);
+      place(K.voices[i], kw * 0.09 + i * bw * 1.18, top * 0.5);
+    }
+    sizeButton(K.back, bh * 1.5, bh);
+    place(K.back, kw - bh, top * 0.5);
+
+    // As many octaves as will leave a white key wide enough for a small
+    // finger, and no more.
+    var octaves = clamp(Math.floor((kw / perPx) / (7 * 46)), 1, 3);
+    var nWhite = 7 * octaves + 1;
+    var ww = kw / nWhite, keyTop = top, keyH = kh - top;
+
+    clear(K.keyLayer);
+    K.keys = [];
+    var blacks = [];
+    for (i = 0; i < nWhite; i++) {
+      var semi = WHITE_SEMI[i % 7] + 12 * Math.floor(i / 7);
+      var midi = KEY_LOW + semi;
+      var r = el('rect', {
+        class: 'pkey', x: (i * ww + 1.5).toFixed(1), y: keyTop.toFixed(1),
+        width: (ww - 3).toFixed(1), height: keyH.toFixed(1),
+        rx: Math.min(ww * 0.14, 18)
+      });
+      r.setAttribute('data-midi', midi);
+      K.keyLayer.appendChild(r);
+      K.keys.push({ node: r, midi: midi, black: false });
+      if (i < nWhite - 1 && BLACK_AFTER[i % 7]) {
+        blacks.push({ x: (i + 1) * ww, midi: midi + 1 });
+      }
+    }
+    // Blacks after the whites so they sit on top of them.
+    for (i = 0; i < blacks.length; i++) {
+      var bwid = ww * 0.62;
+      var b = el('rect', {
+        class: 'pkey', x: (blacks[i].x - bwid / 2).toFixed(1), y: keyTop.toFixed(1),
+        width: bwid.toFixed(1), height: (keyH * 0.62).toFixed(1),
+        rx: Math.min(bwid * 0.18, 14)
+      });
+      b.setAttribute('data-midi', blacks[i].midi);
+      K.keyLayer.appendChild(b);
+      K.keys.push({ node: b, midi: blacks[i].midi, black: true });
+    }
+    paintKeys();
+  }
+
+  function paintKeys() {
+    keySet();
+    for (var i = 0; i < K.keys.length; i++) {
+      var k = K.keys[i], live = inKey(k.midi);
+      k.live = live;
+      k.node.setAttribute('fill', live
+        ? (k.black ? '#2a2f52' : '#f2f2f6')
+        : (k.black ? '#1b1f38' : '#3b4166'));
+      k.node.setAttribute('opacity', live ? 1 : 0.5);
+      k.node.setAttribute('stroke', k.black ? 'none' : 'rgba(10,14,34,0.5)');
+      k.node.setAttribute('stroke-width', 2);
+    }
+  }
+
+  // Straight away, and lit straight away too - on a timer rather than
+  // the frame loop, so a stalled frame cannot leave a key stuck down.
+  function pressKey(node) {
+    var midi = +node.getAttribute('data-midi'), i, k = null;
+    for (i = 0; i < K.keys.length; i++) { if (K.keys[i].node === node) { k = K.keys[i]; } }
+    if (!k || !k.live || !AC) { return; }
+    play(KEY_VOICES[K.voice], midi, AC.currentTime + 0.01, 1.1);
+    node.setAttribute('fill', k.black ? '#6f7cc4' : '#ffe9a0');
+    setTimeout(function () {
+      node.setAttribute('fill', k.black ? '#2a2f52' : '#f2f2f6');
+    }, 150);
+  }
+
+  function pawGlyph() {
+    return '<g fill="#ffffff">'
+      + '<ellipse cx="0" cy="10" rx="17" ry="13"/>'
+      + '<circle cx="-16" cy="-8" r="6.5"/><circle cx="-5.5" cy="-15" r="6.5"/>'
+      + '<circle cx="5.5" cy="-15" r="6.5"/><circle cx="16" cy="-8" r="6.5"/>'
+      + '</g>';
+  }
+
+  function faceLandscape(on) {
+    try {
+      if (!window.screen || !screen.orientation) { return; }
+      if (on && screen.orientation.lock) {
+        var p = screen.orientation.lock('landscape');
+        if (p && p.catch) { p.catch(function () { /* drawn sideways instead */ }); }
+      } else if (!on && screen.orientation.unlock) {
+        screen.orientation.unlock();
+      }
+    } catch (e) { /* not on this browser, and the drawing copes */ }
+  }
+
   function showMode() {
     document.getElementById('tune').setAttribute('display', mode === 'tune' ? 'inline' : 'none');
     document.getElementById('jam').setAttribute('display', mode === 'jam' ? 'inline' : 'none');
+    document.getElementById('keys').setAttribute('display', mode === 'keys' ? 'inline' : 'none');
+    faceLandscape(mode === 'keys');
   }
 
   // One note of whichever sound was just chosen, straight away, so the
@@ -1756,6 +1963,15 @@
       } else if (act === 'home') {
         mode = 'tune';
         showMode();
+      } else if (act === 'keys') {
+        mode = 'keys';
+        showMode();
+      } else if (act === 'animals') {
+        mode = 'jam';
+        showMode();
+      } else if (act.indexOf('voice') === 0) {
+        K.voice = +act.slice(5);
+        paintVoices();
       } else if (act.indexOf('song') === 0) {
         setSong(+act.slice(4));
       } else {
@@ -1770,6 +1986,12 @@
 
     if (mode === 'tune' && t.closest('.ringhit')) {
       tapRing(ev);
+      return;
+    }
+
+    if (mode === 'keys') {
+      var kn = t.closest('.pkey');
+      if (kn) { pressKey(kn); }
       return;
     }
 
@@ -2045,6 +2267,7 @@
   wrapOffset();
   buildTune();
   buildJam();
+  buildKeys();
   applyLeader();
   computeLayout();
   showMode();
