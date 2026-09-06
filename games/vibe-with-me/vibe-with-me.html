@@ -864,10 +864,12 @@
   var SIDEMEN = 3;
   // How long a character keeps dancing after it stops playing, and how
   // long it then spends looking about before it drops off. Somewhere
-  // between ten and thirty seconds each, drawn fresh every time it stops
-  // and drawn per character, so six of them do not all nod off together.
+  // between thirty and ninety seconds each, drawn fresh every time it
+  // stops and drawn per character, so six of them do not all nod off
+  // together - and so nothing is asleep before a child has had time to
+  // wonder where it went.
   var WIND_DOWN = 6;
-  function idleSpan() { return 10 + Math.random() * 20; }
+  function idleSpan() { return 30 + Math.random() * 60; }
   // Notes closer together than this get every other hop skipped.
   var BOUNCE_FLOOR = 0.19;
   var songIdx = clamp(Math.round(load('song', 0)), 0, SONGS.length - 1);
