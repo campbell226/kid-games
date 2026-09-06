@@ -516,18 +516,6 @@
         additive(d, sr, n, 220, [[1, 1], [2, 0.5], [3, 0.22], [4, 0.16], [6, 0.08], [8, 0.05]], 1.1, 0.03);
       });
     } },
-    // The top of the loop, said in a frequency the woodblock barely
-    // reaches. A person hears the first click of the sixteen as very
-    // slightly brighter; a microphone with a filter on it hears a flare.
-    marker: { gain: 0.34, make: function () {
-      return buffer(0.05, function (d, sr, n) {
-        var two = Math.PI * 2;
-        for (var i = 0; i < n; i++) {
-          var t = i / sr;
-          d[i] = Math.sin(two * 6500 * t) * Math.exp(-t / 0.006);
-        }
-      });
-    } },
     click: { gain: 0.9, make: function () {
       return buffer(0.06, function (d, sr, n) {
         var body = new Float32Array(n);
@@ -1010,207 +998,6 @@
     }
   }
 
-  // ------------------------------------------------------------------
-  // Listening.
-  //
-  // The manual sync works, but it asks a child to hear a difference of a
-  // few milliseconds. A microphone does not have to: it can hear the
-  // other device's metronome and work the answer out.
-  //
-  // Two things make it accurate rather than merely close.
-  //
-  // First, it times itself. Whatever a tablet takes to get a sound out
-  // of its speaker, and back in through its microphone, and up through
-  // the buffers to us, is tens of milliseconds and is never reported. So
-  // before listening to anybody else the device plays a few clicks of
-  // its own and times how long they take to come home. Because the
-  // calibration and the listening run through the same detector,
-  // whatever that detector gets wrong cancels out: only its scatter
-  // matters, and scatter averages away over a loop's worth of clicks.
-  //
-  // Second, the marker. Every click sounds the same, so a microphone can
-  // recover which part of a beat you are on but not which beat of the
-  // sixteen - the same problem the ring tap exists to solve. The faint
-  // high tick on the top of the loop is there to be heard by this, and
-  // it is what lets one button do the whole job.
-  //
-  // A microphone needs https, so none of this happens on a file opened
-  // off the disk. That is what the ring and the arrows are still for.
-  // ------------------------------------------------------------------
-  var EARS = {
-    state: 'off', mute: false, stream: null, an: null, hi: null,
-    buf: null, hiBuf: null, poll: 0, floor: 0.002, last: -9,
-    onsets: [], sent: [], rtt: 0, until: 0, done: null, span: 1, startedAt: 0
-  };
-
-  function earsAvailable() {
-    return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
-  }
-
-  function earsPoll() {
-    if (!EARS.an || !AC) { return; }
-    EARS.an.getFloatTimeDomainData(EARS.buf);
-    EARS.hi.getFloatTimeDomainData(EARS.hiBuf);
-    var i, v, sum = 0, hsum = 0, n = EARS.buf.length;
-    for (i = 0; i < n; i++) { v = EARS.buf[i]; sum += v * v; }
-    for (i = 0; i < n; i++) { v = EARS.hiBuf[i]; hsum += v * v; }
-    var rms = Math.sqrt(sum / n), hrms = Math.sqrt(hsum / n);
-    var now = AC.currentTime;
-    var bar = Math.max(0.0025, EARS.floor * 3.2);
-    if (rms > bar && now - EARS.last > 0.08) {
-      EARS.last = now;
-      EARS.onsets.push({ t: now, hi: hrms });
-    }
-    // The floor follows the quiet only, so a steady run of clicks cannot
-    // raise the bar until they stop.
-    EARS.floor = EARS.floor * 0.94 + Math.min(rms, bar) * 0.06;
-    if (EARS.until && now > EARS.until) {
-      var f = EARS.done;
-      EARS.until = 0; EARS.done = null;
-      if (f) { f(); }
-    }
-  }
-
-  function earsStop() {
-    if (EARS.poll) { clearInterval(EARS.poll); EARS.poll = 0; }
-    if (EARS.stream) {
-      EARS.stream.getTracks().forEach(function (tr) { tr.stop(); });
-      EARS.stream = null;
-    }
-    EARS.an = null; EARS.hi = null; EARS.mute = false;
-    EARS.until = 0; EARS.done = null;
-  }
-
-  function earsSetState(st) {
-    EARS.state = st;
-    paintEar();
-    if (st === 'ok' || st === 'fail') {
-      setTimeout(function () {
-        if (EARS.state === st) { EARS.state = 'off'; paintEar(); }
-      }, 1800);
-    }
-  }
-
-  function earsBegin() {
-    if (EARS.state !== 'off') { earsStop(); earsSetState('off'); return; }
-    if (!AC || !earsAvailable()) { earsSetState('fail'); return; }
-    earsSetState('asking');
-    // Echo cancellation would remove the very thing being listened for,
-    // and automatic gain would flatten the difference the marker rides
-    // on. Both off.
-    navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
-    }).then(function (stream) {
-      if (!AC) { return; }
-      EARS.stream = stream;
-      var src = AC.createMediaStreamSource(stream);
-      var band = AC.createBiquadFilter();
-      band.type = 'highpass';
-      band.frequency.setValueAtTime(1500, AC.currentTime);
-      var topA = AC.createBiquadFilter(), topB = AC.createBiquadFilter();
-      topA.type = 'highpass'; topA.frequency.setValueAtTime(5000, AC.currentTime);
-      topB.type = 'highpass'; topB.frequency.setValueAtTime(5000, AC.currentTime);
-      EARS.an = AC.createAnalyser(); EARS.an.fftSize = 1024;
-      EARS.hi = AC.createAnalyser(); EARS.hi.fftSize = 1024;
-      src.connect(band); band.connect(EARS.an);
-      src.connect(topA); topA.connect(topB); topB.connect(EARS.hi);
-      EARS.buf = new Float32Array(EARS.an.fftSize);
-      EARS.hiBuf = new Float32Array(EARS.hi.fftSize);
-      EARS.floor = 0.002; EARS.last = -9; EARS.onsets = [];
-      EARS.poll = setInterval(earsPoll, 8);
-      earsCalibrate();
-    }, function () {
-      earsStop();
-      earsSetState('fail');
-    });
-  }
-
-  // Four of its own clicks, and how long each takes to come home.
-  function earsCalibrate() {
-    earsSetState('calibrating');
-    EARS.mute = true;
-    EARS.sent = [];
-    var t0 = AC.currentTime + 0.35, i, t;
-    for (i = 0; i < 4; i++) {
-      t = t0 + i * 0.45;
-      EARS.sent.push(t);
-      play('marker', 69, t, 1.7);
-      play('click', 69, t, 1);
-    }
-    EARS.onsets = [];
-    EARS.until = t0 + 4 * 0.45 + 0.35;
-    EARS.done = earsCalibrated;
-  }
-
-  function earsCalibrated() {
-    var gaps = [];
-    EARS.sent.forEach(function (t) {
-      var best = null, i, o;
-      for (i = 0; i < EARS.onsets.length; i++) {
-        o = EARS.onsets[i];
-        if (o.t < t || o.t > t + 0.4) { continue; }
-        if (!best || o.hi > best.hi) { best = o; }
-      }
-      if (best) { gaps.push(best.t - t); }
-    });
-    if (gaps.length < 2) { earsStop(); earsSetState('fail'); return; }
-    gaps.sort(function (a, b) { return a - b; });
-    EARS.rtt = gaps[Math.floor(gaps.length / 2)];
-    earsListen();
-  }
-
-  // Then the other device, for a whole loop and a bit, so the marker is
-  // certain to come round at least once.
-  function earsListen() {
-    earsSetState('listening');
-    EARS.mute = true;
-    EARS.onsets = [];
-    EARS.floor = 0.002; EARS.last = -9;
-    EARS.span = (BEATS_PER_LOOP + 2) * beatDur();
-    EARS.startedAt = AC.currentTime;
-    EARS.until = AC.currentTime + EARS.span;
-    EARS.done = earsHeard;
-  }
-
-  function earsHeard() {
-    var beat = beatDur(), hits = EARS.onsets, i;
-    if (hits.length < 6) { earsStop(); earsSetState('fail'); return; }
-
-    // The beat period is already known, so the only unknown is the
-    // phase - and a circular mean over a loop's worth of clicks is far
-    // tighter than any single detection of one of them.
-    var sx = 0, sy = 0, ph;
-    for (i = 0; i < hits.length; i++) {
-      ph = ((hits[i].t - EARS.rtt - skew) / beat) * Math.PI * 2;
-      sx += Math.cos(ph); sy += Math.sin(ph);
-    }
-    // How much they agree with each other. Scattered detections mean it
-    // was hearing a room, not a metronome.
-    if (Math.sqrt(sx * sx + sy * sy) / hits.length < 0.55) {
-      earsStop(); earsSetState('fail'); return;
-    }
-    offset = Math.atan2(sy, sx) / (Math.PI * 2) * beat;
-    wrapOffset(false);
-    save('offset', offset);
-
-    // Which of the sixteen carried the marker. If nothing stands out,
-    // the phase is still worth having, so it keeps that and leaves the
-    // loop where it was rather than rotating it on a guess.
-    var best = null, others = [];
-    for (i = 0; i < hits.length; i++) { if (!best || hits[i].hi > best.hi) { best = hits[i]; } }
-    for (i = 0; i < hits.length; i++) { if (hits[i] !== best) { others.push(hits[i].hi); } }
-    others.sort(function (a, b) { return a - b; });
-    var typical = others[Math.floor(others.length / 2)] || 0;
-    if (best && best.hi > typical * 1.6) {
-      var b = Math.round((best.t - EARS.rtt - gridZero()) / beat);
-      beatShift = ((-b % BEATS_PER_LOOP) + BEATS_PER_LOOP) % BEATS_PER_LOOP;
-      save('shift', beatShift);
-    }
-    resyncGrid();
-    earsStop();
-    earsSetState('ok');
-  }
-
   // Where the playhead is now, as a fraction of the loop. This is the
   // thing two devices have to agree on, and the ring both shows it and
   // sets it.
@@ -1272,8 +1059,7 @@
       }
 
       if (mode === 'tune') {
-        if (onBeat && !EARS.mute) { play('click', 69, t, 1); }
-        if (inLoop === 0 && !EARS.mute) { play('marker', 69, t, 1); }
+        if (onBeat) { play('click', 69, t, 1); }
       } else {
         // Which chord is sounding falls straight out of where we are in
         // the loop, so every device works it out for itself and they all
@@ -1572,16 +1358,6 @@
     T.play = bigButton('#3fa564', playGlyph());
     T.play.setAttribute('data-act', 'play');
 
-    // An ear, in the corner opposite the way out. Only offered where a
-    // microphone could actually be had.
-    T.ear = bigButton('#3f4a7d',
-      '<path d="M -12 26 C -12 6 -26 4 -26 -8 C -26 -24 -10 -30 2 -30'
-      + ' C 18 -30 26 -19 26 -8 C 26 4 14 6 12 14 C 10 21 2 20 0 15"'
-      + ' fill="none" stroke="#ffffff" stroke-width="7"'
-      + ' stroke-linecap="round" stroke-linejoin="round"/>');
-    T.ear.setAttribute('data-act', 'listen');
-    if (!earsAvailable()) { T.ear.setAttribute('display', 'none'); }
-
     g.appendChild(T.hint);
     g.appendChild(T.minus);
     g.appendChild(T.plus);
@@ -1597,27 +1373,12 @@
     g.appendChild(T.left);
     g.appendChild(T.right);
     g.appendChild(T.offText);
-    g.appendChild(T.ear);
     g.appendChild(T.play);
     paintBpm();
-    paintEar();
   }
 
   function paintBpm() {
     if (T.bpmText) { T.bpmText.textContent = String(bpm); }
-  }
-
-  // Driven from the state changes rather than the frame loop, so it
-  // still says what it is doing if the drawing stalls.
-  var EAR_COLOURS = {
-    off: '#3f4a7d', asking: '#5b6bb0', calibrating: '#2f6f8f',
-    listening: '#2f8f7a', ok: '#3fa564', fail: '#a4444f'
-  };
-  function paintEar() {
-    if (!T.ear) { return; }
-    T.ear._body.setAttribute('fill', EAR_COLOURS[EARS.state] || EAR_COLOURS.off);
-    T.ear._body.setAttribute('stroke',
-      EARS.state === 'off' ? 'rgba(255,255,255,0.28)' : '#ffffff');
   }
 
   function paintSongs() {
@@ -1665,10 +1426,6 @@
     var reserve = 58 * perPx;
     var band = Math.min(L.wide ? H * 0.16 : H * 0.075, 110);
     var corner = cornerButton(T.play, W, band);
-    // The ear takes the opposite corner, clear of the browser's own full
-    // screen button in the middle.
-    sizeButton(T.ear, corner * 1.5, corner);
-    place(T.ear, corner * 0.92, band * 0.5);
     var bandTop, widest, nw, nh, fs;
 
     if (L.wide) {
@@ -1704,7 +1461,7 @@
       // rather than at a fixed fraction: whatever the reserve and the
       // corner button do to the hint, nothing below it collides.
       var hf = Math.min(H * 0.019, 46), lead = Math.min(H * 0.026, 58);
-      var hintY = Math.max(H * 0.095, reserve + hf * 0.85, band * 1.05 + hf * 0.85);
+      var hintY = Math.max(H * 0.095, reserve + hf * 0.85, corner * 1.1 + hf * 0.85);
       layoutHint(W * 0.5, hintY, hf, lead);
 
       // Who leads comes first: it settles the key, the chords and the
@@ -1997,8 +1754,6 @@
       } else if (act === 'home') {
         mode = 'tune';
         showMode();
-      } else if (act === 'listen') {
-        earsBegin();
       } else if (act.indexOf('song') === 0) {
         setSong(+act.slice(4));
       } else {
