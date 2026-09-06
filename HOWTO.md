@@ -110,6 +110,41 @@ oversight, and it is not to be "fixed". The rules govern new games.
 
 ---
 
+## Ask Hoot, and the one game that costs money
+
+Ask Hoot is the only game that talks to anything outside itself. She says a
+word, Hoot explains it at whatever reading age the slider is set to. The
+explanation comes from Anthropic's API, which is billed per word.
+
+**Setting it up, once.** At <https://console.anthropic.com>:
+
+1. **Billing → buy credits.** $5 is the minimum and buys roughly 7,000 words.
+   **Turn auto-reload off** — that switch is the whole safety net, because it
+   makes the balance a hard ceiling rather than a direction of travel.
+2. **Settings → Workspaces → create one** called `kid-games`, and give it a
+   monthly spend limit. This keeps the game away from anything else on the
+   account, forever.
+3. **API keys → create a key *inside that workspace***. Copy it.
+4. Open Ask Hoot on the laptop, long-press the corner, paste the key in and
+   press Save. It prints a scrambled line beginning `var BAKED =`. Hand that
+   line to Claude, say which game it belongs to, and it goes into the file so
+   every tablet has it.
+
+**What the scrambling is and is not.** It is not encryption — the page has to
+unscramble the key to use it, so anyone reading the source can too. What it
+stops is machines: GitHub and Anthropic scan public repositories for the
+`sk-ant-` pattern and revoke on sight, and bots scrape for the same string to
+spend it. Breaking the pattern stops all of them. The money is what actually
+caps the damage, which is what steps 1 and 2 are for.
+
+**If it ever leaks,** revoke the key in the console, make another, and repeat
+step 4. It costs an evening of the game, nothing more.
+
+**Running costs.** Roughly 40p per thousand words. The game also stops itself
+at 200 words a day per device — Hoot yawns and goes to sleep until tomorrow.
+
+---
+
 ## If Claude is ever unavailable
 
 The one fallback worth knowing: open the repo on github.com and press `.`, which

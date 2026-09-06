@@ -1,0 +1,1481 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#17203c">
+<title>Ask Hoot</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #17203c;
+    overflow: hidden;
+    touch-action: manipulation;
+    overscroll-behavior: none;
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #stage {
+    display: block;
+    width: 100vw; height: 100vh;
+    width: 100dvw; height: 100dvh;
+  }
+  .hit { fill: transparent; cursor: pointer; }
+  /* Scenery is scenery. Nothing back there is worth a tap, and a stray
+     one landing on a star instead of on Hoot reads as the game ignoring
+     her. */
+  #scenery, #sparks, #glow { pointer-events: none; }
+
+  /* Parent controls, and the typing box. The only words in the game that
+     are not the word being asked about, and the only part deliberately
+     made fiddly to reach: a long press, so a toddler pawing at the
+     corner never opens it. */
+  #parent, #typing {
+    position: fixed; inset: 0;
+    display: none;
+    align-items: center; justify-content: center;
+    background: rgba(9, 14, 30, 0.6);
+    font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: 20px;
+  }
+  #parent.open, #typing.open { display: flex; }
+  #panel, #typebox {
+    background: #fdfaf3; color: #22303f;
+    border-radius: 18px; padding: 20px 22px 22px;
+    width: min(440px, 100%); max-height: 100%; overflow: auto;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.4);
+  }
+  #panel h2 { margin: 0 0 4px; font-size: 19px; }
+  #panel p.sub { margin: 0 0 18px; font-size: 13.5px; color: #63727f; }
+  #panel h3 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
+  #panel p.note { margin: 6px 0 0; font-size: 12.5px; color: #63727f; }
+  .row { margin-bottom: 18px; }
+  .agewrap { display: flex; align-items: center; gap: 14px; }
+  .agewrap input { flex: 1 1 auto; height: 42px; }
+  .agenum {
+    flex: 0 0 auto; min-width: 66px; text-align: center;
+    font-size: 22px; font-weight: 700; color: #b4531c;
+  }
+  .wide, .field {
+    display: block; width: 100%; min-height: 46px;
+    border-radius: 11px; font: inherit; font-size: 15px;
+  }
+  .field { border: 2px solid #cfd8e0; background: #fff; padding: 10px 12px; color: #22303f; }
+  .wide { cursor: pointer; }
+  #save, #typeGo { border: 0; background: #b4531c; color: #fff; font-weight: 600; }
+  #close, #typeCancel { border: 2px solid #cfd8e0; background: #fff; color: #22303f; margin-top: 10px; }
+  #blob {
+    display: none; width: 100%; height: 92px; margin-top: 10px;
+    font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace;
+    border: 2px solid #cfd8e0; border-radius: 11px; padding: 8px; resize: none;
+    background: #f4f7f9; color: #22303f;
+  }
+  #blob.open { display: block; }
+  #status { margin: 0 0 18px; font-size: 13px; color: #63727f; }
+  #status b { color: #22303f; }
+  #typebox h2 { margin: 0 0 14px; font-size: 18px; }
+  #typeWord { font-size: 22px; text-align: center; margin-bottom: 12px; }
+</style>
+</head>
+<body>
+<script>
+// Full screen on the first touch, and a way back if it is off.
+//
+// A browser will not do this by itself: the request has to come out of a
+// gesture the browser counts as user activation, and that list is fussier
+// than it looks. pointerdown only counts when the pointer is a mouse - on
+// a touchscreen it grants nothing at all, which is why listening for it
+// worked on a laptop and did nothing whatever on a tablet. For a finger it
+// is pointerup and touchend that count.
+//
+// Once full screen is on, the automatic asking stops, so leaving it stays
+// left. But leaving it used to mean reloading to get it back, so there is
+// now a small button at the top of the screen that is only there while
+// full screen is off, and takes itself away the moment it is on.
+//
+// An iPhone ignores the lot, because Safari there gives full screen to
+// video and nothing else, so no button is offered. That is what the home
+// screen tags above are for.
+(function () {
+  var el = document.documentElement;
+  var go = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (!go) { return; }
+  var EVENTS = ['pointerup', 'touchend', 'click', 'mousedown'];
+  var asking = false, done = false, btn = null, i;
+
+  function isFull() {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement);
+  }
+
+  function request() {
+    if (asking || isFull()) { return; }
+    asking = true;
+    try {
+      var p = go.call(el);
+      if (p && p.then) { p.then(function () { asking = false; }, function () { asking = false; }); }
+      else { setTimeout(function () { asking = false; }, 500); }
+    } catch (e) { asking = false; }
+  }
+
+  function stopAuto() {
+    done = true;
+    for (var k = 0; k < EVENTS.length; k++) {
+      document.removeEventListener(EVENTS[k], autoTry, true);
+    }
+  }
+
+  function autoTry() {
+    if (done) { return; }
+    if (isFull()) { stopAuto(); sync(); return; }
+    request();
+  }
+
+  function sync() {
+    var want = !isFull();
+    if (want && !btn && document.body) {
+      btn = document.createElement('button');
+      btn.setAttribute('aria-label', 'Full screen');
+      btn.style.cssText = 'position:fixed;top:5px;left:50%;transform:translateX(-50%);'
+        + 'z-index:30;width:46px;height:46px;padding:0;line-height:0;border:0;'
+        + 'border-radius:14px;background:rgba(255,255,255,0.68);cursor:pointer;'
+        + 'box-shadow:0 1px 5px rgba(0,0,0,0.22);-webkit-tap-highlight-color:transparent;';
+      btn.innerHTML = '<svg width="46" height="46" viewBox="0 0 46 46" aria-hidden="true">'
+        + '<g fill="none" stroke="#40563a" stroke-width="3.4" stroke-linecap="round"'
+        + ' stroke-linejoin="round">'
+        + '<path d="M19 14 H14 V19 M27 14 H32 V19 M19 32 H14 V27 M27 32 H32 V27"/>'
+        + '</g></svg>';
+      btn.addEventListener('click', function (e) { e.stopPropagation(); request(); });
+      document.body.appendChild(btn);
+    }
+    if (btn) { btn.style.display = want ? 'block' : 'none'; }
+  }
+
+  document.addEventListener('fullscreenchange', function () {
+    if (isFull()) { stopAuto(); }
+    sync();
+  });
+  document.addEventListener('webkitfullscreenchange', function () {
+    if (isFull()) { stopAuto(); }
+    sync();
+  });
+  for (i = 0; i < EVENTS.length; i++) {
+    document.addEventListener(EVENTS[i], autoTry, true);
+  }
+  sync();
+})();
+</script>
+
+<svg id="stage" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" aria-label="Ask Hoot">
+  <defs>
+    <linearGradient id="ah-sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#101838"/>
+      <stop offset="0.55" stop-color="#222b52"/>
+      <stop offset="1" stop-color="#3d3663"/>
+    </linearGradient>
+    <linearGradient id="ah-bark" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#4a3524"/>
+      <stop offset="0.45" stop-color="#6d4d33"/>
+      <stop offset="1" stop-color="#402d1f"/>
+    </linearGradient>
+    <linearGradient id="ah-page" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fffaee"/>
+      <stop offset="1" stop-color="#f0e3c6"/>
+    </linearGradient>
+    <linearGradient id="ah-card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff8e6"/>
+      <stop offset="1" stop-color="#f5e2b8"/>
+    </linearGradient>
+    <radialGradient id="ah-glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ffe9a8" stop-opacity="0.55"/>
+      <stop offset="0.55" stop-color="#ffd873" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#ffd873" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="ah-moon" cx="0.42" cy="0.36" r="0.7">
+      <stop offset="0" stop-color="#fffdf2"/>
+      <stop offset="1" stop-color="#ecdfae"/>
+    </radialGradient>
+  </defs>
+
+  <g id="scenery"></g>
+  <g id="glow"></g>
+  <g id="book"></g>
+  <g id="hoot"></g>
+  <g id="cards"></g>
+  <g id="sparks"></g>
+  <g id="corner"></g>
+</svg>
+
+<div id="parent" role="dialog" aria-modal="true" aria-label="Parent controls">
+  <div id="panel">
+    <h2>Parent controls</h2>
+    <p class="sub">She will not find this by accident &mdash; it needs a long press on the corner.</p>
+
+    <p id="status"></p>
+
+    <div class="row">
+      <h3>Reading age</h3>
+      <div class="agewrap">
+        <input type="range" id="age" min="3" max="11" step="1" value="5" aria-label="Reading age">
+        <span class="agenum" id="ageNum">5</span>
+      </div>
+      <p class="note">How simple the explanations are. It changes the next word, not the one on screen.</p>
+    </div>
+
+    <div class="row">
+      <h3>API key</h3>
+      <input type="password" class="field" id="key" autocomplete="off" spellcheck="false"
+             placeholder="sk-ant-&hellip;">
+      <p class="note">Kept on this device only. Leave it empty to use the one built into the file.</p>
+      <textarea id="blob" readonly spellcheck="false" aria-label="Scrambled key line"></textarea>
+    </div>
+
+    <button type="button" id="save" class="wide">Save</button>
+    <button type="button" id="close" class="wide">Back to the game</button>
+  </div>
+</div>
+
+<div id="typing" role="dialog" aria-modal="true" aria-label="Type a word">
+  <div id="typebox">
+    <h2>Which word?</h2>
+    <input type="text" class="field" id="typeWord" autocomplete="off" autocapitalize="off"
+           spellcheck="false" enterkeyhint="go">
+    <button type="button" id="typeGo" class="wide" style="margin-top:12px">Ask Hoot</button>
+    <button type="button" id="typeCancel" class="wide">Never mind</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  var svg = document.getElementById('stage');
+
+  function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+  function rand(a, b) { return a + Math.random() * (b - a); }
+  function el(tag, attrs) {
+    var n = document.createElementNS(SVGNS, tag);
+    if (attrs) { for (var k in attrs) { n.setAttribute(k, attrs[k]); } }
+    return n;
+  }
+  function clear(n) { while (n.firstChild) { n.removeChild(n.firstChild); } }
+
+  var reduceQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+  var reduced = reduceQuery.matches;
+  if (reduceQuery.addEventListener) {
+    reduceQuery.addEventListener('change', function (e) { reduced = e.matches; });
+  }
+
+  // ------------------------------------------------------------------
+  // The key.
+  //
+  // Be clear-eyed about what this is: the page has to hand the key to
+  // Anthropic, so the page has to be able to unscramble it, so the
+  // unscrambling is right here in the same file. Anyone who reads the
+  // source gets the key. That is not what this defends against.
+  //
+  // What it defends against is machines. GitHub and Anthropic both scan
+  // public repositories for the sk-ant- pattern and revoke on sight, and
+  // a swarm of bots scrapes for the same string to spend it. Neither
+  // reads JavaScript; both match text. Breaking the pattern stops all of
+  // them, which is very nearly the whole of the real risk.
+  //
+  // The rest of the defence is money, not code: the key lives in its own
+  // workspace with a monthly cap, the balance is topped up by hand with
+  // auto-reload off, and the counter below stops the game itself running
+  // away with it. Worst case is the tenner on the account.
+  // ------------------------------------------------------------------
+  var SALT = 'hoot-in-the-old-oak-tree';
+
+  // Replace the empty string with the line the parent panel prints for
+  // you. Nothing else in this file needs touching to change the key.
+  var BAKED = '';
+
+  function scramble(s) {
+    var out = '', i;
+    for (i = 0; i < s.length; i++) {
+      out += String.fromCharCode(
+        s.charCodeAt(i) ^ (SALT.charCodeAt(i % SALT.length) & 0x1f) ^ ((i * 7 + 13) & 0x1f)
+      );
+    }
+    try { return window.btoa(out); } catch (e) { return ''; }
+  }
+
+  function unscramble(b) {
+    if (!b) { return ''; }
+    var raw;
+    try { raw = window.atob(b); } catch (e) { return ''; }
+    return scrambleRaw(raw);
+  }
+
+  // The transform is its own inverse, so undoing it is doing it again.
+  function scrambleRaw(s) {
+    var out = '', i;
+    for (i = 0; i < s.length; i++) {
+      out += String.fromCharCode(
+        s.charCodeAt(i) ^ (SALT.charCodeAt(i % SALT.length) & 0x1f) ^ ((i * 7 + 13) & 0x1f)
+      );
+    }
+    return out;
+  }
+
+  // ------------------------------------------------------------------
+  // Remembered settings, and the day's tally.
+  // ------------------------------------------------------------------
+  var STORE = 'ask-hoot';
+  var prefs = { age: 5, key: '', day: '', used: 0 };
+  var DAILY_CAP = 200;
+
+  function today() {
+    var d = new Date();
+    return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+  }
+
+  function loadPrefs() {
+    try {
+      var raw = window.localStorage.getItem(STORE);
+      if (!raw) { return; }
+      var p = JSON.parse(raw);
+      if (typeof p.age === 'number') { prefs.age = clamp(p.age | 0, 3, 11); }
+      if (typeof p.key === 'string') { prefs.key = p.key; }
+      if (typeof p.day === 'string') { prefs.day = p.day; }
+      if (typeof p.used === 'number') { prefs.used = p.used | 0; }
+    } catch (e) { /* a fresh start is a perfectly good fallback */ }
+    if (prefs.day !== today()) { prefs.day = today(); prefs.used = 0; }
+  }
+
+  function savePrefs() {
+    try { window.localStorage.setItem(STORE, JSON.stringify(prefs)); }
+    catch (e) { /* private browsing, and it does not matter */ }
+  }
+
+  function apiKey() {
+    return prefs.key || unscramble(BAKED);
+  }
+
+  function spendLeft() {
+    if (prefs.day !== today()) { prefs.day = today(); prefs.used = 0; savePrefs(); }
+    return DAILY_CAP - prefs.used;
+  }
+
+  // ------------------------------------------------------------------
+  // Audio, synthesised from nothing so the game is never silent and
+  // never waits on a download. Hoot's actual words come from the
+  // browser's own voice, which is a different thing and may not be
+  // there at all - so every one of these still has to carry meaning on
+  // its own.
+  // ------------------------------------------------------------------
+  var AC = null, master = null, noiseBuf = null;
+
+  function initAudio() {
+    if (AC) {
+      if (AC.state === 'suspended') { AC.resume(); }
+      return;
+    }
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) { return; }
+    AC = new Ctx();
+    master = AC.createGain();
+    master.gain.setValueAtTime(0.5, AC.currentTime);
+    master.connect(AC.destination);
+
+    var n = Math.floor(AC.sampleRate * 0.5);
+    noiseBuf = AC.createBuffer(1, n, AC.sampleRate);
+    var data = noiseBuf.getChannelData(0);
+    for (var i = 0; i < n; i++) { data[i] = Math.random() * 2 - 1; }
+
+    if (AC.state === 'suspended') { AC.resume(); }
+  }
+
+  function tone(freq, dur, type, vol, bend) {
+    if (!AC) { return; }
+    var t = AC.currentTime + 0.01;
+    var o = AC.createOscillator(), g = AC.createGain();
+    o.type = type || 'sine';
+    o.frequency.setValueAtTime(freq, t);
+    if (bend) { o.frequency.exponentialRampToValueAtTime(freq * bend, t + dur); }
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol || 0.3, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+
+  // Two soft notes, the second lower: the shape of an owl, and the sound
+  // the game makes when it wants her.
+  function hoot(up) {
+    if (!AC) { return; }
+    var t = AC.currentTime + 0.01, i;
+    var notes = up ? [330, 415] : [415, 330];
+    for (i = 0; i < 2; i++) {
+      (function (n, k) {
+        var o = AC.createOscillator(), g = AC.createGain(), lp = AC.createBiquadFilter();
+        var s = t + k * 0.26;
+        o.type = 'sine';
+        o.frequency.setValueAtTime(n * 0.94, s);
+        o.frequency.exponentialRampToValueAtTime(n, s + 0.07);
+        lp.type = 'lowpass';
+        lp.frequency.setValueAtTime(900, s);
+        g.gain.setValueAtTime(0.0001, s);
+        g.gain.exponentialRampToValueAtTime(0.34, s + 0.05);
+        g.gain.setValueAtTime(0.34, s + 0.14);
+        g.gain.exponentialRampToValueAtTime(0.0001, s + 0.3);
+        o.connect(lp); lp.connect(g); g.connect(master);
+        o.start(s); o.stop(s + 0.35);
+      })(notes[i], i);
+    }
+  }
+
+  // A rising sparkle for "I heard you", so she knows the ear is open
+  // before anything else happens.
+  function earOpen() {
+    tone(660, 0.14, 'triangle', 0.22, 1.5);
+  }
+
+  function pageTurn() {
+    if (!AC) { return; }
+    var t = AC.currentTime + 0.01;
+    var src = AC.createBufferSource();
+    src.buffer = noiseBuf;
+    var bp = AC.createBiquadFilter(), g = AC.createGain();
+    bp.type = 'bandpass';
+    bp.Q.setValueAtTime(0.8, t);
+    bp.frequency.setValueAtTime(2600, t);
+    bp.frequency.exponentialRampToValueAtTime(900, t + 0.3);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.2, t + 0.04);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.32);
+    src.connect(bp); bp.connect(g); g.connect(master);
+    src.start(t); src.stop(t + 0.36);
+  }
+
+  function sparkle() {
+    if (!AC) { return; }
+    [784, 988, 1319].forEach(function (f, i) {
+      setTimeout(function () { tone(f, 0.18, 'sine', 0.16); }, i * 70);
+    });
+  }
+
+  // Not a failure noise. A shrug: two flat notes going nowhere.
+  function shrug() {
+    tone(300, 0.18, 'triangle', 0.2);
+    setTimeout(function () { tone(262, 0.26, 'triangle', 0.2); }, 170);
+  }
+
+  function snore() {
+    tone(150, 0.7, 'sine', 0.16, 0.7);
+  }
+
+  // ------------------------------------------------------------------
+  // Hoot's voice.
+  //
+  // The browser's own speech, which on a phone will not make a sound
+  // until a finger has touched the screen once - so the first touch
+  // spends a silent utterance to buy the right to speak later, the same
+  // trick Post a Letter plays on its clips.
+  // ------------------------------------------------------------------
+  var SS = window.speechSynthesis || null;
+  var voice = null, voiceWarmed = false;
+
+  function pickVoice() {
+    if (!SS) { return; }
+    var list = SS.getVoices() || [], i, v;
+    var best = null;
+    for (i = 0; i < list.length; i++) {
+      v = list[i];
+      if (!v.lang) { continue; }
+      if (v.lang.toLowerCase().indexOf('en-gb') === 0) { best = best || v; }
+    }
+    if (!best) {
+      for (i = 0; i < list.length; i++) {
+        if ((list[i].lang || '').toLowerCase().indexOf('en') === 0) { best = list[i]; break; }
+      }
+    }
+    voice = best;
+  }
+
+  if (SS) {
+    pickVoice();
+    if (SS.addEventListener) { SS.addEventListener('voiceschanged', pickVoice); }
+  }
+
+  function warmVoice() {
+    if (!SS || voiceWarmed) { return; }
+    voiceWarmed = true;
+    try {
+      var u = new window.SpeechSynthesisUtterance(' ');
+      u.volume = 0;
+      SS.speak(u);
+    } catch (e) { /* nothing lost */ }
+  }
+
+  function speak(text, onDone) {
+    if (!SS || !text) { if (onDone) { setTimeout(onDone, 400); } return; }
+    try {
+      SS.cancel();
+      var u = new window.SpeechSynthesisUtterance(text);
+      if (voice) { u.voice = voice; }
+      u.lang = 'en-GB';
+      // Slower for the younger reader, because the words are the point.
+      u.rate = clamp(0.72 + (prefs.age - 3) * 0.035, 0.7, 1);
+      u.pitch = 1.05;
+      var fired = false;
+      u.onend = function () { if (!fired) { fired = true; if (onDone) { onDone(); } } };
+      u.onerror = function () { if (!fired) { fired = true; if (onDone) { onDone(); } } };
+      SS.speak(u);
+      // Some browsers drop onend on the floor. A generous timer means the
+      // game never sits there waiting for an event that is not coming.
+      setTimeout(function () {
+        if (!fired) { fired = true; if (onDone) { onDone(); } }
+      }, 1800 + text.length * 90);
+    } catch (e) {
+      if (onDone) { setTimeout(onDone, 600); }
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Layout. Both orientations, so the viewBox follows the screen rather
+  // than the screen being made to fit a viewBox.
+  // ------------------------------------------------------------------
+  var L = null;
+
+  function computeLayout() {
+    var vw = Math.max(1, window.innerWidth), vh = Math.max(1, window.innerHeight);
+    var W = 1000;
+    var H = clamp(Math.round(1000 * vh / vw), 420, 2400);
+    var wide = (vw / vh) >= 1.15;
+
+    // Hoot is about 300 units tall and 200 wide at scale 1, and he is the
+    // thing she aims at, so he is sized off whichever of the two
+    // dimensions would crop him first rather than off one of them.
+    var hootP, book, treeX;
+    if (wide) {
+      treeX = W * 0.045;
+      hootP = { x: W * 0.20, y: H * 0.88, s: clamp(H * 0.0019, 0.5, 1.9) };
+      book = { x: W * 0.66, y: H * 0.50, w: W * 0.58, h: H * 0.74 };
+    } else {
+      treeX = W * 0.15;
+      hootP = { x: W * 0.54, y: H * 0.44, s: clamp(Math.min(W * 0.0024, H * 0.0011), 0.5, 2.6) };
+      book = { x: W * 0.5, y: H * 0.745, w: W * 0.92, h: H * 0.42 };
+    }
+
+    L = { W: W, H: H, wide: wide, hoot: hootP, book: book, branch: hootP.y, treeX: treeX };
+
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    drawScenery();
+    drawCorner();
+    buildHoot();
+    drawBook();
+    layoutCards();
+    drawGlow();
+  }
+
+  // ------------------------------------------------------------------
+  // The wood at night. Deliberately still: everything that moves in this
+  // game is Hoot, so that a movement anywhere means he is answering.
+  // ------------------------------------------------------------------
+  var stars = [];
+
+  function drawScenery() {
+    var g = document.getElementById('scenery');
+    clear(g);
+    var W = L.W, H = L.H, i;
+
+    g.appendChild(el('rect', { x: 0, y: 0, width: W, height: H, fill: 'url(#ah-sky)' }));
+
+    var moon = el('circle', { cx: W * 0.86, cy: H * 0.11, r: Math.min(W, H) * 0.062, fill: 'url(#ah-moon)' });
+    g.appendChild(moon);
+
+    stars = [];
+    var n = Math.round(W * H / 26000);
+    for (i = 0; i < n; i++) {
+      var s = el('circle', {
+        cx: rand(0, W), cy: rand(0, H * 0.62), r: rand(1.2, 3.1),
+        fill: '#fff6d8', opacity: rand(0.2, 0.7)
+      });
+      g.appendChild(s);
+      stars.push({ n: s, p: rand(0, 6.28), sp: rand(0.5, 1.4), base: +s.getAttribute('opacity') });
+    }
+
+    // The tree Hoot sits in.
+    var hx = L.hoot.x, by = L.branch, tx = L.treeX;
+    var tw = Math.max(52, Math.min(W, H) * 0.085);
+
+    // The perch goes down first so the trunk can be laid over the joint.
+    // Drawn the other way round there is a visible seam where the two
+    // gradients meet, and the branch looks stuck on rather than grown.
+    //
+    // Sized off Hoot rather than off the screen: a branch thinner than
+    // the bird standing on it is a branch that is about to give way, and
+    // it reaches past him because one stopping at his feet reads as
+    // snapped off there.
+    var thick = Math.max(18, 34 * L.hoot.s);
+    var tip = hx + (hx - tx) * 0.75;
+    g.appendChild(el('path', {
+      d: 'M ' + (tx - tw * 0.45) + ' ' + (by - thick * 1.4) +
+         ' C ' + ((tx + hx) / 2) + ' ' + (by - thick * 0.9) + ' ' + hx + ' ' + (by - thick * 0.1) +
+         ' ' + tip + ' ' + (by + thick * 0.25) +
+         ' L ' + tip + ' ' + (by + thick * 0.85) +
+         ' C ' + hx + ' ' + (by + thick * 0.9) + ' ' + ((tx + hx) / 2) + ' ' + (by + thick * 0.6) +
+         ' ' + (tx - tw * 0.45) + ' ' + (by + thick * 0.9) + ' Z',
+      fill: 'url(#ah-bark)'
+    }));
+
+    // The trunk runs off the top of the frame rather than coming to a
+    // point - a tree that ends in mid-air reads as a spear, which took
+    // one look at it to discover.
+    g.appendChild(el('path', {
+      d: 'M ' + (tx - tw * 0.62) + ' ' + H +
+         ' C ' + (tx - tw * 0.52) + ' ' + (H * 0.5) + ' ' + (tx - tw * 0.40) + ' ' + (H * 0.25) +
+         ' ' + (tx - tw * 0.34) + ' -20' +
+         ' L ' + (tx + tw * 0.34) + ' -20' +
+         ' C ' + (tx + tw * 0.42) + ' ' + (H * 0.25) + ' ' + (tx + tw * 0.54) + ' ' + (H * 0.5) +
+         ' ' + (tx + tw * 0.66) + ' ' + H + ' Z',
+      fill: 'url(#ah-bark)'
+    }));
+
+    for (i = 0; i < 4; i++) {
+      var gy = H * (0.12 + i * 0.24);
+      g.appendChild(el('path', {
+        d: 'M ' + (tx - tw * 0.18) + ' ' + gy + ' q ' + (tw * 0.12) + ' ' + (H * 0.045) + ' 0 ' + (H * 0.09),
+        stroke: '#3b2a1c', 'stroke-width': Math.max(2, tw * 0.06), fill: 'none',
+        opacity: 0.5, 'stroke-linecap': 'round'
+      }));
+    }
+
+    var span = tip - tx;
+    for (i = 0; i < 7; i++) {
+      var lx = tx + span * rand(0.18, 1.02);
+      var ly = by - rand(thick * 0.2, thick * 1.9);
+      g.appendChild(el('ellipse', {
+        cx: lx, cy: ly, rx: rand(thick * 0.42, thick * 0.86), ry: rand(thick * 0.2, thick * 0.36),
+        fill: '#2f5540', opacity: 0.75,
+        transform: 'rotate(' + rand(-38, 38) + ' ' + lx + ' ' + ly + ')'
+      }));
+    }
+  }
+
+  function drawCorner() {
+    var g = document.getElementById('corner');
+    clear(g);
+    var r = Math.max(20, L.W * 0.026);
+    g.appendChild(el('circle', {
+      id: 'cornerdot', cx: L.W - r * 0.9, cy: r * 0.9, r: r,
+      fill: '#ffffff', opacity: 0.14
+    }));
+  }
+
+  // ------------------------------------------------------------------
+  // Hoot.
+  //
+  // Built once per layout and then moved by transform, so the frame loop
+  // never touches the DOM shape - only where the pieces point. Feet sit
+  // on y = 0 and everything else is above them, which is what lets him
+  // stand on the branch instead of hovering near it.
+  // ------------------------------------------------------------------
+  var OWL = {};
+
+  function buildHoot() {
+    var g = document.getElementById('hoot');
+    clear(g);
+
+    var root = el('g', { id: 'hootroot' });
+    g.appendChild(root);
+
+    var body = el('g', { 'class': 'hbody' });
+    root.appendChild(body);
+
+    // Feet, then tail, then the body, so each sits in front of the last.
+    [-30, 30].forEach(function (d) {
+      body.appendChild(el('path', {
+        d: 'M ' + (d - 16) + ' -6 h 32 M ' + d + ' -20 v 16 M ' + (d - 13) + ' -4 l -6 6 M ' +
+           (d + 13) + ' -4 l 6 6',
+        stroke: '#e2a33c', 'stroke-width': 9, 'stroke-linecap': 'round', fill: 'none'
+      }));
+    });
+
+    body.appendChild(el('ellipse', { cx: 0, cy: -104, rx: 92, ry: 104, fill: '#7d5f43' }));
+    body.appendChild(el('ellipse', { cx: 0, cy: -86, rx: 60, ry: 74, fill: '#d9bd93' }));
+
+    // Breast markings. Three rows of soft chevrons - enough to read as
+    // feathers from across a room, not so many that they buzz.
+    var r, c;
+    for (r = 0; r < 3; r++) {
+      for (c = -1; c <= 1; c++) {
+        body.appendChild(el('path', {
+          d: 'M ' + (c * 30 - 12) + ' ' + (-118 + r * 34) + ' q 12 12 24 0',
+          stroke: '#b99a70', 'stroke-width': 5, fill: 'none', 'stroke-linecap': 'round'
+        }));
+      }
+    }
+
+    // Wings. Each is its own group with the shoulder at the origin, so
+    // lifting one is a rotation and not a redraw.
+    OWL.wingL = el('g', { 'class': 'wing' });
+    OWL.wingL.appendChild(el('path', {
+      d: 'M 0 0 q -34 26 -30 74 q 4 42 26 62 q 10 -60 12 -136 z', fill: '#6b5038'
+    }));
+    OWL.wingR = el('g', { 'class': 'wing' });
+    OWL.wingR.appendChild(el('path', {
+      d: 'M 0 0 q 34 26 30 74 q -4 42 -26 62 q -10 -60 -12 -136 z', fill: '#6b5038'
+    }));
+    body.appendChild(OWL.wingL);
+
+    // Head, hung off its own group so a tilt pivots at the neck.
+    OWL.head = el('g', {});
+    root.appendChild(OWL.head);
+
+    // Ear tufts first, behind the face disc.
+    OWL.head.appendChild(el('path', { d: 'M -66 -46 l -14 -46 l 34 20 z', fill: '#6b5038' }));
+    OWL.head.appendChild(el('path', { d: 'M 66 -46 l 14 -46 l -34 20 z', fill: '#6b5038' }));
+    OWL.head.appendChild(el('circle', { cx: 0, cy: -20, r: 78, fill: '#7d5f43' }));
+    OWL.head.appendChild(el('ellipse', { cx: 0, cy: -14, rx: 66, ry: 58, fill: '#e5cda6' }));
+
+    // Eyes. Two groups so the whites can squash for a blink while the
+    // pupils go on looking wherever they were looking.
+    OWL.eyeL = el('g', {}); OWL.eyeR = el('g', {});
+    [[-32, OWL.eyeL], [32, OWL.eyeR]].forEach(function (p) {
+      var x = p[0], grp = p[1];
+      grp.appendChild(el('circle', { cx: x, cy: -24, r: 30, fill: '#fffdf6' }));
+      grp.appendChild(el('circle', { cx: x, cy: -24, r: 26, fill: '#f7edd6' }));
+      OWL.head.appendChild(grp);
+    });
+    OWL.pupilL = el('g', {}); OWL.pupilR = el('g', {});
+    [[-32, OWL.pupilL], [32, OWL.pupilR]].forEach(function (p) {
+      var x = p[0], grp = p[1];
+      grp.appendChild(el('circle', { cx: x, cy: -24, r: 15, fill: '#241f34' }));
+      grp.appendChild(el('circle', { cx: x + 6, cy: -30, r: 5, fill: '#ffffff' }));
+      OWL.head.appendChild(grp);
+    });
+    // The lids come down over everything, so they must be added last.
+    OWL.lidL = el('rect', { x: -64, y: -56, width: 64, height: 0, fill: '#7d5f43', rx: 6 });
+    OWL.lidR = el('rect', { x: 0, y: -56, width: 64, height: 0, fill: '#7d5f43', rx: 6 });
+    OWL.head.appendChild(OWL.lidL);
+    OWL.head.appendChild(OWL.lidR);
+
+    OWL.head.appendChild(el('path', { d: 'M -13 -6 L 13 -6 L 0 24 Z', fill: '#e2a33c' }));
+
+    // The right wing hangs off the root rather than the body, and after
+    // the head, because a wing cupped to an ear has to be in front of
+    // that ear. Behind it, the gesture is simply invisible.
+    root.appendChild(OWL.wingR);
+
+    // One transparent target over the whole bird. A five-year-old aims at
+    // the owl, not at his left wing.
+    OWL.hit = el('ellipse', { 'class': 'hit', cx: 0, cy: -120, rx: 130, ry: 160, id: 'hoothit' });
+    root.appendChild(OWL.hit);
+
+    OWL.root = root;
+    OWL.body = body;
+    placeHoot();
+  }
+
+  function placeHoot() {
+    OWL.root.setAttribute('transform',
+      'translate(' + L.hoot.x + ' ' + L.hoot.y + ') scale(' + L.hoot.s + ')');
+  }
+
+  // ------------------------------------------------------------------
+  // The book. Where the word and its meaning land.
+  // ------------------------------------------------------------------
+  var bookWord = null, bookLines = [], bookOpen = 0;
+
+  function drawBook() {
+    var g = document.getElementById('book');
+    clear(g);
+    var b = L.book;
+    var FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+
+    var wordSize = Math.min(b.w * 0.15, b.h * 0.22);
+    var defSize = clamp(Math.min(b.w * 0.052, b.h * 0.09), 16, 44);
+    L.maxChars = Math.floor(b.w * 0.86 / (defSize * 0.52));
+
+    var lines = bookLines;
+    var pad = defSize * 1.1;
+
+    // The page is cut to fit what is on it. A four-line answer sitting at
+    // the top of a page-and-a-half of blank paper looks like the game has
+    // stopped halfway through.
+    var blockH = wordSize * 1.05 + (lines.length ? defSize * 0.9 + lines.length * defSize * 1.3 : 0);
+    var pageH = clamp(blockH + pad * 2, b.h * 0.34, b.h);
+    var x = b.x - b.w / 2, y = b.y - pageH / 2;
+
+    g.appendChild(el('rect', {
+      x: x - 10, y: y - 10, width: b.w + 20, height: pageH + 20,
+      rx: 22, fill: '#5a3a2c', opacity: 0.9
+    }));
+    g.appendChild(el('rect', {
+      x: x, y: y, width: b.w, height: pageH, rx: 16, fill: 'url(#ah-page)'
+    }));
+
+    var topY = b.y - blockH / 2;
+    var word = el('text', {
+      x: b.x, y: topY + wordSize * 0.82, 'text-anchor': 'middle',
+      'font-family': FONT, 'font-size': wordSize, 'font-weight': '800', fill: '#8a4a1a'
+    });
+    word.textContent = bookWord || '';
+    g.appendChild(word);
+
+    var startY = topY + wordSize * 1.05 + defSize * 1.4;
+    var i;
+    for (i = 0; i < lines.length; i++) {
+      var t = el('text', {
+        x: b.x, y: startY + i * defSize * 1.3, 'text-anchor': 'middle',
+        'font-family': FONT, 'font-size': defSize, 'font-weight': '500', fill: '#3c3326'
+      });
+      t.textContent = lines[i];
+      g.appendChild(t);
+    }
+
+    g.setAttribute('opacity', bookOpen);
+  }
+
+  function wrap(text, maxChars) {
+    var words = String(text).split(/\s+/), lines = [], line = '', i;
+    for (i = 0; i < words.length; i++) {
+      var next = line ? line + ' ' + words[i] : words[i];
+      if (next.length > maxChars && line) { lines.push(line); line = words[i]; }
+      else { line = next; }
+    }
+    if (line) { lines.push(line); }
+    return lines.slice(0, 7);
+  }
+
+  function showInBook(word, definition) {
+    bookWord = word || '';
+    bookLines = definition ? wrap(definition, L.maxChars || 34) : [];
+    drawBook();
+  }
+
+  // ------------------------------------------------------------------
+  // The choosing cards. When the ear is not sure what it heard, Hoot
+  // offers back what he thinks he got, says each one aloud, and lets her
+  // point at the right one. No words about it - just the words.
+  // ------------------------------------------------------------------
+  var choices = [];
+
+  function layoutCards() {
+    var g = document.getElementById('cards');
+    clear(g);
+    if (!choices.length) { return; }
+
+    var b = L.book;
+    var n = choices.length;
+    var cw, ch, gap, i, cx, cy;
+
+    gap = b.h * 0.05;
+    cw = b.w * 0.86;
+    ch = Math.min((b.h - gap * (n - 1)) / n, b.h * 0.4);
+
+    var totalH = ch * n + gap * (n - 1);
+    var top = b.y - totalH / 2;
+
+    for (i = 0; i < n; i++) {
+      cx = b.x;
+      cy = top + i * (ch + gap) + ch / 2;
+      var grp = el('g', { 'class': 'card', 'data-i': i });
+      grp.appendChild(el('rect', {
+        x: cx - cw / 2, y: cy - ch / 2, width: cw, height: ch, rx: ch * 0.28,
+        fill: 'url(#ah-card)', stroke: '#c99a4e', 'stroke-width': 5
+      }));
+      var t = el('text', {
+        x: cx, y: cy + ch * 0.13, 'text-anchor': 'middle',
+        'font-family': 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+        'font-size': Math.min(ch * 0.46, cw * 0.20), 'font-weight': '800', fill: '#7a4415'
+      });
+      t.textContent = choices[i];
+      grp.appendChild(t);
+      grp.appendChild(el('rect', {
+        'class': 'hit', x: cx - cw / 2, y: cy - ch / 2, width: cw, height: ch,
+        'data-card': i
+      }));
+      g.appendChild(grp);
+    }
+  }
+
+  function offerChoices(list) {
+    choices = list.slice(0, 3);
+    layoutCards();
+    setState('choosing');
+    // Say them in turn, so she can pick by ear rather than by reading.
+    var i = 0;
+    function next() {
+      if (state !== 'choosing' || i >= choices.length) { return; }
+      speak(choices[i++], function () { setTimeout(next, 260); });
+    }
+    next();
+  }
+
+  function clearChoices() {
+    choices = [];
+    clear(document.getElementById('cards'));
+  }
+
+  // ------------------------------------------------------------------
+  // Sparks: the ripples that travel from her towards Hoot while the ear
+  // is open, and the little stars when an answer arrives.
+  // ------------------------------------------------------------------
+  var sparks = [];
+
+  function ripple() {
+    var g = document.getElementById('sparks');
+    var c = el('circle', {
+      cx: L.hoot.x, cy: L.hoot.y - 150 * L.hoot.s, r: 40 * L.hoot.s,
+      fill: 'none', stroke: '#9fe8ff', 'stroke-width': 5, opacity: 0.55
+    });
+    g.appendChild(c);
+    sparks.push({ n: c, t: 0, life: 1.5, kind: 'ring' });
+  }
+
+  function starburst() {
+    var g = document.getElementById('sparks'), i;
+    for (i = 0; i < 12; i++) {
+      var a = rand(0, 6.28), d = rand(30, 120);
+      var s = el('path', {
+        d: 'M 0 -9 L 2.6 -2.6 L 9 0 L 2.6 2.6 L 0 9 L -2.6 2.6 L -9 0 L -2.6 -2.6 Z',
+        fill: '#ffe8a0', opacity: 0.95
+      });
+      g.appendChild(s);
+      sparks.push({
+        n: s, t: 0, life: rand(0.8, 1.4), kind: 'star',
+        x: L.book.x, y: L.book.y - L.book.h * 0.2,
+        vx: Math.cos(a) * d, vy: Math.sin(a) * d - 40, sc: rand(0.8, 2)
+      });
+    }
+  }
+
+  function stepSparks(dt) {
+    var i, s;
+    for (i = sparks.length - 1; i >= 0; i--) {
+      s = sparks[i];
+      s.t += dt;
+      var k = s.t / s.life;
+      if (k >= 1) {
+        if (s.n.parentNode) { s.n.parentNode.removeChild(s.n); }
+        sparks.splice(i, 1);
+        continue;
+      }
+      if (s.kind === 'ring') {
+        s.n.setAttribute('r', (40 + k * 260) * L.hoot.s);
+        s.n.setAttribute('opacity', 0.55 * (1 - k));
+      } else {
+        s.n.setAttribute('transform',
+          'translate(' + (s.x + s.vx * k) + ' ' + (s.y + s.vy * k + 90 * k * k) +
+          ') scale(' + (s.sc * (1 - k * 0.4)) + ')');
+        s.n.setAttribute('opacity', 1 - k);
+      }
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // States. What Hoot's body is doing, which is the whole of the
+  // instructions this game gives.
+  //
+  //   idle      breathing, blinking, glancing about, glowing gently
+  //   listening leaning in, one wing cupped to his ear, eyes wide
+  //   thinking  looking up, head tilted, turning pages
+  //   telling   facing forward, beak working, the book open
+  //   asleep    the day's words are spent; he dozes until tomorrow
+  // ------------------------------------------------------------------
+  var state = 'idle';
+
+  function setState(s) {
+    if (state === s) { return; }
+    state = s;
+    if (s !== 'choosing') { clearChoices(); }
+    drawGlow();
+  }
+
+  function drawGlow() {
+    var g = document.getElementById('glow');
+    clear(g);
+    if (state !== 'idle' && state !== 'listening') { return; }
+    var r = (state === 'listening' ? 300 : 230) * L.hoot.s;
+    g.appendChild(el('circle', {
+      id: 'aura', cx: L.hoot.x, cy: L.hoot.y - 150 * L.hoot.s, r: r, fill: 'url(#ah-glow)'
+    }));
+  }
+
+  // ------------------------------------------------------------------
+  // The ear.
+  //
+  // The browser's own recogniser, not a recording sent anywhere: it is
+  // free, it is quick, and the child's voice never leaves the device.
+  // It does need https and it does need the microphone, so when either
+  // is missing the game falls back to a grown-up typing the word, which
+  // is slower but never a dead end.
+  // ------------------------------------------------------------------
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+  var rec = null, recStop = 0, recGotSomething = false;
+
+  function earPossible() { return !!SR; }
+
+  function startListening() {
+    if (!earPossible()) { openTyping(); return; }
+    if (state === 'listening') { stopListening(); return; }
+    if (spendLeft() <= 0) { setState('asleep'); snore(); return; }
+
+    try {
+      rec = new SR();
+    } catch (e) { openTyping(); return; }
+
+    rec.lang = 'en-GB';
+    rec.interimResults = false;
+    rec.maxAlternatives = 3;
+    rec.continuous = false;
+    recGotSomething = false;
+
+    rec.onresult = function (ev) {
+      recGotSomething = true;
+      var res = ev.results[ev.results.length - 1];
+      var list = [], i, w, best = 0;
+      for (i = 0; i < res.length && i < 3; i++) {
+        w = tidyWord(res[i].transcript);
+        if (w && list.indexOf(w) < 0) { list.push(w); }
+        if (i === 0) { best = res[i].confidence || 0; }
+      }
+      if (!list.length) { heardNothing(); return; }
+      // One clear candidate goes straight through. Anything less than
+      // sure gets offered back, which is the disambiguating step.
+      if (list.length === 1 && (best === 0 || best >= 0.82)) { lookUp(list[0]); }
+      else { offerChoices(list); }
+    };
+
+    rec.onerror = function (ev) {
+      if (ev && (ev.error === 'not-allowed' || ev.error === 'service-not-allowed')) {
+        // Refused, or no https. Typing is the way in from here on.
+        micBlocked = true;
+        openTyping();
+        return;
+      }
+      heardNothing();
+    };
+
+    rec.onend = function () {
+      rec = null;
+      if (state === 'listening' && !recGotSomething) { heardNothing(); }
+    };
+
+    try {
+      rec.start();
+    } catch (e) { openTyping(); return; }
+
+    setState('listening');
+    earOpen();
+    recStop = window.setTimeout(function () { stopListening(); }, 9000);
+  }
+
+  function stopListening() {
+    window.clearTimeout(recStop);
+    if (rec) { try { rec.stop(); } catch (e) { /* already gone */ } }
+  }
+
+  function heardNothing() {
+    window.clearTimeout(recStop);
+    shrug();
+    setState('idle');
+  }
+
+  // Speech comes back as a phrase with capitals and a full stop. What we
+  // want is a single lower-case word, and the last one is nearly always
+  // the one she meant ("um, dinosaur").
+  function tidyWord(s) {
+    var t = String(s || '').toLowerCase().replace(/[^a-z' -]/g, ' ').trim();
+    if (!t) { return ''; }
+    var parts = t.split(/\s+/);
+    if (parts.length > 3) { parts = parts.slice(-1); }
+    t = parts.join(' ').replace(/^(the|a|an|what is|whats|what does) /, '').trim();
+    if (t.length > 28) { t = t.slice(0, 28); }
+    return t;
+  }
+
+  var micBlocked = false;
+
+  // ------------------------------------------------------------------
+  // Asking Claude.
+  //
+  // One short request, one short answer, no conversation kept: a word
+  // and a reading age go out, a sentence comes back. Haiku because a
+  // child waiting is a child wandering off, and because a thousand words
+  // costs about the price of a stamp.
+  // ------------------------------------------------------------------
+  var lastError = '';
+
+  function systemPrompt(age) {
+    var cap = age <= 4 ? 22 : (age <= 6 ? 30 : (age <= 8 ? 40 : 55));
+    return 'You are a kind, twinkly owl called Hoot who explains words to a British child ' +
+      'of about ' + age + ' years old.\n' +
+      'Reply with one or two very short sentences and nothing else: first what the word means, ' +
+      'then a everyday example that starts with "Like when".\n' +
+      'Use only words a ' + age + '-year-old already knows. Never use the word itself, or any ' +
+      'form of it, inside the explanation.\n' +
+      'British English. No markdown, no quotation marks, no lists, no greeting, no sign-off.\n' +
+      'Stay under ' + cap + ' words.\n' +
+      'If it is not a real word, say gently that you have not heard that one, in the same voice.\n' +
+      'Everything you say is read aloud to a small child, so keep it warm and never frightening.';
+  }
+
+  function lookUp(word) {
+    if (!word) { setState('idle'); return; }
+    if (spendLeft() <= 0) { setState('asleep'); snore(); return; }
+
+    var key = apiKey();
+    if (!key) {
+      lastError = 'No API key. Long-press the corner and add one.';
+      giveUp();
+      return;
+    }
+
+    clearChoices();
+    showInBook(word, '');
+    bookOpen = 1;
+    drawBook();
+    setState('thinking');
+    pageTurn();
+
+    prefs.used += 1;
+    savePrefs();
+
+    var ctrl = null, timer = 0;
+    if (window.AbortController) { ctrl = new window.AbortController(); }
+    if (ctrl) { timer = window.setTimeout(function () { ctrl.abort(); }, 20000); }
+
+    window.fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      signal: ctrl ? ctrl.signal : undefined,
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        // Without this header the API refuses the request outright,
+        // because a browser is not where keys are meant to live. If this
+        // ever starts failing with a CORS error, this is the line.
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5',
+        max_tokens: 200,
+        system: systemPrompt(prefs.age),
+        messages: [{ role: 'user', content: word }]
+      })
+    }).then(function (r) {
+      if (timer) { window.clearTimeout(timer); }
+      if (!r.ok) {
+        return r.text().then(function (t) {
+          throw new Error(r.status + ' ' + t.slice(0, 160));
+        });
+      }
+      return r.json();
+    }).then(function (data) {
+      var text = '', i;
+      if (data && data.content) {
+        for (i = 0; i < data.content.length; i++) {
+          if (data.content[i].type === 'text') { text += data.content[i].text; }
+        }
+      }
+      text = text.replace(/\s+/g, ' ').trim();
+      if (!text) { throw new Error('empty answer'); }
+      lastError = '';
+      tell(word, text);
+    })['catch'](function (e) {
+      if (timer) { window.clearTimeout(timer); }
+      lastError = (e && e.message) ? String(e.message) : 'no answer';
+      giveUp();
+    });
+  }
+
+  function tell(word, text) {
+    showInBook(word, text);
+    setState('telling');
+    starburst();
+    sparkle();
+    speak(word + '. ' + text, function () {
+      if (state === 'telling') { setState('idle'); }
+    });
+  }
+
+  // Not a failure - there is no losing here. He simply has not got that
+  // one, shrugs, and is ready to be asked again.
+  function giveUp() {
+    showInBook(bookWord || '', '');
+    bookOpen = 0;
+    drawBook();
+    shrug();
+    setState('idle');
+  }
+
+  // ------------------------------------------------------------------
+  // The frame loop. Everything Hoot does with his body lives here.
+  // ------------------------------------------------------------------
+  var last = 0, time = 0;
+  var blink = 0, blinkIn = rand(2, 5);
+  var look = { x: 0, y: 0, tx: 0, ty: 0 };
+  var lean = 0, cup = 0, tilt = 0, bob = 0;
+
+  function frame(now) {
+    var dt = last ? Math.min(0.05, (now - last) / 1000) : 0.016;
+    last = now;
+    time += dt;
+
+    // Blinking. An owl that never blinks is a stuffed owl.
+    blinkIn -= dt;
+    if (blinkIn <= 0 && blink <= 0) { blink = 0.16; blinkIn = rand(2.4, 6); }
+    if (blink > 0) { blink -= dt; }
+    var lid = blink > 0 ? Math.sin((1 - Math.abs(blink / 0.08 - 1)) * 1.57) : 0;
+    if (state === 'asleep') { lid = 1; }
+    if (state === 'listening') { lid *= 0.4; }
+
+    // Where he is looking, and how he is holding himself.
+    var wantLean = 0, wantCup = 0, wantTilt = 0, wantBob = 0;
+    if (state === 'idle') {
+      if (Math.random() < dt * 0.6) { look.tx = rand(-1, 1); look.ty = rand(-0.6, 0.4); }
+      wantBob = Math.sin(time * 1.4) * 3;
+    } else if (state === 'listening') {
+      look.tx = 0; look.ty = 0.1;
+      wantLean = 10; wantCup = 1; wantTilt = -7;
+      wantBob = Math.sin(time * 5) * 2;
+      if (!reduced && Math.random() < dt * 2.6) { ripple(); }
+    } else if (state === 'thinking') {
+      look.tx = Math.sin(time * 0.9) * 0.7; look.ty = -0.9;
+      wantTilt = Math.sin(time * 0.7) * 10;
+      wantBob = Math.sin(time * 2.2) * 2;
+      if (!reduced && Math.random() < dt * 1.6) { pageTurn(); }
+    } else if (state === 'telling') {
+      look.tx = 0; look.ty = 0.2;
+      wantBob = Math.sin(time * 7) * 3;
+      wantLean = 3;
+    } else if (state === 'choosing') {
+      look.tx = 0; look.ty = 0.5;
+      wantTilt = 5;
+    } else if (state === 'asleep') {
+      wantTilt = 14;
+      wantBob = Math.sin(time * 0.8) * 4;
+      if (Math.random() < dt * 0.25) { snore(); }
+    }
+
+    var k = reduced ? 1 : Math.min(1, dt * 6);
+    look.x += (look.tx - look.x) * k;
+    look.y += (look.ty - look.y) * k;
+    lean += (wantLean - lean) * k;
+    cup += (wantCup - cup) * k;
+    tilt += (wantTilt - tilt) * k;
+    bob += (wantBob - bob) * (reduced ? 1 : Math.min(1, dt * 8));
+
+    // Push it all onto the bird.
+    OWL.body.setAttribute('transform', 'translate(0 ' + bob + ')');
+    OWL.head.setAttribute('transform',
+      'translate(' + (lean * 0.5) + ' ' + (-176 + bob * 0.7) + ') rotate(' + tilt + ')');
+    OWL.pupilL.setAttribute('transform', 'translate(' + (look.x * 7) + ' ' + (look.y * 6) + ')');
+    OWL.pupilR.setAttribute('transform', 'translate(' + (look.x * 7) + ' ' + (look.y * 6) + ')');
+    OWL.lidL.setAttribute('height', 64 * lid);
+    OWL.lidR.setAttribute('height', 64 * lid);
+    // Cupping a wing to the ear is very nearly a half turn, not a
+    // quarter: a quarter swings it flat across his chest like a sash,
+    // which is what it did the first time.
+    OWL.wingL.setAttribute('transform', 'translate(-78 -150) rotate(' + (-6 - cup * 8) + ')');
+    OWL.wingR.setAttribute('transform',
+      'translate(' + (78 + 8 * cup) + ' ' + (-150 - 2 * cup + bob) + ') ' +
+      'rotate(' + (6 - cup * 167) + ') scale(' + (1 - cup * 0.28) + ')');
+
+    var aura = document.getElementById('aura');
+    if (aura) {
+      var pulse = reduced ? 1 : 1 + Math.sin(time * (state === 'listening' ? 4.5 : 1.6)) * 0.09;
+      aura.setAttribute('transform',
+        'translate(' + L.hoot.x + ' ' + (L.hoot.y - 150 * L.hoot.s) + ') scale(' + pulse + ') ' +
+        'translate(' + (-L.hoot.x) + ' ' + (-(L.hoot.y - 150 * L.hoot.s)) + ')');
+    }
+
+    // The book never quite goes away. Sitting there faint and empty it
+    // balances the frame and, more to the point, teaches where words are
+    // going to appear before any word ever has.
+    var wantOpen = (state === 'thinking' || state === 'telling') ? 1 : 0.24;
+    if (state === 'idle' && bookLines.length) { wantOpen = 1; }
+    // The cards need the page to themselves, or the ghost of the book
+    // shows through the middle one.
+    if (state === 'choosing') { wantOpen = 0; }
+    bookOpen += (wantOpen - bookOpen) * (reduced ? 1 : Math.min(1, dt * 4));
+    document.getElementById('book').setAttribute('opacity', bookOpen);
+
+    var i;
+    for (i = 0; i < stars.length; i++) {
+      var s = stars[i];
+      s.n.setAttribute('opacity', s.base * (0.6 + 0.4 * Math.sin(time * s.sp + s.p)));
+    }
+
+    stepSparks(dt);
+    requestAnimationFrame(frame);
+  }
+
+  // ------------------------------------------------------------------
+  // Input
+  // ------------------------------------------------------------------
+  var pressTimer = 0, hootHold = 0, holdFired = false;
+
+  svg.addEventListener('pointerdown', function (ev) {
+    initAudio();
+    warmVoice();
+    var t = ev.target;
+    if (!t || !t.closest) { return; }
+
+    if (t.id === 'cornerdot') {
+      clearTimeout(pressTimer);
+      pressTimer = setTimeout(openParent, 850);
+      return;
+    }
+
+    var card = t.getAttribute && t.getAttribute('data-card');
+    if (card !== null && card !== undefined && card !== '') {
+      var word = choices[+card];
+      clearChoices();
+      hoot(true);
+      lookUp(word);
+      return;
+    }
+
+    if (t.id === 'hoothit') {
+      // A long press on Hoot himself is the way to type a word, so a
+      // grown-up can ask for one the recogniser keeps mangling.
+      clearTimeout(hootHold);
+      holdFired = false;
+      hootHold = setTimeout(function () {
+        holdFired = true;
+        stopListening();
+        openTyping();
+      }, 900);
+      return;
+    }
+  });
+
+  svg.addEventListener('pointerup', function (ev) {
+    clearTimeout(pressTimer);
+    var t = ev.target;
+    if (!t) { return; }
+    if (t.id !== 'hoothit') { return; }
+    clearTimeout(hootHold);
+    // The long press already did its job; letting go must not now also
+    // count as a tap, or the typing box opens and the ear opens behind it.
+    if (holdFired) { holdFired = false; return; }
+
+    if (state === 'asleep') { snore(); return; }
+    if (state === 'telling' || state === 'thinking') {
+      // Tapping mid-answer means "again" - or "stop and let me ask".
+      if (SS) { SS.cancel(); }
+      setState('idle');
+      return;
+    }
+    if (state === 'choosing') { clearChoices(); setState('idle'); return; }
+    hoot(false);
+    startListening();
+  });
+
+  svg.addEventListener('pointercancel', function () {
+    clearTimeout(pressTimer); clearTimeout(hootHold); holdFired = false;
+  });
+
+  var resizeTimer = 0;
+  window.addEventListener('resize', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(computeLayout, 120);
+  });
+  window.addEventListener('orientationchange', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(computeLayout, 220);
+  });
+
+  // ------------------------------------------------------------------
+  // Typing a word. The way in when the microphone is refused, missing,
+  // or simply cannot make sense of "photosynthesis" in a small voice.
+  // ------------------------------------------------------------------
+  var typingEl = document.getElementById('typing');
+  var typeWord = document.getElementById('typeWord');
+
+  function openTyping() {
+    stopListening();
+    setState('idle');
+    typeWord.value = '';
+    typingEl.classList.add('open');
+    setTimeout(function () { typeWord.focus(); }, 50);
+  }
+
+  function closeTyping() { typingEl.classList.remove('open'); }
+
+  function goTyping() {
+    var w = tidyWord(typeWord.value);
+    closeTyping();
+    if (w) { hoot(true); lookUp(w); }
+  }
+
+  document.getElementById('typeGo').addEventListener('click', goTyping);
+  document.getElementById('typeCancel').addEventListener('click', closeTyping);
+  typeWord.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter') { goTyping(); }
+  });
+  typingEl.addEventListener('click', function (ev) {
+    if (ev.target === typingEl) { closeTyping(); }
+  });
+
+  // ------------------------------------------------------------------
+  // Parent controls.
+  // ------------------------------------------------------------------
+  var parentEl = document.getElementById('parent');
+  var ageEl = document.getElementById('age');
+  var ageNum = document.getElementById('ageNum');
+  var keyEl = document.getElementById('key');
+  var blobEl = document.getElementById('blob');
+  var statusEl = document.getElementById('status');
+
+  function syncPanel() {
+    ageEl.value = prefs.age;
+    ageNum.textContent = prefs.age;
+    keyEl.value = '';
+    blobEl.classList.remove('open');
+
+    var bits = [];
+    bits.push('<b>' + prefs.used + '</b> of ' + DAILY_CAP + ' words today');
+    bits.push(apiKey() ? (prefs.key ? 'key: this device' : 'key: built in') : '<b>no key set</b>');
+    bits.push(earPossible() && !micBlocked ? 'microphone: ready' : 'microphone: unavailable, typing only');
+    bits.push(SS ? 'voice: ready' : 'voice: unavailable, words shown only');
+    if (lastError) { bits.push('last error: ' + lastError); }
+    statusEl.innerHTML = bits.join('<br>');
+  }
+
+  function openParent() { syncPanel(); parentEl.classList.add('open'); }
+  function closeParent() { parentEl.classList.remove('open'); }
+
+  ageEl.addEventListener('input', function () { ageNum.textContent = ageEl.value; });
+
+  document.getElementById('save').addEventListener('click', function () {
+    prefs.age = clamp(+ageEl.value || 5, 3, 11);
+    var typed = keyEl.value.trim();
+    if (typed) {
+      prefs.key = typed;
+      // Print the line to paste into this file, so the other devices get
+      // the key without it ever being typed on them - and without it
+      // ever being sent to anybody.
+      blobEl.value = "  var BAKED = '" + scramble(typed) + "';";
+      blobEl.classList.add('open');
+      blobEl.select();
+    }
+    savePrefs();
+    syncPanel();
+    if (!typed) { closeParent(); }
+  });
+
+  document.getElementById('close').addEventListener('click', closeParent);
+  parentEl.addEventListener('click', function (ev) {
+    if (ev.target === parentEl) { closeParent(); }
+  });
+
+  // ------------------------------------------------------------------
+  loadPrefs();
+  computeLayout();
+  if (spendLeft() <= 0) { setState('asleep'); }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
