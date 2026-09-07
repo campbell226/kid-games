@@ -1150,71 +1150,117 @@
 <script>
 // Which game was touched last, and when.
 //
-// Kept here by hand rather than read from git, because reading git would
-// mean a build step and there is deliberately not one. The cost is that
-// this list has to be updated when a game is - CLAUDE.md says so in the
-// checklist, which is the only thing keeping it honest.
+// Read from GitHub, not from a list kept here. A list kept here was tried
+// first and was wrong within the hour: the times were typed rather than
+// looked up, and the footer confidently announced a change three hours
+// into the future. Anything hand-maintained is a claim; this is the
+// repository answering for itself.
+//
+// Two unauthenticated calls, because the commit list does not say which
+// files a commit touched and the single-commit endpoint does. Sixty an
+// hour is the limit and the answer is cached for five minutes, so opening
+// the launcher repeatedly costs nothing.
+//
+// The game names come from the tiles above rather than from a second list
+// here, so adding a game to the shelf is all it takes for the footer to
+// know about it.
 (function () {
-  var UPDATED = {
-    'Animal Band': '2026-08-30T19:02:49+01:00',
-    'Dentist Hoot': '2026-09-05T15:15:53+01:00',
-    'Dictionary': '2026-09-07T18:35:04+01:00',
-    'Doctor Hoot': '2026-09-05T15:15:53+01:00',
-    "Hamish's Times Tables": '2026-08-30T19:02:49+01:00',
-    'Hoot & Shellby': '2026-09-05T15:15:53+01:00',
-    'Picture Pop': '2026-09-05T13:40:04+01:00',
-    'Pizza and Ice Cream': '2026-09-05T15:15:53+01:00',
-    'Post a Letter': '2026-08-30T19:02:49+01:00',
-    'Recorder Garden': '2026-08-30T20:50:55+01:00',
-    'Vibe With Me': '2026-09-06T15:53:54+01:00'
-  };
+  var REPO = 'campbell226/kid-games';
+  var STORE = 'kid-games-latest';
+  var FRESH = 5 * 60 * 1000;
 
-  var best = null, bestAt = 0, name;
-  for (name in UPDATED) {
-    var t = Date.parse(UPDATED[name]);
-    if (t > bestAt) { bestAt = t; best = name; }
+  var out = document.getElementById('latest');
+  if (!out) { return; }
+
+  function names() {
+    var map = {}, links = document.querySelectorAll('a.game'), i, m, span;
+    for (i = 0; i < links.length; i++) {
+      m = /games\/([^/]+)\//.exec(links[i].getAttribute('href') || '');
+      span = links[i].querySelector('span');
+      if (m && span) { map[m[1]] = span.textContent.trim(); }
+    }
+    return map;
   }
-  if (!best) { return; }
 
   // Always UK time, whatever the tablet thinks it is. Europe/London
   // rather than a fixed offset, so this is BST in September and GMT in
   // January without anybody having to remember which.
-  var UK = { timeZone: 'Europe/London' };
-  function opts(extra) {
-    var o = { timeZone: UK.timeZone }, k;
-    for (k in extra) { o[k] = extra[k]; }
-    return o;
-  }
-
-  var d = new Date(bestAt), when, at;
-  try {
-    // en-CA gives YYYY-MM-DD, which subtracts cleanly. Comparing against
-    // the viewer's own midnight would call it yesterday for anyone east
-    // of here after their midnight but before ours.
-    function ukDay(x) { return x.toLocaleDateString('en-CA', UK); }
-    var diff = Math.round(
-      (Date.parse(ukDay(new Date())) - Date.parse(ukDay(d))) / 86400000);
-
-    if (diff <= 0) { when = 'today'; }
-    else if (diff === 1) { when = 'yesterday'; }
-    else {
-      when = d.toLocaleDateString('en-GB', opts({ day: 'numeric', month: 'long' }));
-      if (ukDay(d).slice(0, 4) !== ukDay(new Date()).slice(0, 4)) {
-        when += ' ' + ukDay(d).slice(0, 4);
+  function render(name, iso) {
+    var d = new Date(iso), when, at;
+    try {
+      var UK = { timeZone: 'Europe/London' };
+      // en-CA gives YYYY-MM-DD, which subtracts cleanly. Comparing
+      // against the viewer's own midnight would call this evening
+      // yesterday for anyone already past theirs.
+      function day(x) { return x.toLocaleDateString('en-CA', UK); }
+      var diff = Math.round((Date.parse(day(new Date())) - Date.parse(day(d))) / 86400000);
+      if (diff <= 0) { when = 'today'; }
+      else if (diff === 1) { when = 'yesterday'; }
+      else {
+        when = d.toLocaleDateString('en-GB',
+          { timeZone: 'Europe/London', day: 'numeric', month: 'long' });
+        if (day(d).slice(0, 4) !== day(new Date()).slice(0, 4)) {
+          when += ' ' + day(d).slice(0, 4);
+        }
       }
+      at = d.toLocaleTimeString('en-GB',
+        { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' });
+    } catch (e) {
+      when = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
+      at = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     }
-    at = d.toLocaleTimeString('en-GB',
-      opts({ hour: '2-digit', minute: '2-digit', timeZoneName: 'short' }));
-  } catch (e) {
-    // A browser without named time zones would rather show something
-    // than nothing, so fall back to its own clock.
-    when = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
-    at = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    out.textContent = 'Last updated: ' + name + ' — ' + when + ' at ' + at;
+    out.setAttribute('title', d.toISOString());
   }
 
-  var f = document.getElementById('latest');
-  f.textContent = 'Last updated: ' + best + ' — ' + when + ' at ' + at;
-  f.setAttribute('title', d.toISOString());
+  function cached() {
+    try { return JSON.parse(window.localStorage.getItem(STORE)); }
+    catch (e) { return null; }
+  }
+
+  function keep(v) {
+    try { window.localStorage.setItem(STORE, JSON.stringify(v)); }
+    catch (e) { /* private browsing; it will just ask again next time */ }
+  }
+
+  // Show what we knew straight away, so an offline launcher still says
+  // something true as of the last time it could ask.
+  var have = cached();
+  if (have && have.name && have.iso) { render(have.name, have.iso); }
+  if (have && (Date.now() - (have.got || 0)) < FRESH) { return; }
+
+  var api = 'https://api.github.com/repos/' + REPO + '/commits';
+
+  fetch(api + '?per_page=1&path=games')
+    .then(function (r) { if (!r.ok) { throw new Error(r.status); } return r.json(); })
+    .then(function (list) {
+      if (!list || !list.length) { throw new Error('no commits'); }
+      var sha = list[0].sha;
+      var iso = list[0].commit && list[0].commit.committer && list[0].commit.committer.date;
+      return fetch(api + '/' + sha).then(function (r) {
+        if (!r.ok) { throw new Error(r.status); }
+        return r.json();
+      }).then(function (commit) {
+        var map = names(), files = commit.files || [], i, m;
+        for (i = 0; i < files.length; i++) {
+          m = /^games\/([^/]+)\//.exec(files[i].filename || '');
+          if (m && map[m[1]]) {
+            return { name: map[m[1]], iso: iso, got: Date.now() };
+          }
+        }
+        return null;
+      });
+    })
+    .then(function (v) {
+      if (!v) { return; }
+      keep(v);
+      render(v.name, v.iso);
+    })
+    ['catch'](function () {
+      // Offline, rate limited, or GitHub having a moment. Whatever is
+      // already on screen from the cache stays there, and saying nothing
+      // beats saying something invented - which is how this started.
+    });
 })();
 </script>
 </body>
