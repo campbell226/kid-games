@@ -28,7 +28,7 @@
   /* Scenery is scenery. Nothing back there is worth a tap, and a stray
      one landing on a star instead of on Hoot reads as the game ignoring
      her. */
-  #scenery, #sparks, #glow { pointer-events: none; }
+  #scenery, #sparks, #glow, #pages { pointer-events: none; }
 
   /* Parent controls, and the typing box. The only words in the game that
      are not the word being asked about, and the only part deliberately
@@ -236,6 +236,7 @@
   <g id="scenery"></g>
   <g id="glow"></g>
   <g id="book"></g>
+  <g id="pages"></g>
   <g id="hoot"></g>
   <g id="cards"></g>
   <g id="sparks"></g>
@@ -243,7 +244,7 @@
 </svg>
 
 <div id="agebar">
-  <span id="ageLabel">age</span>
+  <span id="ageLabel">Age</span>
   <input type="range" id="age" min="3" max="11" step="1" value="5" aria-label="Reading age">
   <span id="ageNum">5</span>
 </div>
@@ -289,7 +290,17 @@
   function rand(a, b) { return a + Math.random() * (b - a); }
   function el(tag, attrs) {
     var n = document.createElementNS(SVGNS, tag);
-    if (attrs) { for (var k in attrs) { n.setAttribute(k, attrs[k]); } }
+    // A null attribute has to be skipped rather than set: setAttribute
+    // stringifies it, and transform="null" is an error the browser logs
+    // on every unleaned book on every shelf. Harmless, but it filled the
+    // console with a hundred and fifty complaints and buried the real
+    // ones underneath.
+    if (attrs) {
+      for (var k in attrs) {
+        if (attrs[k] === null || attrs[k] === undefined) { continue; }
+        n.setAttribute(k, attrs[k]);
+      }
+    }
     return n;
   }
   function clear(n) { while (n.firstChild) { n.removeChild(n.firstChild); } }
@@ -940,6 +951,59 @@
     }));
 
     g.setAttribute('opacity', bookOpen);
+
+    // The flicking pages need the page's real geometry, which is only
+    // known here because the page is cut to fit whatever is on it.
+    buildPages(x, y, b.w, pageH, lip);
+  }
+
+  // ------------------------------------------------------------------
+  // Flicking through.
+  //
+  // Hoot was looking down at a book that never moved, which read as
+  // staring rather than searching. Two leaves now turn over at the
+  // spine while he is thinking - a horizontal flip, so each one narrows,
+  // passes through nothing and opens out on the other side, the way a
+  // page actually does. The sound was already here and fires as a leaf
+  // crosses over, rather than at random as it used to.
+  // ------------------------------------------------------------------
+  var leaves = [];
+
+  function buildPages(px, py, pw, ph, lip) {
+    var g = document.getElementById('pages');
+    clear(g);
+    leaves = [];
+    var spine = px + pw / 2;
+    var i;
+    for (i = 0; i < 2; i++) {
+      var leaf = el('g', { opacity: 0 });
+      leaf.appendChild(el('rect', {
+        x: 0, y: py + lip * 0.3, width: pw / 2, height: ph - lip * 0.6,
+        rx: lip * 0.6, fill: 'url(#dic-page)', stroke: '#d8c6a0', 'stroke-width': 2
+      }));
+      g.appendChild(leaf);
+      leaves.push({ n: leaf, spine: spine, t: i * 0.5, over: false });
+    }
+  }
+
+  function stepPages(dt) {
+    var flicking = (state === 'thinking') && !reduced;
+    var i, L2;
+    for (i = 0; i < leaves.length; i++) {
+      L2 = leaves[i];
+      if (!flicking) { L2.n.setAttribute('opacity', 0); L2.t = i * 0.5; continue; }
+      L2.t += dt * 1.15;
+      if (L2.t >= 1) { L2.t -= 1; L2.over = false; }
+      // 1 to -1: the leaf stands up, disappears edge-on, and falls the
+      // other way. Squaring the ease makes it linger open and snap shut.
+      var k = L2.t;
+      var sx = Math.cos(k * Math.PI);
+      if (!L2.over && k > 0.5) { L2.over = true; pageTurn(); }
+      L2.n.setAttribute('transform',
+        'translate(' + L2.spine + ' 0) scale(' + sx + ' 1)');
+      L2.n.setAttribute('opacity', 0.75 * Math.min(1, Math.abs(sx) * 2.2));
+    }
+    document.getElementById('pages').setAttribute('opacity', bookOpen);
   }
 
   function wrap(text, maxChars) {
@@ -1404,7 +1468,6 @@
       wantTilt = toBook * 9 + Math.sin(time * 0.7) * 4;
       wantLean = 7;
       wantBob = Math.sin(time * 2.2) * 2;
-      if (!reduced && Math.random() < dt * 1.6) { pageTurn(); }
     } else if (state === 'telling') {
       // And looks back up from it, at her.
       look.tx = 0; look.ty = 0.15;
@@ -1468,6 +1531,7 @@
       s.n.setAttribute('opacity', s.base * (0.55 + 0.45 * Math.sin(time * s.sp + s.p)));
     }
 
+    stepPages(dt);
     stepSparks(dt);
     requestAnimationFrame(frame);
   }

@@ -30,6 +30,12 @@
     font-weight: 800;
     letter-spacing: -0.02em;
   }
+  #latest {
+    margin-top: clamp(1.5rem, 5vw, 3rem);
+    font-size: 0.85rem;
+    color: #8b96c8;
+    text-align: center;
+  }
   .shelf {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
@@ -1138,5 +1144,56 @@
       <span>Dictionary</span>
     </a>
   </div>
+
+  <footer id="latest"></footer>
+
+<script>
+// Which game was touched last, and when.
+//
+// Kept here by hand rather than read from git, because reading git would
+// mean a build step and there is deliberately not one. The cost is that
+// this list has to be updated when a game is - CLAUDE.md says so in the
+// checklist, which is the only thing keeping it honest.
+(function () {
+  var UPDATED = {
+    'Animal Band': '2026-08-30T19:02:49+01:00',
+    'Dentist Hoot': '2026-09-05T15:15:53+01:00',
+    'Dictionary': '2026-09-07T21:00:00+01:00',
+    'Doctor Hoot': '2026-09-05T15:15:53+01:00',
+    "Hamish's Times Tables": '2026-08-30T19:02:49+01:00',
+    'Hoot & Shellby': '2026-09-05T15:15:53+01:00',
+    'Picture Pop': '2026-09-05T13:40:04+01:00',
+    'Pizza and Ice Cream': '2026-09-05T15:15:53+01:00',
+    'Post a Letter': '2026-08-30T19:02:49+01:00',
+    'Recorder Garden': '2026-08-30T20:50:55+01:00',
+    'Vibe With Me': '2026-09-06T15:53:54+01:00'
+  };
+
+  var best = null, bestAt = 0, name;
+  for (name in UPDATED) {
+    var t = Date.parse(UPDATED[name]);
+    if (t > bestAt) { bestAt = t; best = name; }
+  }
+  if (!best) { return; }
+
+  // "today" and "yesterday" beat a date for the thing you changed an hour
+  // ago, which is the case this footer exists for.
+  var d = new Date(bestAt);
+  var midnight = new Date(); midnight.setHours(0, 0, 0, 0);
+  var days = Math.floor((midnight - d) / 86400000) + (d < midnight ? 1 : 0);
+  var when;
+  if (d >= midnight) { when = 'today'; }
+  else if (days <= 1) { when = 'yesterday'; }
+  else {
+    when = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
+    if (d.getFullYear() !== new Date().getFullYear()) { when += ' ' + d.getFullYear(); }
+  }
+  var at = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+  var f = document.getElementById('latest');
+  f.textContent = 'Last updated: ' + best + ' — ' + when + ' at ' + at;
+  f.setAttribute('title', d.toString());
+})();
+</script>
 </body>
 </html>

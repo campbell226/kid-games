@@ -111,3 +111,7 @@ content was never at fault. The shell is for running things: git, node, wc.
 - To actually look at a tile, write a throwaway page holding the SVGs at about
   640px wide and put it **inside this folder** — the browser pane will not
   screenshot a file outside the project. Delete it before committing.
+- If a game changed, its timestamp in the `UPDATED` list at the bottom of
+  `index.html` changed too. That list feeds the "last updated" footer and is
+  kept by hand, because reading it from git would mean a build step. Nothing
+  will catch a stale entry except remembering it here.
