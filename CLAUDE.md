@@ -113,5 +113,13 @@ content was never at fault. The shell is for running things: git, node, wc.
   screenshot a file outside the project. Delete it before committing.
 - If a game changed, its timestamp in the `UPDATED` list at the bottom of
   `index.html` changed too. That list feeds the "last updated" footer and is
-  kept by hand, because reading it from git would mean a build step. Nothing
-  will catch a stale entry except remembering it here.
+  kept by hand, because reading it from git at load time would mean a build
+  step. **Read the times out of git, never type one.** A typed timestamp put
+  the footer three hours into the future within an hour of the list existing:
+
+      for d in games/*/; do
+        printf '%-22s %s\n' "$(basename "$d")" "$(git log -1 --format=%aI -- "$d")"
+      done
+
+  Run that after committing the game change, so the time you paste is the
+  commit's own rather than a guess at when you finished.
