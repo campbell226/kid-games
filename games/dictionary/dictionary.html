@@ -960,11 +960,43 @@
   }
 
   // ------------------------------------------------------------------
-  // The choosing cards. When the ear is not sure what it heard, Hoot
-  // offers back what he thinks he got, says each one aloud, and lets her
-  // point at the right one. No words about it - just the words.
+  // The confirming cards.
+  //
+  // Nothing heard goes straight to a lookup any more. What the ear
+  // thinks it got comes back as a card, said aloud so she can judge it
+  // without reading it, alongside whatever else the recogniser offered
+  // and a keyboard for when it is none of them.
+  //
+  // The reason is money, but the reason it is worth the extra tap is
+  // that being asked "metal?" and being able to say no is a better
+  // moment than being told confidently about the wrong word. Saying
+  // meddle and getting metal was what prompted it.
+  //
+  // Tapping any card is the confirmation. There is no separate yes,
+  // because choosing a word deliberately already is one.
   // ------------------------------------------------------------------
   var choices = [];
+
+  function keyboardGlyph(g, cx, cy, w) {
+    var h = w * 0.72;
+    var x = cx - w / 2, y = cy - h / 2, c, r;
+    g.appendChild(el('rect', {
+      x: x, y: y, width: w, height: h, rx: h * 0.16,
+      fill: 'none', stroke: '#7a4415', 'stroke-width': Math.max(2, h * 0.09)
+    }));
+    for (r = 0; r < 2; r++) {
+      for (c = 0; c < 4; c++) {
+        g.appendChild(el('rect', {
+          x: x + w * (0.14 + c * 0.19), y: y + h * (0.22 + r * 0.26),
+          width: w * 0.13, height: h * 0.16, rx: h * 0.05, fill: '#7a4415'
+        }));
+      }
+    }
+    g.appendChild(el('rect', {
+      x: x + w * 0.28, y: y + h * 0.74, width: w * 0.44, height: h * 0.13,
+      rx: h * 0.06, fill: '#7a4415'
+    }));
+  }
 
   function layoutCards() {
     var g = document.getElementById('cards');
@@ -972,47 +1004,69 @@
     if (!choices.length) { return; }
 
     var b = L.book;
-    var n = choices.length;
-    var cw, ch, gap, i, cx, cy;
+    // The keyboard gets a card of its own at the end, so "none of these"
+    // is a place to press rather than something to know.
+    var n = choices.length + 1;
 
-    gap = b.h * 0.05;
-    cw = b.w * 0.86;
-    ch = Math.min((b.h - gap * (n - 1)) / n, b.h * 0.4);
+    // Landscape has no height to spare, so the cards go two abreast
+    // there rather than shrinking until the words stop being readable.
+    var cols = (L.wide && n > 2) ? 2 : 1;
+    var rows = Math.ceil(n / cols);
+    var gap = b.h * 0.05;
+    var cw = (b.w * 0.92 - gap * (cols - 1)) / cols;
+    var ch = Math.min((b.h - gap * (rows - 1)) / rows, b.h * 0.42);
 
-    var totalH = ch * n + gap * (n - 1);
+    var totalH = ch * rows + gap * (rows - 1);
+    var totalW = cw * cols + gap * (cols - 1);
     var top = b.y - totalH / 2;
+    var left = b.x - totalW / 2;
+    var i;
 
     for (i = 0; i < n; i++) {
-      cx = b.x;
-      cy = top + i * (ch + gap) + ch / 2;
-      var grp = el('g', { 'class': 'card', 'data-i': i });
+      var col = i % cols, row = Math.floor(i / cols);
+      var cx = left + col * (cw + gap) + cw / 2;
+      var cy = top + row * (ch + gap) + ch / 2;
+      var best = (i === 0);
+      var typer = (i === choices.length);
+
+      var grp = el('g', { 'class': 'card' });
       grp.appendChild(el('rect', {
         x: cx - cw / 2, y: cy - ch / 2, width: cw, height: ch, rx: ch * 0.28,
-        fill: 'url(#dic-card)', stroke: '#c99a4e', 'stroke-width': 5
+        fill: 'url(#dic-card)',
+        stroke: best ? '#b4531c' : '#c99a4e',
+        'stroke-width': best ? 8 : 5
       }));
-      var t = el('text', {
-        x: cx, y: cy + ch * 0.13, 'text-anchor': 'middle',
-        'font-family': 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
-        'font-size': Math.min(ch * 0.46, cw * 0.20), 'font-weight': '800', fill: '#7a4415'
-      });
-      t.textContent = choices[i];
-      grp.appendChild(t);
+
+      if (typer) {
+        keyboardGlyph(grp, cx, cy, Math.min(cw * 0.3, ch * 0.62));
+      } else {
+        var t = el('text', {
+          x: cx, y: cy + ch * 0.13, 'text-anchor': 'middle',
+          'font-family': 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+          'font-size': Math.min(ch * 0.46, cw * 0.2), 'font-weight': '800', fill: '#7a4415'
+        });
+        t.textContent = choices[i];
+        grp.appendChild(t);
+      }
+
       grp.appendChild(el('rect', {
         'class': 'hit', x: cx - cw / 2, y: cy - ch / 2, width: cw, height: ch,
-        'data-card': i
+        'data-card': typer ? 'type' : String(i)
       }));
       g.appendChild(grp);
     }
   }
 
-  function offerChoices(list) {
+  function offerConfirm(list) {
+    // The best guess, then at most two others. More than that on a
+    // screen this size stops being a choice and becomes a wall.
     choices = list.slice(0, 3);
     layoutCards();
-    setState('choosing');
-    // Say them in turn, so she can pick by ear rather than by reading.
+    setState('confirming');
+    // Said in turn, so she can pick by ear rather than by reading.
     var i = 0;
     function next() {
-      if (state !== 'choosing' || i >= choices.length) { return; }
+      if (state !== 'confirming' || i >= choices.length) { return; }
       speak(choices[i++], function () { setTimeout(next, 260); });
     }
     next();
@@ -1094,7 +1148,7 @@
   function setState(s) {
     if (state === s) { return; }
     state = s;
-    if (s !== 'choosing') { clearChoices(); }
+    if (s !== 'confirming') { clearChoices(); }
     drawGlow();
   }
 
@@ -1137,24 +1191,26 @@
 
     rec.lang = 'en-GB';
     rec.interimResults = false;
-    rec.maxAlternatives = 3;
+    // Five rather than three, and every one of them gets shown. The old
+    // code asked for alternatives and then hid them whenever the
+    // recogniser sounded sure - which is exactly when it is wrong in the
+    // way that matters, because a confident mishearing is the one that
+    // gets looked up. "Meddle" came back as "metal" with medal and
+    // mettle very likely sitting unused in this list.
+    rec.maxAlternatives = 5;
     rec.continuous = false;
     recGotSomething = false;
 
     rec.onresult = function (ev) {
       recGotSomething = true;
       var res = ev.results[ev.results.length - 1];
-      var list = [], i, w, best = 0;
-      for (i = 0; i < res.length && i < 3; i++) {
+      var list = [], i, w;
+      for (i = 0; i < res.length && i < 5; i++) {
         w = tidyWord(res[i].transcript);
         if (w && list.indexOf(w) < 0) { list.push(w); }
-        if (i === 0) { best = res[i].confidence || 0; }
       }
       if (!list.length) { heardNothing(); return; }
-      // One clear candidate goes straight through. Anything less than
-      // sure gets offered back, which is the disambiguating step.
-      if (list.length === 1 && (best === 0 || best >= 0.82)) { lookUp(list[0]); }
-      else { offerChoices(list); }
+      offerConfirm(list);
     };
 
     rec.onerror = function (ev) {
@@ -1354,7 +1410,7 @@
       look.tx = 0; look.ty = 0.15;
       wantBob = Math.sin(time * 7) * 3;
       wantLean = 3;
-    } else if (state === 'choosing') {
+    } else if (state === 'confirming') {
       look.tx = 0; look.ty = 0.5;
       wantTilt = 5;
     } else if (state === 'asleep') {
@@ -1402,7 +1458,7 @@
     if (state === 'idle' && bookLines.length) { wantOpen = 1; }
     // The cards need the page to themselves, or the ghost of the book
     // shows through the middle one.
-    if (state === 'choosing') { wantOpen = 0; }
+    if (state === 'confirming') { wantOpen = 0; }
     bookOpen += (wantOpen - bookOpen) * (reduced ? 1 : Math.min(1, dt * 4));
     document.getElementById('book').setAttribute('opacity', bookOpen);
 
@@ -1435,6 +1491,13 @@
 
     var card = t.getAttribute && t.getAttribute('data-card');
     if (card !== null && card !== undefined && card !== '') {
+      if (card === 'type') {
+        // None of them. The keyboard opens with the best guess already
+        // in it, so correcting metal to meddle is two letters rather
+        // than a word typed from nothing.
+        openTyping(choices[0]);
+        return;
+      }
       var word = choices[+card];
       clearChoices();
       hoot(true);
@@ -1478,7 +1541,7 @@
       setState('idle');
       return;
     }
-    if (state === 'choosing') { clearChoices(); setState('idle'); return; }
+    if (state === 'confirming') { clearChoices(); setState('idle'); return; }
     hoot(false);
     startListening();
   });
@@ -1504,12 +1567,18 @@
   var typingEl = document.getElementById('typing');
   var typeWord = document.getElementById('typeWord');
 
-  function openTyping() {
+  function openTyping(prefill) {
     stopListening();
     setState('idle');
-    typeWord.value = '';
+    typeWord.value = prefill || '';
     typingEl.classList.add('open');
-    setTimeout(function () { typeWord.focus(); }, 50);
+    setTimeout(function () {
+      typeWord.focus();
+      // Cursor at the end rather than a selected word, because the point
+      // is usually to fix two letters, not to replace the lot.
+      try { typeWord.setSelectionRange(typeWord.value.length, typeWord.value.length); }
+      catch (e) { /* not every input allows it, and it hardly matters */ }
+    }, 50);
   }
 
   function closeTyping() { typingEl.classList.remove('open'); }
