@@ -113,7 +113,7 @@
   }
   .field { border: 2px solid #cfd8e0; background: #fff; padding: 10px 12px; color: #22303f; }
   .wide { cursor: pointer; }
-  #save, #typeGo { border: 0; background: #b4531c; color: #fff; font-weight: 600; }
+  #typeGo { border: 0; background: #b4531c; color: #fff; font-weight: 600; }
   #close, #typeCancel { border: 2px solid #cfd8e0; background: #fff; color: #22303f; margin-top: 10px; }
   #status { margin: 0 0 18px; font-size: 13px; color: #63727f; }
   #status b { color: #22303f; }
@@ -285,17 +285,14 @@
     <p id="status"></p>
 
     <div class="row">
-      <h3>API key</h3>
-      <input type="password" class="field" id="key" autocomplete="off" spellcheck="false"
-             placeholder="sk-ant-&hellip;">
-      <p class="note">Kept in this browser, on this device, and nowhere else. It is never
-        written into the file and never leaves for anywhere but Anthropic.</p>
-      <p class="note"><b>Do not put a key back into the file.</b> One was scrambled in there
-        on 6 September 2026 and a stranger had spent the balance by the next morning. The
-        page is public, so anything the page can read, a visitor can read.</p>
+      <h3>Where the answers come from</h3>
+      <p class="note">There is no key on this device, and none in the game file. Hoot asks a
+        small service of ours, which holds the key and can do nothing else but explain one
+        word at one reading age. It stops for the day after a thousand words.</p>
+      <p class="note">To change the key, the model or how Hoot talks, edit the worker at
+        dash.cloudflare.com. Nothing here needs touching and no device needs setting up.</p>
     </div>
 
-    <button type="button" id="save" class="wide">Save</button>
     <button type="button" id="close" class="wide">Back to the game</button>
   </div>
 </div>
@@ -355,16 +352,16 @@
   // spend, because an API key carries no account access at all. The
   // workspace spend limit did not hold, for reasons still unresolved.
   //
-  // So a key now lives in one place only: the parent panel, saved into
-  // that one browser, on that one device. It is never written into this
-  // file. Anything the file knows, the internet knows.
+  // The answer was to stop the page holding a key at all. It now asks a
+  // worker that holds one, and that worker cannot be talked into doing
+  // anything but explaining a word to a child. See worker.js.
   // ------------------------------------------------------------------
 
   // ------------------------------------------------------------------
   // Remembered settings, and the day's tally.
   // ------------------------------------------------------------------
   var STORE = 'dictionary';
-  var prefs = { age: 5, key: '', day: '', used: 0 };
+  var prefs = { age: 5, day: '', used: 0 };
   var DAILY_CAP = 200;
 
   function today() {
@@ -378,7 +375,6 @@
       if (!raw) { return; }
       var p = JSON.parse(raw);
       if (typeof p.age === 'number') { prefs.age = clamp(p.age | 0, 3, 11); }
-      if (typeof p.key === 'string') { prefs.key = p.key; }
       if (typeof p.day === 'string') { prefs.day = p.day; }
       if (typeof p.used === 'number') { prefs.used = p.used | 0; }
     } catch (e) { /* a fresh start is a perfectly good fallback */ }
@@ -388,10 +384,6 @@
   function savePrefs() {
     try { window.localStorage.setItem(STORE, JSON.stringify(prefs)); }
     catch (e) { /* private browsing, and it does not matter */ }
-  }
-
-  function apiKey() {
-    return prefs.key;
   }
 
   function spendLeft() {
@@ -1209,36 +1201,33 @@
   var micBlocked = false;
 
   // ------------------------------------------------------------------
-  // Asking Claude.
+  // Asking Hoot's back door.
   //
-  // One short request, one short answer, no conversation kept: a word
-  // and a reading age go out, a sentence comes back. Haiku because a
-  // child waiting is a child wandering off, and because a thousand words
-  // costs about the price of a stamp.
+  // Two fields go out - the word and the reading age - and a sentence
+  // comes back. There is no key here, on this device, or in this file.
+  // It lives on a Cloudflare worker (worker.js, alongside this game),
+  // which is also where the prompt and the choice of model live.
+  //
+  // That is deliberate, and it is the whole redesign. If the page could
+  // send its own prompt, the endpoint would be a free general-purpose
+  // model to anybody who found the URL, which is the shape that emptied
+  // the account in September. As it stands, all it can be made to do is
+  // explain a word to a child, and it stops for the day after a
+  // thousand of those.
+  //
+  // The cost of that is real and worth naming: changing how Hoot talks
+  // now means editing the worker, not this file.
   // ------------------------------------------------------------------
-  var lastError = '';
+  var ENDPOINT = '';   // <- the worker's URL goes here
 
-  function systemPrompt(age) {
-    var cap = age <= 4 ? 22 : (age <= 6 ? 30 : (age <= 8 ? 40 : 55));
-    return 'You are a kind, twinkly owl called Hoot who explains words to a British child ' +
-      'of about ' + age + ' years old.\n' +
-      'Reply with one or two very short sentences and nothing else: first what the word means, ' +
-      'then an everyday example that starts with "Like when".\n' +
-      'Use only words a ' + age + '-year-old already knows. Never use the word itself, or any ' +
-      'form of it, inside the explanation.\n' +
-      'British English. No markdown, no quotation marks, no lists, no greeting, no sign-off.\n' +
-      'Stay under ' + cap + ' words.\n' +
-      'If it is not a real word, say gently that you have not heard that one, in the same voice.\n' +
-      'Everything you say is read aloud to a small child, so keep it warm and never frightening.';
-  }
+  var lastError = '';
 
   function lookUp(word) {
     if (!word) { setState('idle'); return; }
     if (spendLeft() <= 0) { setState('asleep'); snore(); return; }
 
-    var key = apiKey();
-    if (!key) {
-      lastError = 'No API key. Long-press the corner and add one.';
+    if (!ENDPOINT) {
+      lastError = 'No endpoint set. See worker.js.';
       giveUp();
       return;
     }
@@ -1257,43 +1246,33 @@
     if (window.AbortController) { ctrl = new window.AbortController(); }
     if (ctrl) { timer = window.setTimeout(function () { ctrl.abort(); }, 20000); }
 
-    window.fetch('https://api.anthropic.com/v1/messages', {
+    window.fetch(ENDPOINT, {
       method: 'POST',
       signal: ctrl ? ctrl.signal : undefined,
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': key,
-        'anthropic-version': '2023-06-01',
-        // Without this header the API refuses the request outright,
-        // because a browser is not where keys are meant to live. If this
-        // ever starts failing with a CORS error, this is the line.
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5',
-        max_tokens: 200,
-        system: systemPrompt(prefs.age),
-        messages: [{ role: 'user', content: word }]
-      })
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ word: word, age: prefs.age })
     }).then(function (r) {
       if (timer) { window.clearTimeout(timer); }
-      if (!r.ok) {
-        return r.text().then(function (t) {
-          throw new Error(r.status + ' ' + t.slice(0, 160));
-        });
+      return r.json()['catch'](function () { return {}; }).then(function (data) {
+        return { ok: r.ok, status: r.status, data: data };
+      });
+    }).then(function (res) {
+      // The day's ceiling is kept on the worker, where it cannot be
+      // wished away by clearing the browser. When it says stop, Hoot
+      // goes to sleep exactly as he does for the counter on this device.
+      if (res.status === 429) {
+        prefs.used = DAILY_CAP;
+        savePrefs();
+        setState('asleep');
+        snore();
+        return;
       }
-      return r.json();
-    }).then(function (data) {
-      var text = '', i;
-      if (data && data.content) {
-        for (i = 0; i < data.content.length; i++) {
-          if (data.content[i].type === 'text') { text += data.content[i].text; }
-        }
+      if (!res.ok || !res.data.text) {
+        throw new Error(res.status + ' ' + (res.data.error || 'no answer') +
+          (res.data.detail ? ' ' + res.data.detail : ''));
       }
-      text = text.replace(/\s+/g, ' ').trim();
-      if (!text) { throw new Error('empty answer'); }
       lastError = '';
-      tell(word, text);
+      tell(word, res.data.text);
     })['catch'](function (e) {
       if (timer) { window.clearTimeout(timer); }
       lastError = (e && e.message) ? String(e.message) : 'no answer';
@@ -1551,15 +1530,12 @@
   var parentEl = document.getElementById('parent');
   var ageEl = document.getElementById('age');
   var ageNum = document.getElementById('ageNum');
-  var keyEl = document.getElementById('key');
   var statusEl = document.getElementById('status');
 
   function syncPanel() {
-    keyEl.value = '';
-
     var bits = [];
     bits.push('<b>' + prefs.used + '</b> of ' + DAILY_CAP + ' words today');
-    bits.push(prefs.key ? 'key: saved on this device' : '<b>no key set</b>');
+    bits.push(ENDPOINT ? 'answers: via the worker' : '<b>no endpoint set</b>');
     bits.push(earPossible() && !micBlocked ? 'microphone: ready' : 'microphone: unavailable, typing only');
     bits.push(SS ? 'voice: ready' : 'voice: unavailable, words shown only');
     if (lastError) { bits.push('last error: ' + lastError); }
@@ -1581,20 +1557,6 @@
     prefs.age = clamp(+ageEl.value || 5, 3, 11);
     ageNum.textContent = prefs.age;
     savePrefs();
-  });
-
-  document.getElementById('save').addEventListener('click', function () {
-    var typed = keyEl.value.trim();
-    if (!typed) { closeParent(); return; }
-
-    // Saved here and nowhere else. The panel used to print the key back
-    // out, scrambled, ready to paste into the file for the other
-    // devices; that is exactly how it ended up on the open web, so the
-    // printer is gone. Each device is keyed by hand or not at all.
-    prefs.key = typed;
-    savePrefs();
-    syncPanel();
-    closeParent();
   });
 
   document.getElementById('close').addEventListener('click', closeParent);

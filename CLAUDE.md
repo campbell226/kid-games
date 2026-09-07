@@ -78,10 +78,14 @@ This is not a hypothetical. Dictionary shipped a scrambled API key on
 limited the damage was money, not code: a prepaid balance with auto-reload
 off. See HOWTO.md for the whole account of it.
 
-A key belongs in the parent panel, saved to that one browser on that one
-device, entered by hand per device. If a game ever needs a shared secret,
-it needs a server holding it, and that is a conversation to have before
-building rather than after.
+Dictionary now asks a Cloudflare worker (`games/dictionary/worker.js`) that
+holds the key. Copy that shape if another game ever needs one, and copy the
+reason with it: the worker is safe not because it hides a key but because
+the endpoint is not worth stealing. The model and the prompt live on the
+worker, so the page cannot ask for anything except one word explained at one
+reading age, and a counter stops the day after a thousand of those. Never
+let a page send its own prompt to a proxy — that turns it straight back
+into a free general-purpose model for whoever finds the URL.
 
 ## Working method
 

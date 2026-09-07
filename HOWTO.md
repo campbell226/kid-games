@@ -116,12 +116,41 @@ Dictionary is the only game that talks to anything outside itself. She says a
 word, Hoot explains it at whatever reading age the slider is set to. The
 explanation comes from Anthropic's API, which is billed per word.
 
-### The key does not go in the file. Read this before doing anything else.
+### How it works now
+
+No device holds a key and neither does the game file. Dictionary sends two
+fields — the word, and the reading age — to a small Cloudflare worker of ours.
+The worker holds the key, builds the prompt, calls Haiku and sends back one
+sentence.
+
+The point is not that the worker hides the key better. It is that **the
+endpoint is not worth stealing**. All it can be made to do is explain one word
+to a child; the model and the prompt live on the worker, not in the page, so
+nobody who finds the URL gets a general-purpose model. And it counts: after a
+thousand words in a day it refuses, and Hoot goes to sleep until tomorrow.
+Worst case is a bounded, boring failure instead of an empty balance.
+
+There are two ceilings, deliberately. Each device stops itself at 200 words a
+day; the worker stops the whole household at 1,000, which is about 30p and
+cannot be wished away by clearing a browser.
+
+**Setting up the worker, once.** The instructions are at the top of
+`games/dictionary/worker.js` — Cloudflare's dashboard has an in-browser
+editor, so this can all be done from the iPad. In short: create a worker,
+paste the file in, add a KV namespace bound as `COUNTER`, add the API key as a
+**Secret** named `ANTHROPIC_API_KEY`, deploy, and send the URL to Claude.
+
+**To rotate the key,** make a new one in the Anthropic console, revoke the old
+one, and edit the secret in Cloudflare. The game does not change and no device
+needs touching. **To change how Hoot talks,** edit `systemPrompt` in the worker
+and redeploy — that is the cost of keeping the prompt out of the page, and it
+is the trade that makes the endpoint safe.
+
+### Why it is built this way
 
 **6 September 2026.** A key was scrambled into `dictionary.html` and pushed.
 By the following morning a stranger had spent the whole $5 balance on Fable
-5.1 and the account stood at −$0.33. The key was revoked on 7 September and
-the file no longer contains one.
+5.1 and the account stood at −$0.33. The key was revoked on 7 September.
 
 The reasoning that put it there was that scrambling would break the `sk-ant-`
 pattern the scanners and bots match on, and that those were the real threat.
@@ -140,25 +169,11 @@ Two things held, and both were money rather than code:
 One thing did not hold: a **$3 monthly workspace limit was exceeded**, and why
 is unresolved. The likeliest explanation is that the key was created in the
 *Default* workspace rather than in `kid-games` — that field defaults, and it is
-easy to miss. Treat the balance as the only cap you actually have.
+easy to miss.
 
-**Setting it up, once, per device.** At <https://console.anthropic.com>:
-
-1. **Billing → buy credits.** $5 is the minimum and buys roughly 13,000 words.
-   **Turn auto-reload off.** This is the real safety net — everything above it
-   is advisory.
-2. **Settings → Workspaces → create one** called `kid-games` with a monthly
-   spend limit. Worth having, but do not rely on it; see above.
-3. **API keys → create a key**, and *check the workspace field actually says*
-   `kid-games` before you save.
-4. On **each device**, open Dictionary, long-press the top-right corner, paste
-   the key in and press Save. It is kept in that browser on that device and
-   goes nowhere else. There is no way to publish it to the other devices, and
-   that is deliberate.
-
-**If it leaks again,** revoke it in the Console first — that is the only thing
-that stops the spending. Removing it from anywhere else does nothing, because
-whoever has it already has it.
+**Still keep the balance prepaid with auto-reload off.** The worker's counter
+is the everyday ceiling; the balance is the one that does not depend on any
+code of ours being correct.
 
 **Running costs.** Measured, not guessed: a 165-token prompt and a 30-to-70
 token answer on Haiku 4.5 comes to about **0.03p a word**, so roughly 30 words
