@@ -94,7 +94,17 @@ export default {
       return new Response(null, { status: 204, headers: cors(origin) });
     }
     if (request.method !== 'POST') {
-      return json({ error: 'post_only' }, 405, origin);
+      // Opening the URL in a browser is the proof-of-life check, so it
+      // may as well say whether the two bindings actually resolved. Both
+      // are booleans on purpose: whether a secret exists gives nothing
+      // away, and it separates "misnamed or undeployed" from "wrong
+      // value", which are the two ways this fails and look identical
+      // from the outside.
+      return json({
+        error: 'post_only',
+        key: !!env.ANTHROPIC_API_KEY,
+        counter: !!env.COUNTER
+      }, 405, origin);
     }
     // A browser on another site is stopped by CORS anyway; this stops the
     // page being embedded somewhere else and quietly spending the day.
