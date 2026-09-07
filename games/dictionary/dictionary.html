@@ -55,23 +55,6 @@
   #panel p.note { margin: 6px 0 0; font-size: 12.5px; color: #63727f; }
   .row { margin-bottom: 18px; }
 
-  /* Typing a word. A laptop can simply start typing, but a tablet has no
-     keyboard until something asks for one, and a long press on Hoot is
-     not a thing anybody discovers. So: a button, top left, away from
-     both the full screen button and the parent corner. */
-  #typeBtn {
-    position: fixed;
-    top: max(8px, env(safe-area-inset-top));
-    left: max(8px, env(safe-area-inset-left));
-    width: 58px; height: 58px; padding: 0; border: 0;
-    display: flex; align-items: center; justify-content: center;
-    border-radius: 18px; background: rgba(24, 15, 9, 0.55);
-    box-shadow: inset 0 0 0 1.5px rgba(255, 226, 168, 0.22);
-    cursor: pointer; z-index: 6;
-    -webkit-tap-highlight-color: transparent;
-  }
-  #typeBtn svg { width: 36px; height: 26px; display: block; }
-
   /* The reading-age slider lives on the screen itself, not behind the
      long press. It is the one setting that changes between the two of
      them, so it has to be a reach away rather than a secret. */
@@ -101,6 +84,11 @@
   #agebar input::-moz-range-thumb {
     width: 36px; height: 36px; border: 0; border-radius: 50%;
     background: #e2a33c; box-shadow: 0 2px 7px rgba(0, 0, 0, 0.45);
+  }
+  #ageLabel {
+    flex: 0 0 auto;
+    font: 600 15px/1 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: #f4d69a; opacity: 0.7; letter-spacing: 0.06em;
   }
   #ageNum {
     flex: 0 0 auto; min-width: 34px; text-align: center;
@@ -254,25 +242,8 @@
   <g id="corner"></g>
 </svg>
 
-<button type="button" id="typeBtn" aria-label="Type a word">
-  <svg viewBox="0 0 44 32" aria-hidden="true">
-    <rect x="1.6" y="1.6" width="40.8" height="28.8" rx="5"
-          fill="none" stroke="#f4d69a" stroke-width="3"/>
-    <g fill="#f4d69a">
-      <rect x="7" y="8" width="5" height="5" rx="1.4"/>
-      <rect x="15" y="8" width="5" height="5" rx="1.4"/>
-      <rect x="23" y="8" width="5" height="5" rx="1.4"/>
-      <rect x="31" y="8" width="6" height="5" rx="1.4"/>
-      <rect x="7" y="16" width="6" height="5" rx="1.4"/>
-      <rect x="16" y="16" width="5" height="5" rx="1.4"/>
-      <rect x="24" y="16" width="5" height="5" rx="1.4"/>
-      <rect x="32" y="16" width="5" height="5" rx="1.4"/>
-      <rect x="12" y="23" width="20" height="4" rx="2"/>
-    </g>
-  </svg>
-</button>
-
 <div id="agebar">
+  <span id="ageLabel">age</span>
   <input type="range" id="age" min="3" max="11" step="1" value="5" aria-label="Reading age">
   <span id="ageNum">5</span>
 </div>
@@ -932,6 +903,42 @@
       g.appendChild(t);
     }
 
+    // An empty page is where a word goes, so it is also how you put one
+    // there. A dim keyboard on the blank page says so without a word of
+    // instruction, and it replaces the button that used to float in the
+    // corner having nothing to do with anything around it.
+    if (!bookWord) {
+      var kw = Math.min(b.w * 0.22, pageH * 0.42);
+      var kh = kw * 0.72;
+      var kx = b.x - kw / 2, ky = b.y - kh / 2;
+      var kb = el('g', { opacity: 0.3 });
+      kb.appendChild(el('rect', {
+        x: kx, y: ky, width: kw, height: kh, rx: kh * 0.16,
+        fill: 'none', stroke: '#8a6f42', 'stroke-width': kh * 0.09
+      }));
+      var c, r2;
+      for (r2 = 0; r2 < 2; r2++) {
+        for (c = 0; c < 4; c++) {
+          kb.appendChild(el('rect', {
+            x: kx + kw * (0.14 + c * 0.19), y: ky + kh * (0.22 + r2 * 0.26),
+            width: kw * 0.13, height: kh * 0.16, rx: kh * 0.05, fill: '#8a6f42'
+          }));
+        }
+      }
+      kb.appendChild(el('rect', {
+        x: kx + kw * 0.28, y: ky + kh * 0.74, width: kw * 0.44, height: kh * 0.13,
+        rx: kh * 0.06, fill: '#8a6f42'
+      }));
+      g.appendChild(kb);
+    }
+
+    // The whole page is the target, blank or not: tapping the place words
+    // live is how you ask for one.
+    g.appendChild(el('rect', {
+      'class': 'hit', id: 'bookhit',
+      x: x - lip, y: y - lip, width: b.w + lip * 2, height: pageH + lip * 2
+    }));
+
     g.setAttribute('opacity', bookOpen);
   }
 
@@ -1435,9 +1442,14 @@
       return;
     }
 
+    if (t.id === 'bookhit') {
+      openTyping();
+      return;
+    }
+
     if (t.id === 'hoothit') {
-      // A long press on Hoot himself is the way to type a word, so a
-      // grown-up can ask for one the recogniser keeps mangling.
+      // A long press on Hoot himself still opens the keyboard, because
+      // it is muscle memory now and costs nothing to keep.
       clearTimeout(hootHold);
       holdFired = false;
       hootHold = setTimeout(function () {
@@ -1507,13 +1519,6 @@
     closeTyping();
     if (w) { hoot(true); lookUp(w); }
   }
-
-  document.getElementById('typeBtn').addEventListener('click', function (ev) {
-    ev.stopPropagation();
-    initAudio();
-    warmVoice();
-    openTyping();
-  });
 
   document.getElementById('typeGo').addEventListener('click', goTyping);
   document.getElementById('typeCancel').addEventListener('click', closeTyping);
