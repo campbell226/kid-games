@@ -134,11 +134,93 @@ There are two ceilings, deliberately. Each device stops itself at 200 words a
 day; the worker stops the whole household at 1,000, which is about 30p and
 cannot be wished away by clearing a browser.
 
-**Setting up the worker, once.** The instructions are at the top of
-`games/dictionary/worker.js` — Cloudflare's dashboard has an in-browser
-editor, so this can all be done from the iPad. In short: create a worker,
-paste the file in, add a KV namespace bound as `COUNTER`, add the API key as a
-**Secret** named `ANTHROPIC_API_KEY`, deploy, and send the URL to Claude.
+### Setting up the worker, once
+
+Cloudflare renames things in its dashboard from time to time, so if a menu is
+not where this says, search for the word in bold — the concepts do not move,
+only the labels.
+
+**Before Cloudflare — get the Anthropic side ready.** At
+<https://console.anthropic.com>:
+
+1. **Billing.** The balance is negative after September, so add credit. $5 is
+   the minimum. Leave **auto-reload off**.
+2. **API keys → Create Key.** Check the workspace field says `kid-games` and
+   not `Default` — that field defaults, and getting it wrong is the likeliest
+   reason the $3 limit did nothing last time.
+3. Copy the key. It is shown once. Keep it in the clipboard or a password
+   manager for the next few minutes; it is going straight into Cloudflare and
+   nowhere else.
+
+**Step 1 — an account.** Sign up at <https://dash.cloudflare.com>. Workers has
+a free tier that covers this many times over and **does not ask for a card**.
+If it offers to add a domain, skip it; none is needed.
+
+**Step 2 — create the worker.** In the left sidebar, **Workers & Pages**
+(newer dashboards call this **Compute**) → **Create** → **Create Worker**.
+
+- Name it `dictionary`. The name becomes part of the URL, so it matters.
+- The first worker you ever make asks you to pick a **workers.dev subdomain**.
+  Choose something and remember it — it is permanent and it is the middle part
+  of every worker URL you will ever have.
+- Deploy the Hello World placeholder it offers. It is about to be replaced.
+
+**Step 3 — paste the code.** On the worker's page, **Edit code** (or the `</>`
+icon). Select everything in the editor, delete it, and paste the whole of
+`games/dictionary/worker.js` from this repo. Then **Deploy**, top right.
+
+The editor works on an iPad but select-all and paste in it are fiddly. If a
+laptop is to hand, this is the one step worth doing there.
+
+**Step 4 — the counter's storage.** The worker keeps its daily tally in KV, so
+that has to exist before it can be bound.
+
+- Sidebar → **Storage & Databases** → **KV** → **Create a namespace**.
+- Call it `dictionary`. That name is for you; the binding name in the next
+  step is the one the code actually uses.
+
+**Step 5 — bind it.** Back on the worker → **Settings** → **Bindings** →
+**Add** → **KV namespace**.
+
+- **Variable name:** `COUNTER` — exactly that, capitals and all. The code
+  looks for `env.COUNTER` and will fail with `counter_unavailable` if it is
+  spelled anything else.
+- **KV namespace:** the `dictionary` one from step 4.
+
+**Step 6 — the key.** Worker → **Settings** → **Variables and Secrets** →
+**Add**.
+
+- Type: **Secret**, not Variable. A Variable can be read back out of the
+  dashboard afterwards; a Secret cannot.
+- **Name:** `ANTHROPIC_API_KEY` — exactly that.
+- **Value:** the key from before Cloudflare.
+
+**Step 7 — deploy and check.** If a **Deploy** button has appeared after those
+settings changes, press it; bindings and secrets only reach the running worker
+on a deploy.
+
+The worker's URL is on its overview page and looks like
+`https://dictionary.your-subdomain.workers.dev`.
+
+**Open that URL in a browser.** It should show, in plain text:
+
+    {"error":"post_only"}
+
+That is the correct answer and it means the worker is alive — the game sends
+POST requests, and a browser address bar sends GET. Anything else means
+something is wrong:
+
+| What you see | What it means |
+|---|---|
+| `{"error":"post_only"}` | Working. Go to step 8. |
+| A Cloudflare error page | The worker did not deploy. Re-check step 3. |
+| `{"error":"counter_unavailable"}` | The KV binding is missing or misnamed. Step 5. |
+| Nothing / cannot connect | Wrong URL, or the deploy has not finished. Wait a minute. |
+
+**Step 8 — send the URL to Claude**, who puts it in the game and pushes. Then
+open Dictionary and type a word. If it comes back, it is done. If it does not,
+long-press the top-right corner: the parent panel prints the exact error the
+worker gave, and `upstream_401` there means the secret in step 6 is wrong.
 
 **To rotate the key,** make a new one in the Anthropic console, revoke the old
 one, and edit the secret in Cloudflare. The game does not change and no device
