@@ -235,6 +235,7 @@
 
   <g id="scenery"></g>
   <g id="glow"></g>
+  <g id="recents"></g>
   <g id="book"></g>
   <g id="pages"></g>
   <g id="hoot"></g>
@@ -343,7 +344,7 @@
   // Remembered settings, and the day's tally.
   // ------------------------------------------------------------------
   var STORE = 'dictionary';
-  var prefs = { age: 5, day: '', used: 0 };
+  var prefs = { age: 5, day: '', used: 0, recents: [] };
   var DAILY_CAP = 200;
 
   function today() {
@@ -359,6 +360,7 @@
       if (typeof p.age === 'number') { prefs.age = clamp(p.age | 0, 3, 11); }
       if (typeof p.day === 'string') { prefs.day = p.day; }
       if (typeof p.used === 'number') { prefs.used = p.used | 0; }
+      if (p.recents instanceof Array) { prefs.recents = p.recents.slice(0, 8); }
     } catch (e) { /* a fresh start is a perfectly good fallback */ }
     if (prefs.day !== today()) { prefs.day = today(); prefs.used = 0; }
   }
@@ -567,14 +569,21 @@
     // Hoot's feet and the book have to end up below it, or one of them
     // is standing in the wall.
     var hootP, book, deskY;
+    // The pile of words she has already asked about sits on the desk in
+    // its own band, and the book is shortened to make room rather than
+    // the two being left to argue about the same space.
+    var recH = H * 0.075;
+    var recents;
     if (wide) {
-      deskY = H * 0.40;
+      deskY = H * 0.38;
       hootP = { x: W * 0.20, y: H * 0.66, s: clamp(H * 0.0017, 0.5, 1.9) };
-      book = { x: W * 0.65, y: H * 0.64, w: W * 0.56, h: H * 0.46 };
+      recents = { x: W * 0.65, y: H * 0.455, w: W * 0.56, h: recH };
+      book = { x: W * 0.65, y: H * 0.72, w: W * 0.56, h: H * 0.40 };
     } else {
       deskY = H * 0.46;
       hootP = { x: W * 0.5, y: H * 0.53, s: clamp(Math.min(W * 0.0024, H * 0.00095), 0.5, 2.6) };
-      book = { x: W * 0.5, y: H * 0.75, w: W * 0.92, h: H * 0.38 };
+      recents = { x: W * 0.5, y: H * 0.615, w: W * 0.92, h: recH };
+      book = { x: W * 0.5, y: H * 0.80, w: W * 0.92, h: H * 0.30 };
     }
 
     // The age slider is an HTML bar sitting over the bottom of the SVG,
@@ -583,13 +592,15 @@
     // meant re-tuning it for every screen shape that came along.
     var barVb = (74 / Math.max(1, vh)) * H;
 
-    L = { W: W, H: H, wide: wide, hoot: hootP, book: book, deskY: deskY, barVb: barVb };
+    L = { W: W, H: H, wide: wide, hoot: hootP, book: book, recents: recents,
+         deskY: deskY, barVb: barVb };
 
     svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
     drawScenery();
     drawCorner();
     buildHoot();
     drawBook();
+    drawRecents();
     layoutCards();
     drawGlow();
   }
@@ -867,7 +878,9 @@
     var x = b.x - b.w / 2, y = b.y - pageH / 2;
 
     // Keep the whole page above the slider, and off the top of the desk.
-    var floor = L.H - L.barVb - Math.max(6, L.H * 0.012);
+    // The lip is the cover standing proud of the page, so the floor has
+    // to clear that too or the binding tucks under the slider.
+    var floor = L.H - L.barVb - Math.max(6, L.H * 0.012) - lip * 2;
     if (y + pageH > floor) { y = floor - pageH; }
     if (y < L.deskY + Math.max(4, L.H * 0.01)) { y = L.deskY + Math.max(4, L.H * 0.01); }
 
@@ -1021,6 +1034,112 @@
     bookWord = word || '';
     bookLines = definition ? wrap(definition, L.maxChars || 34) : [];
     drawBook();
+  }
+
+  // ------------------------------------------------------------------
+  // What she has already asked, kept on the device.
+  //
+  // Every answer is stored under the word and the reading age together,
+  // because a five-year-old's badger is not a nine-year-old's. Asking
+  // again costs nothing and comes back at once. The pile on the desk is
+  // the same store made visible: the last few words, lying where she
+  // left them, and tapping one opens it again.
+  // ------------------------------------------------------------------
+  var CACHE_STORE = 'dictionary-answers';
+  var CACHE_MAX = 400;
+  var answers = {};
+
+  function cacheKey(word, age) { return word + '|' + age; }
+
+  function loadAnswers() {
+    try { answers = JSON.parse(window.localStorage.getItem(CACHE_STORE)) || {}; }
+    catch (e) { answers = {}; }
+  }
+
+  function saveAnswers() {
+    try { window.localStorage.setItem(CACHE_STORE, JSON.stringify(answers)); }
+    catch (e) { /* full, or private browsing: it is a saving, not a store */ }
+  }
+
+  function recall(word, age) {
+    var e = answers[cacheKey(word, age)];
+    if (!e) { return null; }
+    e.at = Date.now();
+    return e.t;
+  }
+
+  function remember(word, age, text) {
+    answers[cacheKey(word, age)] = { t: text, at: Date.now() };
+    var keys = Object.keys(answers), i;
+    if (keys.length > CACHE_MAX) {
+      keys.sort(function (a, b) { return answers[a].at - answers[b].at; });
+      for (i = 0; i < keys.length - CACHE_MAX; i++) { delete answers[keys[i]]; }
+    }
+    saveAnswers();
+  }
+
+  var RECENT_MAX = 4;
+
+  function noteRecent(word) {
+    var r = prefs.recents || [], i;
+    for (i = r.length - 1; i >= 0; i--) { if (r[i] === word) { r.splice(i, 1); } }
+    r.unshift(word);
+    prefs.recents = r.slice(0, RECENT_MAX);
+    savePrefs();
+    drawRecents();
+  }
+
+  function drawRecents() {
+    var g = document.getElementById('recents');
+    clear(g);
+    var r = prefs.recents || [];
+    if (!r.length || !L.recents) { return; }
+
+    var b = L.recents;
+    var n = Math.min(r.length, RECENT_MAX);
+    var gap = b.w * 0.02;
+    var cw = (b.w - gap * (n - 1)) / n;
+    var left = b.x - b.w / 2;
+    var i;
+
+    for (i = 0; i < n; i++) {
+      var cx = left + i * (cw + gap) + cw / 2;
+      var word = r[i];
+      var grp = el('g', { 'class': 'recent' });
+
+      grp.appendChild(el('rect', {
+        x: cx - cw / 2, y: b.y - b.h / 2, width: cw, height: b.h,
+        rx: b.h * 0.18, fill: SPINES[i % SPINES.length]
+      }));
+      // The spine down the left edge, so it reads as a closed book seen
+      // from above rather than as a coloured tile.
+      grp.appendChild(el('rect', {
+        x: cx - cw / 2, y: b.y - b.h / 2, width: Math.max(4, cw * 0.06), height: b.h,
+        rx: b.h * 0.18, fill: '#00000033'
+      }));
+      grp.appendChild(el('rect', {
+        x: cx + cw / 2 - Math.max(3, cw * 0.04), y: b.y - b.h * 0.4,
+        width: Math.max(3, cw * 0.035), height: b.h * 0.8, rx: 2,
+        fill: '#f2e6c8', opacity: 0.8
+      }));
+
+      // Sized to the word rather than to the card, so "dinosaur" is
+      // smaller than "cat" instead of running off the cover.
+      var size = Math.min(b.h * 0.44, cw * 0.78 / Math.max(3, word.length * 0.56));
+      var t = el('text', {
+        x: cx + cw * 0.02, y: b.y + size * 0.34, 'text-anchor': 'middle',
+        'font-family': 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+        'font-size': size, 'font-weight': '700', fill: '#fdf6e4'
+      });
+      t.textContent = word;
+      grp.appendChild(t);
+
+      grp.appendChild(el('rect', {
+        'class': 'hit', x: cx - cw / 2, y: b.y - b.h / 2, width: cw, height: b.h,
+        'data-recent': word
+      }));
+      g.appendChild(grp);
+    }
   }
 
   // ------------------------------------------------------------------
@@ -1198,14 +1317,293 @@
   }
 
   // ------------------------------------------------------------------
+  // Words that sound like other words.
+  //
+  // The recogniser was supposed to supply these and does not: saying
+  // "meddle" produced "medal" and nothing else, so there was one wrong
+  // card and no right one. This list is the fallback, and it exists to
+  // be searched by sound rather than read.
+  //
+  // Soundex is crude and that is exactly why it suits: it throws metal,
+  // meddle, medal, mettle, muddle and middle into one bucket, which is
+  // the confusion it needs to undo. A cleverer algorithm would separate
+  // words this game wants kept together.
+  //
+  // Common words a child might say, plus the classic traps - the pairs
+  // that sound alike and mean nothing like each other, which are the
+  // ones worth being asked about.
+  // ------------------------------------------------------------------
+  var WORDS = (
+    'able about above accident ache acorn across acrobat add address adventure ' +
+    'afraid after afternoon again against age air aisle alarm album alive all ' +
+    'allowed aloud alphabet already always ambulance angel anger angry animal ' +
+    'ankle answer ant antler anxious apart apple apron arch are argue arm armour ' +
+    'army around arrive arrow art artist ask asleep astronaut ate attic aunt ' +
+    'autumn awake award away awful axe baby back bacon bad badge badger bag bake ' +
+    'baker balance bald ball balloon banana band bandage bang bank bare barge ' +
+    'bark barn barrel base basket bat bath be beach bead beak beam bean bear ' +
+    'beard beast beat beautiful beaver because bed bee beech beef been beetle ' +
+    'before beg begin behind believe bell belly belong below belt bench bend ' +
+    'berry beside best better between bicycle big bill bin bird birth biscuit ' +
+    'bit bite bitter black blade blanket blaze bleed blend bless blind blink ' +
+    'block blood bloom blossom blow blue blunt blush board boast boat body boil ' +
+    'bold bolt bone bonnet book boot border bore born borrow boss both bother ' +
+    'bottle bottom bough bounce bow bowl box boy brain brake branch brave bread ' +
+    'break breakfast breath breathe breeze brick bride bridge bright bring ' +
+    'broad broken brook broom brother brown brush bubble bucket buckle bud ' +
+    'buffalo bug build bulb bull bump bun bunch bundle burn burrow burst bury ' +
+    'bus bush busy but butter butterfly button buy by cabbage cabin cake ' +
+    'calendar calf call calm camel camera camp can candle cannon canoe cap cape ' +
+    'captain car card care careful carpet carriage carrot carry cart cartoon ' +
+    'carve case castle cat catch caterpillar cattle caught cause cave ceiling ' +
+    'cellar cement centre cereal certain chain chair chalk change chapter charge ' +
+    'chase cheap cheek cheer cheese cherry chest chew chicken chief child ' +
+    'chimney chin chip chocolate choice choose chop chorus church circle circus ' +
+    'city clap class claw clay clean clear clever cliff climb clip cloak clock ' +
+    'close cloth cloud clown club clue clumsy coach coal coarse coast coat cobweb ' +
+    'cocoa coffee coin cold collar collect colour comb come comfort common ' +
+    'compass complete computer cone confuse container continue cook cool copper ' +
+    'copy cord cork corn corner correct cost cottage cotton cough could count ' +
+    'country couple courage course cousin cover cow crab crack cradle crane ' +
+    'crash crawl crayon cream crease create creature creep crew cricket crisp ' +
+    'crocodile crooked crop cross crow crowd crown cruel crumb crumble crush ' +
+    'crust cry crystal cub cube cuckoo cup cupboard curious curl curtain curve ' +
+    'cushion custard cut cycle dad daisy damp dance danger dark dart dash ' +
+    'daughter dawn day dead deaf deal dear death decide deck decorate deep deer ' +
+    'defend delay delicious deliver den dentist depend describe desert deserve ' +
+    'desk destroy detail diamond diary dice die different difficult dig dim ' +
+    'dinner dinosaur dip direct dirt disappear discover dish disturb ditch dive ' +
+    'divide dizzy do doctor dodge dog doll dolphin done donkey door dot double ' +
+    'dough dove down dozen dragon drain draw drawer dream dress drift drill ' +
+    'drink drip drive drop drown drum dry duck dull dumb dune during dusk dust ' +
+    'duty dwarf each eager eagle ear early earn earth east easy eat echo edge ' +
+    'egg eight elbow elder electric elephant else empty end enemy engine enjoy ' +
+    'enough enter envelope equal escape even evening ever every evil exact ' +
+    'examine except excite excuse exercise exit expect explain explore extra eye ' +
+    'face fact factory fade fail faint fair fairy faith fall false family famous ' +
+    'fan far fare farm fast fasten fat fate father fault favourite fear feast ' +
+    'feather feed feel feet fell fellow female fence fern ferry fetch fever few ' +
+    'field fierce fight figure file fill film final find fine finger finish fir ' +
+    'fire firm first fish fist fit fix flag flame flap flash flat flavour flea ' +
+    'fleece flesh flew float flock flood floor flour flow flower flute fly foal ' +
+    'foam fog fold follow food fool foot for force forest forget fork form fort ' +
+    'fortune forward fossil found fountain four fox frame free freeze fresh ' +
+    'friend fright frog from front frost frown fruit fry fuel full fun fur ' +
+    'furniture further future gain gale gallop game gap garage garden gate ' +
+    'gather gentle ghost giant gift giggle giraffe girl give glad glance glass ' +
+    'gleam glide glitter globe gloom glove glow glue goal goat gold golf good ' +
+    'goose gorilla grab grain grand grape grass grave gravy graze great greedy ' +
+    'green greet grey grill grin grip groan ground group grow growl grumble ' +
+    'guard guess guest guide guitar gulp gum gun gust gutter habit hail hair ' +
+    'half hall halt hammer hamster hand handle hang happen happy harbour hard ' +
+    'hare harm harvest hat hatch hate haul haunt have hawk hay he head heal ' +
+    'health heap hear heard heart heat heaven heavy hedge heel height hello helm ' +
+    'help hen herd here hero hide high hill hint hip hire hiss history hit hive ' +
+    'hoarse hobby hold hole hollow holy home honest honey hood hoof hook hoop ' +
+    'hop hope horn horse hose hospital hot hotel hour house how howl hug huge ' +
+    'hum humble hump hundred hunger hunt hurry hurt hut ice icicle idea idle ill ' +
+    'imagine important inch indeed injure ink insect inside instead invent ' +
+    'invite iron island itch jacket jam jar jaw jelly jewel job join joke ' +
+    'journey joy judge jug juggle juice jump jungle just kangaroo keen keep ' +
+    'kennel kettle key kick kid kill kind king kiss kitchen kite kitten knee ' +
+    'kneel knife knight knit knob knock knot know ladder lady lake lamb lame ' +
+    'lamp land lane language lantern lap large last late laugh laundry law lawn ' +
+    'lay lazy lead leaf lean leap learn least leather leave ledge left leg lemon ' +
+    'lend length leopard less lesson let letter level library lick lid lie life ' +
+    'lift light like lily limb lime limp line lion lip liquid list listen little ' +
+    'live lizard load loaf loan lobster lock log lonely long look loop loose ' +
+    'lorry lose lost lot loud love low luck lump lunch lung machine mad magic ' +
+    'magnet maid mail main make male mammal man mane manner many map marble march ' +
+    'mark market marry marsh mask mast master mat match material matter meadow ' +
+    'meal mean meant measure meat medal meddle medicine meet melon melt memory ' +
+    'mend mention meow mercy mermaid mess message metal method mettle middle ' +
+    'midnight might mild mile milk mill mind mine minute mirror miss mist ' +
+    'mistake mix moan model moment money monkey monster month moon mop more ' +
+    'morning moss most moth mother motor mould mountain mouse mouth move mud ' +
+    'muddle mug mule mumble muscle museum mushroom music must nail name narrow ' +
+    'nasty nature naughty near neat neck need needle neighbour nest net never ' +
+    'new news next nibble nice night nine noble nod noise none noon north nose ' +
+    'note nothing notice now number nurse nut oak oar oat obey ocean odd off ' +
+    'offer office often oil old olive once one onion only open orange orchard ' +
+    'order organ other otter ought our out oval oven over owe owl own ox pack ' +
+    'paddle page pail pain paint pair palace pale palm pan pancake panda panic ' +
+    'pantry paper parade parcel pardon parent park parrot part partner party ' +
+    'pass past paste pat patch path patient pattern pause paw pay pea peace peach ' +
+    'peacock peak peanut pear pearl pebble peck pedal peel peep pen pencil penny ' +
+    'people pepper perch perfect perhaps person pet petal photo piano pick ' +
+    'picnic picture pie piece pig pigeon pile pill pillow pilot pin pinch pine ' +
+    'pink pipe pirate pit pitch pity place plain plan plane plank plant plaster ' +
+    'plate play please pleasure plenty plot plough plug plum plumber plump ' +
+    'pocket poem point poison poke pole police polish polite pond pony pool poor ' +
+    'pop porch pork port possible post pot potato pounce pound pour powder power ' +
+    'practise praise pram prance pray present press pretend pretty prevent price ' +
+    'prick pride prince print prison private prize probably problem promise ' +
+    'proper protect proud prove provide prowl public puddle puff pull pump ' +
+    'pumpkin punch puncture punish pup pupil puppet pure purple purpose purr ' +
+    'purse push puzzle quack quarrel quarter queen queer question queue quick ' +
+    'quiet quilt quit quite quiver rabbit race rack radio raft rag rage raid ' +
+    'rail rain rainbow raise rake ran ranch rang range rank rap rat rate rather ' +
+    'rattle raw ray reach read ready real reason recipe record red reed reef ' +
+    'refuse region regret reign rein remain remember remind remove rent repair ' +
+    'repeat reply report rescue rest return reward rhyme ribbon rice rich rid ' +
+    'riddle ride ridge right rim ring rinse rip ripe rise risk river road roar ' +
+    'roast rob robin robot rock rocket rod rode roll roof room root rope rose ' +
+    'rot rough round route row rub rubber rubbish rude rug ruin rule rumble run ' +
+    'rush rust sack sad saddle safe said sail salad sale salt same sand ' +
+    'sandwich sank sat satin sauce saucer sausage save saw say scale scar scarce ' +
+    'scare scarf scatter scene scent school science scissors scold scoop score ' +
+    'scrap scrape scratch scream screen screw scribble scrub sea seal search ' +
+    'season seat second secret see seed seek seem seize sell send sense sent ' +
+    'sentence separate serious serve settle seven several sew shade shadow shake ' +
+    'shall shallow shame shape share shark sharp shatter shave shed sheep sheet ' +
+    'shelf shell shelter shepherd shield shine ship shirt shiver shock shoe ' +
+    'shoot shop shore short shoulder shout shovel show shower shrink shrub shut ' +
+    'shy sick side sigh sight sign silence silk silly silver simple since sing ' +
+    'single sink sip sir sister sit six size skate sketch ski skin skip skirt ' +
+    'skull sky slab slam slap slate sledge sleep sleeve slice slide slight slim ' +
+    'slip slippery slope slot slow slug slum sly smack small smart smash smell ' +
+    'smile smoke smooth snack snail snake snap sneeze sniff snore snout snow ' +
+    'soak soap soar sob sock soft soil sold soldier sole solid some son song ' +
+    'soon soot sore sorry sort sound soup sour south space spade spare spark ' +
+    'sparrow speak spear special speck speech speed spell spend spider spill ' +
+    'spin spine spire spirit spit splash split spoil sponge spool spoon sport ' +
+    'spot spout spray spread spring sprinkle sprout spy square squash squeak ' +
+    'squeeze squirrel stable stack staff stage stain stair stalk stall stamp ' +
+    'stand star stare start starve station stay steady steal steam steel steep ' +
+    'steer stem step stick stiff still sting stir stitch stock stomach stone ' +
+    'stool stoop stop store storm story stout stove straight strain strange ' +
+    'straw stream street stretch strike string strip stripe strong struggle ' +
+    'stubborn stuck study stuff stumble stump stupid sudden suffer sugar suit ' +
+    'sum summer sun supper suppose sure surface surprise swallow swamp swan swap ' +
+    'swarm sway swear sweat sweep sweet swell swift swim swing switch sword ' +
+    'table tack tadpole tail tailor take tale talk tall tame tangle tank tap ' +
+    'tape tar target task taste taught teach team tear tease teeth telephone ' +
+    'tell temper tempt ten tender tent term terrible test than thank that thaw ' +
+    'the theatre their them then there these they thick thief thigh thimble thin ' +
+    'thing think third thirst this thistle thorn those though thought thousand ' +
+    'thread threat three threw throat throne through throw thumb thunder tick ' +
+    'ticket tickle tide tidy tie tiger tight tile till timber time tin tiny tip ' +
+    'tire tired title toad toast today toe together toilet told tomato tomorrow ' +
+    'tongue tonight too took tool tooth top torch tore tortoise toss total touch ' +
+    'tough tour tow towel tower town toy track tractor trade traffic trail train ' +
+    'tramp trap travel tray treacle tread treasure treat tree tremble trench ' +
+    'trial triangle trick trickle tried trim trip trolley trot trouble trousers ' +
+    'truck true trumpet trunk trust truth try tub tube tuck tug tulip tumble ' +
+    'tune tunnel turkey turn turtle tusk twig twin twist two type tyre ugly ' +
+    'umbrella uncle under understand undo unhappy uniform unless until up upon ' +
+    'upset upstairs use useful usual valley value van vanish vase vegetable veil ' +
+    'vein velvet verse very vessel vest view village vine violet violin visit ' +
+    'voice volcano vote vowel voyage wade wag wage waist wait wake walk wall ' +
+    'wander want war ward warm warn wash wasp waste watch water wave wax way we ' +
+    'weak wealth weapon wear weary weather weave web wedding weed week weep ' +
+    'weigh weight welcome well went were west wet whale wheat wheel when where ' +
+    'whether which while whip whirl whisker whisper whistle white who whole whose ' +
+    'why wicked wide widow width wife wild will willow win wind window wine wing ' +
+    'wink winter wipe wire wise wish witch with within without witness wizard ' +
+    'wobble woke wolf woman wonder wood wool word wore work world worm worn ' +
+    'worry worse worship worth would wound wrap wreck wren wrestle wriggle wring ' +
+    'wrist write wrong wrote yacht yard yawn year yell yellow yes yesterday yet ' +
+    'yolk you young zebra zero zigzag zip zoo'
+  ).split(' ');
+
+  // Soundex: first letter, then the consonant sounds after it, doubles
+  // and vowels dropped. Four characters, so metal and meddle both land
+  // on M340 and can find each other.
+  var SDX = { b: 1, f: 1, p: 1, v: 1, c: 2, g: 2, j: 2, k: 2, q: 2, s: 2, x: 2,
+              z: 2, d: 3, t: 3, l: 4, m: 5, n: 5, r: 6 };
+
+  // English spells sounds that are not there, and soundex keys on the
+  // very first letter, so knight and night land in different buckets -
+  // which is exactly the pair a child meets first. These four rules put
+  // the silent letters back where they belong before keying: silent
+  // initial clusters, silent gh after a vowel, ph for f, and silent b
+  // after m at the end.
+  function desilence(w) {
+    return w
+      .replace(/^(kn|gn|wr|pn|ps)/, function (m) { return m.charAt(1); })
+      .replace(/([aeiou])gh/g, '$1')
+      .replace(/ph/g, 'f')
+      .replace(/mb$/, 'm');
+  }
+
+  function soundex(w) {
+    w = desilence(String(w || '').toLowerCase().replace(/[^a-z]/g, ''));
+    if (!w) { return ''; }
+    var out = '', last = SDX[w.charAt(0)] || 0, i, c, ch;
+    for (i = 1; i < w.length && out.length < 3; i++) {
+      ch = w.charAt(i);
+      c = SDX[ch] || 0;
+      if (c && c !== last) { out += c; }
+      // h and w are transparent: two consonants either side of one still
+      // count as the same sound.
+      if (ch !== 'h' && ch !== 'w') { last = c; }
+    }
+    return (w.charAt(0) + out + '000').slice(0, 4).toUpperCase();
+  }
+
+  // Built once. Two thousand words is nothing to walk, but walking it
+  // per keystroke of a child's voice would still be silly.
+  var BY_SOUND = {};
+  (function () {
+    var i, k;
+    for (i = 0; i < WORDS.length; i++) {
+      k = soundex(WORDS[i]);
+      if (!BY_SOUND[k]) { BY_SOUND[k] = []; }
+      BY_SOUND[k].push(WORDS[i]);
+    }
+  })();
+
+  function editDistance(a, b) {
+    var m = a.length, n = b.length, prev = [], cur = [], i, j;
+    for (j = 0; j <= n; j++) { prev[j] = j; }
+    for (i = 1; i <= m; i++) {
+      cur[0] = i;
+      for (j = 1; j <= n; j++) {
+        cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1,
+          prev[j - 1] + (a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1));
+      }
+      for (j = 0; j <= n; j++) { prev[j] = cur[j]; }
+    }
+    return prev[n];
+  }
+
+  function sharedStart(a, b) {
+    var i = 0;
+    while (i < a.length && i < b.length && a.charAt(i) === b.charAt(i)) { i++; }
+    return i;
+  }
+
+  // Everything in the bucket already sounds alike, so the ranking only
+  // decides which two to show - and it compares the de-silenced forms,
+  // not the spellings. Ranking on spelling put net and nut above knight
+  // for "night", because night and knight do not share so much as a
+  // first letter. On sound they are the same word, distance nought.
+  function soundAlikes(word, exclude, max) {
+    var bucket = BY_SOUND[soundex(word)] || [];
+    var heard = desilence(word);
+    var out = [], i, w, s;
+    for (i = 0; i < bucket.length; i++) {
+      w = bucket[i];
+      if (w === word || exclude.indexOf(w) >= 0) { continue; }
+      s = desilence(w);
+      out.push({ w: w, d: editDistance(heard, s), p: sharedStart(heard, s) });
+    }
+    out.sort(function (a, b) {
+      return a.d - b.d || b.p - a.p || a.w.length - b.w.length;
+    });
+    return out.slice(0, max).map(function (o) { return o.w; });
+  }
+
+  // ------------------------------------------------------------------
   // States. What Hoot's body is doing, which is the whole of the
   // instructions this game gives.
   //
-  //   idle      breathing, blinking, glancing about, glowing gently
-  //   listening leaning in, one wing cupped to his ear, eyes wide
-  //   thinking  looking up, head tilted, turning pages
-  //   telling   facing forward, beak working, the book open
-  //   asleep    the day's words are spent; he dozes until tomorrow
+  //   idle       breathing, blinking, glancing about, glowing gently
+  //   listening  leaning in, one wing cupped to his ear, eyes wide
+  //   confirming asking which word she meant, before spending anything
+  //   thinking   head down over the book, flicking through it
+  //   telling    looking up from it, beak working, the book open
+  //   asleep     the day's words are spent; he dozes until tomorrow
   // ------------------------------------------------------------------
   var state = 'idle';
 
@@ -1274,6 +1672,11 @@
         if (w && list.indexOf(w) < 0) { list.push(w); }
       }
       if (!list.length) { heardNothing(); return; }
+      // Top up from the word list when the recogniser is stingy, which
+      // it usually is: "meddle" came back as "medal" and nothing else.
+      if (list.length < 3) {
+        list = list.concat(soundAlikes(list[0], list, 3 - list.length));
+      }
       offerConfirm(list);
     };
 
@@ -1351,6 +1754,22 @@
 
   function lookUp(word) {
     if (!word) { setState('idle'); return; }
+
+    // Asked before, at this age? Then it is already here, and neither
+    // counter should hear about it. A beat of flicking first, because
+    // an answer that appears the instant she taps reads as a glitch
+    // rather than as him remembering.
+    var known = recall(word, prefs.age);
+    if (known) {
+      clearChoices();
+      showInBook(word, '');
+      setState('thinking');
+      window.setTimeout(function () {
+        if (state === 'thinking') { tell(word, known); }
+      }, 550);
+      return;
+    }
+
     if (spendLeft() <= 0) { setState('asleep'); snore(); return; }
 
     if (!ENDPOINT) {
@@ -1408,6 +1827,8 @@
   }
 
   function tell(word, text) {
+    remember(word, prefs.age, text);
+    noteRecent(word);
     showInBook(word, text);
     setState('telling');
     starburst();
@@ -1566,6 +1987,16 @@
       clearChoices();
       hoot(true);
       lookUp(word);
+      return;
+    }
+
+    var again = t.getAttribute && t.getAttribute('data-recent');
+    if (again) {
+      // At the age the slider says now, not the age it was first asked
+      // at - so moving the slider and tapping a word is how you hear the
+      // same word explained older.
+      hoot(true);
+      lookUp(again);
       return;
     }
 
@@ -1741,6 +2172,7 @@
 
   // ------------------------------------------------------------------
   loadPrefs();
+  loadAnswers();
   syncAge();
   computeLayout();
   if (spendLeft() <= 0) { setState('asleep'); }
