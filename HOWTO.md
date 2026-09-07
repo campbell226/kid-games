@@ -116,29 +116,49 @@ Dictionary is the only game that talks to anything outside itself. She says a
 word, Hoot explains it at whatever reading age the slider is set to. The
 explanation comes from Anthropic's API, which is billed per word.
 
-**Setting it up, once.** At <https://console.anthropic.com>:
+### The key does not go in the file. Read this before doing anything else.
+
+**6 September 2026.** A key was scrambled into `dictionary.html` and pushed.
+By the following morning a stranger had spent the whole $5 balance on Fable
+5.1 and the account stood at −$0.33. The key was revoked on 7 September and
+the file no longer contains one.
+
+The reasoning that put it there was that scrambling would break the `sk-ant-`
+pattern the scanners and bots match on, and that those were the real threat.
+They were not. **The game is served on a public URL**, so the key was not
+sitting in a repository somebody had to find — it was handed to every visitor
+who opened the developer console. No amount of scrambling changes that,
+because the page has to unscramble it to use it.
+
+Two things held, and both were money rather than code:
+
+- The balance was **prepaid with auto-reload off**, so the loss stopped at $5.
+- An API key can only **spend**. It carries no access to the Console, to
+  billing details, to the card, or to anything on claude.ai — not the account,
+  not conversations, not memory. Nothing personal was exposed.
+
+One thing did not hold: a **$3 monthly workspace limit was exceeded**, and why
+is unresolved. The likeliest explanation is that the key was created in the
+*Default* workspace rather than in `kid-games` — that field defaults, and it is
+easy to miss. Treat the balance as the only cap you actually have.
+
+**Setting it up, once, per device.** At <https://console.anthropic.com>:
 
 1. **Billing → buy credits.** $5 is the minimum and buys roughly 13,000 words.
-   **Turn auto-reload off** — that switch is the whole safety net, because it
-   makes the balance a hard ceiling rather than a direction of travel.
-2. **Settings → Workspaces → create one** called `kid-games`, and give it a
-   monthly spend limit. This keeps the game away from anything else on the
-   account, forever.
-3. **API keys → create a key *inside that workspace***. Copy it.
-4. Open Dictionary on the laptop, long-press the corner, paste the key in and
-   press Save. It prints a scrambled line beginning `var BAKED =`. Hand that
-   line to Claude, say which game it belongs to, and it goes into the file so
-   every tablet has it.
+   **Turn auto-reload off.** This is the real safety net — everything above it
+   is advisory.
+2. **Settings → Workspaces → create one** called `kid-games` with a monthly
+   spend limit. Worth having, but do not rely on it; see above.
+3. **API keys → create a key**, and *check the workspace field actually says*
+   `kid-games` before you save.
+4. On **each device**, open Dictionary, long-press the top-right corner, paste
+   the key in and press Save. It is kept in that browser on that device and
+   goes nowhere else. There is no way to publish it to the other devices, and
+   that is deliberate.
 
-**What the scrambling is and is not.** It is not encryption — the page has to
-unscramble the key to use it, so anyone reading the source can too. What it
-stops is machines: GitHub and Anthropic scan public repositories for the
-`sk-ant-` pattern and revoke on sight, and bots scrape for the same string to
-spend it. Breaking the pattern stops all of them. The money is what actually
-caps the damage, which is what steps 1 and 2 are for.
-
-**If it ever leaks,** revoke the key in the console, make another, and repeat
-step 4. It costs an evening of the game, nothing more.
+**If it leaks again,** revoke it in the Console first — that is the only thing
+that stops the spending. Removing it from anywhere else does nothing, because
+whoever has it already has it.
 
 **Running costs.** Measured, not guessed: a 165-token prompt and a 30-to-70
 token answer on Haiku 4.5 comes to about **0.03p a word**, so roughly 30 words

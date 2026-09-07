@@ -64,6 +64,25 @@ to any page that is not on https, so a game with ears does nothing at all
 opened off the disk — Recorder Garden is the first of those. Anything built
 on a permission like that needs a fallback that still works without it.
 
+## Secrets
+
+Never put a credential in a game file. Not in plain text, not encoded, not
+obfuscated, not split into pieces. These files are served on a public URL,
+so every one of their bytes is handed to every visitor; the page has to be
+able to read a key to use it, therefore so can anyone who opens the
+developer console. Obfuscation only defeats pattern scanners, and pattern
+scanners were never the threat.
+
+This is not a hypothetical. Dictionary shipped a scrambled API key on
+6 September 2026 and the balance was spent by a stranger overnight. What
+limited the damage was money, not code: a prepaid balance with auto-reload
+off. See HOWTO.md for the whole account of it.
+
+A key belongs in the parent panel, saved to that one browser on that one
+device, entered by hand per device. If a game ever needs a shared secret,
+it needs a server holding it, and that is a conversation to have before
+building rather than after.
+
 ## Working method
 
 For anything beyond a small tweak, give me the plan first and wait — a

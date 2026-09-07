@@ -54,12 +54,6 @@
   #panel h3 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
   #panel p.note { margin: 6px 0 0; font-size: 12.5px; color: #63727f; }
   .row { margin-bottom: 18px; }
-  #blobnote { display: none; }
-  #blobnote.open { display: block; }
-  #blobnote code {
-    font: 12px/1 ui-monospace, Menlo, Consolas, monospace;
-    background: #e8edf1; border-radius: 4px; padding: 1px 4px;
-  }
 
   /* Typing a word. A laptop can simply start typing, but a tablet has no
      keyboard until something asks for one, and a long press on Hoot is
@@ -121,13 +115,6 @@
   .wide { cursor: pointer; }
   #save, #typeGo { border: 0; background: #b4531c; color: #fff; font-weight: 600; }
   #close, #typeCancel { border: 2px solid #cfd8e0; background: #fff; color: #22303f; margin-top: 10px; }
-  #blob {
-    display: none; width: 100%; height: 92px; margin-top: 10px;
-    font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace;
-    border: 2px solid #cfd8e0; border-radius: 11px; padding: 8px; resize: none;
-    background: #f4f7f9; color: #22303f;
-  }
-  #blob.open { display: block; }
   #status { margin: 0 0 18px; font-size: 13px; color: #63727f; }
   #status b { color: #22303f; }
   #typebox h2 { margin: 0 0 14px; font-size: 18px; }
@@ -301,10 +288,11 @@
       <h3>API key</h3>
       <input type="password" class="field" id="key" autocomplete="off" spellcheck="false"
              placeholder="sk-ant-&hellip;">
-      <p class="note">Kept on this device only. Leave it empty to use the one built into the file.</p>
-      <p class="note" id="blobnote">Paste this line into <code>dictionary.html</code>, replacing the
-        one that starts <code>var BAKED</code>, and every other device gets the key too.</p>
-      <textarea id="blob" readonly spellcheck="false" aria-label="Scrambled key line"></textarea>
+      <p class="note">Kept in this browser, on this device, and nowhere else. It is never
+        written into the file and never leaves for anywhere but Anthropic.</p>
+      <p class="note"><b>Do not put a key back into the file.</b> One was scrambled in there
+        on 6 September 2026 and a stranger had spent the balance by the next morning. The
+        page is public, so anything the page can read, a visitor can read.</p>
     </div>
 
     <button type="button" id="save" class="wide">Save</button>
@@ -345,57 +333,32 @@
   }
 
   // ------------------------------------------------------------------
-  // The key.
+  // The key. There is no longer one in this file, and there must not be
+  // one again.
   //
-  // Be clear-eyed about what this is: the page has to hand the key to
-  // Anthropic, so the page has to be able to unscramble it, so the
-  // unscrambling is right here in the same file. Anyone who reads the
-  // source gets the key. That is not what this defends against.
+  // What was here before: a key scrambled with a fixed transform, on the
+  // reasoning that the page has to unscramble it to use it, so the
+  // scrambling could not stop a human - but it would break the sk-ant-
+  // pattern that GitHub's scanners and the scraping bots match on, and
+  // those were very nearly the whole of the real risk.
   //
-  // What it defends against is machines. GitHub and Anthropic both scan
-  // public repositories for the sk-ant- pattern and revoke on sight, and
-  // a swarm of bots scrapes for the same string to spend it. Neither
-  // reads JavaScript; both match text. Breaking the pattern stops all of
-  // them, which is very nearly the whole of the real risk.
+  // They were not. The key went in on 6 September 2026 and by the next
+  // morning a stranger had spent the balance on Fable 5.1. The argument
+  // ignored the obvious: this game is served on a public URL, so the
+  // key was not merely in a repository somebody had to find, it was
+  // handed to every visitor who opened the developer console. Pattern
+  // scanners were never the threat. The page being public was.
   //
-  // The rest of the defence is money, not code: the key lives in its own
-  // workspace with a monthly cap, the balance is topped up by hand with
-  // auto-reload off, and the counter below stops the game itself running
-  // away with it. Worst case is the tenner on the account.
+  // Only two things held, and both were money rather than code: the
+  // balance was prepaid with auto-reload off, so the damage stopped at
+  // the five dollars on the account; and the key could spend, and only
+  // spend, because an API key carries no account access at all. The
+  // workspace spend limit did not hold, for reasons still unresolved.
+  //
+  // So a key now lives in one place only: the parent panel, saved into
+  // that one browser, on that one device. It is never written into this
+  // file. Anything the file knows, the internet knows.
   // ------------------------------------------------------------------
-  var SALT = 'hoot-in-the-old-oak-tree';
-
-  // Replace this line with the one the parent panel prints for you.
-  // Nothing else in this file needs touching to change the key.
-  var BAKED = 'dnA5d2ptNHJhbSYkI3Y9SUJiQypKd3tyLCY6ZnFdZVR8JFZYSX1wTD53Lm1yUE5mLGd9K3xtQlFjRG5sf0RjTVolajpHRmQpTHZaZU5uMl9YeWYnZXVGRyoqOWFRZHNVNlxzO151UVVac1dW';
-
-  function scramble(s) {
-    var out = '', i;
-    for (i = 0; i < s.length; i++) {
-      out += String.fromCharCode(
-        s.charCodeAt(i) ^ (SALT.charCodeAt(i % SALT.length) & 0x1f) ^ ((i * 7 + 13) & 0x1f)
-      );
-    }
-    try { return window.btoa(out); } catch (e) { return ''; }
-  }
-
-  function unscramble(b) {
-    if (!b) { return ''; }
-    var raw;
-    try { raw = window.atob(b); } catch (e) { return ''; }
-    return scrambleRaw(raw);
-  }
-
-  // The transform is its own inverse, so undoing it is doing it again.
-  function scrambleRaw(s) {
-    var out = '', i;
-    for (i = 0; i < s.length; i++) {
-      out += String.fromCharCode(
-        s.charCodeAt(i) ^ (SALT.charCodeAt(i % SALT.length) & 0x1f) ^ ((i * 7 + 13) & 0x1f)
-      );
-    }
-    return out;
-  }
 
   // ------------------------------------------------------------------
   // Remembered settings, and the day's tally.
@@ -428,7 +391,7 @@
   }
 
   function apiKey() {
-    return prefs.key || unscramble(BAKED);
+    return prefs.key;
   }
 
   function spendLeft() {
@@ -1589,29 +1552,21 @@
   var ageEl = document.getElementById('age');
   var ageNum = document.getElementById('ageNum');
   var keyEl = document.getElementById('key');
-  var blobEl = document.getElementById('blob');
   var statusEl = document.getElementById('status');
-  var blobNote = document.getElementById('blobnote');
 
   function syncPanel() {
     keyEl.value = '';
 
     var bits = [];
     bits.push('<b>' + prefs.used + '</b> of ' + DAILY_CAP + ' words today');
-    bits.push(apiKey() ? (prefs.key ? 'key: this device' : 'key: built in') : '<b>no key set</b>');
+    bits.push(prefs.key ? 'key: saved on this device' : '<b>no key set</b>');
     bits.push(earPossible() && !micBlocked ? 'microphone: ready' : 'microphone: unavailable, typing only');
     bits.push(SS ? 'voice: ready' : 'voice: unavailable, words shown only');
     if (lastError) { bits.push('last error: ' + lastError); }
     statusEl.innerHTML = bits.join('<br>');
   }
 
-  function hideBlob() {
-    blobEl.value = '';
-    blobEl.classList.remove('open');
-    blobNote.classList.remove('open');
-  }
-
-  function openParent() { hideBlob(); syncPanel(); parentEl.classList.add('open'); }
+  function openParent() { syncPanel(); parentEl.classList.add('open'); }
   function closeParent() { parentEl.classList.remove('open'); }
 
   // The reading age, live on the screen. Dragging it does not disturb
@@ -1632,17 +1587,14 @@
     var typed = keyEl.value.trim();
     if (!typed) { closeParent(); return; }
 
+    // Saved here and nowhere else. The panel used to print the key back
+    // out, scrambled, ready to paste into the file for the other
+    // devices; that is exactly how it ended up on the open web, so the
+    // printer is gone. Each device is keyed by hand or not at all.
     prefs.key = typed;
     savePrefs();
-    // syncPanel clears the key box, so the line to paste has to be
-    // written after it and not before - written first, the refresh wiped
-    // it and the panel just closed looking like nothing had happened.
     syncPanel();
-    blobEl.value = "  var BAKED = '" + scramble(typed) + "';";
-    blobEl.classList.add('open');
-    blobNote.classList.add('open');
-    blobEl.focus();
-    blobEl.select();
+    closeParent();
   });
 
   document.getElementById('close').addEventListener('click', closeParent);
