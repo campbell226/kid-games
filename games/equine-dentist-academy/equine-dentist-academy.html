@@ -264,9 +264,23 @@ h1 span{display:block;white-space:nowrap}
 .seg button{background:#fff;border:2px solid #B5D2C6;border-radius:999px;padding:9px 18px;font-size:17px;font-weight:700;color:var(--ink);cursor:pointer;min-width:56px}
 .seg button:hover{border-color:var(--ink-soft)}
 .seg button[aria-pressed="true"]{background:var(--blue);border-color:var(--blue-dark);color:#fff}
-.secondary.danger{color:var(--wrong);border-color:var(--wrong);box-shadow:0 4px 0 var(--wrong)}
+.secondary.danger{color:var(--wrong);border-color:var(--wrong);box-shadow:0 4px 0 var(--wrong);margin-top:12px;font-size:16px;padding:10px 20px}
 .secondary.danger:active:not(:disabled){box-shadow:0 1px 0 var(--wrong)}
-.secondary.danger[data-armed="1"]{background:var(--wrong);color:#fff}
+
+/* the removal dialog */
+.modal{position:fixed;inset:0;background:rgba(18,59,58,.55);display:flex;align-items:center;justify-content:center;padding:20px;z-index:50}
+.modal-card{background:var(--enamel);border:3px solid var(--ink);border-radius:22px;padding:24px;max-width:24rem;width:100%;box-shadow:0 10px 0 rgba(18,59,58,.25)}
+.modal-card h3{font-family:var(--display);font-weight:800;font-size:26px;margin:0 0 8px}
+.modal-card p{margin:0 0 18px;color:var(--ink-soft)}
+.modal-card .quiet{display:block;margin:14px auto 0}
+.hold{position:relative;overflow:hidden;width:100%;background:var(--enamel);border:3px solid var(--wrong);border-radius:999px;padding:16px 20px;font:700 18px var(--body);cursor:pointer;touch-action:none;-webkit-user-select:none;user-select:none}
+/* The fill is the soft tint, not the strong one: ink has to stay readable
+   on both halves of the button while it crosses. */
+.hold-fill{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--gum);transition:width 90ms linear}
+.hold-label{position:relative;color:var(--ink)}
+@media (prefers-reduced-motion:reduce){
+  .hold-fill{transition:none}
+}
 .dir-actions{display:flex;gap:12px;flex-wrap:wrap;align-items:center;border-top:2px solid #B5D2C6;padding-top:18px;margin-top:4px}
 .director-link{margin:26px 0 0;text-align:right}
 .note{background:#FFF9E6;border:2px dashed var(--brass);border-radius:12px;padding:10px 14px;margin:12px 0 0}
@@ -534,9 +548,10 @@ h1 span{display:block;white-space:nowrap}
       <p class="dir-intro">Changes apply to that rider's next exam, on whichever tablet she picks up.</p>
 
       <div class="field">
-        <span class="lab">Settings for</span>
-        <p class="sub2">Every rider has her own. These follow her name, not this tablet.</p>
+        <span class="lab">Rider</span>
+        <p class="sub2">Every rider has her own settings. These follow her name, not this tablet.</p>
         <div class="seg" id="segRider"></div>
+        <button id="btnRemoveRider" class="secondary danger" type="button">Remove this rider</button>
       </div>
 
       <div class="field">
@@ -604,18 +619,27 @@ h1 span{display:block;white-space:nowrap}
         <textarea id="noteInput" maxlength="140" rows="3" placeholder="Good luck today — watch out for the Triadan ones"></textarea>
       </div>
 
-      <div class="field">
-        <span class="lab">Take a rider off the roll</span>
-        <p class="sub2">Her casebook, her rank and her certificates go with her. None of it can be got back.</p>
-        <button id="btnRemoveRider" class="secondary danger" type="button">Remove this rider</button>
-      </div>
-
       <p class="err" id="dirErr" hidden></p>
 
       <div class="dir-actions">
         <button id="btnDirSave" class="primary" type="button">Save and close</button>
         <button id="btnDirReset" class="secondary" type="button">Reset to normal</button>
         <button id="btnDirLock" class="quiet" type="button">Lock this area</button>
+      </div>
+    </div>
+
+    <!-- Removing a rider asks for a held press rather than a tap. A tap can
+         be an accident; holding on past the point you meant to stop is not. -->
+    <div class="modal" id="removeModal" hidden>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="removeTitle">
+        <h3 id="removeTitle">Remove <span id="removeName"></span>?</h3>
+        <p>Her casebook, her rank and her certificates go with her. None of it can be got back.</p>
+        <button id="btnHold" class="hold" type="button">
+          <span class="hold-fill" id="holdFill"></span>
+          <span class="hold-label" id="holdLabel">Press and hold to remove</span>
+        </button>
+        <p class="err" id="removeErr" hidden></p>
+        <button id="btnRemoveCancel" class="quiet" type="button">Keep her at the Academy</button>
       </div>
     </div>
   </section>
@@ -2233,6 +2257,17 @@ async function refreshRoll() {
     const k = slugOf(r.name);
     if (!by[k] || (r.solved || 0) > (by[k].solved || 0)) { by[k] = r; }
   });
+  // Whoever is playing is on the roll by definition, even when neither
+  // list knows it - the Academy unreachable and localStorage refused, which
+  // is private browsing, or a borrowed tablet with no signal. Without this
+  // the Director opens the panel and cannot see the child in front of her.
+  if (progress.name && !by[slugOf(progress.name)]) {
+    by[slugOf(progress.name)] = {
+      name: progress.name,
+      solved: (progress.solved || []).length,
+      updated: progress.updated || ''
+    };
+  }
   roll = Object.keys(by).map(k => by[k]);
   renderRoll();
 }
@@ -2818,7 +2853,7 @@ function renderDirector() {
 async function dirSelect(name) {
   dirRider = name;
   dirError('');
-  disarmRemove();   // an armed Remove must never carry over to another rider
+  closeRemove();   // an open removal must never carry over to another rider
   let record = null;
   if (slugOf(name) === slugOf(progress.name)) { record = progress; }
   const res = await Academy.call('load', {name: name});
@@ -2903,44 +2938,100 @@ function closeDirector() {
   dirUnlocked = false;
   dirKey = null;
   dirSettings = null;
-  disarmRemove();
+  closeRemove();
   goHome();
 }
 
-// Taking a rider off the roll. Two taps, and the second one says her
-// name, because there is nothing behind this to undo it with.
-let removeArmed = false, removeTimer = null;
+// Taking a rider off the roll.
+//
+// A dialog, and then a press held to the end of it rather than a second
+// tap. A tap can be an accident and a second tap can be the same accident
+// twice; carrying on holding past the moment you meant to stop is not
+// something a hand does by itself. Letting go early cancels, which is the
+// part that makes it safe to try.
+const HOLD_MS = 1600;
+let holdStart = 0, holdRaf = null, holdTimer = null, holding = false;
 
-function disarmRemove() {
-  clearTimeout(removeTimer);
-  removeArmed = false;
-  const b = $('btnRemoveRider');
-  if (b) { b.textContent = 'Remove this rider'; b.removeAttribute('data-armed'); }
+function openRemove() {
+  if (!dirRider) { dirError('Choose a rider first.'); return; }
+  dirError('');
+  $('removeName').textContent = dirRider;
+  $('removeErr').hidden = true;
+  resetHold();
+  $('removeModal').hidden = false;
+  $('btnHold').focus();
+}
+
+function closeRemove() {
+  cancelHold();
+  $('removeModal').hidden = true;
+}
+
+function resetHold() {
+  $('holdFill').style.width = '0%';
+  $('holdLabel').textContent = 'Press and hold to remove';
+  $('btnHold').disabled = false;
+}
+
+function cancelHold() {
+  holding = false;
+  clearTimeout(holdTimer);
+  holdTimer = null;
+  if (holdRaf) { cancelAnimationFrame(holdRaf); holdRaf = null; }
+  if (!$('btnHold').disabled) { resetHold(); }
+}
+
+// The clock decides, and the bar only reports. Driving the finish from
+// the animation frames themselves meant that a browser which had stopped
+// painting - a throttled tab, a slow machine - could leave a press held
+// forever without ever arriving, which reads as the button being broken.
+function tickHold() {
+  if (!holding) { holdRaf = null; return; }
+  const done = Math.min(1, (Date.now() - holdStart) / HOLD_MS);
+  $('holdFill').style.width = (done * 100) + '%';
+  holdRaf = done < 1 ? requestAnimationFrame(tickHold) : null;
+}
+
+function finishHold() {
+  if (!holding) { return; }
+  holding = false;
+  holdTimer = null;
+  if (holdRaf) { cancelAnimationFrame(holdRaf); holdRaf = null; }
+  $('holdFill').style.width = '100%';
+  $('btnHold').disabled = true;
+  $('holdLabel').textContent = 'Removing…';
+  removeRider();
+}
+
+function startHold(e) {
+  if (e && e.preventDefault) { e.preventDefault(); }
+  if (holding || $('btnHold').disabled) { return; }
+  holding = true;
+  holdStart = Date.now();
+  $('holdLabel').textContent = 'Keep holding…';
+  holdTimer = setTimeout(finishHold, HOLD_MS);
+  holdRaf = requestAnimationFrame(tickHold);
 }
 
 async function removeRider() {
-  const b = $('btnRemoveRider');
-  if (!dirRider) { dirError('Choose a rider first.'); return; }
-
-  if (!removeArmed) {
-    removeArmed = true;
-    b.textContent = 'Tap again to remove ' + dirRider + ' for good';
-    b.setAttribute('data-armed', '1');
-    removeTimer = setTimeout(disarmRemove, 5000);
+  const name = dirRider;
+  const res = await Academy.call('delete', {name: name, password: dirKey});
+  if (!res || !res.ok) {
+    const p = $('removeErr');
+    p.textContent = res
+      ? 'The Academy would not remove that rider.'
+      : 'The Academy cannot be reached, so nothing was removed.';
+    p.hidden = false;
+    resetHold();
     return;
   }
-  const name = dirRider;
-  disarmRemove();
-
-  const res = await Academy.call('delete', {name: name, password: dirKey});
-  if (!res) { dirError('The Academy cannot be reached, so nothing was removed.'); return; }
-  if (!res.ok) { dirError('The Academy would not remove that rider.'); return; }
 
   // The tablet's own copy has to go too, or the next save would merge it
   // straight back and the removal would look as though it had failed.
   const wasPlaying = slugOf(progress.name || '') === slugOf(name);
   forget(name);
   if (wasPlaying) { showPicker(); }
+  closeRemove();
   await refreshRoll();
   renderDirectorRiders();
   await dirSelect(roll.length ? roll[0].name : '');
@@ -2959,7 +3050,34 @@ $('btnDirReset').addEventListener('click', () => {
   renderDirector();
   Sound.play('select');
 });
-$('btnRemoveRider').addEventListener('click', removeRider);
+$('btnRemoveRider').addEventListener('click', openRemove);
+$('btnRemoveCancel').addEventListener('click', closeRemove);
+
+// Every way a press can end has to cancel, including the ones that are not
+// the finger letting go: sliding off the button, the browser taking the
+// pointer for a scroll, another app coming to the front mid-hold.
+$('btnHold').addEventListener('pointerdown', startHold);
+['pointerup', 'pointerleave', 'pointercancel'].forEach(ev =>
+  $('btnHold').addEventListener(ev, cancelHold));
+window.addEventListener('blur', cancelHold);
+document.addEventListener('visibilitychange', () => { if (document.hidden) cancelHold(); });
+
+// Holding the key down works the same way, for anyone on a keyboard. The
+// browser repeats keydown while it is held, which would restart the clock,
+// so repeats are ignored and only the real keyup cancels.
+$('btnHold').addEventListener('keydown', e => {
+  if (e.key !== ' ' && e.key !== 'Enter') { return; }
+  e.preventDefault();
+  if (!e.repeat) { startHold(e); }
+});
+$('btnHold').addEventListener('keyup', e => {
+  if (e.key === ' ' || e.key === 'Enter') { cancelHold(); }
+});
+$('removeModal').addEventListener('click', e => { if (e.target === $('removeModal')) closeRemove(); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !$('removeModal').hidden) { e.preventDefault(); closeRemove(); }
+});
+
 $('segRider').addEventListener('click', e => {
   const b = e.target.closest('button[data-rider]');
   if (!b) return;
