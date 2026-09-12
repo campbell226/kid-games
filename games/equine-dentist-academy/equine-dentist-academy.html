@@ -278,6 +278,18 @@ h1 span{display:block;white-space:nowrap}
    on both halves of the button while it crosses. */
 .hold-fill{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--gum);transition:width 90ms linear}
 .hold-label{position:relative;color:var(--ink)}
+
+/* the logbook */
+.modal-card.wide{max-width:34rem}
+#dirHeading{-webkit-user-select:none;user-select:none}
+.logrows{max-height:55vh;overflow-y:auto;margin:4px 0 8px;border-top:2px solid #B5D2C6}
+.logrow{border-bottom:1px solid #CFE3D8;padding:9px 2px;font-size:15px;line-height:1.4}
+.logrow .when{display:block;color:var(--ink-soft);font-size:13px}
+.logrow.exam{border-left:4px solid var(--right);padding-left:9px}
+.logrow.practice{border-left:4px solid var(--brass);padding-left:9px}
+.logrow.settings{border-left:4px solid var(--blue);padding-left:9px}
+.logrow.removed,.logrow.cleared{border-left:4px solid var(--wrong);padding-left:9px}
+.logempty{color:var(--ink-soft);padding:14px 2px}
 @media (prefers-reduced-motion:reduce){
   .hold-fill{transition:none}
 }
@@ -523,7 +535,7 @@ h1 span{display:block;white-space:nowrap}
 
   <!-- DIRECTOR -->
   <section id="screen-director" class="screen dir" hidden>
-    <h2>Director of the Academy</h2>
+    <h2 id="dirHeading">Director of the Academy</h2>
 
     <div id="dirGate">
       <p class="dir-intro">This is where the Director sets how much help each rider gets.</p>
@@ -642,6 +654,21 @@ h1 span{display:block;white-space:nowrap}
         </button>
         <p class="err" id="removeErr" hidden></p>
         <button id="btnRemoveCancel" class="quiet" type="button">Keep her at the Academy</button>
+      </div>
+    </div>
+
+    <!-- The logbook. Nothing on the page points at it: it opens on a long
+         press of the heading above, and there is no button to find. -->
+    <div class="modal" id="logModal" hidden>
+      <div class="modal-card wide" role="dialog" aria-modal="true" aria-labelledby="logTitle">
+        <h3 id="logTitle">Logbook</h3>
+        <div class="start-row" id="logAsk" hidden>
+          <input id="logPw" type="password" autocomplete="off" placeholder="Logbook password">
+          <button id="btnLogOpen" class="primary" type="button">Open</button>
+        </div>
+        <p class="err" id="logErr" hidden></p>
+        <div class="logrows" id="logRows"></div>
+        <button id="btnLogClose" class="quiet" type="button">Close</button>
       </div>
     </div>
   </section>
@@ -1980,6 +2007,11 @@ const Academy = {
 // Written now, sent shortly. A ten-case exam lands a dozen changes in a
 // few minutes and they are worth one write between them.
 let pushTimer = null;
+// A finished round, waiting to travel up with the next save. It is held
+// rather than sent on its own so that a round played offline is still
+// recorded whenever the tablet next gets through.
+let pendingRound = null;
+
 function saveUser() {
   if (!progress.name) { return; }
   progress.updated = new Date().toISOString();
@@ -1991,7 +2023,10 @@ function saveUser() {
 
 async function pushUp() {
   if (!progress.name) { return; }
-  const res = await Academy.call('save', {name: progress.name, record: forWire(progress)});
+  const payload = {name: progress.name, record: forWire(progress)};
+  if (pendingRound) { payload.round = pendingRound; }
+  const res = await Academy.call('save', payload);
+  if (res && res.ok) { pendingRound = null; }
 
   // Removed from under her while she was playing. Rare, but letting the
   // tablet keep her would put her back at the next save.
@@ -2714,6 +2749,14 @@ function finish() {
     if (earned.length) state.score += PROMOTION_BONUS * earned.length;
     progress.best = Math.max(progress.best || 0, state.score);
     progress.rounds = (progress.rounds || 0) + 1;
+  }
+  // Both kinds of round are worth recording, and a practice round can have
+  // put new cases in the casebook too, so both are saved now.
+  if (total) {
+    pendingRound = {
+      mode: state.mode, score: state.score, right: correct,
+      total: total, newly: state.newlySolved
+    };
     saveUser();
   }
 
@@ -2963,6 +3006,7 @@ function closeDirector() {
   dirKey = null;
   dirSettings = null;
   closeRemove();
+  $('logModal').hidden = true;
   goHome();
 }
 
@@ -3075,6 +3119,90 @@ $('btnDirReset').addEventListener('click', () => {
   renderDirector();
   Sound.play('select');
 });
+/* ---------- the logbook ----------
+   No control points at this. It opens on a long press of the heading,
+   while the Director's area is unlocked, and nothing on the page says so.
+   That keeps it out of sight; what keeps it shut is the password, and if
+   LOGBOOK_PASSWORD is set on the worker that is a different password from
+   the Director's - which is the only part of this that is really secret,
+   since a hidden gesture is only hidden until somebody leans on it.   */
+const LOG_HOLD_MS = 2000;
+let logHoldTimer = null;
+
+function renderLog(entries) {
+  if (!entries.length) {
+    $('logRows').innerHTML = '<p class="logempty">Nothing recorded yet.</p>';
+    return;
+  }
+  $('logRows').innerHTML = entries.map(e => {
+    const d = new Date(e.t);
+    let when;
+    try {
+      when = d.toLocaleString('en-GB', {timeZone: 'Europe/London', day: 'numeric',
+        month: 'short', hour: '2-digit', minute: '2-digit'});
+    } catch (err) { when = d.toISOString().slice(0, 16).replace('T', ' '); }
+    return `<div class="logrow ${esc(e.kind)}">${esc(e.text)}<span class="when">${esc(when)}</span></div>`;
+  }).join('');
+}
+
+async function loadLog(password) {
+  $('logErr').hidden = true;
+  $('logRows').innerHTML = '<p class="logempty">Fetching…</p>';
+  const res = await Academy.call('log', {password: password});
+  if (!res) {
+    $('logRows').innerHTML = '';
+    $('logErr').textContent = 'The Academy cannot be reached.';
+    $('logErr').hidden = false;
+    return;
+  }
+  if (!res.ok) {
+    $('logRows').innerHTML = '';
+    if (res.data.ownPassword || res.status === 403) {
+      // Either the logbook has a password of its own, or the one we tried
+      // was wrong. Ask, rather than guessing again.
+      $('logAsk').hidden = false;
+      $('logPw').value = '';
+      $('logPw').focus();
+      if (password) {
+        $('logErr').textContent = 'Not that one.';
+        $('logErr').hidden = false;
+      }
+      return;
+    }
+    $('logErr').textContent = res.data.error === 'locked_out'
+      ? 'Too many wrong guesses today.'
+      : 'The logbook is not available.';
+    $('logErr').hidden = false;
+    return;
+  }
+  $('logAsk').hidden = true;
+  renderLog(res.data.entries || []);
+}
+
+function openLog() {
+  if (!dirUnlocked) { return; }
+  $('logErr').hidden = true;
+  $('logAsk').hidden = true;
+  $('logModal').hidden = false;
+  loadLog(dirKey);
+}
+
+$('dirHeading').addEventListener('pointerdown', () => {
+  if (!dirUnlocked) { return; }
+  clearTimeout(logHoldTimer);
+  logHoldTimer = setTimeout(openLog, LOG_HOLD_MS);
+});
+['pointerup', 'pointerleave', 'pointercancel'].forEach(ev =>
+  $('dirHeading').addEventListener(ev, () => clearTimeout(logHoldTimer)));
+$('btnLogClose').addEventListener('click', () => { $('logModal').hidden = true; });
+$('btnLogOpen').addEventListener('click', () => loadLog($('logPw').value.trim()));
+$('logPw').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); loadLog($('logPw').value.trim()); }
+});
+$('logModal').addEventListener('click', e => {
+  if (e.target === $('logModal')) { $('logModal').hidden = true; }
+});
+
 $('btnRemoveRider').addEventListener('click', openRemove);
 $('btnRemoveCancel').addEventListener('click', closeRemove);
 
@@ -3100,7 +3228,9 @@ $('btnHold').addEventListener('keyup', e => {
 });
 $('removeModal').addEventListener('click', e => { if (e.target === $('removeModal')) closeRemove(); });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && !$('removeModal').hidden) { e.preventDefault(); closeRemove(); }
+  if (e.key !== 'Escape') { return; }
+  if (!$('removeModal').hidden) { e.preventDefault(); closeRemove(); }
+  else if (!$('logModal').hidden) { e.preventDefault(); $('logModal').hidden = true; }
 });
 
 $('segRider').addEventListener('click', e => {

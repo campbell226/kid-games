@@ -111,6 +111,72 @@ const MAX_NOTE = 140;
 // other is a stale cache.
 const GONE_DAYS = 7;
 
+// The logbook.
+//
+// Entries are written here rather than sent here. Nothing in the game can
+// add a line: the lines are a side effect of the things the log is about -
+// an exam that finished, settings the Director changed, a rider removed.
+// So there is no write endpoint to find, and no entry can exist without
+// the thing it records having actually happened. The wording is composed
+// here too, so a tablet cannot choose what the log says about it.
+//
+// Reading wants LOGBOOK_PASSWORD if that secret exists, and falls back to
+// the Director's password if it does not. That way it works the moment it
+// is deployed, and can be put beyond the Director later by adding one
+// secret and telling nobody - which is the only version of this that is
+// actually secret, since a hidden gesture is only hidden until it is found.
+const LOG_DAYS = 180;
+const LOG_MAX = 200;
+
+const LABELS = {
+  examLength: 'Patients per exam',
+  vet: 'Ask the vet',
+  hint: "Nutmeg's hint",
+  halve: 'Lifelines cost half',
+  second: 'Second chance',
+  gentle: 'Easier cases only'
+};
+
+function shownAs(v) {
+  return v === true ? 'on' : (v === false ? 'off' : String(v));
+}
+
+function describeSettings(before, after) {
+  const bits = [];
+  for (const k of Object.keys(SETTINGS)) {
+    if (before[k] !== after[k]) {
+      bits.push(LABELS[k] + ' ' + shownAs(before[k]) + ' → ' + shownAs(after[k]));
+    }
+  }
+  if ((before.note || '') !== (after.note || '')) {
+    bits.push(after.note ? 'message set to "' + after.note + '"' : 'message cleared');
+  }
+  return bits;
+}
+
+// Newest first, by inverting the clock into the key: KV lists keys in
+// order, and the alternative is reading the whole log to sort it.
+async function logLine(env, kind, rider, text) {
+  const now = Date.now();
+  const key = 'log:' + String(9999999999999 - now).padStart(13, '0') +
+    '-' + Math.random().toString(36).slice(2, 8);
+  const entry = {
+    t: new Date(now).toISOString(),
+    kind: kind,
+    rider: rider || '',
+    text: String(text).slice(0, 300)
+  };
+  try {
+    await env.ACADEMY.put(key, JSON.stringify(entry), {
+      metadata: entry,
+      expirationTtl: LOG_DAYS * 86400
+    });
+  } catch (e) {
+    // A log that cannot be written is not a reason to fail the exam it
+    // was recording. The child's casebook matters more than the note.
+  }
+}
+
 function cors(origin) {
   return {
     'Access-Control-Allow-Origin': origin === ALLOWED_ORIGIN ? origin : ALLOWED_ORIGIN,
@@ -340,6 +406,28 @@ export default {
       return json({ riders: riders }, 200, origin);
     }
 
+    // ---- the logbook ----
+    if (op === 'log') {
+      const pw = env.LOGBOOK_PASSWORD || env.DIRECTOR_PASSWORD;
+      if (!pw) { return json({ error: 'no_password_set' }, 503, origin); }
+      if (!same(body && body.password, pw)) {
+        const spent = await spend(env, 'guesses', DAILY_GUESSES);
+        if (!spent.ok) { return json({ error: 'locked_out' }, 429, origin); }
+        // Says whether a separate logbook password is what was wanted, so
+        // the game knows to ask for one rather than insisting the Director's
+        // password is wrong. It gives away nothing that the game's own
+        // behaviour would not.
+        return json({ ok: false, ownPassword: !!env.LOGBOOK_PASSWORD }, 403, origin);
+      }
+      let listed;
+      try {
+        listed = await env.ACADEMY.list({ prefix: 'log:', limit: LOG_MAX });
+      } catch (e) {
+        return json({ error: 'store_unavailable' }, 503, origin);
+      }
+      return json({ entries: listed.keys.map(k => k.metadata).filter(Boolean) }, 200, origin);
+    }
+
     const name = cleanName(body && body.name);
     if (op === 'load' || op === 'save' || op === 'clear' || op === 'settings' || op === 'delete') {
       if (!name) { return json({ error: 'bad_name' }, 400, origin); }
@@ -415,6 +503,27 @@ export default {
         return json({ error: 'store_unavailable' }, 503, origin);
       }
       if (!written.ok) { return json({ error: written.error }, written.status, origin); }
+
+      if (op === 'clear') {
+        await logLine(env, 'cleared', record.name, record.name + ' cleared her casebook');
+      } else {
+        // A finished round, if one is being reported. The numbers are
+        // rebuilt here like everything else, and the sentence is written
+        // here rather than sent, so a tablet cannot narrate itself.
+        const round = (body && body.round) || null;
+        const total = round ? cleanCount(round.total, 500) : 0;
+        if (total > 0) {
+          const right = Math.min(cleanCount(round.right, 500), total);
+          const score = cleanCount(round.score, 1e7);
+          const newly = cleanCount(round.newly, 500);
+          const exam = round.mode !== 'practice';
+          let line = record.name + (exam ? ' finished an exam: ' : ' practised: ') +
+            right + ' of ' + total + ' right';
+          if (exam) { line += ', ' + score + ' points'; }
+          if (newly) { line += ', ' + newly + ' new case' + (newly === 1 ? '' : 's'); }
+          await logLine(env, exam ? 'exam' : 'practice', record.name, line);
+        }
+      }
       return json({ record: record }, 200, origin);
     }
 
@@ -444,6 +553,7 @@ export default {
         } catch (e) {
           return json({ error: 'store_unavailable' }, 503, origin);
         }
+        await logLine(env, 'removed', name, 'Director removed ' + name + ' from the roll');
         return json({ ok: true, name: name }, 200, origin);
       }
 
@@ -458,6 +568,7 @@ export default {
       const spent = await spend(env, 'writes', DAILY_WRITES);
       if (!spent.ok) { return json({ error: spent.error }, spent.status, origin); }
 
+      const wasSettings = cleanSettings(current.settings);
       current.settings = cleanSettings(body && body.settings);
       current.updated = new Date().toISOString();
       let written;
@@ -467,6 +578,11 @@ export default {
         return json({ error: 'store_unavailable' }, 503, origin);
       }
       if (!written.ok) { return json({ error: written.error }, written.status, origin); }
+
+      const changes = describeSettings(wasSettings, current.settings);
+      await logLine(env, 'settings', name, changes.length
+        ? 'Director changed ' + name + ' — ' + changes.join('; ')
+        : 'Director saved ' + name + ' with nothing changed');
       return json({ ok: true, record: current }, 200, origin);
     }
 
