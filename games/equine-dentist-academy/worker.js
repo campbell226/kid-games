@@ -120,11 +120,10 @@ const GONE_DAYS = 7;
 // the thing it records having actually happened. The wording is composed
 // here too, so a tablet cannot choose what the log says about it.
 //
-// Reading wants LOGBOOK_PASSWORD if that secret exists, and falls back to
-// the Director's password if it does not. So it works the moment it is
-// deployed, from the Director's area, and can be given a second lock
-// later - for a Director who is no longer the only one who knows the
-// first password - by adding one secret and changing nothing else.
+// Reading it wants the Director's password, the same one that opens the
+// area the link lives in. There is deliberately no second password: one
+// more secret to set, remember and rotate, guarding the same cupboard
+// from the same person, is a lock on the inside of an unlocked door.
 const LOG_DAYS = 180;
 const LOG_MAX = 200;
 
@@ -408,16 +407,11 @@ export default {
 
     // ---- the logbook ----
     if (op === 'log') {
-      const pw = env.LOGBOOK_PASSWORD || env.DIRECTOR_PASSWORD;
-      if (!pw) { return json({ error: 'no_password_set' }, 503, origin); }
-      if (!same(body && body.password, pw)) {
+      if (!env.DIRECTOR_PASSWORD) { return json({ error: 'no_password_set' }, 503, origin); }
+      if (!same(body && body.password, env.DIRECTOR_PASSWORD)) {
         const spent = await spend(env, 'guesses', DAILY_GUESSES);
         if (!spent.ok) { return json({ error: 'locked_out' }, 429, origin); }
-        // Says whether a separate logbook password is what was wanted, so
-        // the game knows to ask for one rather than insisting the Director's
-        // password is wrong. It gives away nothing that the game's own
-        // behaviour would not.
-        return json({ ok: false, ownPassword: !!env.LOGBOOK_PASSWORD }, 403, origin);
+        return json({ ok: false }, 403, origin);
       }
       let listed;
       try {

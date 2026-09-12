@@ -695,10 +695,6 @@ h1 span{display:block;white-space:nowrap}
     <div class="modal" id="logModal" hidden>
       <div class="modal-card wide" role="dialog" aria-modal="true" aria-labelledby="logTitle">
         <h3 id="logTitle">Logbook</h3>
-        <div class="start-row" id="logAsk" hidden>
-          <input id="logPw" type="password" autocomplete="off" placeholder="Logbook password">
-          <button id="btnLogOpen" class="primary" type="button">Open</button>
-        </div>
         <p class="err" id="logErr" hidden></p>
         <div class="logrows" id="logRows"></div>
         <button id="btnLogClose" class="quiet" type="button">Close</button>
@@ -3154,10 +3150,10 @@ $('btnDirReset').addEventListener('click', () => {
 });
 /* ---------- the logbook ----------
    It opens from its own link in the Director's area, which is already
-   behind the password, so there is nothing to hide it from. If the
-   optional LOGBOOK_PASSWORD secret exists on the worker it asks for that
-   instead - a second lock for a Director who is not the only one who
-   knows the first password.                                          */
+   behind the password, so there is nothing to hide it from and nothing
+   more to ask for. The Academy still wants that password on the way
+   through, because the door being open here says nothing about who is
+   calling the endpoint from somewhere else.                          */
 
 function renderLog(entries) {
   if (!entries.length) {
@@ -3175,54 +3171,37 @@ function renderLog(entries) {
   }).join('');
 }
 
-async function loadLog(password) {
+// The password is the one already in hand from unlocking this area, so
+// there is nothing to ask for here.
+async function loadLog() {
   $('logErr').hidden = true;
   $('logRows').innerHTML = '<p class="logempty">Fetching…</p>';
-  const res = await Academy.call('log', {password: password});
+  const res = await Academy.call('log', {password: dirKey});
+  $('logRows').innerHTML = '';
   if (!res) {
-    $('logRows').innerHTML = '';
     $('logErr').textContent = 'The Academy cannot be reached.';
     $('logErr').hidden = false;
     return;
   }
   if (!res.ok) {
-    $('logRows').innerHTML = '';
-    if (res.data.ownPassword || res.status === 403) {
-      // Either the logbook has a password of its own, or the one we tried
-      // was wrong. Ask, rather than guessing again.
-      $('logAsk').hidden = false;
-      $('logPw').value = '';
-      $('logPw').focus();
-      if (password) {
-        $('logErr').textContent = 'Not that one.';
-        $('logErr').hidden = false;
-      }
-      return;
-    }
     $('logErr').textContent = res.data.error === 'locked_out'
       ? 'Too many wrong guesses today.'
       : 'The logbook is not available.';
     $('logErr').hidden = false;
     return;
   }
-  $('logAsk').hidden = true;
   renderLog(res.data.entries || []);
 }
 
 function openLog() {
   if (!dirUnlocked) { return; }
   $('logErr').hidden = true;
-  $('logAsk').hidden = true;
   $('logModal').hidden = false;
-  loadLog(dirKey);
+  loadLog();
 }
 
 $('btnLogbook').addEventListener('click', openLog);
 $('btnLogClose').addEventListener('click', () => { $('logModal').hidden = true; });
-$('btnLogOpen').addEventListener('click', () => loadLog($('logPw').value.trim()));
-$('logPw').addEventListener('keydown', e => {
-  if (e.key === 'Enter') { e.preventDefault(); loadLog($('logPw').value.trim()); }
-});
 $('logModal').addEventListener('click', e => {
   if (e.target === $('logModal')) { $('logModal').hidden = true; }
 });
