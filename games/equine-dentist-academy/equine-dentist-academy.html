@@ -49,6 +49,15 @@ h1 span{display:block;white-space:nowrap}
 .start label{display:block;font-weight:700;margin-bottom:6px}
 .start-row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
 .start-row input{font:20px var(--body);color:var(--ink);padding:12px 16px;border:2px solid var(--ink);border-radius:14px;background:#fff;flex:1 1 220px;max-width:340px}
+.riders{display:flex;flex-wrap:wrap;gap:12px;margin:10px 0 14px}
+.rider{display:flex;flex-direction:column;align-items:flex-start;gap:2px;background:var(--enamel);border:2px solid var(--ink);border-radius:18px;box-shadow:0 4px 0 var(--ink);padding:12px 22px;min-width:150px;cursor:pointer;color:var(--ink);text-align:left}
+.rider:active{transform:translateY(3px);box-shadow:0 1px 0 var(--ink)}
+.rider .rn{font-family:var(--display);font-weight:800;font-size:24px;font-stretch:85%}
+.rider .rr{color:var(--ink-soft);font-size:15px}
+.rider.new{background:var(--blue-soft);border-style:dashed;box-shadow:none;justify-content:center}
+.rider.new:active{transform:none}
+.riding{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-weight:700;margin:0 0 18px}
+.riding .quiet{padding:4px 2px}
 .rules{list-style:none;padding:0;margin:28px 0;display:grid;gap:12px}
 .rules li{display:flex;gap:12px;align-items:flex-start}
 .rules .ic{font-size:24px;line-height:1.2;flex:none;width:32px;text-align:center}
@@ -336,12 +345,20 @@ h1 span{display:block;white-space:nowrap}
 
     <p class="intro" id="introText"></p>
 
-    <div class="start">
-      <label for="nameInput">Your name, for your certificates</label>
-      <div class="start-row">
-        <input id="nameInput" type="text" maxlength="30" autocomplete="off" placeholder="Type your name">
+    <div class="start" id="riderPick">
+      <label for="nameInput">Who is riding today?</label>
+      <div class="riders" id="riderList"></div>
+      <div class="start-row" id="newRider" hidden>
+        <input id="nameInput" type="text" maxlength="16" autocomplete="off" placeholder="Type your name">
+        <button id="btnAddRider" class="primary" type="button">Join the Academy</button>
       </div>
+      <p class="err" id="riderErr" hidden></p>
     </div>
+
+    <p class="riding" id="ridingAs" hidden>
+      <span id="ridingName"></span>
+      <button id="btnSwitch" class="quiet" type="button">Change rider</button>
+    </p>
 
     <div class="rankcard">
       <div class="ros" id="homeRosette"></div>
@@ -492,7 +509,7 @@ h1 span{display:block;white-space:nowrap}
     <h2>Director of the Academy</h2>
 
     <div id="dirGate">
-      <p class="dir-intro">This is where the Director sets how much help the trainee gets on this device.</p>
+      <p class="dir-intro">This is where the Director sets how much help each rider gets.</p>
       <div class="gate">
         <label for="pwInput">Director's password</label>
         <div class="start-row">
@@ -500,6 +517,7 @@ h1 span{display:block;white-space:nowrap}
           <button id="btnUnlock" class="primary" type="button">Unlock</button>
         </div>
         <p class="err" id="pwErr" hidden>That's not the password. Ask the Director.</p>
+        <p class="storage-note" id="gateNote"></p>
       </div>
       <p><button id="btnDirBack" class="quiet" type="button">Back to the yard</button></p>
     </div>
@@ -510,7 +528,13 @@ h1 span{display:block;white-space:nowrap}
         <p>You are responsible for helping the students at your Academy learn. The settings below decide how hard their exams are and how much help they get along the way.</p>
         <p>Give a student plenty of support while they are finding their feet, then take it away a bit at a time as they improve. That is where the learning happens. Nothing here is permanent, so change it as often as you like.</p>
       </div>
-      <p class="dir-intro">Changes apply to the next exam started on this device.</p>
+      <p class="dir-intro">Changes apply to that rider's next exam, on whichever tablet she picks up.</p>
+
+      <div class="field">
+        <span class="lab">Settings for</span>
+        <p class="sub2">Every rider has her own. These follow her name, not this tablet.</p>
+        <div class="seg" id="segRider"></div>
+      </div>
 
       <div class="field">
         <span class="lab">Patients per exam</span>
@@ -576,6 +600,8 @@ h1 span{display:block;white-space:nowrap}
         <p class="sub2">Shown at the end of every exam. Leave it empty for none.</p>
         <textarea id="noteInput" maxlength="140" rows="3" placeholder="Good luck today — watch out for the Triadan ones"></textarea>
       </div>
+
+      <p class="err" id="dirErr" hidden></p>
 
       <div class="dir-actions">
         <button id="btnDirSave" class="primary" type="button">Save and close</button>
@@ -1762,12 +1788,19 @@ const BANK = [
  }
 ];
 const DEFAULTS = {examLength: 10, vet: 1, hint: 1, halve: true, second: false, gentle: true, note: ''};
-const DIRECTOR_PASSWORD = 'equine';
+// The Academy's records office: one record per rider, kept off the
+// tablet so a casebook is hers wherever she plays and her brother cannot
+// reach it. The Director's password lives there too rather than here,
+// because every byte of this file is handed to whoever opens the page.
+// See worker.js in this folder. Empty it and the game falls back to
+// this tablet alone, which is how it behaves offline anyway.
+const ENDPOINT = 'https://academy.campbell226.workers.dev/';
 const POINTS = {1: 100, 2: 150, 3: 200};
 const STREAK_BONUS = 50;
 const PROMOTION_BONUS = 250;
 const LETTERS = 'ABCDE';
-const STORE_KEY = 'horse-dentist-academy';
+const STORE_KEY = 'equine-dentist-academy';
+const RIDER_NAME = /^[A-Za-z][A-Za-z' -]{0,15}$/;
 
 const COATS = {
   grey: '#C3C9CC',
@@ -1824,34 +1857,112 @@ function shade(hex, amt) {
   return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
 }
 
-/* ---------- storage (claude.ai artifact storage if present, else memory) ---------- */
+/* ---------- storage ----------
+   Two copies, and the tablet is the lesser one. Every save is written to
+   localStorage at once and pushed to the Academy a moment later; what
+   comes back from the Academy is what the game then believes. The tablet
+   copy exists so that a dropped connection loses nothing and so that the
+   game still opens on a train, not because it is the record.
+
+   Nothing here has to decide which copy is newer, because the Academy
+   merges rather than overwrites: solved and seen only grow, best and
+   rounds take the higher number. So the fix for every disagreement is
+   the same - send the whole local record up and use the answer. A week
+   spent offline arrives intact the first time it gets through.       */
+
 const blankRecord = () => ({
   name: '', solved: [], seen: [], best: 0, rounds: 0, muted: false,
   awards: {'stable-hand': new Date().toISOString()},
   settings: Object.assign({}, DEFAULTS)
 });
 
-const Store = {
-  mem: null,
-  async load() {
-    try {
-      if (window.storage && typeof window.storage.get === 'function') {
-        const r = await window.storage.get(STORE_KEY, false);
-        if (r && r.value) return JSON.parse(r.value);
-      }
-    } catch (e) { /* key not found or storage unavailable */ }
-    return this.mem;
+// Only the fields the Academy accepts. Settings are deliberately absent:
+// the Director writes those, and a tablet that could send them could
+// hand itself lifelines.
+const forWire = r => ({
+  name: r.name, solved: r.solved || [], seen: r.seen || [],
+  best: r.best || 0, rounds: r.rounds || 0, muted: !!r.muted,
+  awards: r.awards || {}
+});
+
+const slugOf = n => String(n).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+const Local = {
+  get(key) {
+    try { return JSON.parse(window.localStorage.getItem(STORE_KEY + ':' + key)); }
+    catch (e) { return null; }
   },
-  async save(data) {
-    this.mem = JSON.parse(JSON.stringify(data));
+  set(key, value) {
+    try { window.localStorage.setItem(STORE_KEY + ':' + key, JSON.stringify(value)); }
+    catch (e) { /* private browsing, or a full quota; the Academy still has it */ }
+  },
+  drop(key) {
+    try { window.localStorage.removeItem(STORE_KEY + ':' + key); } catch (e) { /* ignore */ }
+  },
+  rider(name) { return this.get('rider:' + slugOf(name)); },
+  saveRider(rec) { this.set('rider:' + slugOf(rec.name), rec); },
+  // The roll on this tablet is read out of the keys themselves rather
+  // than from an index kept beside them, which could go out of step.
+  roll() {
+    const out = [];
     try {
-      if (window.storage && typeof window.storage.set === 'function') {
-        await window.storage.set(STORE_KEY, JSON.stringify(data), false);
+      const prefix = STORE_KEY + ':rider:';
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const k = window.localStorage.key(i);
+        if (k && k.indexOf(prefix) === 0) {
+          const r = JSON.parse(window.localStorage.getItem(k));
+          if (r && r.name) { out.push({name: r.name, solved: (r.solved || []).length, updated: r.updated || ''}); }
+        }
       }
     } catch (e) { /* ignore */ }
+    return out;
   }
 };
-const saveUser = () => Store.save(progress);
+
+const Academy = {
+  reachable: null,
+  async call(op, payload) {
+    if (!ENDPOINT) { this.reachable = false; return null; }
+    let res, data = null;
+    try {
+      res = await fetch(ENDPOINT, {
+        method: 'POST',
+        headers: {'content-type': 'application/json'},
+        body: JSON.stringify(Object.assign({op: op}, payload || {}))
+      });
+    } catch (e) {
+      // No wifi, or the worker is not deployed. Either way the tablet
+      // copy carries on and the next save tries again.
+      this.reachable = false;
+      return null;
+    }
+    this.reachable = true;
+    try { data = await res.json(); } catch (e) { data = null; }
+    return {ok: res.ok, status: res.status, data: data || {}};
+  }
+};
+
+// Written now, sent shortly. A ten-case exam lands a dozen changes in a
+// few minutes and they are worth one write between them.
+let pushTimer = null;
+function saveUser() {
+  if (!progress.name) { return; }
+  progress.updated = new Date().toISOString();
+  Local.saveRider(progress);
+  Local.set('last', progress.name);
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(pushUp, 800);
+}
+
+async function pushUp() {
+  if (!progress.name) { return; }
+  const res = await Academy.call('save', {name: progress.name, record: forWire(progress)});
+  if (!res || !res.ok || !res.data.record) { return; }
+  // Take back the merged record, so a second tablet's work shows up here
+  // without anybody reloading. Settings come from the Academy alone.
+  adopt(res.data.record, {keepName: true});
+  Local.saveRider(progress);
+}
 
 /* ---------- sound (Web Audio synthesis) ---------- */
 const Sound = {
@@ -2039,6 +2150,118 @@ function renderRules() {
   if (s.second) items.push(['↩️', 'Get one wrong and you get a second go, for half the points.']);
   items.push(['🔥', 'Get three or more right in a row for a streak bonus.']);
   $('rulesList').innerHTML = items.map(([ic, text]) => `<li><span class="ic">${ic}</span><span>${text}</span></li>`).join('');
+}
+
+/* ---------- riders ---------- */
+let roll = [];
+
+// Become this rider. Everything the game reads about a player goes
+// through here, so a record from the Academy, a record off the tablet
+// and a brand new one all arrive in the same state.
+function adopt(record, opts) {
+  const keep = opts && opts.keepName && progress.name;
+  const name = keep ? progress.name : (record.name || '');
+  progress = Object.assign(blankRecord(), record);
+  progress.name = name;
+  progress.settings = Object.assign({}, DEFAULTS, progress.settings || {});
+  progress.awards = progress.awards || {};
+  const ids = new Set(BANK.map(q => q.id));
+  progress.solved = (progress.solved || []).filter(id => ids.has(id));
+  progress.seen = (progress.seen || []).filter(id => ids.has(id));
+  grantAwards();
+  setMute(!!progress.muted);
+  updateTitle();
+}
+
+function riderError(msg) {
+  const p = $('riderErr');
+  p.textContent = msg || '';
+  p.hidden = !msg;
+}
+
+function renderRoll() {
+  const list = roll.slice().sort((a, b) => a.name.localeCompare(b.name));
+  $('riderList').innerHTML = list.map(r => {
+    const n = r.solved || 0;
+    return `<button class="rider" type="button" data-name="${esc(r.name)}">` +
+      `<span class="rn">${esc(r.name)}</span>` +
+      `<span class="rr">${esc(rankFor(n).title)} · ${n} of ${BANK.length}</span></button>`;
+  }).join('') +
+    '<button class="rider new" type="button" data-new="1">' +
+    '<span class="rn">Someone new</span><span class="rr">Join the Academy</span></button>';
+}
+
+// Both rolls, folded together by name: a rider created on this tablet
+// while the wifi was off still appears beside the ones the Academy knows.
+async function refreshRoll() {
+  const res = await Academy.call('list');
+  const server = (res && res.ok && Array.isArray(res.data.riders)) ? res.data.riders : [];
+  const by = {};
+  server.concat(Local.roll()).forEach(r => {
+    if (!r || !r.name) { return; }
+    const k = slugOf(r.name);
+    if (!by[k] || (r.solved || 0) > (by[k].solved || 0)) { by[k] = r; }
+  });
+  roll = Object.keys(by).map(k => by[k]);
+  renderRoll();
+}
+
+function showPicker() {
+  $('riderPick').hidden = false;
+  $('ridingAs').hidden = true;
+  $('newRider').hidden = roll.length > 0;
+  riderError('');
+}
+
+function showRiding() {
+  $('riderPick').hidden = true;
+  $('ridingAs').hidden = false;
+  $('ridingName').textContent = 'Riding as ' + progress.name + '.';
+}
+
+async function pickRider(name) {
+  const local = Local.rider(name);
+  // One call rather than two: sending the tablet's copy up merges it and
+  // hands the whole rider back. A rider this tablet has never met has
+  // nothing to send, so that one is a plain load.
+  const res = local
+    ? await Academy.call('save', {name: name, record: forWire(local)})
+    : await Academy.call('load', {name: name});
+  const record = (res && res.ok && res.data.record) ? res.data.record : local;
+  adopt(Object.assign({}, record || blankRecord(), {name: name}));
+  Local.saveRider(progress);
+  Local.set('last', progress.name);
+  showRiding();
+  updateTitle();
+}
+
+async function createRider() {
+  const name = $('nameInput').value.replace(/\s+/g, ' ').trim();
+  if (!RIDER_NAME.test(name)) {
+    riderError('A name of letters, up to sixteen of them, please.');
+    $('nameInput').focus();
+    return;
+  }
+  const already = roll.find(r => slugOf(r.name) === slugOf(name));
+  if (already) { await pickRider(already.name); return; }
+
+  const fresh = Object.assign(blankRecord(), {name: name});
+  // Enrolled at the Academy before anything else, so that a full roll is
+  // said out loud now rather than discovered after an exam.
+  const res = await Academy.call('save', {name: name, record: forWire(fresh)});
+  if (res && !res.ok) {
+    riderError(res.data.error === 'roll_full'
+      ? 'The Academy has no room for another rider. The Director can make space.'
+      : 'The Academy would not take that name. Try another one.');
+    return;
+  }
+  adopt((res && res.ok && res.data.record) ? res.data.record : fresh);
+  Local.saveRider(progress);
+  Local.set('last', progress.name);
+  await refreshRoll();
+  showRiding();
+  updateTitle();
+  Sound.play('magic');
 }
 
 function goHome() { updateTitle(); renderIntro(); renderRules(); show('screen-title'); }
@@ -2470,7 +2693,12 @@ function openCasebook() {
 }
 
 let clearArmed = false, clearTimer = null;
-function clearCasebook() {
+
+// Wiping has to be its own errand at the Academy. An ordinary save
+// merges, so emptying the tablet and saving would simply fill it back up
+// from the Academy's copy - and would look, for a moment, as though it
+// had worked. Offline, this refuses and says so rather than pretending.
+async function clearCasebook() {
   const btn = $('btnClear');
   if (!clearArmed) {
     clearArmed = true;
@@ -2481,21 +2709,53 @@ function clearCasebook() {
   clearTimeout(clearTimer);
   clearArmed = false;
   btn.textContent = 'Clear casebook';
-  progress.solved = []; progress.seen = []; progress.best = 0; progress.rounds = 0;
-  progress.awards = {'stable-hand': new Date().toISOString()};
-  saveUser();
+  if (!progress.name) { return; }
+
+  clearTimeout(pushTimer);
+  const res = await Academy.call('clear', {name: progress.name});
+  if (!res || !res.ok) {
+    btn.textContent = 'The Academy is offline. Nothing cleared.';
+    setTimeout(() => { btn.textContent = 'Clear casebook'; }, 4000);
+    return;
+  }
+  adopt(Object.assign({}, res.data.record, {name: progress.name}));
+  Local.saveRider(progress);
   openCasebook();
 }
 
-/* ---------- director's area ---------- */
+/* ---------- director's area ----------
+   The password is not in this file. It is a secret on the worker, which
+   answers yes or no and nothing else, and it is sent again with the
+   settings themselves - so a tablet that has heard "yes" once still
+   cannot write settings without it.
+
+   The panel edits a copy. Nothing reaches the Academy until Save, so a
+   Director who taps about and changes her mind has changed nothing. */
 const NUMERIC_KEYS = ['examLength', 'vet', 'hint'];
+
+let dirKey = null;      // the password, held only while the panel is open
+let dirRider = '';      // whose settings are on screen
+let dirSettings = null; // the copy being edited
 
 function setSeg(id, value) {
   [...$(id).children].forEach(b => b.setAttribute('aria-pressed', b.dataset.value === String(value) ? 'true' : 'false'));
 }
 
+function dirError(msg) {
+  const p = $('dirErr');
+  p.textContent = msg || '';
+  p.hidden = !msg;
+}
+
+function renderDirectorRiders() {
+  const list = roll.slice().sort((a, b) => a.name.localeCompare(b.name));
+  $('segRider').innerHTML = list.map(r =>
+    `<button type="button" data-rider="${esc(r.name)}" aria-pressed="${slugOf(r.name) === slugOf(dirRider) ? 'true' : 'false'}">${esc(r.name)}</button>`
+  ).join('') || '<span class="sub2">No riders yet. Someone has to join the Academy first.</span>';
+}
+
 function renderDirector() {
-  const s = S();
+  const s = dirSettings || DEFAULTS;
   setSeg('segLength', s.examLength);
   setSeg('segVet', s.vet);
   setSeg('segHint', s.hint);
@@ -2503,11 +2763,30 @@ function renderDirector() {
   setSeg('segSecond', s.second ? 1 : 0);
   setSeg('segGentle', s.gentle ? 1 : 0);
   $('noteInput').value = s.note || '';
+  renderDirectorRiders();
+}
+
+// Load one rider's settings to edit. The Academy is asked rather than the
+// tablet, because the Academy is where they are kept.
+async function dirSelect(name) {
+  dirRider = name;
+  dirError('');
+  let record = null;
+  if (slugOf(name) === slugOf(progress.name)) { record = progress; }
+  const res = await Academy.call('load', {name: name});
+  if (res && res.ok && res.data.record) { record = res.data.record; }
+  else if (!record) { record = Local.rider(name); }
+  dirSettings = Object.assign({}, DEFAULTS, (record && record.settings) || {});
+  renderDirector();
 }
 
 function openDirector() {
   $('pwInput').value = '';
   $('pwErr').hidden = true;
+  dirError('');
+  $('gateNote').textContent = Academy.reachable === false
+    ? 'The Academy cannot be reached just now, so this door will not open. These settings belong to the rider rather than to this tablet, and only the Academy can change them.'
+    : '';
   $('dirGate').hidden = dirUnlocked;
   $('dirPanel').hidden = !dirUnlocked;
   if (dirUnlocked) renderDirector();
@@ -2515,25 +2794,68 @@ function openDirector() {
   if (!dirUnlocked) $('pwInput').focus();
 }
 
-function unlockDirector() {
-  if ($('pwInput').value.trim().toLowerCase() !== DIRECTOR_PASSWORD) {
+async function unlockDirector() {
+  const pw = $('pwInput').value.trim();
+  if (!pw) { return; }
+  const btn = $('btnUnlock');
+  btn.disabled = true;
+  const res = await Academy.call('unlock', {password: pw});
+  btn.disabled = false;
+
+  if (!res) {
+    $('gateNote').textContent = 'The Academy cannot be reached just now, so this door will not open. Try again when the tablet is back online.';
+    Sound.play('wrong');
+    return;
+  }
+  if (!res.ok) {
+    $('pwErr').textContent = res.data.error === 'locked_out'
+      ? 'Too many wrong guesses today. The door opens again tomorrow.'
+      : (res.data.error === 'no_password_set'
+        ? 'No password has been set at the Academy yet.'
+        : "That's not the password. Ask the Director.");
     $('pwErr').hidden = false;
     $('pwInput').select();
     Sound.play('wrong');
     return;
   }
+
+  dirKey = pw;
   dirUnlocked = true;
   $('pwErr').hidden = true;
   $('dirGate').hidden = true;
   $('dirPanel').hidden = false;
-  renderDirector();
+  await refreshRoll();
+  await dirSelect(progress.name || (roll[0] && roll[0].name) || '');
   Sound.play('magic');
 }
 
-function saveDirector(close) {
-  S().note = $('noteInput').value.trim();
-  saveUser();
-  if (close) { dirUnlocked = false; goHome(); }
+async function saveDirector(close) {
+  if (!dirRider || !dirSettings) { if (close) { closeDirector(); } return; }
+  dirSettings.note = $('noteInput').value.trim();
+
+  const res = await Academy.call('settings', {name: dirRider, password: dirKey, settings: dirSettings});
+  if (!res) { dirError('The Academy cannot be reached, so nothing was changed.'); return; }
+  if (!res.ok) {
+    dirError(res.data.error === 'no_such_rider'
+      ? 'The Academy has no record of that rider yet. Ask her to start an exam first.'
+      : 'The Academy would not take those settings.');
+    return;
+  }
+  // If the Director has been editing the rider who is playing, she should
+  // see it at once rather than on the next reload.
+  if (slugOf(dirRider) === slugOf(progress.name) && res.data.record) {
+    progress.settings = Object.assign({}, DEFAULTS, res.data.record.settings || {});
+    Local.saveRider(progress);
+  }
+  dirError('');
+  if (close) { closeDirector(); }
+}
+
+function closeDirector() {
+  dirUnlocked = false;
+  dirKey = null;
+  dirSettings = null;
+  goHome();
 }
 
 $('btnDirector').addEventListener('click', openDirector);
@@ -2541,21 +2863,26 @@ $('btnUnlock').addEventListener('click', unlockDirector);
 $('pwInput').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); unlockDirector(); } });
 $('btnDirBack').addEventListener('click', goHome);
 $('btnDirSave').addEventListener('click', () => saveDirector(true));
-$('btnDirLock').addEventListener('click', () => saveDirector(true));
+$('btnDirLock').addEventListener('click', closeDirector);
 $('btnDirReset').addEventListener('click', () => {
-  progress.settings = Object.assign({}, DEFAULTS);
+  dirSettings = Object.assign({}, DEFAULTS);
   renderDirector();
-  saveUser();
   Sound.play('select');
 });
-document.querySelectorAll('.seg').forEach(group => {
+$('segRider').addEventListener('click', e => {
+  const b = e.target.closest('button[data-rider]');
+  if (!b) return;
+  dirSelect(b.dataset.rider);
+  Sound.play('select');
+});
+document.querySelectorAll('.seg[data-key]').forEach(group => {
   group.addEventListener('click', e => {
     const b = e.target.closest('button');
-    if (!b || !group.contains(b)) return;
+    if (!b || !group.contains(b) || !dirSettings) return;
     const key = group.dataset.key, raw = b.dataset.value;
-    S()[key] = NUMERIC_KEYS.includes(key) ? parseInt(raw, 10) : raw === '1';
+    dirSettings[key] = NUMERIC_KEYS.includes(key) ? parseInt(raw, 10) : raw === '1';
     setSeg(group.id, raw);
-    saveUser();
+    dirError('');
     Sound.play('select');
   });
 });
@@ -2569,13 +2896,30 @@ function setMute(m) {
   b.setAttribute('aria-pressed', m ? 'true' : 'false');
 }
 
-$('btnMute').addEventListener('click', () => { setMute(!Sound.muted); saveUser(); if (!Sound.muted) Sound.play('select'); });
-$('btnStart').addEventListener('click', startExam);
-$('nameInput').addEventListener('input', () => {
-  progress.name = $('nameInput').value.trim();
-  renderRankCard();
+$('btnMute').addEventListener('click', () => {
+  setMute(!Sound.muted);
+  Local.set('muted', Sound.muted);   // the tablet remembers even before a rider is picked
   saveUser();
+  if (!Sound.muted) Sound.play('select');
 });
+$('btnStart').addEventListener('click', () => {
+  if (!progress.name) { showPicker(); $('riderList').scrollIntoView({block: 'center'}); return; }
+  startExam();
+});
+$('riderList').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  if (b.dataset.new) {
+    $('newRider').hidden = false;
+    $('nameInput').value = '';
+    $('nameInput').focus();
+    return;
+  }
+  if (b.dataset.name) { pickRider(b.dataset.name); }
+});
+$('btnAddRider').addEventListener('click', createRider);
+$('nameInput').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); createRider(); } });
+$('btnSwitch').addEventListener('click', async () => { await refreshRoll(); showPicker(); });
 $('btnCerts').addEventListener('click', openCerts);
 $('btnCertBack').addEventListener('click', goHome);
 $('certGrid').addEventListener('click', e => {
@@ -2625,17 +2969,19 @@ document.addEventListener('keydown', e => {
 });
 
 (async function init() {
-  const saved = await Store.load();
-  if (saved && Array.isArray(saved.solved)) progress = Object.assign(blankRecord(), saved);
-  progress.settings = Object.assign({}, DEFAULTS, progress.settings || {});
-  progress.awards = progress.awards || {};
-  const ids = new Set(BANK.map(q => q.id));
-  progress.solved = progress.solved.filter(id => ids.has(id));
-  progress.seen = (progress.seen || []).filter(id => ids.has(id));
-  grantAwards();
-  $('nameInput').value = progress.name || '';
-  setMute(!!progress.muted);
+  setMute(!!Local.get('muted'));
   renderRanks();
+  goHome();
+
+  // The roll and the rider are fetched after the yard is already on
+  // screen, so a slow or missing Academy delays nothing a child can see.
+  await refreshRoll();
+  const last = Local.get('last');
+  if (last && roll.some(r => slugOf(r.name) === slugOf(last))) {
+    await pickRider(last);
+  } else {
+    showPicker();
+  }
   goHome();
 })();
 })();
