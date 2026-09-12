@@ -1,0 +1,32 @@
+// How the academy worker gets deployed from a clone of this repo.
+//
+// This is not a build step and the game does not know it exists. It is a
+// description of where worker.js goes and what it needs bound to it, so
+// that `wrangler deploy` in this folder is the whole of a release rather
+// than a series of clicks in a dashboard that have to be remembered.
+//
+// On a new machine, once:
+//
+//     npx wrangler login                       (approve in the browser)
+//     npx wrangler kv namespace create ACADEMY (prints the id below)
+//     npx wrangler deploy
+//     npx wrangler secret put DIRECTOR_PASSWORD
+//
+// The id below is not a secret. It names a namespace inside one
+// Cloudflare account and is useless to anybody who cannot authenticate
+// as that account, which is why it can sit in a public repository when
+// an API key never could. The password is the opposite, and is why the
+// last line of that list is a separate command you type yourself: it is
+// set on the worker and stored by Cloudflare, and it appears nowhere in
+// this repository, in this file, or in the game.
+{
+  "name": "academy",
+  "main": "worker.js",
+  "compatibility_date": "2026-09-12",
+  "kv_namespaces": [
+    {
+      "binding": "ACADEMY",
+      "id": "REPLACE_WITH_THE_ID_FROM_KV_NAMESPACE_CREATE"
+    }
+  ]
+}

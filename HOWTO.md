@@ -276,6 +276,40 @@ Spoken Content → Voices. It is free and it makes a large difference.
 
 ---
 
+## Cloudflare on a machine that has never seen this repo
+
+Two games now have a worker: Dictionary holds the Anthropic key, and the
+Equine Dentist Academy holds the children's casebooks and the Director's
+password. Neither can be deployed by cloning the repo alone, and that is the
+point — a clone gives somebody the code, not the account.
+
+What travels in the repo is everything that is not a secret: the worker source,
+and for the Academy a `wrangler.jsonc` saying what binds to what. What does not
+travel, and must be done once per machine and once per account:
+
+1. **Authenticate.** `npx wrangler login` opens a browser for you to approve.
+   The token is cached in `~/.wrangler`, outside the repo, so nothing is ever
+   committed. One login covers every worker, not one per game.
+2. **Create the store**, if this is a fresh Cloudflare account rather than a
+   fresh laptop. `npx wrangler kv namespace create ACADEMY` prints an id; paste
+   it into `wrangler.jsonc`. The id is not a credential — it names a namespace
+   inside an account, and is worthless without the login above.
+3. **Deploy.** `npx wrangler deploy` from the game's folder.
+4. **Set the password.** `npx wrangler secret put DIRECTOR_PASSWORD`, then type
+   it. This is the only step that cannot be automated and should not be: it is
+   a secret, it lives on Cloudflare, and it is deliberately absent from every
+   file here. See the Secrets rule in CLAUDE.md for why that is not negotiable.
+
+Claude can do steps 2 and 3 unattended once `.claude/settings.json` carries the
+wrangler permission rules, which are committed. It cannot do 1 or 4: signing in
+and typing a password are yours, and no amount of setup changes that.
+
+Dictionary's worker predates this and is still deployed by pasting into the
+dashboard, which is why it has no `wrangler.jsonc`. That works from a tablet,
+which the CLI does not, so it has not been changed for the sake of matching.
+
+---
+
 ## If Claude is ever unavailable
 
 The one fallback worth knowing: open the repo on github.com and press `.`, which
