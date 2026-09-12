@@ -1143,6 +1143,77 @@
       </svg>
       <span>Dictionary</span>
     </a>
+
+    <a class="game" href="games/equine-dentist-academy/equine-dentist-academy.html">
+      <svg viewBox="0 0 320 200" role="img" aria-label="Equine Dentist Academy">
+        <defs>
+          <linearGradient id="eda-wall" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#E8F7EE"/><stop offset="1" stop-color="#BFE2D2"/>
+          </linearGradient>
+          <linearGradient id="eda-coat" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#8A4520"/><stop offset="1" stop-color="#6E3419"/>
+          </linearGradient>
+          <linearGradient id="eda-enamel" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#FFFEF9"/><stop offset="1" stop-color="#EDEDDD"/>
+          </linearGradient>
+        </defs>
+
+        <!-- the boarded wall of the yard -->
+        <rect width="320" height="200" fill="url(#eda-wall)"/>
+        <g stroke="#ADDBC5" stroke-width="2" opacity="0.85" fill="none">
+          <path d="M52 0v158M104 0v158M156 0v158M208 0v158M260 0v158"/>
+        </g>
+        <rect x="0" y="154" width="320" height="7" fill="#FFFEF9" opacity="0.65"/>
+
+        <!-- bedding -->
+        <rect x="0" y="160" width="320" height="40" fill="#EFDCAE"/>
+        <g stroke="#D8BE82" stroke-width="2" stroke-linecap="round" opacity="0.9" fill="none">
+          <path d="M12 174l22 6M48 184l20-8M96 172l18 10M140 186l22-6M190 176l20 8M236 172l22 8M282 184l24-8"/>
+        </g>
+
+        <!-- a rosette already won, hung on the boards -->
+        <path d="M20 46l-5 34 13-11 10 13 3-36z" fill="#C99A38"/>
+        <circle cx="28" cy="34" r="17" fill="#C99A38"/>
+        <circle cx="28" cy="34" r="12" fill="#F4C443"/>
+        <circle cx="28" cy="34" r="7.5" fill="#FFFEF9" stroke="#DDB14D" stroke-width="2"/>
+
+        <!-- the patient -->
+        <path d="M40 104C22 128 10 162 6 200h98c-4-40-8-60-16-72z" fill="url(#eda-coat)"/>
+        <path d="M64 56C46 70 40 96 42 120c-10 22-16 46-18 72h18c4-30 12-54 20-70-6-22-4-48 8-64z" fill="#F4C443"/>
+        <path d="M58 68c-8 18-9 38-6 52-9 22-14 46-16 72M70 66c-6 18-6 36-3 50-8 22-12 44-14 68" fill="none" stroke="#DDB14D" stroke-width="3" stroke-linecap="round"/>
+        <path d="M68 64L58 34l26 22z" fill="#6E3419"/>
+        <path d="M90 56l2-26 16 22z" fill="#6E3419"/>
+        <path d="M70 60l-6-16 14 12z" fill="#A9673B"/>
+        <path d="M70 62c28-12 54 4 67 28 10 18 27 24 29 38 2 15-13 24-26 23-10-1-16-4-23 0-11 8-24 11-34 8-23-7-39-25-39-51 0-20 10-38 26-46z" fill="url(#eda-coat)"/>
+        <path d="M116 70c14 22 26 38 34 56" fill="none" stroke="#F3E7D4" stroke-width="12" stroke-linecap="round" opacity="0.9"/>
+        <ellipse cx="104" cy="92" rx="8" ry="9" fill="#123B3A"/>
+        <circle cx="107" cy="88" r="2.8" fill="#FFFEF9"/>
+        <path d="M94 78q10-6 19 0" stroke="#4A2412" stroke-width="3" fill="none" stroke-linecap="round"/>
+        <ellipse cx="156" cy="124" rx="5" ry="7" fill="#4A2412" transform="rotate(-20 156 124)"/>
+
+        <!-- the grin: two big incisors, cleaned and happy about it -->
+        <path d="M126 141c12-6 26-4 28 3 2 8-8 14-18 12-8-1-12-8-10-15z" fill="#EFA39B" stroke="#123B3A" stroke-width="2"/>
+        <rect x="130" y="143" width="9" height="11" rx="2.5" fill="#FFFEF9"/>
+        <rect x="141" y="143" width="9" height="11" rx="2.5" fill="#FFFEF9"/>
+
+        <!-- the mirror -->
+        <path d="M206 200l-18-74" stroke="#1E4FD8" stroke-width="8" stroke-linecap="round"/>
+        <circle cx="186" cy="116" r="13" fill="#E3EAFE" stroke="#123B3A" stroke-width="3"/>
+        <path d="M180 113q6-6 12-2" stroke="#FFFEF9" stroke-width="3" fill="none" stroke-linecap="round"/>
+
+        <!-- the cheek tooth, most of it still in the jaw -->
+        <rect x="216" y="96" width="76" height="64" rx="12" fill="#EAD8B8"/>
+        <g fill="#DCC6A0">
+          <circle cx="228" cy="118" r="3"/><circle cx="280" cy="132" r="3.5"/><circle cx="236" cy="146" r="3"/>
+        </g>
+        <path d="M226 50l6-7 7 7 7-7 7 7 7-7 6 7v84q0 16-14 16h-4q-4-5-8 0h-1q-13 0-13-16z" fill="url(#eda-enamel)" stroke="#123B3A" stroke-width="3.5" stroke-linejoin="round"/>
+        <path d="M238 58c-4 32 4 60 0 82M254 58c4 32-4 60 0 82" fill="none" stroke="#B9D9CE" stroke-width="3.5" stroke-linecap="round"/>
+        <rect x="216" y="92" width="76" height="16" rx="8" fill="#EFA39B"/>
+        <path d="M280 40l3 9 9 3-9 3-3 9-3-9-9-3 9-3z" fill="#F4C443"/>
+        <path d="M206 60l2 6 6 2-6 2-2 6-2-6-6-2 6-2z" fill="#F4C443"/>
+      </svg>
+      <span>Equine Dentist Academy</span>
+    </a>
   </div>
 
   <footer id="latest"></footer>

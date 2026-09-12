@@ -1,0 +1,2644 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Equine Dentist Academy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --mint:#D8EFE4; --mint-2:#C2E4D4; --ink:#123B3A; --ink-soft:#4C6A68; --enamel:#FFFEF9;
+  --blue:#1E4FD8; --blue-dark:#12318F; --blue-soft:#E3EAFE; --straw:#F4C443;
+  --chestnut:#6E3419; --brass:#DDB14D;
+  --right:#1F8A4C; --right-soft:#DDF3E5; --wrong:#C8452F; --wrong-soft:#FBE3DD; --gum:#EFA39B;
+  --display:"Bricolage Grotesque","Arial Narrow",system-ui,sans-serif;
+  --body:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--mint);color:var(--ink);font-family:var(--body);font-size:18px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button{font-family:inherit}
+:focus-visible{outline:3px dashed var(--blue);outline-offset:3px}
+[hidden]{display:none !important}
+
+.topbar{max-width:780px;margin:0 auto;padding:12px 18px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.brand{font-family:var(--display);font-weight:800;font-size:19px;font-stretch:80%}
+.icon-btn{background:var(--enamel);color:var(--ink);border:2px solid var(--ink);border-radius:999px;padding:6px 14px;font-size:15px;font-weight:700;cursor:pointer}
+
+main{max-width:780px;margin:0 auto;padding:4px 18px 40px}
+
+/* buttons */
+.primary,.secondary{border-radius:999px;padding:14px 26px;font-size:18px;font-weight:700;cursor:pointer;transition:transform .08s,box-shadow .08s}
+.primary{background:var(--blue);color:#fff;border:2px solid var(--blue-dark);box-shadow:0 4px 0 var(--blue-dark)}
+.secondary{background:var(--enamel);color:var(--ink);border:2px solid var(--ink);box-shadow:0 4px 0 var(--ink)}
+.primary:active:not(:disabled),.secondary:active:not(:disabled){transform:translateY(3px);box-shadow:0 1px 0 var(--blue-dark)}
+.secondary:active:not(:disabled){box-shadow:0 1px 0 var(--ink)}
+.primary:disabled{background:#9FB0DE;border-color:#8797C4;box-shadow:0 4px 0 #8797C4;cursor:not-allowed}
+.quiet{background:none;border:0;color:var(--ink-soft);text-decoration:underline;font-size:15px;cursor:pointer;padding:8px}
+
+/* title screen */
+.hero{display:grid;grid-template-columns:1.35fr 1fr;align-items:center;gap:8px;margin-top:4px}
+h1{font-family:var(--display);font-weight:800;font-stretch:75%;font-size:clamp(46px,9vw,78px);line-height:.9;letter-spacing:-.015em;margin:0 0 12px}
+h1 span{display:block;white-space:nowrap}
+.sub{font-family:var(--display);font-weight:700;font-size:24px;margin:0;color:var(--ink-soft)}
+.tagline{font-style:italic;color:var(--ink-soft);margin:4px 0 0}
+.hero-tooth{width:100%;max-width:330px;justify-self:end}
+.intro{font-size:20px;max-width:60ch;margin:18px 0 22px}
+.start label{display:block;font-weight:700;margin-bottom:6px}
+.start-row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.start-row input{font:20px var(--body);color:var(--ink);padding:12px 16px;border:2px solid var(--ink);border-radius:14px;background:#fff;flex:1 1 220px;max-width:340px}
+.rules{list-style:none;padding:0;margin:28px 0;display:grid;gap:12px}
+.rules li{display:flex;gap:12px;align-items:flex-start}
+.rules .ic{font-size:24px;line-height:1.2;flex:none;width:32px;text-align:center}
+.ask-dir{color:var(--ink-soft);font-style:italic;margin:-6px 0 22px}
+.cb-teaser{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;border-top:3px solid var(--ink);padding-top:18px}
+.cb-teaser p{margin:2px 0 8px;color:var(--ink-soft)}
+.mini-teeth{display:flex;flex-wrap:wrap;gap:3px}
+.mini-teeth .tooth-ic{width:15px;height:25px}
+.ranks{margin-top:22px}
+.ranks summary{cursor:pointer;font-weight:700}
+.ranks ul{list-style:none;padding:0;margin:10px 0 0;display:grid;gap:6px}
+.ranks li{display:flex;align-items:center;gap:10px}
+.ranks .dot{width:18px;height:18px;border-radius:50%;border:2px solid var(--ink);flex:none}
+
+/* tooth icon */
+.tooth-ic{width:26px;height:42px;overflow:visible}
+.tooth-ic .t-body{fill:var(--enamel);stroke:var(--ink-soft);stroke-width:1.6;stroke-linejoin:round}
+.tooth-ic .t-gum{fill:var(--gum)}
+.tooth-ic .t-crack{fill:none;stroke:none;stroke-width:1.6;stroke-linecap:round}
+.tooth-ic .t-spark{fill:none}
+.tooth-ic.pending .t-body{fill:rgba(255,255,255,.45);stroke:#8FB2A6}
+.tooth-ic.pending .t-gum{fill:#E8C3BE}
+.tooth-ic.current .t-body{stroke:var(--blue);stroke-width:2.6}
+.tooth-ic.current{transform:translateY(-4px)}
+.tooth-ic.right .t-body{fill:#fff;stroke:var(--right);stroke-width:2.2}
+.tooth-ic.right .t-spark{fill:var(--straw);stroke:#B8860B;stroke-width:.6}
+.tooth-ic.wrong .t-body{fill:#D8C49C;stroke:#8A6A3A}
+.tooth-ic.wrong .t-crack{stroke:#6E4F22}
+
+/* quiz */
+.quiz-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin:6px 0 16px}
+.teeth{display:flex;gap:5px;flex-wrap:wrap}
+.stats{display:flex;gap:14px;flex-wrap:wrap;font-weight:700;font-size:16px}
+.stats .streak{color:#B4441F}
+.patient{background:var(--enamel);border:3px solid var(--ink);border-radius:22px;overflow:hidden}
+.door{background:var(--chestnut) repeating-linear-gradient(90deg,rgba(0,0,0,.14) 0 2px,transparent 2px 46px);display:flex;align-items:center;gap:18px;padding:16px 20px}
+.avatar{width:86px;height:86px;border-radius:50%;border:4px solid var(--brass);display:grid;place-items:center;font-size:44px;position:relative;flex:none}
+.avatar .horse{filter:drop-shadow(0 2px 0 rgba(0,0,0,.25));line-height:1;letter-spacing:-12px;padding-right:12px}
+.avatar .horse.single{letter-spacing:0;padding:0}
+.mood{position:absolute;right:-12px;top:-10px;width:40px;height:40px;border-radius:50%;background:#fff;border:2px solid var(--ink);display:grid;place-items:center;font-size:24px}
+.plate{position:relative;background:var(--brass);color:#2A1A06;border-radius:8px;padding:8px 26px;box-shadow:inset 0 0 0 2px rgba(80,50,0,.35),0 3px 0 rgba(0,0,0,.25)}
+.plate::before,.plate::after{content:"";position:absolute;top:50%;width:7px;height:7px;margin-top:-3.5px;border-radius:50%;background:#9C7426}
+.plate::before{left:9px}.plate::after{right:9px}
+.plate strong{display:block;font-family:var(--display);font-size:27px;line-height:1.05;font-stretch:85%}
+.plate span{font-size:15px}
+.case-body{padding:18px 22px 22px}
+.meta{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:15px;color:var(--ink-soft);margin-bottom:10px}
+.stars{color:#C08A12;font-size:18px;letter-spacing:2px}
+.topic{background:var(--mint);border-radius:999px;padding:2px 12px}
+.stem{margin:0 0 12px;max-width:66ch}
+.lead{font-weight:700;margin:0 0 14px;font-size:19px}
+.hintbox{background:#FFF4CF;border-left:6px solid var(--straw);border-radius:8px;padding:10px 14px;margin:0 0 14px;font-size:17px}
+.options{display:grid;gap:10px}
+.opt{display:flex;gap:14px;align-items:flex-start;width:100%;text-align:left;background:#fff;color:var(--ink);border:2px solid #B5D2C6;border-radius:14px;padding:11px 14px;font-size:18px;line-height:1.4;cursor:pointer}
+.opt:hover:not(:disabled){border-color:var(--ink-soft)}
+.opt .letter{flex:none;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--mint);font-weight:700;font-size:16px;margin-top:-2px}
+.opt .opt-text{flex:1}
+.opt.selected{border-color:var(--blue);background:var(--blue-soft)}
+.opt.selected .letter{background:var(--blue);color:#fff}
+.opt.correct{border-color:var(--right);background:var(--right-soft);opacity:1}
+.opt.correct .letter{background:var(--right);color:#fff}
+.opt.incorrect{border-color:var(--wrong);background:var(--wrong-soft);opacity:1}
+.opt.incorrect .letter{background:var(--wrong);color:#fff}
+.opt.incorrect.removed .opt-text{text-decoration:line-through;opacity:.7}
+.opt.removed{opacity:.35;text-decoration:line-through}
+.opt:disabled{cursor:default}
+.opt:disabled:not(.correct):not(.incorrect):not(.removed){opacity:.6}
+.actions{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px}
+.lifelines{display:flex;gap:10px;flex-wrap:wrap}
+.lifeline{background:#fff;color:var(--ink);border:2px dashed var(--ink-soft);border-radius:12px;padding:9px 13px;font-size:16px;font-weight:700;cursor:pointer}
+.lifeline:disabled{opacity:.45;cursor:default;text-decoration:line-through}
+.leave{margin-top:10px;text-align:right}
+
+.feedback{margin-top:18px;background:var(--enamel);border:3px solid var(--ink);border-radius:22px;padding:18px 22px 22px}
+.feedback.is-right{border-color:var(--right)}
+.feedback.is-wrong{border-color:var(--wrong)}
+.verdict{font-family:var(--display);font-weight:800;font-size:30px;line-height:1.1;margin:0 0 6px;font-stretch:85%}
+.is-right .verdict{color:var(--right)}
+.is-wrong .verdict{color:var(--wrong)}
+.verdict-sub{margin:0 0 6px}
+.notes h3{font-family:var(--display);font-size:21px;margin:14px 0 4px}
+.notes p{margin:0 0 12px;max-width:66ch}
+.keypoint{background:var(--mint);border-radius:12px;padding:10px 14px}
+.feedback .primary{margin-top:6px}
+
+/* results */
+.award{display:grid;grid-template-columns:210px 1fr;gap:22px;align-items:center;background:var(--enamel);border:3px solid var(--ink);border-radius:22px;padding:22px}
+.award.no-rosette{grid-template-columns:1fr}
+.rosette svg{width:100%;max-width:210px;display:block;margin:0 auto}
+.award h2{font-family:var(--display);font-weight:800;font-size:40px;line-height:1;margin:0 0 10px;font-stretch:80%}
+.award p{margin:0 0 10px}
+.cert{border:2px dashed var(--brass);border-radius:12px;padding:10px 14px;background:#FFF9E6;font-style:italic}
+.res-actions{display:flex;flex-wrap:wrap;gap:12px;margin:22px 0 8px}
+.res-casebook{color:var(--ink-soft);margin:6px 0 24px}
+.results h3{font-family:var(--display);font-size:24px;margin:10px 0 12px}
+.review{padding:0;margin:0;list-style:none;display:grid;gap:10px}
+.review li{background:var(--enamel);border-radius:14px;padding:12px 16px;border-left:7px solid var(--right)}
+.review li.r-wrong{border-left-color:var(--wrong)}
+.rv-head{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.rv-mark{font-weight:800}
+.r-right .rv-mark{color:var(--right)}
+.r-wrong .rv-mark{color:var(--wrong)}
+.rv-topic{color:var(--ink-soft);font-size:15px}
+.rv-line{margin:4px 0}
+.review details{margin-top:6px}
+.review summary{cursor:pointer;color:var(--blue);font-weight:700;font-size:16px}
+.review details p{margin:6px 0 0}
+
+/* casebook */
+.casebook h2{font-family:var(--display);font-weight:800;font-size:44px;margin:6px 0 4px;font-stretch:80%}
+.cb-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;margin:18px 0 22px}
+.cb-card{background:var(--enamel);border:2px solid var(--ink);border-radius:16px;padding:12px 14px}
+.cb-card.locked{background:transparent;border:2px dashed #8FB2A6;color:var(--ink-soft)}
+.cb-top{display:flex;gap:10px;align-items:center;margin-bottom:6px}
+.cb-top strong{display:block;line-height:1.2}
+.cb-top span{font-size:14px;color:var(--ink-soft)}
+.cb-card p{margin:0;font-size:15px;line-height:1.4}
+.mini-av{width:42px;height:42px;border-radius:50%;border:3px solid var(--brass);display:grid;place-items:center;font-size:21px;flex:none;letter-spacing:-6px}
+.mini-av.single{letter-spacing:0}
+.mini-av.locked-av{background:transparent;border:2px dashed #8FB2A6;font-weight:800;font-size:20px;letter-spacing:0}
+.cb-actions{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+
+.foot{max-width:780px;margin:0 auto;padding:0 18px 30px;font-size:14px;color:var(--ink-soft)}
+
+/* screens */
+.certs h2{font-family:var(--display);font-weight:800;font-size:40px;margin:6px 0 8px;font-stretch:80%}
+.storage-note{color:var(--ink-soft);font-size:15px;max-width:62ch}
+
+/* rank card */
+.rankcard{display:flex;align-items:center;gap:18px;background:var(--enamel);border:3px solid var(--ink);border-radius:22px;padding:16px 20px;margin:20px 0}
+.rankcard .ros{width:84px;flex:none}
+.rankcard .ros svg{width:100%;display:block}
+.rankcard h3{font-family:var(--display);font-weight:800;font-size:27px;margin:0 0 2px;font-stretch:85%}
+.rankcard p{margin:0 0 8px;color:var(--ink-soft);font-size:16px}
+.rankcard .epi{font-family:var(--display);font-weight:700;color:var(--blue);font-size:17px;margin:-2px 0 6px}
+.bar{height:14px;background:#fff;border:2px solid var(--ink);border-radius:999px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--blue);border-radius:999px}
+.home-actions{display:flex;gap:12px;flex-wrap:wrap;margin:18px 0 0}
+
+.dir-brief{background:var(--enamel);border:3px solid var(--ink);border-radius:18px;padding:16px 20px;margin:0 0 16px}
+.dir-brief h3{font-family:var(--display);font-weight:800;font-size:22px;margin:0 0 6px}
+.dir-brief p{margin:0 0 8px;max-width:62ch}
+.dir-brief p:last-child{margin-bottom:0}
+
+/* promotion */
+.promo{text-align:center;padding-top:10px}
+.promo-kicker{font-size:15px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-soft);margin:0 0 10px}
+.promo-ros{width:190px;margin:0 auto 14px}
+.promo-ros svg{width:100%;display:block;animation:spin-in 1s cubic-bezier(.2,.8,.2,1)}
+.promo h2{font-family:var(--display);font-weight:800;font-size:clamp(38px,7vw,58px);line-height:1;margin:0 0 6px;font-stretch:80%}
+.promo-ep{font-family:var(--display);font-weight:700;font-size:21px;color:var(--blue);margin:0 0 14px}
+.promo-text{max-width:56ch;margin:0 auto 12px}
+.promo-bonus{display:inline-block;background:#FFF4CF;border:2px dashed var(--brass);border-radius:999px;padding:7px 18px;font-weight:700;margin:0 0 20px}
+.promo-actions{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+
+/* certificates */
+.cert-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin:18px 0 22px}
+.cert-card{background:var(--enamel);border:2px solid var(--ink);border-radius:16px;padding:14px}
+.cert-card.locked{background:transparent;border:2px dashed #8FB2A6;color:var(--ink-soft)}
+.cert-card h3{font-family:var(--display);font-size:21px;margin:0 0 2px}
+.cert-card p{margin:0 0 10px;font-size:15px;color:var(--ink-soft)}
+.cert-card button{background:var(--blue);color:#fff;border:2px solid var(--blue-dark);border-radius:999px;padding:8px 16px;font-weight:700;font-size:15px;cursor:pointer}
+.rankup{background:#FFF4CF;border:3px solid var(--straw);border-radius:16px;padding:14px 18px;margin:14px 0 0}
+.rankup strong{font-family:var(--display);font-size:22px}
+.rankup button{margin-top:10px}
+
+/* certificate sheet */
+.sheet{background:#fff;color:#123B3A;border:2px solid var(--ink);border-radius:8px;padding:30px;max-width:760px;margin:0 auto}
+.sheet-in{border:3px double var(--brass);padding:26px 30px;text-align:center}
+.sheet .s-acad{font-family:var(--display);font-weight:800;font-size:27px;font-stretch:85%;margin:0 0 2px}
+.sheet .s-rule{color:var(--ink-soft);letter-spacing:.22em;font-size:12px;text-transform:uppercase;margin:0 0 18px}
+.sheet .s-lead{font-style:italic;color:var(--ink-soft);margin:0 0 4px}
+.sheet .s-name{font-family:var(--display);font-weight:800;font-size:38px;font-stretch:85%;margin:0 0 10px;line-height:1.05}
+.sheet .s-rank{font-family:var(--display);font-weight:800;font-size:30px;font-stretch:85%;color:var(--blue);margin:0 0 10px;line-height:1.1}
+.sheet .s-epi{font-family:var(--display);font-weight:700;font-size:17px;color:var(--ink-soft);margin:-6px 0 10px}
+.sheet .s-body{margin:0 auto 16px;max-width:48ch}
+.sheet .s-ros{width:120px;margin:0 auto 10px}
+.sheet .s-ros svg{width:100%;display:block}
+.sheet .s-feet{display:flex;justify-content:space-between;gap:20px;margin-top:22px;font-size:14px}
+.sheet .s-feet div{flex:1}
+.sheet .s-val{display:flex;align-items:flex-end;justify-content:center;min-height:34px;border-bottom:1.5px solid var(--ink);padding-bottom:3px}
+.sheet .s-lab{display:block;font-size:13px;color:var(--ink-soft);padding-top:5px}
+#printArea{display:none}
+@media print{
+  .topbar, main, .foot, #confetti{display:none !important}
+  body{background:#fff}
+  #printArea{display:block}
+  .sheet{border:0;max-width:none;padding:0}
+  @page{size:A4 landscape;margin:14mm}
+}
+
+/* director */
+.dir h2{font-family:var(--display);font-weight:800;font-size:40px;margin:6px 0 8px;font-stretch:80%}
+.dir-intro{max-width:60ch;color:var(--ink-soft);margin:0 0 18px}
+.gate label{display:block;font-weight:700;margin-bottom:6px}
+.gate .start-row input{flex:1 1 180px;max-width:260px}
+.err{color:var(--wrong);font-weight:700;margin:10px 0 0}
+.field{border-top:2px solid #B5D2C6;padding:16px 0}
+.field .lab{font-family:var(--display);font-weight:700;font-size:21px;display:block}
+.field .sub2{color:var(--ink-soft);font-size:16px;margin:2px 0 10px;max-width:56ch}
+.field input[type=text], .field textarea{font:17px var(--body);color:var(--ink);padding:11px 14px;border:2px solid var(--ink);border-radius:12px;background:#fff;width:100%;max-width:460px}
+.field textarea{resize:vertical;line-height:1.45;display:block}
+.seg{display:flex;flex-wrap:wrap;gap:8px}
+.seg button{background:#fff;border:2px solid #B5D2C6;border-radius:999px;padding:9px 18px;font-size:17px;font-weight:700;color:var(--ink);cursor:pointer;min-width:56px}
+.seg button:hover{border-color:var(--ink-soft)}
+.seg button[aria-pressed="true"]{background:var(--blue);border-color:var(--blue-dark);color:#fff}
+.dir-actions{display:flex;gap:12px;flex-wrap:wrap;align-items:center;border-top:2px solid #B5D2C6;padding-top:18px;margin-top:4px}
+.director-link{margin:26px 0 0;text-align:right}
+.note{background:#FFF9E6;border:2px dashed var(--brass);border-radius:12px;padding:10px 14px;margin:12px 0 0}
+.retrybox{background:var(--wrong-soft);border-left:6px solid var(--wrong);border-radius:8px;padding:10px 14px;margin:0 0 14px;font-size:17px}
+
+/* motion */
+#confetti{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:50}
+#confetti i{position:absolute;top:-18px;width:9px;height:14px;border-radius:2px;animation-name:fall;animation-timing-function:cubic-bezier(.3,.6,.6,1);animation-fill-mode:forwards}
+@keyframes fall{to{transform:translate(var(--dx),110vh) rotate(var(--rot))}}
+.avatar.bounce{animation:bounce .6s}
+.avatar.shake{animation:shake .45s}
+@keyframes bounce{0%,100%{transform:translateY(0)}30%{transform:translateY(-14px)}60%{transform:translateY(0)}80%{transform:translateY(-5px)}}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-7px)}50%{transform:translateX(6px)}75%{transform:translateX(-4px)}}
+.rosette svg{animation:spin-in 1s cubic-bezier(.2,.8,.2,1)}
+@keyframes spin-in{from{transform:rotate(-220deg) scale(.2);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none !important;transition:none !important}
+}
+
+@media (max-width:680px){
+  body{font-size:17px}
+  .hero{grid-template-columns:1fr}
+  .hero-tooth{justify-self:center;max-width:280px;margin-top:6px}
+  .door{padding:14px}
+  .avatar{width:72px;height:72px;font-size:36px}
+  .plate{padding:6px 22px}
+  .plate strong{font-size:23px}
+  .case-body{padding:16px}
+  .award{grid-template-columns:1fr;text-align:center}
+  .award h2{font-size:34px}
+  .dir h2, .certs h2{font-size:30px}
+  .rankcard{gap:14px;padding:14px}
+  .rankcard .ros{width:64px}
+  .promo-ros{width:150px}
+  .promo-actions .primary, .promo-actions .secondary{width:100%}
+  .sheet{padding:16px}
+  .sheet .s-name{font-size:30px}
+  .sheet .s-rank{font-size:24px}
+  .seg button{padding:9px 14px;font-size:16px}
+  .actions .primary{width:100%}
+  .mini-teeth{gap:2px}
+  .mini-teeth .tooth-ic{width:13px;height:22px}
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <span class="brand" id="brand">Equine Dentist Academy</span>
+  <button id="btnMute" class="icon-btn" type="button" aria-pressed="false">🔊 Sound on</button>
+</header>
+
+<main>
+  <!-- TITLE -->
+  <section id="screen-title" class="screen">
+    <div class="hero">
+      <div>
+        <h1><span>Equine</span><span>Dentist</span><span>Academy</span></h1>
+        <p class="sub">Casebook training programme</p>
+      </div>
+      <svg class="hero-tooth" viewBox="0 0 360 400" role="img" aria-label="Diagram of a long horse cheek tooth. Only the top shows above the gum; most of it is hidden in the jaw.">
+        <rect x="10" y="118" width="190" height="272" rx="26" fill="#EAD8B8"/>
+        <g fill="#DCC6A0"><circle cx="38" cy="172" r="4"/><circle cx="176" cy="212" r="5"/><circle cx="44" cy="300" r="5"/><circle cx="170" cy="344" r="4"/><circle cx="32" cy="238" r="3"/><circle cx="182" cy="280" r="3"/></g>
+        <path d="M65 56 L78 40 L91 56 L104 40 L117 56 L130 40 L143 56 L150 47 V342 Q150 374 124 374 H118 Q110 362 102 374 H92 Q65 374 65 342 Z" fill="#FFFEF9" stroke="#123B3A" stroke-width="4" stroke-linejoin="round"/>
+        <path d="M90 66 C82 122 100 182 88 242 S96 322 92 352" fill="none" stroke="#B9D9CE" stroke-width="4" stroke-linecap="round"/>
+        <path d="M125 66 C133 122 115 182 127 242 S119 322 123 352" fill="none" stroke="#B9D9CE" stroke-width="4" stroke-linecap="round"/>
+        <rect x="10" y="104" width="190" height="28" rx="14" fill="#EFA39B"/>
+        <g font-family="Atkinson Hyperlegible, system-ui, sans-serif" font-size="15" fill="#123B3A">
+          <line x1="153" y1="46" x2="208" y2="46" stroke="#123B3A" stroke-width="2"/>
+          <text x="214" y="51">Chewing surface</text>
+          <line x1="202" y1="118" x2="208" y2="118" stroke="#123B3A" stroke-width="2"/>
+          <text x="214" y="123">Gum line</text>
+          <path d="M208 148 h8 v214 h-8" fill="none" stroke="#123B3A" stroke-width="2"/>
+          <text x="226" y="244">Spare tooth,</text>
+          <text x="226" y="264">hidden in</text>
+          <text x="226" y="284">the jaw</text>
+        </g>
+      </svg>
+    </div>
+
+    <p class="intro" id="introText"></p>
+
+    <div class="start">
+      <label for="nameInput">Your name, for your certificates</label>
+      <div class="start-row">
+        <input id="nameInput" type="text" maxlength="30" autocomplete="off" placeholder="Type your name">
+      </div>
+    </div>
+
+    <div class="rankcard">
+      <div class="ros" id="homeRosette"></div>
+      <div style="flex:1">
+        <h3 id="homeRank"></h3>
+        <p class="epi" id="homeEpithet" hidden></p>
+        <p id="homeProgress"></p>
+        <div class="bar"><i id="homeBar"></i></div>
+      </div>
+    </div>
+
+    <p><button id="btnStart" class="primary" type="button">Start my exam</button></p>
+
+    <ul class="rules" id="rulesList"></ul>
+    <p class="ask-dir">Would you like any of this changed? Speak to the Director of the Academy.</p>
+
+    <div class="cb-teaser">
+      <div>
+        <strong>Your casebook</strong>
+        <p id="titleProgress"></p>
+        <div class="mini-teeth" id="miniTeeth" aria-hidden="true"></div>
+      </div>
+    </div>
+
+    <div class="home-actions">
+      <button id="btnCasebook" class="secondary" type="button">Open casebook</button>
+      <button id="btnCerts" class="secondary" type="button">My certificates</button>
+    </div>
+
+    <details class="ranks">
+      <summary>Ranks you can earn</summary>
+      <ul id="rankList"></ul>
+    </details>
+
+    <p class="director-link"><button id="btnDirector" class="quiet" type="button">Director of the Academy's Area</button></p>
+  </section>
+
+  <!-- QUIZ -->
+  <section id="screen-quiz" class="screen" hidden>
+    <div class="quiz-head">
+      <div>
+        <div class="teeth" id="teeth"></div>
+      </div>
+      <div class="stats" aria-live="polite">
+        <span id="caseCount"></span>
+        <span id="score"></span>
+        <span id="streak" class="streak"></span>
+      </div>
+    </div>
+
+    <article class="patient">
+      <div class="door">
+        <div class="avatar" id="avatar"><span class="horse single" id="horseEmoji">🐴</span><span class="mood" id="mood" aria-hidden="true">😣</span></div>
+        <div class="plate"><strong id="pName"></strong><span id="pDesc"></span></div>
+      </div>
+      <div class="case-body">
+        <div class="meta"><span class="stars" id="stars"></span><span class="topic" id="topic"></span></div>
+        <p class="stem" id="stem"></p>
+        <p class="lead" id="lead"></p>
+        <div class="hintbox" id="hintbox" hidden></div>
+        <div class="retrybox" id="retrybox" hidden></div>
+        <div class="options" id="options"></div>
+        <div class="actions">
+          <div class="lifelines">
+            <button id="btnVet" class="lifeline" type="button">🩺 Ask the vet</button>
+            <button id="btnHint" class="lifeline" type="button">📓 Nutmeg's hint</button>
+          </div>
+          <button id="btnLock" class="primary" type="button" disabled>Lock in my answer</button>
+        </div>
+      </div>
+    </article>
+
+    <section class="feedback" id="feedback" hidden aria-live="polite">
+      <p class="verdict" id="verdict"></p>
+      <p class="verdict-sub" id="verdictSub"></p>
+      <div class="notes">
+        <h3>Professor Nutmeg's notes</h3>
+        <p id="explain"></p>
+        <p class="keypoint"><strong>Remember:</strong> <span id="keypoint"></span></p>
+      </div>
+      <button id="btnNext" class="primary" type="button">Next patient</button>
+    </section>
+
+    <div class="leave"><button id="btnLeave" class="quiet" type="button">Leave this exam</button></div>
+  </section>
+
+  <!-- RESULTS -->
+  <section id="screen-results" class="screen results" hidden>
+    <div class="award" id="award">
+      <div class="rosette" id="rosette"></div>
+      <div>
+        <h2 id="resTitle"></h2>
+        <p id="resScore"></p>
+        <p id="resMsg"></p>
+        <div class="bar" id="resBarWrap"><i id="resBar"></i></div>
+        <div class="rankup" id="rankUp" hidden>
+          <strong id="rankUpTitle"></strong>
+          <p id="rankUpText"></p>
+          <button id="btnRankCert" class="primary" type="button">Get your certificate</button>
+        </div>
+        <p class="note" id="dirNote" hidden></p>
+      </div>
+    </div>
+    <div class="res-actions">
+      <button id="btnAgain" class="primary" type="button">Start a new exam</button>
+      <button id="btnRetry" class="secondary" type="button">Retry missed cases</button>
+      <button id="btnResCasebook" class="secondary" type="button">Open casebook</button>
+    </div>
+    <p class="res-casebook" id="resCasebook"></p>
+    <h3>Your patients</h3>
+    <ol class="review" id="review"></ol>
+    <p><button id="btnHome" class="quiet" type="button">Back to the yard</button></p>
+  </section>
+
+  <!-- PROMOTION -->
+  <section id="screen-promo" class="screen promo" hidden>
+    <p class="promo-kicker">The Academy has an announcement</p>
+    <div class="promo-ros" id="promoRosette"></div>
+    <h2 id="promoTitle"></h2>
+    <p class="promo-ep" id="promoEpithet" hidden></p>
+    <p class="promo-text" id="promoText"></p>
+    <p class="promo-bonus" id="promoBonus"></p>
+    <div class="promo-actions">
+      <button id="btnPromoCert" class="primary" type="button">See my certificate</button>
+      <button id="btnPromoOn" class="secondary" type="button">Carry on to my results</button>
+    </div>
+  </section>
+
+  <!-- CERTIFICATES -->
+  <section id="screen-certs" class="screen certs" hidden>
+    <h2>Certificates</h2>
+    <p id="certIntro"></p>
+    <div class="cert-grid" id="certGrid"></div>
+    <div id="certPreview" hidden>
+      <h3>Preview</h3>
+      <div class="sheet" id="certSheet"></div>
+      <div class="cb-actions" style="margin-top:16px">
+        <button id="btnDoPrint" class="primary" type="button">Print this certificate</button>
+        <button id="btnClosePreview" class="quiet" type="button">Close preview</button>
+      </div>
+      <p class="storage-note" style="margin-top:10px">If nothing happens when you press print, save this page to your computer first and open it in a web browser.</p>
+    </div>
+    <p><button id="btnCertBack" class="quiet" type="button">Back to the yard</button></p>
+  </section>
+
+  <!-- DIRECTOR -->
+  <section id="screen-director" class="screen dir" hidden>
+    <h2>Director of the Academy</h2>
+
+    <div id="dirGate">
+      <p class="dir-intro">This is where the Director sets how much help the trainee gets on this device.</p>
+      <div class="gate">
+        <label for="pwInput">Director's password</label>
+        <div class="start-row">
+          <input id="pwInput" type="password" autocomplete="off" placeholder="Password">
+          <button id="btnUnlock" class="primary" type="button">Unlock</button>
+        </div>
+        <p class="err" id="pwErr" hidden>That's not the password. Ask the Director.</p>
+      </div>
+      <p><button id="btnDirBack" class="quiet" type="button">Back to the yard</button></p>
+    </div>
+
+    <div id="dirPanel" hidden>
+      <div class="dir-brief">
+        <h3>Your job, Director</h3>
+        <p>You are responsible for helping the students at your Academy learn. The settings below decide how hard their exams are and how much help they get along the way.</p>
+        <p>Give a student plenty of support while they are finding their feet, then take it away a bit at a time as they improve. That is where the learning happens. Nothing here is permanent, so change it as often as you like.</p>
+      </div>
+      <p class="dir-intro">Changes apply to the next exam started on this device.</p>
+
+      <div class="field">
+        <span class="lab">Patients per exam</span>
+        <p class="sub2">A shorter exam for a shorter attention span.</p>
+        <div class="seg" id="segLength" data-key="examLength">
+          <button type="button" data-value="5">5</button>
+          <button type="button" data-value="10">10</button>
+          <button type="button" data-value="15">15</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="lab">Ask the vet</span>
+        <p class="sub2">Clears away two wrong answers on one case.</p>
+        <div class="seg" id="segVet" data-key="vet">
+          <button type="button" data-value="0">None</button>
+          <button type="button" data-value="1">1</button>
+          <button type="button" data-value="2">2</button>
+          <button type="button" data-value="3">3</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="lab">Nutmeg's hint</span>
+        <p class="sub2">A clue that points at the answer without giving it away.</p>
+        <div class="seg" id="segHint" data-key="hint">
+          <button type="button" data-value="0">None</button>
+          <button type="button" data-value="1">1</button>
+          <button type="button" data-value="2">2</button>
+          <button type="button" data-value="3">3</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="lab">Lifelines cost half the points</span>
+        <p class="sub2">Turn this off and help is free.</p>
+        <div class="seg" id="segHalve" data-key="halve">
+          <button type="button" data-value="1">Yes</button>
+          <button type="button" data-value="0">No</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="lab">Second chance</span>
+        <p class="sub2">A wrong answer is taken away and she picks again, for half the points.</p>
+        <div class="seg" id="segSecond" data-key="second">
+          <button type="button" data-value="0">Off</button>
+          <button type="button" data-value="1">On</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="lab">Cases in the draw</span>
+        <p class="sub2">The easier set leaves out the hardest cases. Once a student has met all of those, harder ones join the draw on their own, so this can never leave them stuck.</p>
+        <div class="seg" id="segGentle" data-key="gentle">
+          <button type="button" data-value="1">Easier cases only</button>
+          <button type="button" data-value="0">All cases</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="lab">Message from the Director</span>
+        <p class="sub2">Shown at the end of every exam. Leave it empty for none.</p>
+        <textarea id="noteInput" maxlength="140" rows="3" placeholder="Good luck today — watch out for the Triadan ones"></textarea>
+      </div>
+
+      <div class="dir-actions">
+        <button id="btnDirSave" class="primary" type="button">Save and close</button>
+        <button id="btnDirReset" class="secondary" type="button">Reset to normal</button>
+        <button id="btnDirLock" class="quiet" type="button">Lock this area</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- CASEBOOK -->
+  <section id="screen-casebook" class="screen casebook" hidden>
+    <h2>Casebook</h2>
+    <p id="cbCount"></p>
+    <div class="cb-grid" id="cbGrid"></div>
+    <div class="cb-actions">
+      <button id="btnCbStart" class="primary" type="button">Start an exam</button>
+      <button id="btnCbBack" class="secondary" type="button">Back to the yard</button>
+      <button id="btnClear" class="quiet" type="button">Clear casebook</button>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">Cases written against the UK Category 1, 2 and 3 equine dental procedure lists. Just for fun and learning: real horses need real vets and EDTs.</footer>
+<div id="confetti" aria-hidden="true"></div>
+<div id="printArea"></div>
+
+<script>
+(() => {
+'use strict';
+
+const BANK = [
+ {
+  "id": "quidding",
+  "topic": "Spotting problems",
+  "difficulty": 1,
+  "patient": {
+   "name": "Duchess",
+   "desc": "23-year-old grey Welsh pony",
+   "coat": "grey"
+  },
+  "stem": "Duchess's owner rings you. For the last few weeks Duchess has been leaving little balls of half-chewed hay on her stable floor. She is slower to finish her feed and has lost some weight.",
+  "lead": "What is the name for dropping partly chewed food like this?",
+  "options": [
+   "Cribbing",
+   "Weaving",
+   "Quidding",
+   "Colic",
+   "Choke"
+  ],
+  "answer": 2,
+  "explanation": "**Quidding** means dropping wads (called *quids*) of partly chewed food. It's one of the classic signs that chewing hurts — often because of sharp enamel points, a loose tooth or gum disease. Cribbing and weaving are repetitive stable habits, choke is food stuck in the gullet (food and saliva come down the nose), and colic is tummy pain.",
+  "key": "Quidding plus weight loss means it's time to look in the mouth.",
+  "hint": "This isn't about tummy ache or stable habits. Think about what's going wrong inside her mouth."
+ },
+ {
+  "id": "sharp-points",
+  "topic": "Anatomy",
+  "difficulty": 2,
+  "patient": {
+   "name": "Biscuit",
+   "desc": "9-year-old palomino cob",
+   "coat": "palomino"
+  },
+  "stem": "Biscuit has started tossing his head when he's ridden, and there are small ulcers on the inside of his cheeks. You slide your hand gently along the outside of his upper cheek teeth and feel sharp edges.",
+  "lead": "Where do sharp enamel points **most** often form in a horse's mouth?",
+  "options": [
+   "Only on the canine teeth",
+   "On the tongue side of the upper cheek teeth and the cheek side of the lower cheek teeth",
+   "On the cheek side of the upper cheek teeth and the tongue side of the lower cheek teeth",
+   "Evenly all the way around every cheek tooth",
+   "On the biting edges of the front teeth (incisors)"
+  ],
+  "answer": 2,
+  "explanation": "A horse's upper jaw is wider than its lower jaw — this is called **anisognathia**. As the horse chews from side to side, the outer edges of the upper cheek teeth and the inner edges of the lower cheek teeth don't get ground down, so they form sharp points. The upper points cut the cheeks and the lower points cut the tongue. Rasping these points smooth is the most common job an EDT does.",
+  "key": "The upper jaw is wider than the lower jaw, so points form on the upper-outside and lower-inside edges.",
+  "hint": "The upper jaw is wider than the lower jaw. Which edges would miss out on being ground down?"
+ },
+ {
+  "id": "diet",
+  "topic": "Feeding",
+  "difficulty": 2,
+  "patient": {
+   "name": "Bramble and Blaze",
+   "desc": "two 10-year-old horses on the same yard",
+   "coat": "bay",
+   "emoji": "🐴🐴"
+  },
+  "stem": "Bramble lives out and grazes grass for about 16 hours a day. Blaze is stabled most of the time and eats lots of hard feed (pellets and mix) with less hay.",
+  "lead": "Which horse is more likely to develop bad sharp enamel points, and why?",
+  "options": [
+   "Both the same — what a horse eats makes no difference",
+   "Bramble — grass is soft, so it doesn't wear the tooth edges",
+   "Neither — sharp points only happen in horses over 20",
+   "Blaze — hard feed is chewed with shorter side-to-side strokes",
+   "Bramble — she spends more hours chewing, so more points form"
+  ],
+  "answer": 3,
+  "explanation": "Horses evolved to graze for most of the day. Chewing long fibre like grass and hay makes the jaw sweep **wide from side to side**, grinding across the whole chewing surface. Hard feed is chewed with **shorter strokes**, so the outer edges don't get worn down and sharp points build up faster. Lots of forage is good for teeth as well as tummies.",
+  "key": "More forage means wider chewing strokes and more even wear.",
+  "hint": "Picture how the jaw moves when chewing a big mouthful of long grass compared with a few pellets."
+ },
+ {
+  "id": "enamel-ridges",
+  "topic": "Anatomy",
+  "difficulty": 3,
+  "patient": {
+   "name": "Pepper",
+   "desc": "6-year-old piebald cob",
+   "coat": "piebald"
+  },
+  "stem": "Using your dental mirror, you look at Pepper's cheek teeth. The chewing surfaces are covered in hard, crinkly ridges — a bit like a cheese grater — even though they are being worn down every single day.",
+  "lead": "Why do horse cheek teeth stay rough and ridged as they wear?",
+  "options": [
+   "They're made of three tissues of different hardness that wear at different speeds",
+   "Horses sharpen their own teeth by chewing wooden fences",
+   "They're covered in tiny spikes that regrow every few weeks",
+   "They have no enamel, so the soft bone crumbles unevenly",
+   "Horse saliva is acidic and carves fresh grooves every day"
+  ],
+  "answer": 0,
+  "explanation": "Horse cheek teeth are made of **enamel** (the hardest substance in the body), **dentine** and **cementum**, all folded together. The softer dentine and cementum wear away faster than the enamel, leaving hard enamel ridges standing up. So the tooth stays rough as it wears — a **self-sharpening grinder**, perfect for crushing tough grass.",
+  "key": "Enamel, dentine and cementum wear at different rates, making self-sharpening ridges.",
+  "hint": "Imagine a path made of pebbles and soft mud. After lots of rain, which bits stick up?"
+ },
+ {
+  "id": "eruption-rate",
+  "topic": "Anatomy",
+  "difficulty": 2,
+  "patient": {
+   "name": "Captain",
+   "desc": "15-year-old dapple grey Irish Draught",
+   "coat": "dapple"
+  },
+  "stem": "Captain's owner is surprised he needs a dental check every year. “I thought adult teeth stopped growing?” she says. You explain that horses have **hypsodont** teeth: very long teeth with lots of spare tooth hidden inside the jaw, which slowly comes up (**erupts**) as the chewing surface wears away.",
+  "lead": "Roughly how fast does an adult horse's cheek tooth erupt?",
+  "options": [
+   "About 2–3 mm per year",
+   "About 1 cm per month",
+   "About 2–3 mm per week",
+   "About 2–3 cm per year",
+   "Not at all — adult horse teeth never move"
+  ],
+  "answer": 0,
+  "explanation": "An adult horse's cheek teeth erupt about **2–3 mm a year** — roughly matching how fast they're worn down by grinding tough, gritty grass. It's a slow balancing act, which is why problems like sharp points and hooks keep coming back and adult horses need a check-up at least once a year. In very old horses, the spare tooth eventually runs out.",
+  "key": "Hypsodont teeth keep erupting about 2–3 mm a year for most of the horse's life.",
+  "hint": "Think slow — one set of teeth has to last a horse 25 years or more."
+ },
+ {
+  "id": "tooth-count",
+  "topic": "Anatomy",
+  "difficulty": 2,
+  "keepOrder": true,
+  "patient": {
+   "name": "Jasper",
+   "desc": "12-year-old bay gelding",
+   "coat": "bay"
+  },
+  "stem": "You're filling in Jasper's dental chart. He has all of his incisors and cheek teeth, plus all four canine teeth, but no wolf teeth. Remember: there are 6 incisors in each jaw and 6 cheek teeth in each row.",
+  "lead": "How many teeth does Jasper have altogether?",
+  "options": [
+   "24",
+   "32",
+   "36",
+   "40",
+   "44"
+  ],
+  "answer": 3,
+  "explanation": "**12 incisors** (6 top, 6 bottom) + **4 canines** + **24 cheek teeth** (6 in each of the 4 rows) = **40**. Mares often don't have canines, so they usually have 36, and some horses also have up to four wolf teeth. An adult horse can have anywhere from 36 to 44 teeth — which is why every mouth gets its own chart.",
+  "key": "A typical adult male horse has 40 teeth: 12 incisors, 4 canines and 24 cheek teeth.",
+  "hint": "Add them up: incisors (top and bottom) + canines + cheek teeth (four rows of six)."
+ },
+ {
+  "id": "triadan-206",
+  "topic": "Triadan numbers",
+  "difficulty": 3,
+  "patient": {
+   "name": "Rolo",
+   "desc": "11-year-old liver chestnut Thoroughbred",
+   "coat": "liver"
+  },
+  "stem": "Your supervising EDT examines Rolo and writes on his chart: “206 — sharp enamel point, rasped.” Horse dentists use the **Triadan system**, in which every tooth has its own three-digit number.",
+  "lead": "Which tooth is 206?",
+  "options": [
+   "The lower left first cheek tooth (second premolar)",
+   "The upper right first cheek tooth (second premolar)",
+   "The lower right canine",
+   "The upper left second molar",
+   "The upper left first cheek tooth (second premolar)"
+  ],
+  "answer": 4,
+  "explanation": "The **first digit** is the quarter of the mouth, going clockwise as you look at the horse's face: 1 = upper right, 2 = upper left, 3 = lower left, 4 = lower right (always the horse's own right and left). The **last two digits** count back from the middle front tooth: 01–03 incisors, 04 canine, 05 wolf tooth, 06–08 premolars, 09–11 molars. So 206 is the upper left 06 — the first cheek tooth. It's called the *second* premolar because the little wolf tooth (05) is the first!",
+  "key": "Quadrants go 1 upper right, 2 upper left, 3 lower left, 4 lower right. Canines are always 04 and first molars always 09.",
+  "hint": "First digit: which quarter of the mouth (1 is upper right, then go clockwise as you face the horse). Last two digits: which tooth, counting back from the front."
+ },
+ {
+  "id": "wolf-tooth-205",
+  "topic": "Triadan numbers",
+  "difficulty": 3,
+  "patient": {
+   "name": "Pickle",
+   "desc": "4-year-old bay Connemara mare",
+   "coat": "bay"
+  },
+  "stem": "Pickle has just started being ridden and keeps shaking her head when the bit is in her mouth. You find a tiny, pointed tooth just in front of the first cheek tooth on her upper **left** side.",
+  "lead": "What is this tooth, and what is its Triadan number?",
+  "options": [
+   "A wolf tooth, 105",
+   "A baby-tooth cap, 206",
+   "A wolf tooth, 205",
+   "A wolf tooth, 305",
+   "A canine tooth, 204"
+  ],
+  "answer": 2,
+  "explanation": "**Wolf teeth** are small first premolars. Many horses have them, usually in the upper jaw just in front of the cheek teeth — right where the bit can knock against them. In the Triadan system they're always **05**, and upper left is quadrant **2**, so this is **205**. (105 would be upper right and 305 lower left.) Canines (04) sit further forward in the gap between the front teeth and cheek teeth, and are mostly found in males.",
+  "key": "Wolf teeth are always number 05, and they can bother a horse with a bit in.",
+  "hint": "Upper left is quadrant 2. Wolf teeth have the number just before the cheek teeth start at 06."
+ },
+ {
+  "id": "caps",
+  "topic": "Young horses",
+  "difficulty": 2,
+  "patient": {
+   "name": "Sprout",
+   "desc": "3-year-old chestnut Arab",
+   "coat": "chestnut"
+  },
+  "stem": "Sprout has started quidding and chewing with his mouth slightly open. When you examine him, you find a thin shell of tooth sitting on top of one of his upper cheek teeth. It wobbles when you touch it.",
+  "lead": "What is this most likely to be?",
+  "options": [
+   "A lump of tartar (calculus)",
+   "A sharp enamel point that has snapped off",
+   "A cap — the worn-down remains of a baby tooth",
+   "A wolf tooth growing sideways",
+   "A fractured slab of an adult molar"
+  ],
+  "answer": 2,
+  "explanation": "Like children, horses have **deciduous** (baby) teeth. The baby premolars are pushed up by the adult teeth growing underneath, and their worn-down remains — called **caps** — are shed between about **2½ and 4½ years old**. A loose cap can be uncomfortable and cause quidding. Removing loose caps is one of the procedures a trained EDT can carry out.",
+  "key": "Caps are the remains of baby cheek teeth, shed between about 2½ and 4½ years old.",
+  "hint": "Sprout is only 3. What happens to young horses' teeth at this age — just like in children?"
+ },
+ {
+  "id": "eruption-bumps",
+  "topic": "Young horses",
+  "difficulty": 2,
+  "patient": {
+   "name": "Luna",
+   "desc": "3-year-old black Friesian filly",
+   "coat": "black"
+  },
+  "stem": "Luna's owner has found hard lumps along the underside of Luna's lower jaw, one on each side. They're firm, match each other, aren't hot and don't seem to hurt. Luna is eating well.",
+  "lead": "What is the most likely explanation?",
+  "options": [
+   "A fracture of the lower jaw",
+   "Tartar building up on the lower teeth",
+   "Eruption bumps from adult teeth developing in the jaw",
+   "Hooks on the last lower cheek teeth",
+   "Strangles abscesses in the throat glands"
+  ],
+  "answer": 2,
+  "explanation": "**Eruption bumps** are bony swellings caused by adult cheek teeth developing in the jaw beneath the baby teeth. They're common in 2–4-year-olds, are usually on both sides, and shrink as the adult teeth come through. Strangles abscesses are hot and painful and come with a fever. If a bump becomes painful, keeps growing or starts leaking pus, a vet needs to see it.",
+  "key": "A young horse with matching, painless lumps on the jaw: think eruption bumps.",
+  "hint": "Check the clues: young, both sides the same, not painful, eating well."
+ },
+ {
+  "id": "galvayne",
+  "topic": "Ageing by teeth",
+  "difficulty": 2,
+  "keepOrder": true,
+  "patient": {
+   "name": "Mystery",
+   "desc": "skewbald rescue pony, age unknown",
+   "coat": "skewbald"
+  },
+  "stem": "Mystery arrived at a rescue centre without a passport, and the staff ask you to estimate his age. On his upper corner incisors you see a brown groove that starts at the gum and runs about halfway down the tooth.",
+  "lead": "About how old is Mystery likely to be?",
+  "options": [
+   "About 5 years",
+   "About 10 years",
+   "About 15 years",
+   "About 20 years",
+   "About 30 years"
+  ],
+  "answer": 2,
+  "explanation": "This is **Galvayne's groove**. It appears at the gum at about **10 years**, reaches halfway down at about **15**, reaches the bottom at about **20**, then starts disappearing from the top and has usually gone by about **30**. It's only a rough guide — ageing horses by their teeth gets less accurate as they get older, which is one reason passports and microchips matter.",
+  "key": "Galvayne's groove appears at about 10, is halfway at 15, full length at 20 and gone by 30.",
+  "hint": "The groove appears at about age 10 and takes about 10 years to grow all the way down."
+ },
+ {
+  "id": "hooks",
+  "topic": "Dental problems",
+  "difficulty": 2,
+  "patient": {
+   "name": "Hector",
+   "desc": "12-year-old dun Highland pony",
+   "coat": "dun"
+  },
+  "stem": "Hector's lower jaw doesn't slide smoothly forwards and backwards when you move it. You find a tall overgrowth at the front of his upper first cheek tooth (06), and another at the back of his last lower cheek tooth (11).",
+  "lead": "What are these overgrowths called?",
+  "options": [
+   "Caps",
+   "Hooks",
+   "Ramps",
+   "Diastemata",
+   "Wave mouth"
+  ],
+  "answer": 1,
+  "explanation": "**Hooks** form because the upper row of cheek teeth usually sits slightly further forward than the lower row. The front of the upper 06s and the back of the lower 11s have nothing opposite to grind against, so they overgrow. Big hooks can stop the jaw sliding forwards and backwards naturally. (Ramps are overgrowths on the lower 06s, wave mouth is a wavy row of teeth, and diastemata are gaps between teeth.)",
+  "key": "The upper row sits further forward, so hooks form on the front of the upper 06s and the back of the lower 11s.",
+  "hint": "The upper and lower rows of cheek teeth don't line up exactly — the upper row sits a little further forward."
+ },
+ {
+  "id": "diastema",
+  "topic": "Dental problems",
+  "difficulty": 3,
+  "patient": {
+   "name": "Dotty",
+   "desc": "18-year-old spotted Appaloosa mare",
+   "coat": "spotted"
+  },
+  "stem": "Dotty is dropping food and tilting her head to one side while she eats. Between two of her lower cheek teeth you find a gap packed with smelly, rotting grass. The gum around it is red, swollen and bleeds easily.",
+  "lead": "What is the most likely diagnosis?",
+  "options": [
+   "A retained baby-tooth cap",
+   "An eruption bump",
+   "Sharp enamel points cutting the tongue",
+   "EOTRH of the incisors",
+   "A diastema with periodontal (gum) disease"
+  ],
+  "answer": 4,
+  "explanation": "A **diastema** is an abnormal gap between cheek teeth. Food gets trapped in it and rots, and bacteria damage the gum and the tissues holding the tooth in place — this is **periodontal disease** (*perio* = around, *dontal* = tooth). It's one of the most painful dental problems horses get. The gap needs cleaning out, and treatment is usually planned with the horse's vet.",
+  "key": "Food packed in a gap plus sore, bleeding gums: diastema with periodontal disease.",
+  "hint": "Gap + trapped food + angry gums. Which answer is about the tissues around the tooth?"
+ },
+ {
+  "id": "sinusitis",
+  "topic": "Dental problems",
+  "difficulty": 3,
+  "patient": {
+   "name": "Monty",
+   "desc": "13-year-old chestnut Welsh Cob",
+   "coat": "chestnut"
+  },
+  "stem": "For three weeks Monty has had thick, yellow, very smelly discharge from his **left** nostril only. He's bright, eating normally, and his temperature is normal.",
+  "lead": "What is the most likely cause?",
+  "options": [
+   "Strangles, a contagious infection of the throat glands",
+   "A loose wolf tooth rubbing on the bit",
+   "A sharp enamel point on one of the lower cheek teeth",
+   "An infected tooth root spreading into the sinus above it",
+   "A cold caught from another horse on the yard"
+  ],
+  "answer": 3,
+  "explanation": "The roots of the back upper cheek teeth sit inside the **maxillary sinuses** — air spaces in the horse's face. If one of those tooth roots becomes infected, the infection can spread into the sinus and cause a smelly discharge from **one** nostril, on the same side as the bad tooth. Strangles and colds usually cause discharge from both nostrils, often with a fever. Monty needs his **vet**, who may take X-rays or a CT scan. Knowing when to refer is a big part of being a good EDT.",
+  "key": "Smelly discharge from one nostril: think tooth root infection spreading into the sinus, and refer to the vet.",
+  "hint": "Only one nostril, and it smells bad. What sits right above the roots of the back upper cheek teeth?"
+ },
+ {
+  "id": "eotrh",
+  "topic": "Older horses",
+  "difficulty": 3,
+  "patient": {
+   "name": "Old Sam",
+   "desc": "24-year-old brown hunter",
+   "coat": "brown"
+  },
+  "stem": "Sam won't bite into apples or carrots any more. Above his front teeth (incisors) the gums are swollen and knobbly, with a couple of small holes leaking pus. His cheek teeth look fairly normal.",
+  "lead": "Which condition is most likely?",
+  "options": [
+   "A retained baby-tooth cap",
+   "Sharp enamel points on the cheek teeth",
+   "Eruption bumps from adult teeth coming through",
+   "EOTRH (Equine Odontoclastic Tooth Resorption and Hypercementosis)",
+   "A fractured wolf tooth"
+  ],
+  "answer": 3,
+  "explanation": "**EOTRH** is a painful condition of older horses (usually over 15) that affects the **incisors and canines**. The tooth roots are slowly eaten away (*resorption*) while lumpy extra cementum builds up around them (*hypercementosis*). The vet confirms it with X-rays and often removes the affected incisors. Horses usually feel much better afterwards — many graze happily without their front teeth!",
+  "key": "An old horse with sore, knobbly gums above the incisors: think EOTRH, and refer for vet X-rays.",
+  "hint": "Sam is old, and the trouble is at the front of his mouth. Eruption bumps happen in young horses."
+ },
+ {
+  "id": "smooth-mouth",
+  "topic": "Older horses",
+  "difficulty": 1,
+  "patient": {
+   "name": "Grandad",
+   "desc": "34-year-old black Shetland pony",
+   "coat": "black"
+  },
+  "stem": "Grandad is losing weight even though he has plenty of hay. His cheek teeth are worn very short, some are smooth and flat, and a few have worn right down to the gum.",
+  "lead": "After a vet check to rule out other causes of weight loss, what's the most helpful advice for his owner?",
+  "options": [
+   "Switch to soaked, easy-to-chew fibre such as a hay-replacer mash",
+   "Wait a few months for his worn teeth to grow back",
+   "Rasp his cheek teeth to make them sharper for grinding",
+   "Give him extra long hay so he has more to chew on",
+   "Feed him only carrots and apples from now on"
+  ],
+  "answer": 0,
+  "explanation": "Very old horses can run out of spare tooth: their teeth have **expired**, with nothing left to erupt. Smooth, worn-down teeth can't grind long hay properly, so the horse loses weight even with a full hay net. **Soaked fibre mashes** (such as soaked hay replacers or short-chopped fibre) give him the fibre he needs without heavy chewing. The vet check matters too — old horses can lose weight for lots of other reasons.",
+  "key": "Expired teeth can't grind hay, so switch to soaked fibre mashes.",
+  "hint": "Grandad's teeth can't grind any more. Which food doesn't need much grinding but still gives him fibre?"
+ },
+ {
+  "id": "speculum",
+  "topic": "Equipment",
+  "difficulty": 1,
+  "patient": {
+   "name": "Clover",
+   "desc": "8-year-old strawberry roan cob",
+   "coat": "roan"
+  },
+  "stem": "It's time for Clover's yearly dental check. You want to see and feel every tooth, right to the very back of her mouth, safely.",
+  "lead": "What is the best way to do this?",
+  "options": [
+   "Hold her tongue out to one side and peek in with a torch",
+   "Listen to her chewing with a stethoscope held against her cheek",
+   "Skip looking and take X-rays of her whole head instead",
+   "Check her front teeth only, as problems at the back are rare",
+   "Rinse her mouth, fit a full-mouth speculum, then use a head torch and mirror"
+  ],
+  "answer": 4,
+  "explanation": "A **full-mouth speculum** holds the mouth safely open so you can see and feel all the cheek teeth — without one you'd only glimpse the front, and you could get your fingers crushed. First you rinse the mouth with water to wash out food, then use a **head torch** and **dental mirror** to see right to the back. X-rays are useful extras, but they don't replace a proper look and feel. And problems at the back are common, not rare!",
+  "key": "Rinse, speculum, light and mirror — then look and feel.",
+  "hint": "Horse mouths are long and dark, and their cheek teeth are strong enough to crush fingers."
+ },
+ {
+  "id": "motorised-heat",
+  "topic": "Equipment",
+  "difficulty": 2,
+  "patient": {
+   "name": "Maverick",
+   "desc": "10-year-old grey ex-racehorse",
+   "coat": "grey"
+  },
+  "stem": "Maverick has some large overgrowths. As a Category 2 EDT, you're using a motorised (power) dental tool to reduce them, while his vet keeps him sedated.",
+  "lead": "Why should you work in short bursts and only remove as much tooth as you need to?",
+  "options": [
+   "To avoid overheating the tooth or exposing the living pulp inside",
+   "To make the battery last for the rest of the day's horses",
+   "Because power tools are only safe to use on the front teeth",
+   "Because horse teeth grow back overnight, so there's no point",
+   "To stop Maverick waking up from his sedation too early"
+  ],
+  "answer": 0,
+  "explanation": "Inside every tooth is the **pulp** — living tissue with nerves and blood vessels. Power tools create friction **heat**, which can damage the pulp, and taking off too much tooth can **expose** it. Either can kill the tooth and lead to pain or infection. Good EDTs use short bursts, keep the tooth cool, and remove only what's needed.",
+  "key": "With power tools: short bursts, keep it cool, don't over-reduce — protect the pulp.",
+  "hint": "What's alive inside a tooth, and what does friction make?"
+ },
+ {
+  "id": "wolf-tooth-vet",
+  "topic": "Rules and safety",
+  "difficulty": 2,
+  "patient": {
+   "name": "Jigsaw",
+   "desc": "5-year-old palomino gelding",
+   "coat": "palomino"
+  },
+  "stem": "You're now a qualified Category 2 EDT. Jigsaw has a wolf tooth that has fully come through the gum and is in the normal position. His owner would like it removed.",
+  "lead": "Under the UK rules, how should this be done?",
+  "options": [
+   "It can't be done — wolf teeth must never be removed",
+   "With a vet there throughout, who gives the sedation and pain relief",
+   "By you, using sedative left over from another horse on the yard",
+   "By the farrier, while Jigsaw is being shod",
+   "By you alone — wolf teeth are tiny, so no sedation is needed"
+  ],
+  "answer": 1,
+  "explanation": "Removing a wolf tooth that has **erupted normally** is a **Category 2** procedure, but only under **direct and continuous veterinary supervision**. The vet gives the sedation and pain relief and stays for the aftercare. Sedatives are veterinary medicines, and medicine prescribed for one horse must never be used on another. EDTs and vets work as a team.",
+  "key": "Wolf tooth removal needs a vet there throughout, to sedate, give pain relief and handle aftercare.",
+  "hint": "Sedatives are veterinary medicines. Who is allowed to give them?"
+ },
+ {
+  "id": "cat2-scope",
+  "topic": "Rules and safety",
+  "difficulty": 3,
+  "patient": {
+   "name": "Tinsel",
+   "desc": "7-year-old cremello show pony",
+   "coat": "cremello"
+  },
+  "stem": "Congratulations — you've passed your approved exam and qualified as a Category 2 Equine Dental Technician! Your friend is a Category 1 trainee: she has done the training but hasn't taken the exam yet. You're both working on Tinsel today.",
+  "lead": "Which of these jobs can you now do that your Category 1 friend cannot?",
+  "options": [
+   "Extract a diseased cheek tooth that's firmly attached",
+   "Scrape tartar off the teeth above the gum line",
+   "Remove a loose baby-tooth cap",
+   "Remove sharp enamel points with hand rasps",
+   "Use a power tool to remove sharp enamel points"
+  ],
+  "answer": 4,
+  "explanation": "In the UK, horse dental procedures are sorted into three categories. **Category 1** (after recognised training) includes examining teeth, hand-rasping sharp points, removing loose caps and removing tartar. **Category 2** (after passing an approved exam) adds jobs such as using **power tools** on overgrowths and sharp points, removing loose teeth or fragments, and removing wolf teeth with a vet present. **Category 3** is everything else — like extracting a firmly attached diseased tooth — and is for **vets only**.",
+  "key": "Category 1 is hand tools, Category 2 adds power tools and more, and Category 3 is vets only.",
+  "hint": "One answer is a vets-only job. Of the others, which one needs special equipment?"
+ },
+ {
+  "id": "halitosis",
+  "topic": "Spotting problems",
+  "difficulty": 1,
+  "patient": {
+   "name": "Willow",
+   "desc": "16-year-old bay mare",
+   "coat": "bay"
+  },
+  "stem": "Willow's owner says her breath has started to smell horrible — “like a compost heap” — and she tilts her head to one side while she eats.",
+  "lead": "What does really bad breath usually mean in a horse?",
+  "options": [
+   "She has been eating too much spring grass",
+   "Food is rotting somewhere it shouldn't be, such as in a gap or under a sore gum",
+   "She has a cold, and it will clear up in a week",
+   "Her stomach is empty and she needs more hard feed",
+   "Nothing — horses' breath always smells strong"
+  ],
+  "answer": 1,
+  "explanation": "A healthy horse's breath smells of grass, not rot. A truly foul smell means food is **trapped and decaying** — in a gap between teeth, under an inflamed gum, or around a dead or infected tooth. Add the head tilt, which says one spot in particular hurts, and Willow needs a full examination with a speculum to find it.",
+  "key": "Foul breath means rotting food or infection somewhere in the mouth. Always go and look.",
+  "hint": "Think what a heap of old grass smells like after a week in the rain. Where could that be happening?"
+ },
+ {
+  "id": "choke",
+  "topic": "Spotting problems",
+  "difficulty": 2,
+  "patient": {
+   "name": "Tango",
+   "desc": "14-year-old chestnut gelding",
+   "coat": "chestnut"
+  },
+  "stem": "Tango has bolted his dry feed. Now he's standing with his neck stretched out, coughing, and green slime mixed with saliva is coming down **both** nostrils. He looks distressed, but he isn't rolling and he can breathe.",
+  "lead": "What should happen next?",
+  "options": [
+   "Trot him round the school to shake the blockage loose",
+   "Offer him a big bucket of water to wash the blockage down",
+   "Take away his food and water and call the vet straight away — this is choke",
+   "Rasp his sharp enamel points now, so he can chew properly",
+   "Leave him — horses always clear it themselves within a day"
+  ],
+  "answer": 2,
+  "explanation": "**Choke** in a horse is food stuck in the **oesophagus** (the gullet), not the windpipe — which is why he can still breathe. The giveaway is food and saliva coming back down **both** nostrils. It's an emergency, because he can breathe fluid into his lungs. Remove all food and water and call the vet. Poor chewing is one cause, so once the choke has settled he needs his teeth checked.",
+  "key": "Food and saliva down both nostrils after feeding means choke: remove feed and water, call the vet.",
+  "hint": "His gullet is already blocked. Would sending more food or water down it help?"
+ },
+ {
+  "id": "jaw-abscess",
+  "topic": "Spotting problems",
+  "difficulty": 3,
+  "patient": {
+   "name": "Hercules",
+   "desc": "9-year-old dun cob",
+   "coat": "dun"
+  },
+  "stem": "Hercules has a firm swelling on the underside of his lower jaw, on the left side only. It's hot, he flinches when you touch it, and there's a small hole in the skin leaking pus.",
+  "lead": "What is the most likely cause?",
+  "options": [
+   "A bruise from knocking his jaw on the stable door",
+   "An infected tooth root in the lower jaw, draining out through the skin",
+   "Eruption bumps from adult teeth pushing through",
+   "A sharp enamel point on the upper cheek teeth above it",
+   "Tartar built up around his lower canine teeth"
+  ],
+  "answer": 1,
+  "explanation": "A hole in the skin leaking pus is a **draining tract**. Infection at the root of a lower cheek tooth builds up inside the jaw bone and eventually finds its way out through the skin. Eruption bumps are the opposite picture: young horse, both sides, painless. Hercules is 9, and his swelling is one-sided, hot, sore and discharging. This is a **vet** job — X-rays, and usually the tooth has to come out, which is Category 3.",
+  "key": "One-sided, painful, pus-leaking jaw swelling means an infected tooth root. Refer to the vet.",
+  "hint": "Harmless growing bumps are painless and come in matching pairs. How many of those boxes does Hercules tick?"
+ },
+ {
+  "id": "saliva-buffer",
+  "topic": "Feeding",
+  "difficulty": 3,
+  "patient": {
+   "name": "Barley",
+   "desc": "7-year-old liver chestnut gelding",
+   "coat": "liver"
+  },
+  "stem": "Barley's mouth is sore, so he's chewing far less than usual. His vet is worried about his stomach as well as his teeth. Horses only make saliva while they are actually chewing.",
+  "lead": "Why does chewing less put his stomach at risk?",
+  "options": [
+   "Saliva is how his body stores its water",
+   "Saliva neutralises stomach acid, and his stomach makes acid all the time",
+   "Saliva kills the worms that live in his stomach",
+   "Saliva makes his stomach empty faster",
+   "Saliva carries the fibre his stomach needs to work"
+  ],
+  "answer": 1,
+  "explanation": "Unlike us, a horse makes saliva **only while chewing** — and horse saliva is full of **bicarbonate**, which is an antacid. Meanwhile his stomach trickles out acid **all day and all night**, because it evolved for an animal that grazes for 16 hours. Less chewing means less buffering, which is one reason horses with painful teeth get **gastric ulcers**. Teeth, chewing and gut health are all one system.",
+  "key": "Chewing makes saliva, and saliva buffers the acid a horse's stomach produces non-stop.",
+  "hint": "What do people take for heartburn? Horses make their own version, but only while they chew."
+ },
+ {
+  "id": "colic-fibre",
+  "topic": "Feeding",
+  "difficulty": 2,
+  "patient": {
+   "name": "Flossie",
+   "desc": "22-year-old strawberry roan mare",
+   "coat": "roan"
+  },
+  "stem": "Flossie's teeth haven't been checked for five years. Her droppings are full of long, barely chewed lengths of hay, and last month the vet treated her for an impaction colic.",
+  "lead": "How does poor chewing lead to an impaction?",
+  "options": [
+   "Long, poorly chewed fibre travels badly and can pack together into a blockage",
+   "Chewing is what pushes food along the whole length of the gut",
+   "It doesn't — teeth and colic have nothing to do with each other",
+   "Unchewed hay turns to gas the moment it reaches the stomach",
+   "Poor chewing makes a horse drink far too much water"
+  ],
+  "answer": 0,
+  "explanation": "Chewing chops fibre short and mixes it with saliva. Long, dry, poorly chewed lengths travel badly and can pack together where the gut narrows — an **impaction**. Whole strands of hay in the droppings are a warning sign you can spot from outside the horse. Any horse that has had an impaction colic should have its teeth checked.",
+  "key": "Long fibre in the droppings is a chewing problem, and poor chewing raises the risk of impaction colic.",
+  "hint": "Think about what blocks a plughole: small bits, or long tangled strands?"
+ },
+ {
+  "id": "silica",
+  "topic": "Horse biology",
+  "difficulty": 2,
+  "patient": {
+   "name": "Twiglet",
+   "desc": "8-year-old skewbald pony",
+   "coat": "skewbald"
+  },
+  "stem": "Twiglet's young owner asks why horses need such enormous teeth when people manage perfectly well with small ones. You explain that grass is far harder on teeth than it looks.",
+  "lead": "What is it about grass that wears horses' teeth down so fast?",
+  "options": [
+   "Grass contains gritty particles of silica, and grazing horses swallow soil and sand with it",
+   "Grass is acidic and dissolves enamel while it's being chewed",
+   "Grass has no water in it, so chewing it creates friction",
+   "Grass is full of sugar, which rots horse teeth the way it rots ours",
+   "Grass freezes for much of the year, and the cold cracks teeth"
+  ],
+  "answer": 0,
+  "explanation": "Grasses build **silica** — the same mineral as sand and glass — into their leaves, partly as a defence against being eaten. Grazing horses pick up soil and grit along with it. Grinding that for 16 hours a day wears teeth away fast, which is why horses evolved **hypsodont** teeth with an enormous reserve of spare tooth buried in the jaw. Curiously, horses almost never get the sugar-caused cavities that we do.",
+  "key": "Grass contains gritty silica, which is why horses evolved teeth with so much spare length.",
+  "hint": "What is sand made of? And what would chewing sand all day do to your own teeth?"
+ },
+ {
+  "id": "dental-pad",
+  "topic": "Horse biology",
+  "difficulty": 2,
+  "patient": {
+   "name": "Bluebell",
+   "desc": "12-year-old bay pony",
+   "coat": "bay"
+  },
+  "stem": "Bluebell shares her field with the farm's cattle. Her owner has noticed that the grass where the horses graze is cropped far shorter than the grass where the cows graze.",
+  "lead": "Which difference in their mouths best explains this?",
+  "options": [
+   "Horses have longer tongues, so they can reach further down",
+   "Cows have no upper incisors, just a tough pad, while horses have upper and lower incisors that meet",
+   "Cows have four stomachs, so they need to eat less grass",
+   "Cows have no teeth at all and swallow grass whole",
+   "Horses use their canine teeth to cut the grass off short"
+  ],
+  "answer": 1,
+  "explanation": "Cattle and sheep have a **dental pad** where their upper front teeth would be: they wrap their tongue round a clump of grass and tear it off. A horse has incisors **top and bottom** that meet like scissor blades, so it can nip grass right down to the roots. That's why horses can graze a paddock bare — and why they swallow more soil and grit than cattle do, which wears their teeth faster.",
+  "key": "Horses have upper and lower incisors that meet, so they graze far closer than cattle can.",
+  "hint": "Try biting something using only your bottom teeth. What would you have to do instead?"
+ },
+ {
+  "id": "brachydont",
+  "topic": "Horse biology",
+  "difficulty": 2,
+  "patient": {
+   "name": "Socks",
+   "desc": "10-year-old piebald pony",
+   "coat": "piebald"
+  },
+  "stem": "You've explained to Socks's owner that his cheek teeth keep erupting throughout his life. She asks why her own teeth don't do the same thing.",
+  "lead": "What is the main difference between human teeth and horse cheek teeth?",
+  "options": [
+   "Human teeth are hypsodont too, just very much slower",
+   "Human teeth have no enamel, so they simply wear away instead of erupting",
+   "Human teeth are made of bone rather than enamel and dentine",
+   "Human teeth are brachydont: short-crowned, fully erupted, and finished once they're through",
+   "Humans grow a whole new set of teeth roughly every ten years"
+  ],
+  "answer": 3,
+  "explanation": "**Brachydont** means “short tooth” — ours, and a dog's. They erupt fully, form roots, and then stay put for life. **Hypsodont** means “high tooth” — a horse's cheek teeth and incisors — with a long **reserve crown** buried in the jaw that keeps pushing up to replace what's ground away. A horse's diet would wear our teeth to stumps within a few years.",
+  "key": "Our teeth are brachydont and finished; horse cheek teeth are hypsodont and keep erupting.",
+  "hint": "One of those words means “high tooth” and one means “short tooth”. Which kind are you eating your dinner with?"
+ },
+ {
+  "id": "bars",
+  "topic": "Anatomy",
+  "difficulty": 1,
+  "patient": {
+   "name": "Merlin",
+   "desc": "6-year-old black gelding",
+   "coat": "black"
+  },
+  "stem": "Merlin is being fitted with his first bit. On each side of his lower jaw, between his front teeth and his cheek teeth, there's a long stretch of gum with no teeth in it at all.",
+  "lead": "What is this space called, and what is it for?",
+  "options": [
+   "The infundibulum — where food is held while it's being chewed",
+   "The occlusal surface — the part of the tooth that grinds the food",
+   "A diastema — an abnormal gap that always needs treating",
+   "The wolf tooth space — a gap that always has a hidden tooth in it",
+   "The bars, or interdental space — the toothless gum where the bit rests"
+  ],
+  "answer": 4,
+  "explanation": "Every horse has a natural toothless gap between the front teeth and the cheek teeth: the **interdental space**, usually called **the bars**. The bit sits here, on thin gum over bone, which is why a badly fitted bit hurts and why a **wolf tooth** at the back of this space causes so much trouble. A **diastema** is a different thing altogether: an abnormal gap **between** cheek teeth.",
+  "key": "The bars are the normal toothless gap where the bit sits; a diastema is an abnormal gap between cheek teeth.",
+  "hint": "Two answers describe gaps. Only one of them is a gap that every healthy horse has."
+ },
+ {
+  "id": "occlusal-angle",
+  "topic": "Anatomy",
+  "difficulty": 3,
+  "patient": {
+   "name": "Rusty",
+   "desc": "13-year-old chestnut gelding",
+   "coat": "chestnut"
+  },
+  "stem": "Looking at Rusty's cheek teeth from the front, the grinding surfaces are not flat. They slope, so the upper and lower rows meet at an angle of roughly 10 to 15 degrees. An over-enthusiastic rasper could flatten that slope right out.",
+  "lead": "Why would flattening the angle be bad for Rusty?",
+  "options": [
+   "It wouldn't matter — the angle grows back within a week",
+   "The slope is what lets the rows shear past each other, so a flat table grinds far less well",
+   "Flat teeth would make it easier for him to bite people",
+   "A flat surface would stop his teeth erupting altogether",
+   "The slope is what holds the bit steady in his mouth"
+  ],
+  "answer": 1,
+  "explanation": "A horse chews in a sideways sweep, and the sloping surfaces — the **occlusal angle** — shear past each other like the blades of a pair of scissors. Flatten the slope and you've turned a grinder into two flat boards: chewing gets less efficient, and normal wear takes a very long time to restore the angle. This is why good EDTs take off as little tooth as they can. **Less is more.**",
+  "key": "Cheek teeth meet at a slope of about 10 to 15 degrees, and that slope is what makes grinding work.",
+  "hint": "Compare how scissor blades cut with what happens when you press two flat boards together."
+ },
+ {
+  "id": "canines",
+  "topic": "Anatomy",
+  "difficulty": 2,
+  "patient": {
+   "name": "Nelson",
+   "desc": "7-year-old brown gelding",
+   "coat": "brown"
+  },
+  "stem": "Nelson has four pointed teeth sitting in the gap between his front teeth and his cheek teeth. Maisie, a mare in the next stable and exactly the same age, has none at all.",
+  "lead": "What are these teeth, and why doesn't Maisie have them?",
+  "options": [
+   "Wolf teeth — mares shed theirs while they are still foals",
+   "Extra incisors, which only geldings grow",
+   "First cheek teeth, which sit further forward in males",
+   "Canines, or tushes — they erupt at about 4 to 5 years and are mostly found in male horses",
+   "Baby-tooth caps, which Maisie has already shed"
+  ],
+  "answer": 3,
+  "explanation": "**Canines**, also called tushes, erupt at about **4 to 5 years**. Most male horses have four; only a minority of mares grow them, and when they do they're often small. They're leftover fighting teeth from wild stallions and are no use at all for chewing. Because they sit near the front of the interdental space, a long sharp canine — or tartar built up on one — can catch on the bit or on a rider's hand.",
+  "key": "Canines erupt at about 4 to 5 years and are mostly found in male horses.",
+  "hint": "These are fighting teeth, not chewing teeth. In a wild herd, which horses would be doing the fighting?"
+ },
+ {
+  "id": "triadan-409",
+  "topic": "Triadan numbers",
+  "difficulty": 3,
+  "patient": {
+   "name": "Domino",
+   "desc": "15-year-old piebald cob",
+   "coat": "piebald"
+  },
+  "stem": "Your notes on Domino read: “409 — large overgrowth, referred to vet.” Remember that the quadrants run 1 upper right, 2 upper left, 3 lower left, 4 lower right, and that 09 is always the first molar.",
+  "lead": "Which tooth is 409?",
+  "options": [
+   "The upper right first molar",
+   "The lower right first molar",
+   "The lower right ninth incisor",
+   "The lower right canine",
+   "The lower left first molar"
+  ],
+  "answer": 1,
+  "explanation": "Quadrant **4** is the **lower right**, and **09** is always the **first molar** — the fourth tooth along the cheek tooth row, because 06, 07 and 08 are the premolars. No horse has nine incisors, and the canine is always **04**. Once you know the two rules — quadrants run clockwise starting at the horse's upper right, and the last two digits count back from the middle front tooth — you can name any tooth in the mouth.",
+  "key": "Quadrant 4 is lower right and 09 is always the first molar. Two rules name every tooth.",
+  "hint": "Count along the cheek teeth: 06, 07 and 08 are the premolars. What comes next?"
+ },
+ {
+  "id": "triadan-101",
+  "topic": "Triadan numbers",
+  "difficulty": 2,
+  "patient": {
+   "name": "Saffron",
+   "desc": "5-year-old palomino mare",
+   "coat": "palomino"
+  },
+  "stem": "You're charting Saffron's front teeth. She has six incisors in her upper jaw and six in her lower jaw, and they've all come through.",
+  "lead": "Which tooth is 101?",
+  "options": [
+   "The corner incisor at the outer edge of the upper right",
+   "The central incisor at the very front of the lower left",
+   "The wolf tooth on the upper right",
+   "The first cheek tooth on the upper right",
+   "The central incisor at the very front of the upper right"
+  ],
+  "answer": 4,
+  "explanation": "The last two digits count **outwards from the middle of the mouth**: 01 is the central incisor, 02 the middle incisor and 03 the corner incisor. Quadrant **1** is the **upper right**. So 101 is the upper right central incisor, and the tooth touching it across the midline is 201. Cheek teeth don't begin until 06, and the wolf tooth is 05.",
+  "key": "01 is always the central incisor, counting outwards from the middle of the mouth.",
+  "hint": "The counting starts in the middle of the mouth and works outwards. So where must number 01 be?"
+ },
+ {
+  "id": "incisor-eruption",
+  "topic": "Young horses",
+  "difficulty": 3,
+  "patient": {
+   "name": "Archie",
+   "desc": "bay gelding, age disputed",
+   "coat": "bay"
+  },
+  "stem": "A dealer says Archie is “rising four”. You look at his front teeth: all six upper and six lower incisors are permanent adult teeth, and all of them are in wear.",
+  "lead": "What does that tell you about his age?",
+  "options": [
+   "Nothing at all — horses are born with their adult incisors",
+   "He's exactly 4 — the full set of adult incisors appears at 4",
+   "He's under 3, so those must still be baby teeth",
+   "He's at least 5 — the corner incisors are the last to arrive, at about 4½",
+   "He's at least 8 — adult incisors don't finish erupting until then"
+  ],
+  "answer": 3,
+  "explanation": "Permanent incisors arrive in pairs: **centrals at about 2½, middles at about 3½, corners at about 4½**. A horse with all twelve permanent incisors up and in wear has a **full mouth** and is **5 or over**. So Archie is older than the dealer says. This is exactly why people have always looked in a horse's mouth before handing over any money.",
+  "key": "Centrals at 2½, middles at 3½, corners at 4½. A full mouth means 5 years old.",
+  "hint": "Count up in years from 2½. Which pair comes through last, and how old is he by the time they're worn?"
+ },
+ {
+  "id": "first-check",
+  "topic": "Young horses",
+  "difficulty": 2,
+  "patient": {
+   "name": "Peanut",
+   "desc": "2-year-old cremello colt",
+   "coat": "cremello"
+  },
+  "stem": "Peanut is 2 years old and will be backed and bitted next year. His owner asks when he should have his first proper dental check.",
+  "lead": "What is the best advice?",
+  "options": [
+   "Every ten years, the way some vaccinations are boosted",
+   "Never, unless a vet specifically asks for it",
+   "Once he's 5 and has a full mouth of adult teeth",
+   "Only if he starts quidding or losing weight",
+   "Now, and again before he's bitted, then about every six months while he's shedding caps"
+  ],
+  "answer": 4,
+  "explanation": "Between about 2½ and 4½ a young horse sheds **24 baby teeth** while more than 36 adult teeth push through underneath. It's the busiest few years of his mouth's life, so **six-monthly** checks are usually advised right through it. A check before bitting catches sharp points and wolf teeth **before** he learns that a bit hurts — waiting for symptoms means waiting for pain.",
+  "key": "Young horses need checking roughly every six months while they shed caps, and before they are bitted.",
+  "hint": "Between 2½ and 4½ his mouth is busier than it will ever be again. Also: is it better to find pain, or prevent it?"
+ },
+ {
+  "id": "dental-star",
+  "topic": "Ageing by teeth",
+  "difficulty": 3,
+  "patient": {
+   "name": "Winnie",
+   "desc": "12-year-old dapple grey mare",
+   "coat": "dapple"
+  },
+  "stem": "On the chewing surface of Winnie's front teeth, a dark brown mark has appeared in front of the enamel cup, running across the tooth.",
+  "lead": "What is this mark, and what makes it?",
+  "options": [
+   "The cup, which only appears once a horse is older",
+   "A crack running through the enamel",
+   "Trapped food staining the chewing surface",
+   "A filling put in by a previous dentist",
+   "The dental star — secondary dentine the tooth lays down to protect its pulp as it wears"
+  ],
+  "answer": 4,
+  "explanation": "As an incisor wears down, it would eventually expose the living **pulp** inside — so the tooth defends itself by laying down **secondary dentine** beneath. When the surface wears into that dentine it shows as the **dental star**: first a line, later a round mark in the middle of the tooth. The **cup** goes the other way, wearing away as the horse ages. Together they help estimate age, though only roughly.",
+  "key": "The dental star is secondary dentine protecting the pulp. Cups wear away as stars appear.",
+  "hint": "The tooth is slowly wearing down towards something living. What might it build underneath as a shield?"
+ },
+ {
+  "id": "incisor-shape",
+  "topic": "Ageing by teeth",
+  "difficulty": 2,
+  "patient": {
+   "name": "Bandit",
+   "desc": "brown gelding, no passport",
+   "coat": "brown"
+  },
+  "stem": "You compare the chewing surfaces of the front teeth in two horses. In the younger one they are wide, flat ovals. In Bandit they are much narrower and clearly triangular.",
+  "lead": "What does the difference in shape tell you?",
+  "options": [
+   "The shape is set at birth and tells you the horse's breed",
+   "Teeth become narrower and more triangular as they wear down, so Bandit is the older horse",
+   "Triangular teeth mean the horse has gum disease",
+   "Triangular teeth are a sign that a horse has been crib-biting",
+   "Teeth get wider and rounder with age, so Bandit is the younger horse"
+  ],
+  "answer": 1,
+  "explanation": "An incisor is not the same shape all the way down. Near the top it's a wide oval; deeper into the jaw it narrows and becomes triangular. As the horse grinds the tooth away, the surface you can see moves further down it, so the shape runs **oval → round → triangular → narrow oval**. Put that together with the incisor angle, which gets more sloped with age, and you have another rough guide.",
+  "key": "Incisor chewing surfaces run oval, then round, then triangular as the horse ages.",
+  "hint": "You're looking at a slice through the tooth, further down it each year. Is a tooth the same shape all the way down?"
+ },
+ {
+  "id": "crib-biter",
+  "topic": "Ageing by teeth",
+  "difficulty": 3,
+  "patient": {
+   "name": "Jester",
+   "desc": "7-year-old chestnut gelding",
+   "coat": "chestnut"
+  },
+  "stem": "Jester's passport says he is 7. But his front teeth are worn short and flat, and a visiting student guesses from them that he must be over 20. He spends hours gripping the top of his stable door with his front teeth and gulping air.",
+  "lead": "Why do his teeth look so much older than he is?",
+  "options": [
+   "Crib-biting makes teeth erupt much faster than normal",
+   "Chestnut horses are born with softer enamel than other colours",
+   "His passport must be wrong, because teeth never lie",
+   "The air he swallows while cribbing dissolves the enamel",
+   "Crib-biting grinds the incisors down, so they look far older than the horse really is"
+  ],
+  "answer": 4,
+  "explanation": "**Crib-biting** is a stereotypy: the horse grips a solid edge with its incisors and gulps air. All that gripping wears the front teeth abnormally fast, so ageing him from his teeth gives a wildly wrong answer. It's a useful reminder that dental ageing is an **estimate**. Diet, sandy soil, crib-biting and plain individual variation all shift it. Passports and microchips are the reliable record.",
+  "key": "Ageing by teeth is only an estimate — habits like crib-biting can make a young horse look ancient.",
+  "hint": "Look at what he does to that stable door all day. What would doing that do to your own front teeth?"
+ },
+ {
+  "id": "wave-mouth",
+  "topic": "Dental problems",
+  "difficulty": 2,
+  "patient": {
+   "name": "Gus",
+   "desc": "20-year-old bay gelding",
+   "coat": "bay"
+  },
+  "stem": "Looking along Gus's cheek teeth from the side, the row isn't a level line. It rises and dips like a wave, with one tall tooth and a dip on either side of it.",
+  "lead": "What is the safest way to treat this?",
+  "options": [
+   "Reduce the overgrowths a little at a time, over several visits",
+   "Leave it entirely alone, because wave mouth never causes problems",
+   "Rasp the whole row level in one session so he can chew properly tonight",
+   "Extract the tall teeth so that the row is even",
+   "Feed only hard feed from now on, so the shape of the row stops mattering"
+  ],
+  "answer": 0,
+  "explanation": "**Wave mouth** builds up over years, usually from uneven wear or a missing tooth. Those tall teeth are living teeth with **pulp** inside them, so taking a lot off in one session risks exposing and killing the pulp. Overgrowths are reduced **gradually**, often six months apart, letting the teeth erupt and settle between visits. Big reductions and extractions belong to the vet in any case.",
+  "key": "Wave mouth is corrected slowly across several visits, never all in one go.",
+  "hint": "There is living tissue inside those tall teeth. What does that tell you about how much you can take off at once?"
+ },
+ {
+  "id": "step-mouth",
+  "topic": "Dental problems",
+  "difficulty": 3,
+  "patient": {
+   "name": "Elvis",
+   "desc": "18-year-old black cob",
+   "coat": "black"
+  },
+  "stem": "Elvis lost one lower cheek tooth to an infection two years ago. Today you find that the tooth **above** the gap has grown right down into the space, so far that his jaw can barely slide sideways.",
+  "lead": "Why has that tooth overgrown?",
+  "options": [
+   "The gap filled with packed food, which pushed the tooth downwards",
+   "Losing a tooth makes the remaining teeth grow faster to make up for it",
+   "With nothing opposite to grind against, it simply kept on erupting",
+   "Teeth next to an infection always grow towards the gap",
+   "It isn't overgrown — the jaw has shrunk around it"
+  ],
+  "answer": 2,
+  "explanation": "Horse teeth erupt steadily whether or not anything is wearing them down. Take away the opposing tooth and there's nothing to grind against, so the tooth above the gap keeps coming and forms a **step**. That's why a horse that has lost a tooth needs **lifelong, regular** checks: the overgrowth has to be kept back, a little at a time, for the rest of its life.",
+  "key": "A tooth with nothing opposite it keeps erupting into a step, so gaps need lifelong monitoring.",
+  "hint": "What normally stops a horse's tooth getting longer and longer? And what's missing here?"
+ },
+ {
+  "id": "fractured-tooth",
+  "topic": "Dental problems",
+  "difficulty": 3,
+  "patient": {
+   "name": "Wilbur",
+   "desc": "11-year-old bay gelding",
+   "coat": "bay"
+  },
+  "stem": "A slab has split away from one of Wilbur's cheek teeth. The sharp edge left behind is cutting his cheek, but the rest of the tooth is still firmly attached in the jaw.",
+  "lead": "As a Category 2 EDT, what can you do?",
+  "options": [
+   "Nothing at all, and say nothing to the owner about it",
+   "Extract the whole tooth yourself, since broken teeth are Category 2",
+   "Sedate him yourself and take the loose slab out",
+   "Smooth the sharp edges of the fractured and neighbouring teeth to make him comfortable, and refer him to the vet",
+   "Rasp every tooth in his mouth completely flat so that nothing is sharp"
+  ],
+  "answer": 3,
+  "explanation": "**Palliative rasping of fractured and adjacent teeth** is on the Category 2 list, so you can take the sharp edges off and stop it cutting him. But extracting a tooth that is still **firmly attached** is **Category 3** — vets only. (A loose fragment with almost no attachment left would be a different matter, and Category 2.) *Palliative* means making something more comfortable rather than curing it, which is exactly the job here.",
+  "key": "You can smooth a fractured tooth to make a horse comfortable, but a firmly attached tooth is the vet's to extract.",
+  "hint": "“Palliative” means making someone comfortable rather than curing them. Which answer does only that?"
+ },
+ {
+  "id": "parrot-mouth",
+  "topic": "Dental problems",
+  "difficulty": 2,
+  "patient": {
+   "name": "Tilly",
+   "desc": "3-year-old palomino filly",
+   "coat": "palomino"
+  },
+  "stem": "Tilly's upper jaw is noticeably longer than her lower jaw, so her top front teeth overhang the bottom ones instead of meeting them. Her owner is thinking about breeding from her one day.",
+  "lead": "What is this, and what advice matters most?",
+  "options": [
+   "A normal variation that needs no attention at all",
+   "A fractured jaw that needs surgery straight away",
+   "Parrot mouth — it's caused by eating from a high haynet, and it will correct itself",
+   "Parrot mouth — it's inherited, so breeding from her isn't advised, and she'll need dental care for life",
+   "Wave mouth — it will settle once she has finished teething"
+  ],
+  "answer": 3,
+  "explanation": "**Parrot mouth** (also called overjet, or brachygnathism) is a conformational fault the horse is born with, and it runs in families — which is why breeding from an affected horse is discouraged. Because the rows don't line up, the front of her upper 06s and the back of her lower 11s have nothing to grind against, so she will grow **hooks** and needs regular dental care all her life.",
+  "key": "Parrot mouth is inherited, causes hooks, and means lifelong dental care.",
+  "hint": "Her jaws were already like this the day she was born. What does that suggest about her future foals?"
+ },
+ {
+  "id": "calculus",
+  "topic": "Dental problems",
+  "difficulty": 2,
+  "patient": {
+   "name": "Marmite",
+   "desc": "14-year-old black gelding",
+   "coat": "black"
+  },
+  "stem": "Thick brown-yellow crusts have built up around Marmite's lower canine teeth, right where the gum meets the tooth. The gum underneath looks red and unhappy.",
+  "lead": "What is this, and who is allowed to remove it?",
+  "options": [
+   "An enamel overgrowth, needing a power tool and a Category 2 EDT",
+   "Calculus, or tartar — taking it off above the gum line is a Category 1 procedure",
+   "Trapped food, which will wash away on its own",
+   "Calculus — only a vet may ever remove it",
+   "Secondary dentine, which must always be left alone"
+  ],
+  "answer": 1,
+  "explanation": "**Calculus**, or tartar, is plaque that has hardened. It builds up most on the **lower canines** because salivary ducts open nearby. It irritates the gum, so it's scaled off. Removing **supragingival** calculus — the part **above** the gum line — is on the **Category 1** list, which means any properly trained person can do it. Anything below the gum line is another matter and belongs with the vet.",
+  "key": "Tartar collects on the lower canines, and removing it from above the gum line is Category 1 work.",
+  "hint": "Two answers name it correctly, so the real question is who does the job. Which category is the easiest one to reach?"
+ },
+ {
+  "id": "loose-tooth",
+  "topic": "Older horses",
+  "difficulty": 3,
+  "patient": {
+   "name": "Bonnie",
+   "desc": "27-year-old flea-bitten grey mare",
+   "coat": "flea"
+  },
+  "stem": "One of Bonnie's cheek teeth wobbles freely when you touch it with a finger. The gum around it has receded almost completely, there's hardly anything holding it in, and it clearly hurts her to eat.",
+  "lead": "What can you do as a Category 2 EDT?",
+  "options": [
+   "Tell the owner to feed around it and book another check in two years",
+   "Nothing, because every extraction is Category 3 whatever state the tooth is in",
+   "Wire it to the tooth next door until the vet can get there",
+   "Rasp the tooth flat so that it stops wobbling",
+   "Remove it — a loose tooth with almost no attachment left is a Category 2 procedure"
+  ],
+  "answer": 4,
+  "explanation": "The Category 2 list includes **the removal of loose teeth or dental fragments with negligible periodontal attachments** — teeth that are barely held in any more. That's a very different thing from extracting a firmly rooted tooth, which is Category 3. Old horses do lose teeth as the reserve crown runs out. The honest judgement call is always: is this one genuinely almost out, or am I about to start something a vet should be finishing?",
+  "key": "A tooth with almost no attachment left can be removed by a Category 2 EDT; a firmly rooted one cannot.",
+  "hint": "The key words on the Category 2 list are “negligible periodontal attachment”. How much is still holding this tooth in?"
+ },
+ {
+  "id": "check-frequency",
+  "topic": "Older horses",
+  "difficulty": 1,
+  "patient": {
+   "name": "Pumpkin",
+   "desc": "26-year-old chestnut mare",
+   "coat": "chestnut"
+  },
+  "stem": "Pumpkin is 26. She has a diastema that traps food, one missing tooth, and two overgrowths you're reducing slowly. Her owner asks how often she should be seen from now on.",
+  "lead": "What is the best advice?",
+  "options": [
+   "Every six months, because she has ongoing problems that need watching",
+   "Once every three years, since she's too old to treat now anyway",
+   "Once a month, so that everything can be rasped down quickly",
+   "Once a year is plenty for every horse, whatever state their teeth are in",
+   "Only when she stops eating altogether"
+  ],
+  "answer": 0,
+  "explanation": "A healthy adult horse needs a check **at least once a year**. Horses that need closer watching — the very young shedding caps, the very old, and any horse with diastemata, missing teeth, overgrowths or gum disease — are usually seen every **six months**. Monthly would be far too often: teeth erupt only 2 to 3 mm a year, so there'd be nothing new to treat and a real risk of over-rasping.",
+  "key": "Yearly for a healthy horse; six-monthly for the very young, the very old, and any horse with ongoing problems.",
+  "hint": "Two of these are far too rare and one is far too often. Remember how slowly a tooth erupts."
+ },
+ {
+  "id": "hygiene-ppe",
+  "topic": "Equipment",
+  "difficulty": 1,
+  "patient": {
+   "name": "Freckle",
+   "desc": "8-year-old spotted pony",
+   "coat": "spotted"
+  },
+  "stem": "Freckle is the sixth horse you've seen today. Your rasps and speculum have already been in five other mouths, and there's a horse in the end box recovering from a respiratory infection.",
+  "lead": "What matters most before you start on Freckle?",
+  "options": [
+   "Wear eye protection only, since instruments don't carry germs",
+   "Work as fast as you can, so there's less time for germs to spread",
+   "Nothing — horses can't pass infections to each other through their mouths",
+   "Clean and disinfect your instruments between every horse, and wear gloves and eye protection",
+   "Rinse the instruments in the water bucket you've been using all day"
+  ],
+  "answer": 3,
+  "explanation": "Instruments travelling from mouth to mouth are a perfect way to spread infection round a yard, so they are **cleaned and disinfected between every horse** — a shared bucket of dirty water achieves exactly the opposite. **PPE** matters too: gloves, and eye protection, because rasping and power tools throw out a fine spray of water, tooth dust and saliva. Good biosecurity protects the whole yard, not just the horse in front of you.",
+  "key": "Disinfect instruments between every horse, and wear gloves and eye protection.",
+  "hint": "Think about what has been in those five other mouths, and what flies off a power tool while it's running."
+ },
+ {
+  "id": "head-support",
+  "topic": "Equipment",
+  "difficulty": 3,
+  "patient": {
+   "name": "Dennis",
+   "desc": "16-year-old liver chestnut gelding",
+   "coat": "liver"
+  },
+  "stem": "Dennis has been sedated by his vet so that you can reduce a large overgrowth. A sedated horse drops its head and can't hold it up, and a horse's head is heavy — around 20 kg.",
+  "lead": "What should you do with his head while you work?",
+  "options": [
+   "Rest it on a padded head stand at a comfortable working height",
+   "Tie his head up high to the rafters with a rope",
+   "Kneel down and work on him from underneath",
+   "Let it hang as low as it will go, so he stays relaxed",
+   "Hold it up by hand for the whole session"
+  ],
+  "answer": 0,
+  "explanation": "A sedated horse can't support its own head, and leaving it hanging for a long session causes swelling and can damage nerves — as well as making it impossible for you to see properly. A **padded head stand** takes the weight at a sensible height. Tying a head high up is dangerous if he stumbles, and **kneeling or sitting underneath a horse** is one of the fastest ways to get badly hurt. You always work standing, with a way out.",
+  "key": "Support a sedated horse's head on a padded stand, and never kneel or sit underneath a horse.",
+  "hint": "His head weighs about as much as a large sack of feed, and right now he can't lift it himself."
+ },
+ {
+  "id": "consent",
+  "topic": "Rules and safety",
+  "difficulty": 2,
+  "patient": {
+   "name": "Bertie",
+   "desc": "9-year-old dun gelding",
+   "coat": "dun"
+  },
+  "stem": "You arrive to give Bertie the routine rasp you were booked for, and find far more than that: a diastema packed with rotting food, and a tooth that will need the vet. His owner isn't there. A 13-year-old who helps out at the yard is holding him.",
+  "lead": "What should you do?",
+  "options": [
+   "Leave quietly without saying anything and send an invoice",
+   "Get on and treat everything you've found — you're the expert and the owner booked you",
+   "Treat the diastema now and tell the owner about it afterwards",
+   "Contact the owner, explain what you've found, and agree a plan before doing anything extra",
+   "Ask the 13-year-old to decide, since she's the one holding him"
+  ],
+  "answer": 3,
+  "explanation": "You explain your findings and **agree a treatment plan with the owner or their agent** before going beyond what was booked. That's **informed consent**, and it's written into the standards for exactly this situation. A 13-year-old helper isn't the owner's agent and can't agree to treatment or to the cost of it. Ring the owner — and whatever is decided, the findings go into your written record.",
+  "key": "Explain what you've found and get the owner's agreement before doing more than was booked.",
+  "hint": "Somebody has to say yes to the extra treatment and to the extra cost. Is that person in the stable?"
+ },
+ {
+  "id": "safe-position",
+  "topic": "Rules and safety",
+  "difficulty": 1,
+  "patient": {
+   "name": "Tuppence",
+   "desc": "6-year-old grey mare, new to the yard",
+   "coat": "grey"
+  },
+  "stem": "Tuppence is new, nervous, and has never had her teeth done before. The only space free is a dark corner of the yard next to a stack of jump poles.",
+  "lead": "What's the safest way to set up?",
+  "options": [
+   "Work in the corner — being hemmed in will stop her moving around",
+   "Start quickly, before she has time to think about it",
+   "Tie her to the stack of jump poles so she can't pull away",
+   "Work on your own, so there are fewer people for her to worry about",
+   "Move somewhere well lit and uncluttered with a clear way out, and have an experienced handler hold her"
+  ],
+  "answer": 4,
+  "explanation": "Before you touch a horse, you set the place up: **good light**, room to work, nothing to trip over, and an **escape route** for you. A **competent handler** holds the horse so that you can concentrate on the mouth. Never tie a horse to something that will move or topple if it pulls back, and never corner yourself where a frightened horse can pin you.",
+  "key": "Good light, clear space, a way out, and a competent handler. Set up before you start.",
+  "hint": "Imagine she panics halfway through. Where exactly would you go?"
+ },
+ {
+  "id": "competence",
+  "topic": "Rules and safety",
+  "difficulty": 2,
+  "patient": {
+   "name": "Comet",
+   "desc": "10-year-old buckskin gelding",
+   "coat": "buckskin"
+  },
+  "stem": "There's something in Comet's mouth you have never seen before: an odd, soft, red lump growing from the gum behind his last upper cheek tooth. It doesn't match anything in your training.",
+  "lead": "What should you do?",
+  "options": [
+   "Rasp around it and hope it settles down on its own",
+   "Have a go at removing it — it's in the mouth, so it's your job",
+   "Say nothing, since it wasn't what you were booked to look at",
+   "Stop, record what you've found, explain it to the owner, and refer him to the vet",
+   "Look it up online and treat it as whatever the first result says"
+  ],
+  "answer": 3,
+  "explanation": "Every EDT works **within the limits of their training, competence and experience** — a rule written into the standards, and the same rule doctors and vets work to. Recognising which findings need **veterinary referral** is a professional skill in its own right, not an admission of failure. Record it, describe it to the owner, and hand it to the vet. A lump in a mouth needs a proper diagnosis.",
+  "key": "Work within your competence, record what you find, and refer anything you don't recognise to the vet.",
+  "hint": "The bravest-sounding answer isn't the professional one. What does a real expert do when they meet something they don't know?"
+ }
+];
+const DEFAULTS = {examLength: 10, vet: 1, hint: 1, halve: true, second: false, gentle: true, note: ''};
+const DIRECTOR_PASSWORD = 'equine';
+const POINTS = {1: 100, 2: 150, 3: 200};
+const STREAK_BONUS = 50;
+const PROMOTION_BONUS = 250;
+const LETTERS = 'ABCDE';
+const STORE_KEY = 'horse-dentist-academy';
+
+const COATS = {
+  grey: '#C3C9CC',
+  dapple: 'radial-gradient(circle at 30% 30%, #DCE1E3 0 12%, transparent 13%), radial-gradient(circle at 66% 40%, #DCE1E3 0 10%, transparent 11%), radial-gradient(circle at 45% 72%, #DCE1E3 0 11%, transparent 12%), #97A1A7',
+  palomino: '#E0B45A', bay: '#7A4222', brown: '#4A2C1D', liver: '#5A2A17', chestnut: '#B35A2C',
+  black: '#2B2725', dun: '#C8A26A', roan: '#B08884', cremello: '#EFE3C8', buckskin: '#CE9B46',
+  flea: 'radial-gradient(circle at 30% 34%, #B4736A 0 5%, transparent 6%), radial-gradient(circle at 66% 28%, #B4736A 0 4%, transparent 5%), radial-gradient(circle at 72% 68%, #B4736A 0 5%, transparent 6%), radial-gradient(circle at 34% 70%, #B4736A 0 4%, transparent 5%), #E6E4E0',
+  piebald: 'radial-gradient(circle at 28% 32%, #FFFFFF 0 20%, transparent 21%), radial-gradient(circle at 74% 70%, #FFFFFF 0 17%, transparent 18%), #2B2725',
+  skewbald: 'radial-gradient(circle at 30% 70%, #FFFFFF 0 20%, transparent 21%), radial-gradient(circle at 72% 28%, #FFFFFF 0 16%, transparent 17%), #B06E3C',
+  spotted: 'radial-gradient(circle at 25% 30%, #3A2A20 0 6%, transparent 7%), radial-gradient(circle at 62% 22%, #3A2A20 0 5%, transparent 6%), radial-gradient(circle at 76% 62%, #3A2A20 0 6%, transparent 7%), radial-gradient(circle at 34% 76%, #3A2A20 0 5%, transparent 6%), #E9E2D3'
+};
+
+const RANKS = [
+  {id: 'stable-hand', pct: 0, title: 'Stable Hand', lines: ['Stable', 'Hand'], c1: '#E27FA3', c2: '#FFFFFF',
+   msg: 'Everyone starts by mucking out. Solve your first cases and the Academy will notice.'},
+  {id: 'trainee', pct: 0.10, title: 'Trainee', lines: ['Trainee'], c1: '#2E8B57', c2: '#FFFFFF',
+   msg: 'You know your way round a mouth now. Keep going.'},
+  {id: 'rasper', pct: 0.25, title: 'Rasper', lines: ['Rasper'], c1: '#E3AE18', c2: '#FFFFFF',
+   msg: 'A quarter of the casebook, and you can be trusted with a hand rasp.'},
+  {id: 'technician', pct: 0.45, title: 'Technician', lines: ['Technician'], c1: '#1E4FD8', c2: '#F7F2E8',
+   msg: 'Nearly half the casebook. The yard asks for you by name.'},
+  {id: 'senior', pct: 0.65, title: 'Senior Technician', lines: ['Senior', 'Technician'], c1: '#0F7B6C', c2: '#F7F2E8',
+   msg: 'Two thirds of every case in the bank. The difficult mouths come to you.'},
+  {id: 'principal', pct: 0.85, title: 'Principal Technician', lines: ['Principal', 'Technician'], c1: '#C8283A', c2: '#F7F2E8',
+   msg: 'Only a handful of cases left unsolved. The Academy is running out of things to teach you.'},
+  {id: 'chiron', pct: 1, title: 'Chiron', epithet: 'Master of horse, man and medicine',
+   lines: ['Chiron'], c1: '#5B2A91', c2: '#F4C443',
+   msg: 'Every case in the bank, solved. Chiron was the centaur who taught medicine to the healers of Greece: half horse, half man, and the finest teacher either kind ever had. The Academy gives no higher honour.'}
+];
+const rankBar = r => Math.ceil(r.pct * BANK.length);
+const rankFor = n => RANKS.slice().reverse().find(r => n >= rankBar(r));
+const nextRank = n => RANKS.find(r => n < rankBar(r));
+
+const RIGHT_LINES = ['Spot on!', 'Neigh-ce work!', 'Brilliant diagnosis!', `Straight from the horse's mouth!`, `That's the one!`, 'Top of the class!'];
+const WRONG_LINES = ['Hay, not quite.', 'Whoa there, not this time.', 'Close, but not quite.', 'Good try, but not this one.'];
+
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, ch => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[ch]));
+const fmt = s => esc(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\*(.+?)\*/g, '<em>$1</em>');
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const shuffle = a => { const b = a.slice(); for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; };
+const reducedMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+const ukDate = d => new Date(d).toLocaleDateString('en-GB', {day: 'numeric', month: 'long', year: 'numeric'});
+const times = n => n === 1 ? 'once' : n === 2 ? 'twice' : n + ' times';
+const S = () => progress.settings;
+const drawPool = () => S().gentle ? BANK.filter(q => q.difficulty <= 2) : BANK;
+const coat = q => COATS[q.patient.coat] || COATS.bay;
+const horseEmoji = q => q.patient.emoji || '🐴';
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const c = v => Math.max(0, Math.min(255, v + amt));
+  const r = c(n >> 16), g = c((n >> 8) & 255), b = c(n & 255);
+  return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+}
+
+/* ---------- storage (claude.ai artifact storage if present, else memory) ---------- */
+const blankRecord = () => ({
+  name: '', solved: [], seen: [], best: 0, rounds: 0, muted: false,
+  awards: {'stable-hand': new Date().toISOString()},
+  settings: Object.assign({}, DEFAULTS)
+});
+
+const Store = {
+  mem: null,
+  async load() {
+    try {
+      if (window.storage && typeof window.storage.get === 'function') {
+        const r = await window.storage.get(STORE_KEY, false);
+        if (r && r.value) return JSON.parse(r.value);
+      }
+    } catch (e) { /* key not found or storage unavailable */ }
+    return this.mem;
+  },
+  async save(data) {
+    this.mem = JSON.parse(JSON.stringify(data));
+    try {
+      if (window.storage && typeof window.storage.set === 'function') {
+        await window.storage.set(STORE_KEY, JSON.stringify(data), false);
+      }
+    } catch (e) { /* ignore */ }
+  }
+};
+const saveUser = () => Store.save(progress);
+
+/* ---------- sound (Web Audio synthesis) ---------- */
+const Sound = {
+  ctx: null, muted: false, noise: null,
+  ensure() {
+    if (!this.ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      this.ctx = new AC();
+    }
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+    return this.ctx;
+  },
+  note(freq, t, dur, type, vol) {
+    const c = this.ctx, o = c.createOscillator(), g = c.createGain();
+    o.type = type || 'triangle';
+    o.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol || 0.12, t + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(c.destination);
+    o.start(t); o.stop(t + dur + 0.05);
+  },
+  hoof(t, freq) {
+    const c = this.ctx;
+    if (!this.noise) {
+      const len = Math.floor(c.sampleRate * 0.08);
+      const buf = c.createBuffer(1, len, c.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+      this.noise = buf;
+    }
+    const s = c.createBufferSource(), bp = c.createBiquadFilter(), g = c.createGain();
+    s.buffer = this.noise; bp.type = 'bandpass'; bp.frequency.value = freq; bp.Q.value = 4; g.gain.value = 0.55;
+    s.connect(bp); bp.connect(g); g.connect(c.destination);
+    s.start(t);
+  },
+  play(name) {
+    if (this.muted) return;
+    const c = this.ensure();
+    if (!c) return;
+    const t = c.currentTime + 0.01;
+    switch (name) {
+      case 'select': this.note(700, t, 0.07, 'triangle', 0.07); break;
+      case 'lock': this.note(440, t, 0.08, 'square', 0.035); this.note(660, t + 0.06, 0.1, 'square', 0.035); break;
+      case 'right': [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => this.note(f, t + 0.08 + i * 0.08, 0.28, 'triangle', 0.12)); break;
+      case 'streak': [1318.5, 1568, 2093].forEach((f, i) => this.note(f, t + 0.45 + i * 0.07, 0.18, 'sine', 0.07)); break;
+      case 'wrong': this.note(330, t + 0.08, 0.22, 'sine', 0.12); this.note(247, t + 0.26, 0.38, 'sine', 0.12); break;
+      case 'retry': this.note(392, t, 0.14, 'sine', 0.1); this.note(330, t + 0.12, 0.2, 'sine', 0.1); break;
+      case 'magic': for (let i = 0; i < 7; i++) this.note(1100 + Math.random() * 1300, t + i * 0.05, 0.14, 'sine', 0.05); break;
+      case 'hooves': [0, 0.14, 0.38, 0.52].forEach((d, i) => this.hoof(t + d, i % 2 ? 850 : 1350)); break;
+      case 'fanfare':
+        this.note(523.25, t, 0.2, 'triangle', 0.13); this.note(659.25, t + 0.15, 0.2, 'triangle', 0.13);
+        this.note(783.99, t + 0.3, 0.2, 'triangle', 0.13);
+        [1046.5, 783.99, 659.25].forEach(f => this.note(f, t + 0.45, 1.0, 'triangle', 0.08));
+        break;
+      case 'soft': this.note(523.25, t, 0.3, 'sine', 0.1); this.note(659.25, t + 0.16, 0.45, 'sine', 0.1); break;
+    }
+  }
+};
+
+/* ---------- state ---------- */
+let progress = blankRecord();
+let dirUnlocked = false;
+const state = {
+  mode: 'exam', round: [], i: 0, score: 0, streak: 0, bestStreak: 0,
+  lifelines: {vet: 0, hint: 0}, selected: null, answered: false,
+  usedVetThis: false, usedHintThis: false, secondChanceUsed: false,
+  removed: new Set(), results: [], newlySolved: 0, lastMissed: []
+};
+
+/* ---------- drawing ---------- */
+function toothSVG(cls) {
+  return `<svg class="tooth-ic ${cls}" viewBox="0 0 24 40" aria-hidden="true">` +
+    `<path class="t-body" d="M4 10 L7 5 L10 10 L13 5 L16 10 L19 5 L20 10 V33 Q20 37 16 37 H8 Q4 37 4 33 Z"/>` +
+    `<rect class="t-gum" x="2" y="16" width="20" height="4" rx="2"/>` +
+    `<path class="t-crack" d="M13 11 L10 17 L14 23 L11 30"/>` +
+    `<path class="t-spark" d="M21 -1 l1.3 3 3 1.3 -3 1.3 -1.3 3 -1.3 -3 -3 -1.3 3 -1.3z"/></svg>`;
+}
+
+function rosetteSVG(rank) {
+  const {c1, c2, lines} = rank;
+  const dark = shade(c1, -28);
+  let pleats = '';
+  for (let i = 0; i < 36; i++) {
+    pleats += `<ellipse cx="100" cy="40" rx="8" ry="30" fill="${i % 2 ? c1 : dark}" transform="rotate(${i * 10} 100 100)"/>`;
+  }
+  const size = lines.some(l => l.length > 9) ? 14 : (lines.length > 2 ? 15 : 19);
+  const lh = size + 3;
+  const start = -((lines.length - 1) * lh) / 2 + size * 0.35;
+  const tspans = lines.map((l, i) => `<tspan x="100" dy="${i === 0 ? start : lh}">${esc(l)}</tspan>`).join('');
+  return `<svg viewBox="0 0 200 300" role="img" aria-label="${esc(rank.title)} rosette">` +
+    `<polygon points="72,120 106,132 94,294 78,274 58,288" fill="${c1}"/>` +
+    `<polygon points="128,120 94,132 106,294 122,274 142,288" fill="${dark}"/>` +
+    `<polygon points="82,150 96,154 88,262 80,254" fill="${c2}" opacity=".85"/>` +
+    `<polygon points="118,150 104,154 112,262 120,254" fill="${c2}" opacity=".85"/>` +
+    pleats +
+    `<circle cx="100" cy="100" r="60" fill="${c2}"/>` +
+    `<circle cx="100" cy="100" r="54" fill="${c1}"/>` +
+    `<circle cx="100" cy="100" r="46" fill="#FFFEF9" stroke="${c2}" stroke-width="3"/>` +
+    `<text x="100" y="100" text-anchor="middle" font-family="Bricolage Grotesque, Arial Narrow, sans-serif" font-weight="800" font-size="${size}" fill="#123B3A">${tspans}</text>` +
+    `</svg>`;
+}
+
+function confetti(n) {
+  if (reducedMotion) return;
+  const colours = ['#F4C443', '#1E4FD8', '#1F8A4C', '#EFA39B', '#FFFFFF', '#5B2A91'];
+  const layer = $('confetti');
+  for (let i = 0; i < (n || 40); i++) {
+    const bit = document.createElement('i');
+    bit.style.left = (Math.random() * 100) + 'vw';
+    bit.style.background = pick(colours);
+    bit.style.setProperty('--dx', (Math.random() * 180 - 90) + 'px');
+    bit.style.setProperty('--rot', (Math.random() * 720 - 360) + 'deg');
+    bit.style.animationDelay = (Math.random() * 0.25) + 's';
+    bit.style.animationDuration = (1.2 + Math.random() * 0.9) + 's';
+    layer.appendChild(bit);
+    setTimeout(() => bit.remove(), 2600);
+  }
+}
+
+/* ---------- screens ---------- */
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => { s.hidden = (s.id !== id); });
+  $('brand').hidden = (id === 'screen-title');
+  window.scrollTo(0, 0);
+}
+
+function updateTitle() {
+  const n = progress.solved.length;
+  const parts = [];
+  if (n) {
+    parts.push(`${n} of ${BANK.length} cases solved`);
+    if (progress.best) parts.push(`Best round: ${progress.best} points`);
+    if (progress.rounds) parts.push(`Exams taken: ${progress.rounds}`);
+    $('titleProgress').textContent = parts.join('. ') + '.';
+  } else {
+    $('titleProgress').textContent = 'No cases solved yet. Every patient you diagnose correctly is added here.';
+  }
+  const solved = new Set(progress.solved);
+  $('miniTeeth').innerHTML = BANK.map(q => toothSVG(solved.has(q.id) ? 'right' : 'pending')).join('');
+  renderRankCard();
+}
+
+function renderRankCard() {
+  const n = progress.solved.length, rank = rankFor(n), next = nextRank(n);
+  $('homeRosette').innerHTML = rosetteSVG(rank);
+  $('homeRank').textContent = `${progress.name || 'Rider'} — ${rank.title}`;
+  $('homeEpithet').textContent = rank.epithet || '';
+  $('homeEpithet').hidden = !rank.epithet;
+  $('homeProgress').textContent = next
+    ? `${n} of ${BANK.length} cases solved. ${rankBar(next) - n} more to become ${next.title}.`
+    : `All ${BANK.length} cases solved. There is no higher rank.`;
+  $('homeBar').style.width = Math.round((n / BANK.length) * 100) + '%';
+}
+
+function renderRanks() {
+  $('rankList').innerHTML = RANKS.map(r => {
+    const need = rankBar(r);
+    const when = need === 0 ? 'from your first day' : `${need} of the ${BANK.length} cases solved`;
+    const ep = r.epithet ? `, ${esc(r.epithet).toLowerCase()}` : '';
+    return `<li><span class="dot" style="background:${r.c1}"></span><span><strong>${esc(r.title)}</strong>${ep}: ${when}</span></li>`;
+  }).join('');
+}
+
+function renderIntro() {
+  $('introText').innerHTML = `There are <strong>${BANK.length} cases</strong> in the bank. Every patient you get right is added to your casebook for good, and the Academy raises your rank as the casebook fills. It's meant to be tricky, so don't worry if it takes a few goes.`;
+}
+
+function renderRules() {
+  const s = S(), seen = new Set(progress.seen || []);
+  const easy = BANK.filter(q => q.difficulty <= 2);
+  const items = [['🦷', 'Read each case, pick the single best answer, then lock it in.']];
+  items.push(['🐴', `Each exam brings <strong>${Math.min(s.examLength, BANK.length)}</strong> patients into the yard.`]);
+  if (s.gentle) {
+    items.push(['📗', easy.some(q => !seen.has(q.id))
+      ? `Your cases come from the <strong>easier ${easy.length}</strong> in the bank.`
+      : `You have met every easier case, so harder ones are joining the draw now.`]);
+  } else {
+    items.push(['📗', `Your cases come from <strong>all ${BANK.length}</strong> in the bank.`]);
+  }
+  if (s.vet) items.push(['🩺', `<strong>Ask the vet</strong> ${times(s.vet)} per exam to clear away two wrong answers.`]);
+  if (s.hint) items.push(['📓', `<strong>Nutmeg's hint</strong> ${times(s.hint)} per exam for a clue from Professor Nutmeg.`]);
+  if ((s.vet || s.hint) && s.halve) items.push(['⚖️', `Using a lifeline halves that case's points.`]);
+  if (s.second) items.push(['↩️', 'Get one wrong and you get a second go, for half the points.']);
+  items.push(['🔥', 'Get three or more right in a row for a streak bonus.']);
+  $('rulesList').innerHTML = items.map(([ic, text]) => `<li><span class="ic">${ic}</span><span>${text}</span></li>`).join('');
+}
+
+function goHome() { updateTitle(); renderIntro(); renderRules(); show('screen-title'); }
+
+/* ---------- ranks and certificates ---------- */
+function grantAwards() {
+  const n = progress.solved.length, earned = [];
+  RANKS.forEach(r => {
+    if (n >= rankBar(r) && !progress.awards[r.id]) {
+      progress.awards[r.id] = new Date().toISOString();
+      earned.push(r);
+    }
+  });
+  return earned;
+}
+
+function certificateHTML(rank) {
+  const when = progress.awards[rank.id] ? ukDate(progress.awards[rank.id]) : ukDate(Date.now());
+  const solvedThen = rankBar(rank);
+  const line = rank.pct === 0
+    ? `for joining the Academy and taking charge of a yard brush`
+    : `having correctly worked up ${solvedThen} of the Academy's ${BANK.length} cases`;
+  return `<div class="sheet-in">
+    <p class="s-acad">Equine Dentist Academy</p>
+    <p class="s-rule">Certificate of Rank</p>
+    <div class="s-ros">${rosetteSVG(rank)}</div>
+    <p class="s-lead">This is to certify that</p>
+    <p class="s-name">${esc(progress.name || 'Rider')}</p>
+    <p class="s-lead">is admitted to the rank of</p>
+    <p class="s-rank">${esc(rank.title)}</p>
+    ${rank.epithet ? `<p class="s-epi">${esc(rank.epithet)}</p>` : ''}
+    <p class="s-body">${line}.</p>
+    <div class="s-feet"><div><span class="s-val">${esc(when)}</span><span class="s-lab">Date</span></div><div><span class="s-val"></span><span class="s-lab">Director of the Academy</span></div></div>
+  </div>`;
+}
+
+function openCerts() {
+  const n = progress.solved.length, earnedCount = RANKS.filter(r => progress.awards[r.id]).length;
+  $('certIntro').textContent = `${earnedCount} of the ${RANKS.length} Academy ranks earned, with ${n} of the ${BANK.length} cases solved.`;
+  $('certGrid').innerHTML = RANKS.map(r => {
+    if (!progress.awards[r.id]) {
+      return `<article class="cert-card locked"><h3>${esc(r.title)}</h3><p>Solve ${rankBar(r)} cases to earn this.</p></article>`;
+    }
+    return `<article class="cert-card"><h3>${esc(r.title)}</h3><p>Awarded ${esc(ukDate(progress.awards[r.id]))}</p><button type="button" data-rank="${r.id}">View and print</button></article>`;
+  }).join('');
+  $('certPreview').hidden = true;
+  show('screen-certs');
+}
+
+let previewRank = null;
+function previewCert(id) {
+  previewRank = RANKS.find(r => r.id === id);
+  if (!previewRank) return;
+  $('certSheet').innerHTML = certificateHTML(previewRank);
+  $('certPreview').hidden = false;
+  $('certPreview').scrollIntoView({behavior: reducedMotion ? 'auto' : 'smooth', block: 'start'});
+}
+
+function printCert(rank) {
+  $('printArea').innerHTML = `<div class="sheet">${certificateHTML(rank)}</div>`;
+  try { window.print(); } catch (e) { /* sandboxed frames may refuse */ }
+}
+
+/* ---------- round flow ---------- */
+function startRound(questions, mode) {
+  state.mode = mode;
+  state.round = questions.map(q => {
+    const idx = q.options.map((_, i) => i);
+    const order = q.keepOrder ? idx : shuffle(idx);
+    return {q, order, correctPos: order.indexOf(q.answer)};
+  });
+  state.i = 0; state.score = 0; state.streak = 0; state.bestStreak = 0;
+  state.lifelines = {vet: S().vet, hint: S().hint};
+  state.results = []; state.newlySolved = 0;
+  show('screen-quiz');
+  renderQuestion();
+  Sound.play('hooves');
+}
+
+const NEW_PER_EXAM = 2;
+
+function pickRound(pool, n) {
+  const seen = new Set(progress.seen || []), solved = new Set(progress.solved);
+  const inPool = new Set(pool.map(q => q.id));
+  const want = Math.min(NEW_PER_EXAM, n);
+  // Work down the tiers until the new-case slots are filled. Tiers 2 and 4 reach outside
+  // the chosen set, so the easier-cases-only setting can never dead-end the casebook.
+  const tiers = [
+    pool.filter(q => !seen.has(q.id)),
+    BANK.filter(q => !inPool.has(q.id) && !seen.has(q.id)),
+    pool.filter(q => seen.has(q.id) && !solved.has(q.id)),
+    BANK.filter(q => !inPool.has(q.id) && seen.has(q.id) && !solved.has(q.id))
+  ];
+  const first = [];
+  for (const tier of tiers) {
+    if (first.length >= want) break;
+    for (const q of shuffle(tier)) {
+      if (first.length >= want) break;
+      first.push(q);
+    }
+  }
+  const taken = new Set(first.map(q => q.id));
+  const rest = shuffle(pool.filter(q => !taken.has(q.id))).slice(0, Math.max(0, n - first.length));
+  if (first.length + rest.length < n) {
+    const have = new Set([...taken, ...rest.map(q => q.id)]);
+    rest.push(...shuffle(BANK.filter(q => !have.has(q.id))).slice(0, n - first.length - rest.length));
+  }
+  // shuffle the whole round so the new cases aren't always the first patients through the door
+  return shuffle(first.concat(rest));
+}
+
+function startExam() {
+  const pool = drawPool();
+  startRound(pickRound(pool, Math.min(S().examLength, pool.length)), 'exam');
+}
+
+function updateStats() {
+  $('caseCount').textContent = `Patient ${state.i + 1} of ${state.round.length}`;
+  $('score').textContent = `${state.score} points`;
+  $('streak').textContent = state.streak >= 2 ? `🔥 ${state.streak} in a row` : '';
+}
+
+function renderTeeth() {
+  const html = state.round.map((_, i) => {
+    let cls = 'pending';
+    if (i < state.results.length) cls = state.results[i].right ? 'right' : 'wrong';
+    else if (i === state.i) cls = 'current';
+    return toothSVG(cls);
+  }).join('');
+  $('teeth').innerHTML = html;
+  const right = state.results.filter(r => r.right).length;
+  $('teeth').setAttribute('aria-label', `${right} correct out of ${state.results.length} answered`);
+}
+
+function setLifelineButtons() {
+  const vet = $('btnVet'), hint = $('btnHint');
+  const v = state.lifelines.vet, h = state.lifelines.hint;
+  vet.hidden = S().vet === 0;
+  hint.hidden = S().hint === 0;
+  vet.disabled = v <= 0 || state.answered || state.usedVetThis;
+  hint.disabled = h <= 0 || state.answered || state.usedHintThis;
+  vet.textContent = v > 0 ? `🩺 Ask the vet${v > 1 ? ' (' + v + ' left)' : ''}` : '🩺 Vet used up';
+  hint.textContent = h > 0 ? `📓 Nutmeg's hint${h > 1 ? ' (' + h + ' left)' : ''}` : '📓 Hints used up';
+}
+
+function renderQuestion() {
+  const item = state.round[state.i], q = item.q;
+  state.selected = null; state.answered = false; state.removed = new Set();
+  state.usedVetThis = false; state.usedHintThis = false; state.secondChanceUsed = false;
+
+  if (!progress.seen) progress.seen = [];
+  if (!progress.seen.includes(q.id)) { progress.seen.push(q.id); saveUser(); }
+
+  updateStats();
+  renderTeeth();
+
+  const av = $('avatar');
+  av.classList.remove('bounce', 'shake');
+  av.style.background = coat(q);
+  const he = $('horseEmoji');
+  he.textContent = horseEmoji(q);
+  he.classList.toggle('single', !q.patient.emoji);
+  $('mood').textContent = '😣';
+  $('pName').textContent = q.patient.name;
+  $('pDesc').textContent = q.patient.desc;
+  $('stars').textContent = '★'.repeat(q.difficulty) + '☆'.repeat(3 - q.difficulty);
+  $('stars').setAttribute('aria-label', `Difficulty ${q.difficulty} of 3`);
+  $('topic').textContent = q.topic;
+  $('stem').innerHTML = fmt(q.stem);
+  $('lead').innerHTML = fmt(q.lead);
+  $('hintbox').hidden = true;
+  $('retrybox').hidden = true;
+
+  const box = $('options');
+  box.innerHTML = '';
+  item.order.forEach((origIdx, pos) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'opt';
+    b.setAttribute('aria-pressed', 'false');
+    b.innerHTML = `<span class="letter">${LETTERS[pos]}</span><span class="opt-text">${fmt(q.options[origIdx])}</span>`;
+    b.addEventListener('click', () => select(pos));
+    box.appendChild(b);
+  });
+
+  $('btnLock').hidden = false;
+  $('btnLock').disabled = true;
+  setLifelineButtons();
+  const fb = $('feedback');
+  fb.hidden = true;
+  fb.classList.remove('is-right', 'is-wrong');
+  window.scrollTo(0, 0);
+}
+
+function select(pos) {
+  if (state.answered || state.removed.has(pos)) return;
+  state.selected = pos;
+  [...$('options').children].forEach((b, i) => {
+    b.classList.toggle('selected', i === pos);
+    b.setAttribute('aria-pressed', i === pos ? 'true' : 'false');
+  });
+  $('btnLock').disabled = false;
+  Sound.play('select');
+}
+
+function useVet() {
+  if (state.lifelines.vet <= 0 || state.answered || state.usedVetThis) return;
+  const item = state.round[state.i];
+  const wrong = item.order.map((_, pos) => pos).filter(pos => pos !== item.correctPos && !state.removed.has(pos));
+  shuffle(wrong).slice(0, 2).forEach(pos => {
+    state.removed.add(pos);
+    const b = $('options').children[pos];
+    b.classList.add('removed');
+    b.classList.remove('selected');
+    b.disabled = true;
+    if (state.selected === pos) { state.selected = null; $('btnLock').disabled = true; }
+  });
+  state.lifelines.vet--;
+  state.usedVetThis = true;
+  setLifelineButtons();
+  Sound.play('magic');
+}
+
+function useHint() {
+  if (state.lifelines.hint <= 0 || state.answered || state.usedHintThis) return;
+  const q = state.round[state.i].q;
+  const box = $('hintbox');
+  box.innerHTML = `<strong>Professor Nutmeg says:</strong> ${fmt(q.hint)}`;
+  box.hidden = false;
+  state.lifelines.hint--;
+  state.usedHintThis = true;
+  setLifelineButtons();
+  Sound.play('magic');
+}
+
+function secondChance() {
+  const pos = state.selected;
+  state.secondChanceUsed = true;
+  state.removed.add(pos);
+  const b = $('options').children[pos];
+  b.classList.remove('selected');
+  b.classList.add('incorrect');
+  b.disabled = true;
+  b.setAttribute('aria-pressed', 'false');
+  state.selected = null;
+  $('btnLock').disabled = true;
+  const box = $('retrybox');
+  box.innerHTML = '<strong>Not that one.</strong> Have another go — the right answer is still up there.';
+  box.hidden = false;
+  const av = $('avatar');
+  av.classList.remove('bounce', 'shake');
+  void av.offsetWidth;
+  av.classList.add('shake');
+  $('mood').textContent = '🤔';
+  Sound.play('retry');
+  box.scrollIntoView({behavior: reducedMotion ? 'auto' : 'smooth', block: 'nearest'});
+}
+
+function lock() {
+  if (state.answered || state.selected === null) return;
+  const item = state.round[state.i], q = item.q;
+  const right = state.selected === item.correctPos;
+  Sound.play('lock');
+  if (!right && S().second && !state.secondChanceUsed) { secondChance(); return; }
+  state.answered = true;
+
+  const lifelineUsed = state.usedVetThis || state.usedHintThis;
+  const halved = (lifelineUsed && S().halve) || state.secondChanceUsed;
+  let pts = 0, bonus = 0;
+  if (right) {
+    state.streak++;
+    state.bestStreak = Math.max(state.bestStreak, state.streak);
+    pts = POINTS[q.difficulty] || 100;
+    if (halved) pts = Math.round(pts / 2);
+    if (state.streak >= 3) bonus = STREAK_BONUS;
+    state.score += pts + bonus;
+    if (!progress.solved.includes(q.id)) { progress.solved.push(q.id); state.newlySolved++; }
+  } else {
+    state.streak = 0;
+  }
+  state.results.push({
+    q, right,
+    chosen: q.options[item.order[state.selected]],
+    correctText: q.options[q.answer]
+  });
+
+  [...$('options').children].forEach((b, pos) => {
+    b.disabled = true;
+    b.classList.remove('selected');
+    if (pos === item.correctPos) b.classList.add('correct');
+    else if (pos === state.selected) b.classList.add('incorrect');
+  });
+  $('btnLock').hidden = true;
+  setLifelineButtons();
+
+  const av = $('avatar');
+  void av.offsetWidth;
+  const fb = $('feedback');
+  if (right) {
+    $('mood').textContent = '😁';
+    av.classList.add('bounce');
+    Sound.play('right');
+    if (bonus) Sound.play('streak');
+    confetti(bonus ? 60 : 36);
+    fb.classList.add('is-right');
+    $('verdict').textContent = `${pick(RIGHT_LINES)} +${pts} points`;
+    const extras = [];
+    if (bonus) extras.push(`🔥 ${state.streak} in a row: streak bonus +${bonus}.`);
+    if (halved) extras.push('Half points this time, because you had a bit of help.');
+    $('verdictSub').textContent = extras.join(' ');
+    $('verdictSub').hidden = extras.length === 0;
+  } else {
+    $('mood').textContent = '😬';
+    av.classList.add('shake');
+    Sound.play('wrong');
+    fb.classList.add('is-wrong');
+    $('verdict').textContent = pick(WRONG_LINES);
+    $('verdictSub').innerHTML = `The answer was: <strong>${fmt(q.options[q.answer])}</strong>`;
+    $('verdictSub').hidden = false;
+  }
+  $('explain').innerHTML = fmt(q.explanation);
+  $('keypoint').textContent = q.key;
+  $('btnNext').textContent = state.i === state.round.length - 1 ? 'See my results' : 'Next patient';
+  fb.hidden = false;
+  updateStats();
+  renderTeeth();
+  if (right) saveUser();
+  setTimeout(() => {
+    fb.scrollIntoView({behavior: reducedMotion ? 'auto' : 'smooth', block: 'nearest'});
+    $('btnNext').focus({preventScroll: true});
+  }, 120);
+}
+
+function next() {
+  if (!state.answered) return;
+  state.i++;
+  if (state.i >= state.round.length) { finish(); return; }
+  renderQuestion();
+  Sound.play('hooves');
+}
+
+function finish() {
+  const total = state.results.length;
+  const correct = state.results.filter(r => r.right).length;
+  state.lastMissed = state.results.filter(r => !r.right).map(r => r.q);
+
+  const retry = $('btnRetry');
+  retry.hidden = state.lastMissed.length === 0;
+  retry.textContent = `Retry my ${state.lastMissed.length} missed case${state.lastMissed.length === 1 ? '' : 's'}`;
+
+  let earned = [];
+  if (state.mode === 'exam') {
+    earned = grantAwards();
+    if (earned.length) state.score += PROMOTION_BONUS * earned.length;
+    progress.best = Math.max(progress.best || 0, state.score);
+    progress.rounds = (progress.rounds || 0) + 1;
+    saveUser();
+  }
+
+  const solved = progress.solved.length;
+  const rank = rankFor(solved), next = nextRank(solved);
+  $('award').classList.remove('no-rosette');
+  $('rosette').hidden = false;
+  $('rosette').innerHTML = rosetteSVG(rank);
+  $('resTitle').textContent = rank.title;
+
+  if (state.mode === 'exam') {
+    $('resScore').textContent = `${correct} out of ${total} correct this round, for ${state.score} points. Best streak ${state.bestStreak}.`;
+  } else {
+    $('resScore').textContent = `Practice round: you fixed ${correct} of ${total} case${total === 1 ? '' : 's'}.`;
+  }
+  $('resMsg').textContent = next
+    ? `${solved} of the ${BANK.length} cases are in your casebook. ${rankBar(next) - solved} more and you become ${next.title}.`
+    : rank.msg;
+  $('resBar').style.width = Math.round((solved / BANK.length) * 100) + '%';
+
+  const top = earned[earned.length - 1];
+  $('rankUp').hidden = !top;
+  if (top) {
+    $('rankUpTitle').textContent = `New rank: ${top.title}`;
+    $('rankUpText').textContent = earned.length > 1
+      ? `You went up ${earned.length} ranks in one exam.`
+      : top.msg;
+    $('btnRankCert').dataset.rank = top.id;
+  }
+
+  const note = (S().note || '').trim();
+  $('dirNote').textContent = note ? `A message from the Director: ${note}` : '';
+  $('dirNote').hidden = !note;
+  $('resCasebook').textContent = `Casebook: ${solved} of ${BANK.length} cases solved` + (state.newlySolved ? ` (${state.newlySolved} new this time).` : '.');
+
+  $('review').innerHTML = state.results.map(r => `
+    <li class="${r.right ? 'r-right' : 'r-wrong'}">
+      <div class="rv-head"><span class="rv-mark">${r.right ? '✓' : '✗'}</span><strong>${esc(r.q.patient.name)}</strong><span class="rv-topic">${esc(r.q.topic)}</span></div>
+      ${r.right ? '' : `<p class="rv-line">You said: ${fmt(r.chosen)}</p>`}
+      <p class="rv-line">Answer: <strong>${fmt(r.correctText)}</strong></p>
+      <details><summary>Read the notes</summary><p>${fmt(r.q.explanation)}</p></details>
+    </li>`).join('');
+
+  if (top) showPromotion(top, earned.length); else { Sound.play('soft'); show('screen-results'); }
+}
+
+function showPromotion(rank, count) {
+  $('promoRosette').innerHTML = rosetteSVG(rank);
+  $('promoTitle').textContent = `You are now ${rank.title}`;
+  $('promoEpithet').textContent = rank.epithet || '';
+  $('promoEpithet').hidden = !rank.epithet;
+  $('promoText').textContent = count > 1
+    ? `${rank.msg} And you climbed ${count} ranks in a single exam, which is not something the yard sees often.`
+    : rank.msg;
+  $('promoBonus').textContent = `Promotion bonus: +${PROMOTION_BONUS * count} points`;
+  $('btnPromoCert').dataset.rank = rank.id;
+  show('screen-promo');
+  Sound.play('fanfare');
+  setTimeout(() => confetti(120), 250);
+}
+
+/* ---------- casebook ---------- */
+function openCasebook() {
+  const solved = new Set(progress.solved);
+  $('cbCount').textContent = `${solved.size} of ${BANK.length} cases solved. Get a case right in any exam to add it here.`;
+  $('cbGrid').innerHTML = BANK.map(q => {
+    if (!solved.has(q.id)) {
+      return `<article class="cb-card locked"><div class="cb-top"><span class="mini-av locked-av">?</span><div><strong>Unsolved case</strong><span>${esc(q.topic)}</span></div></div><p>Solve this case in an exam to unlock it.</p></article>`;
+    }
+    return `<article class="cb-card"><div class="cb-top"><span class="mini-av${q.patient.emoji ? '' : ' single'}" style="background:${coat(q)}">${horseEmoji(q)}</span><div><strong>${esc(q.patient.name)}</strong><span>${esc(q.topic)}</span></div></div><p>${esc(q.key)}</p></article>`;
+  }).join('');
+  show('screen-casebook');
+}
+
+let clearArmed = false, clearTimer = null;
+function clearCasebook() {
+  const btn = $('btnClear');
+  if (!clearArmed) {
+    clearArmed = true;
+    btn.textContent = 'Tap again to clear everything';
+    clearTimer = setTimeout(() => { clearArmed = false; btn.textContent = 'Clear casebook'; }, 4000);
+    return;
+  }
+  clearTimeout(clearTimer);
+  clearArmed = false;
+  btn.textContent = 'Clear casebook';
+  progress.solved = []; progress.seen = []; progress.best = 0; progress.rounds = 0;
+  progress.awards = {'stable-hand': new Date().toISOString()};
+  saveUser();
+  openCasebook();
+}
+
+/* ---------- director's area ---------- */
+const NUMERIC_KEYS = ['examLength', 'vet', 'hint'];
+
+function setSeg(id, value) {
+  [...$(id).children].forEach(b => b.setAttribute('aria-pressed', b.dataset.value === String(value) ? 'true' : 'false'));
+}
+
+function renderDirector() {
+  const s = S();
+  setSeg('segLength', s.examLength);
+  setSeg('segVet', s.vet);
+  setSeg('segHint', s.hint);
+  setSeg('segHalve', s.halve ? 1 : 0);
+  setSeg('segSecond', s.second ? 1 : 0);
+  setSeg('segGentle', s.gentle ? 1 : 0);
+  $('noteInput').value = s.note || '';
+}
+
+function openDirector() {
+  $('pwInput').value = '';
+  $('pwErr').hidden = true;
+  $('dirGate').hidden = dirUnlocked;
+  $('dirPanel').hidden = !dirUnlocked;
+  if (dirUnlocked) renderDirector();
+  show('screen-director');
+  if (!dirUnlocked) $('pwInput').focus();
+}
+
+function unlockDirector() {
+  if ($('pwInput').value.trim().toLowerCase() !== DIRECTOR_PASSWORD) {
+    $('pwErr').hidden = false;
+    $('pwInput').select();
+    Sound.play('wrong');
+    return;
+  }
+  dirUnlocked = true;
+  $('pwErr').hidden = true;
+  $('dirGate').hidden = true;
+  $('dirPanel').hidden = false;
+  renderDirector();
+  Sound.play('magic');
+}
+
+function saveDirector(close) {
+  S().note = $('noteInput').value.trim();
+  saveUser();
+  if (close) { dirUnlocked = false; goHome(); }
+}
+
+$('btnDirector').addEventListener('click', openDirector);
+$('btnUnlock').addEventListener('click', unlockDirector);
+$('pwInput').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); unlockDirector(); } });
+$('btnDirBack').addEventListener('click', goHome);
+$('btnDirSave').addEventListener('click', () => saveDirector(true));
+$('btnDirLock').addEventListener('click', () => saveDirector(true));
+$('btnDirReset').addEventListener('click', () => {
+  progress.settings = Object.assign({}, DEFAULTS);
+  renderDirector();
+  saveUser();
+  Sound.play('select');
+});
+document.querySelectorAll('.seg').forEach(group => {
+  group.addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b || !group.contains(b)) return;
+    const key = group.dataset.key, raw = b.dataset.value;
+    S()[key] = NUMERIC_KEYS.includes(key) ? parseInt(raw, 10) : raw === '1';
+    setSeg(group.id, raw);
+    saveUser();
+    Sound.play('select');
+  });
+});
+
+/* ---------- wiring ---------- */
+function setMute(m) {
+  Sound.muted = m;
+  if (progress) progress.muted = m;
+  const b = $('btnMute');
+  b.textContent = m ? '🔈 Sound off' : '🔊 Sound on';
+  b.setAttribute('aria-pressed', m ? 'true' : 'false');
+}
+
+$('btnMute').addEventListener('click', () => { setMute(!Sound.muted); saveUser(); if (!Sound.muted) Sound.play('select'); });
+$('btnStart').addEventListener('click', startExam);
+$('nameInput').addEventListener('input', () => {
+  progress.name = $('nameInput').value.trim();
+  renderRankCard();
+  saveUser();
+});
+$('btnCerts').addEventListener('click', openCerts);
+$('btnCertBack').addEventListener('click', goHome);
+$('certGrid').addEventListener('click', e => {
+  const b = e.target.closest('button[data-rank]');
+  if (b) previewCert(b.dataset.rank);
+});
+$('btnDoPrint').addEventListener('click', () => { if (previewRank) printCert(previewRank); });
+$('btnClosePreview').addEventListener('click', () => { $('certPreview').hidden = true; });
+$('btnPromoOn').addEventListener('click', () => show('screen-results'));
+$('btnPromoCert').addEventListener('click', e => {
+  const r = RANKS.find(x => x.id === e.currentTarget.dataset.rank);
+  if (r) { openCerts(); previewCert(r.id); }
+});
+$('btnRankCert').addEventListener('click', e => {
+  const r = RANKS.find(x => x.id === e.currentTarget.dataset.rank);
+  if (r) { openCerts(); previewCert(r.id); }
+});
+$('btnCasebook').addEventListener('click', openCasebook);
+$('btnVet').addEventListener('click', useVet);
+$('btnHint').addEventListener('click', useHint);
+$('btnLock').addEventListener('click', lock);
+$('btnNext').addEventListener('click', next);
+$('btnLeave').addEventListener('click', goHome);
+$('btnAgain').addEventListener('click', startExam);
+$('btnRetry').addEventListener('click', () => { if (state.lastMissed.length) startRound(shuffle(state.lastMissed), 'practice'); });
+$('btnResCasebook').addEventListener('click', openCasebook);
+$('btnHome').addEventListener('click', goHome);
+$('btnCbStart').addEventListener('click', startExam);
+$('btnCbBack').addEventListener('click', goHome);
+$('btnClear').addEventListener('click', clearCasebook);
+
+document.addEventListener('keydown', e => {
+  if ($('screen-quiz').hidden) return;
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+  if (e.key === 'Enter') {
+    if (t && t.tagName === 'BUTTON' && !t.classList.contains('opt')) return; // let the focused button do its own thing
+    e.preventDefault();
+    if (!state.answered) lock(); else next();
+    return;
+  }
+  if (state.answered || e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key.toUpperCase();
+  let pos = LETTERS.indexOf(k);
+  if (pos < 0) pos = '12345'.indexOf(k);
+  if (pos >= 0 && pos < state.round[state.i].q.options.length) { e.preventDefault(); select(pos); }
+});
+
+(async function init() {
+  const saved = await Store.load();
+  if (saved && Array.isArray(saved.solved)) progress = Object.assign(blankRecord(), saved);
+  progress.settings = Object.assign({}, DEFAULTS, progress.settings || {});
+  progress.awards = progress.awards || {};
+  const ids = new Set(BANK.map(q => q.id));
+  progress.solved = progress.solved.filter(id => ids.has(id));
+  progress.seen = (progress.seen || []).filter(id => ids.has(id));
+  grantAwards();
+  $('nameInput').value = progress.name || '';
+  setMute(!!progress.muted);
+  renderRanks();
+  goHome();
+})();
+})();
+</script>
+</body>
+</html>
