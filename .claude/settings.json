@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wrangler *)",
+      "Bash(npx wrangler *)",
+      "Bash(npx -y wrangler *)"
+    ],
+    "ask": [
+      "Bash(wrangler delete *)",
+      "Bash(npx wrangler delete *)",
+      "Bash(wrangler kv namespace delete *)",
+      "Bash(npx wrangler kv namespace delete *)",
+      "Bash(wrangler kv key delete *)",
+      "Bash(npx wrangler kv key delete *)",
+      "Bash(wrangler secret delete *)",
+      "Bash(npx wrangler secret delete *)"
+    ]
+  }
+}
