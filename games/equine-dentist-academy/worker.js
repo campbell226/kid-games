@@ -121,10 +121,10 @@ const GONE_DAYS = 7;
 // here too, so a tablet cannot choose what the log says about it.
 //
 // Reading wants LOGBOOK_PASSWORD if that secret exists, and falls back to
-// the Director's password if it does not. That way it works the moment it
-// is deployed, and can be put beyond the Director later by adding one
-// secret and telling nobody - which is the only version of this that is
-// actually secret, since a hidden gesture is only hidden until it is found.
+// the Director's password if it does not. So it works the moment it is
+// deployed, from the Director's area, and can be given a second lock
+// later - for a Director who is no longer the only one who knows the
+// first password - by adding one secret and changing nothing else.
 const LOG_DAYS = 180;
 const LOG_MAX = 200;
 

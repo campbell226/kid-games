@@ -281,7 +281,12 @@ h1 span{display:block;white-space:nowrap}
 
 /* the logbook */
 .modal-card.wide{max-width:34rem}
-#dirHeading{-webkit-user-select:none;user-select:none}
+.tome{display:flex;align-items:center;gap:16px;width:100%;text-align:left;background:var(--enamel);border:2px solid var(--ink);border-radius:18px;box-shadow:0 4px 0 var(--ink);padding:14px 18px;margin:18px 0 4px;cursor:pointer;color:var(--ink);font-family:inherit}
+.tome:active{transform:translateY(3px);box-shadow:0 1px 0 var(--ink)}
+.tome svg{width:60px;height:auto;flex:none}
+.tome strong{display:block;font-family:var(--display);font-weight:800;font-size:21px}
+.tome em{display:block;color:var(--ink-soft);font-size:15px;font-style:normal}
+@media (prefers-reduced-motion:reduce){ .tome:active{transform:none} }
 .logrows{max-height:55vh;overflow-y:auto;margin:4px 0 8px;border-top:2px solid #B5D2C6}
 .logrow{border-bottom:1px solid #CFE3D8;padding:9px 2px;font-size:15px;line-height:1.4}
 .logrow .when{display:block;color:var(--ink-soft);font-size:13px}
@@ -535,7 +540,7 @@ h1 span{display:block;white-space:nowrap}
 
   <!-- DIRECTOR -->
   <section id="screen-director" class="screen dir" hidden>
-    <h2 id="dirHeading">Director of the Academy</h2>
+    <h2>Director of the Academy</h2>
 
     <div id="dirGate">
       <p class="dir-intro">This is where the Director sets how much help each rider gets.</p>
@@ -633,6 +638,36 @@ h1 span{display:block;white-space:nowrap}
       </div>
       </div>
 
+      <!-- Outside the settings block on purpose: the logbook is worth
+           reading even when there is nobody left on the roll. -->
+      <button id="btnLogbook" class="tome" type="button">
+        <svg viewBox="0 0 72 64" aria-hidden="true" focusable="false">
+          <!-- the page block, showing at the fore-edge -->
+          <rect x="20" y="9" width="40" height="46" rx="2" fill="#F6F2E4" stroke="#123B3A" stroke-width="2"/>
+          <g stroke="#CFC2A4" stroke-width="1.5" fill="none">
+            <path d="M55 13v38M58 13v38"/>
+          </g>
+          <!-- the ribbon, hanging out of the bottom -->
+          <path d="M53 50h6v13l-3-3.5-3 3.5z" fill="#C8452F" stroke="#123B3A" stroke-width="1.4" stroke-linejoin="round"/>
+          <!-- the boards -->
+          <path d="M10 8a4 4 0 0 1 4-4h34a4 4 0 0 1 4 4v48a4 4 0 0 1-4 4H14a4 4 0 0 1-4-4z"
+                fill="#7A3D1C" stroke="#123B3A" stroke-width="2.5" stroke-linejoin="round"/>
+          <path d="M10 8a4 4 0 0 1 4-4h7v56h-7a4 4 0 0 1-4-4z" fill="#5C2E13"/>
+          <g fill="#DDB14D">
+            <rect x="10" y="16" width="11" height="4"/>
+            <rect x="10" y="44" width="11" height="4"/>
+          </g>
+          <!-- a cheek tooth stamped on the cover -->
+          <path d="M31 20l3-4 3 4 3-4 3 4 2-3v20q0 5-4 5h-1q-1-2-2 0h-1q-6 0-6-5z"
+                fill="#EFE4C8" stroke="#DDB14D" stroke-width="1.6" stroke-linejoin="round"/>
+          <rect x="28" y="46" width="18" height="2.5" rx="1.2" fill="#DDB14D"/>
+        </svg>
+        <span>
+          <strong>Director's Logbook</strong>
+          <em>Every exam sat, and every change you have made</em>
+        </span>
+      </button>
+
       <p class="err" id="dirErr" hidden></p>
 
       <div class="dir-actions">
@@ -657,8 +692,6 @@ h1 span{display:block;white-space:nowrap}
       </div>
     </div>
 
-    <!-- The logbook. Nothing on the page points at it: it opens on a long
-         press of the heading above, and there is no button to find. -->
     <div class="modal" id="logModal" hidden>
       <div class="modal-card wide" role="dialog" aria-modal="true" aria-labelledby="logTitle">
         <h3 id="logTitle">Logbook</h3>
@@ -3120,14 +3153,11 @@ $('btnDirReset').addEventListener('click', () => {
   Sound.play('select');
 });
 /* ---------- the logbook ----------
-   No control points at this. It opens on a long press of the heading,
-   while the Director's area is unlocked, and nothing on the page says so.
-   That keeps it out of sight; what keeps it shut is the password, and if
-   LOGBOOK_PASSWORD is set on the worker that is a different password from
-   the Director's - which is the only part of this that is really secret,
-   since a hidden gesture is only hidden until somebody leans on it.   */
-const LOG_HOLD_MS = 2000;
-let logHoldTimer = null;
+   It opens from its own link in the Director's area, which is already
+   behind the password, so there is nothing to hide it from. If the
+   optional LOGBOOK_PASSWORD secret exists on the worker it asks for that
+   instead - a second lock for a Director who is not the only one who
+   knows the first password.                                          */
 
 function renderLog(entries) {
   if (!entries.length) {
@@ -3187,13 +3217,7 @@ function openLog() {
   loadLog(dirKey);
 }
 
-$('dirHeading').addEventListener('pointerdown', () => {
-  if (!dirUnlocked) { return; }
-  clearTimeout(logHoldTimer);
-  logHoldTimer = setTimeout(openLog, LOG_HOLD_MS);
-});
-['pointerup', 'pointerleave', 'pointercancel'].forEach(ev =>
-  $('dirHeading').addEventListener(ev, () => clearTimeout(logHoldTimer)));
+$('btnLogbook').addEventListener('click', openLog);
 $('btnLogClose').addEventListener('click', () => { $('logModal').hidden = true; });
 $('btnLogOpen').addEventListener('click', () => loadLog($('logPw').value.trim()));
 $('logPw').addEventListener('keydown', e => {
