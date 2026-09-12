@@ -264,6 +264,9 @@ h1 span{display:block;white-space:nowrap}
 .seg button{background:#fff;border:2px solid #B5D2C6;border-radius:999px;padding:9px 18px;font-size:17px;font-weight:700;color:var(--ink);cursor:pointer;min-width:56px}
 .seg button:hover{border-color:var(--ink-soft)}
 .seg button[aria-pressed="true"]{background:var(--blue);border-color:var(--blue-dark);color:#fff}
+.secondary.danger{color:var(--wrong);border-color:var(--wrong);box-shadow:0 4px 0 var(--wrong)}
+.secondary.danger:active:not(:disabled){box-shadow:0 1px 0 var(--wrong)}
+.secondary.danger[data-armed="1"]{background:var(--wrong);color:#fff}
 .dir-actions{display:flex;gap:12px;flex-wrap:wrap;align-items:center;border-top:2px solid #B5D2C6;padding-top:18px;margin-top:4px}
 .director-link{margin:26px 0 0;text-align:right}
 .note{background:#FFF9E6;border:2px dashed var(--brass);border-radius:12px;padding:10px 14px;margin:12px 0 0}
@@ -599,6 +602,12 @@ h1 span{display:block;white-space:nowrap}
         <span class="lab">Message from the Director</span>
         <p class="sub2">Shown at the end of every exam. Leave it empty for none.</p>
         <textarea id="noteInput" maxlength="140" rows="3" placeholder="Good luck today — watch out for the Triadan ones"></textarea>
+      </div>
+
+      <div class="field">
+        <span class="lab">Take a rider off the roll</span>
+        <p class="sub2">Her casebook, her rank and her certificates go with her. None of it can be got back.</p>
+        <button id="btnRemoveRider" class="secondary danger" type="button">Remove this rider</button>
       </div>
 
       <p class="err" id="dirErr" hidden></p>
@@ -1957,6 +1966,18 @@ function saveUser() {
 async function pushUp() {
   if (!progress.name) { return; }
   const res = await Academy.call('save', {name: progress.name, record: forWire(progress)});
+
+  // Removed from under her while she was playing. Rare, but letting the
+  // tablet keep her would put her back at the next save.
+  if (res && !res.ok && res.data.error === 'gone') {
+    const name = progress.name;
+    forget(name);
+    await refreshRoll();
+    showPicker();
+    riderError(name + ' is no longer at the Academy.');
+    goHome();
+    return;
+  }
   if (!res || !res.ok || !res.data.record) { return; }
   // Take back the merged record, so a second tablet's work shows up here
   // without anybody reloading. Settings come from the Academy alone.
@@ -2173,6 +2194,16 @@ function adopt(record, opts) {
   updateTitle();
 }
 
+// Drop every trace of a rider from this tablet.
+function forget(name) {
+  Local.drop('rider:' + slugOf(name));
+  if (slugOf(Local.get('last') || '') === slugOf(name)) { Local.drop('last'); }
+  if (slugOf(progress.name || '') === slugOf(name)) {
+    clearTimeout(pushTimer);
+    adopt(blankRecord());
+  }
+}
+
 function riderError(msg) {
   const p = $('riderErr');
   p.textContent = msg || '';
@@ -2227,6 +2258,18 @@ async function pickRider(name) {
   const res = local
     ? await Academy.call('save', {name: name, record: forWire(local)})
     : await Academy.call('load', {name: name});
+
+  // The Director has taken her off the roll somewhere else. This tablet
+  // is the last place she exists, and holding on to her would put her
+  // back the next time anybody tapped her name.
+  if (res && !res.ok && res.data.error === 'gone') {
+    forget(name);
+    await refreshRoll();
+    showPicker();
+    riderError(name + ' is no longer at the Academy.');
+    return;
+  }
+
   const record = (res && res.ok && res.data.record) ? res.data.record : local;
   adopt(Object.assign({}, record || blankRecord(), {name: name}));
   Local.saveRider(progress);
@@ -2248,7 +2291,11 @@ async function createRider() {
   const fresh = Object.assign(blankRecord(), {name: name});
   // Enrolled at the Academy before anything else, so that a full roll is
   // said out loud now rather than discovered after an exam.
-  const res = await Academy.call('save', {name: name, record: forWire(fresh)});
+  //
+  // `fresh` says somebody typed this name rather than tapping a
+  // remembered one, which is what lets a rider the Director removed be
+  // enrolled again on purpose without a stale tablet doing it by accident.
+  const res = await Academy.call('save', {name: name, record: forWire(fresh), fresh: true});
   if (res && !res.ok) {
     riderError(res.data.error === 'roll_full'
       ? 'The Academy has no room for another rider. The Director can make space.'
@@ -2771,6 +2818,7 @@ function renderDirector() {
 async function dirSelect(name) {
   dirRider = name;
   dirError('');
+  disarmRemove();   // an armed Remove must never carry over to another rider
   let record = null;
   if (slugOf(name) === slugOf(progress.name)) { record = progress; }
   const res = await Academy.call('load', {name: name});
@@ -2855,7 +2903,49 @@ function closeDirector() {
   dirUnlocked = false;
   dirKey = null;
   dirSettings = null;
+  disarmRemove();
   goHome();
+}
+
+// Taking a rider off the roll. Two taps, and the second one says her
+// name, because there is nothing behind this to undo it with.
+let removeArmed = false, removeTimer = null;
+
+function disarmRemove() {
+  clearTimeout(removeTimer);
+  removeArmed = false;
+  const b = $('btnRemoveRider');
+  if (b) { b.textContent = 'Remove this rider'; b.removeAttribute('data-armed'); }
+}
+
+async function removeRider() {
+  const b = $('btnRemoveRider');
+  if (!dirRider) { dirError('Choose a rider first.'); return; }
+
+  if (!removeArmed) {
+    removeArmed = true;
+    b.textContent = 'Tap again to remove ' + dirRider + ' for good';
+    b.setAttribute('data-armed', '1');
+    removeTimer = setTimeout(disarmRemove, 5000);
+    return;
+  }
+  const name = dirRider;
+  disarmRemove();
+
+  const res = await Academy.call('delete', {name: name, password: dirKey});
+  if (!res) { dirError('The Academy cannot be reached, so nothing was removed.'); return; }
+  if (!res.ok) { dirError('The Academy would not remove that rider.'); return; }
+
+  // The tablet's own copy has to go too, or the next save would merge it
+  // straight back and the removal would look as though it had failed.
+  const wasPlaying = slugOf(progress.name || '') === slugOf(name);
+  forget(name);
+  if (wasPlaying) { showPicker(); }
+  await refreshRoll();
+  renderDirectorRiders();
+  await dirSelect(roll.length ? roll[0].name : '');
+  dirError('');
+  Sound.play('select');
 }
 
 $('btnDirector').addEventListener('click', openDirector);
@@ -2869,6 +2959,7 @@ $('btnDirReset').addEventListener('click', () => {
   renderDirector();
   Sound.play('select');
 });
+$('btnRemoveRider').addEventListener('click', removeRider);
 $('segRider').addEventListener('click', e => {
   const b = e.target.closest('button[data-rider]');
   if (!b) return;
