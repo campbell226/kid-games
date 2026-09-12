@@ -554,6 +554,7 @@ h1 span{display:block;white-space:nowrap}
         <button id="btnRemoveRider" class="secondary danger" type="button">Remove this rider</button>
       </div>
 
+      <div id="dirFields">
       <div class="field">
         <span class="lab">Patients per exam</span>
         <p class="sub2">A shorter exam for a shorter attention span.</p>
@@ -617,6 +618,7 @@ h1 span{display:block;white-space:nowrap}
         <span class="lab">Message from the Director</span>
         <p class="sub2">Shown at the end of every exam. Leave it empty for none.</p>
         <textarea id="noteInput" maxlength="140" rows="3" placeholder="Good luck today — watch out for the Triadan ones"></textarea>
+      </div>
       </div>
 
       <p class="err" id="dirErr" hidden></p>
@@ -2200,6 +2202,14 @@ function renderRules() {
 /* ---------- riders ---------- */
 let roll = [];
 
+// Riders this tablet knows have gone, because it removed them or was told
+// so. The Academy's own list takes the best part of a minute to catch up -
+// it is a listing of keys rather than a query, and eventually consistent -
+// so without this the roll hands back the rider you just deleted and the
+// panel calmly re-selects her. Waiting or reloading does not help; only
+// not asking does.
+const removedHere = new Set();
+
 // Become this rider. Everything the game reads about a player goes
 // through here, so a record from the Academy, a record off the tablet
 // and a brand new one all arrive in the same state.
@@ -2220,6 +2230,7 @@ function adopt(record, opts) {
 
 // Drop every trace of a rider from this tablet.
 function forget(name) {
+  removedHere.add(slugOf(name));
   Local.drop('rider:' + slugOf(name));
   if (slugOf(Local.get('last') || '') === slugOf(name)) { Local.drop('last'); }
   if (slugOf(progress.name || '') === slugOf(name)) {
@@ -2255,6 +2266,7 @@ async function refreshRoll() {
   server.concat(Local.roll()).forEach(r => {
     if (!r || !r.name) { return; }
     const k = slugOf(r.name);
+    if (removedHere.has(k)) { return; }
     if (!by[k] || (r.solved || 0) > (by[k].solved || 0)) { by[k] = r; }
   });
   // Whoever is playing is on the roll by definition, even when neither
@@ -2337,6 +2349,8 @@ async function createRider() {
       : 'The Academy would not take that name. Try another one.');
     return;
   }
+  // She is back on purpose, so stop hiding her from the roll.
+  removedHere.delete(slugOf(name));
   adopt((res && res.ok && res.data.record) ? res.data.record : fresh);
   Local.saveRider(progress);
   Local.set('last', progress.name);
@@ -2833,7 +2847,16 @@ function renderDirectorRiders() {
   const list = roll.slice().sort((a, b) => a.name.localeCompare(b.name));
   $('segRider').innerHTML = list.map(r =>
     `<button type="button" data-rider="${esc(r.name)}" aria-pressed="${slugOf(r.name) === slugOf(dirRider) ? 'true' : 'false'}">${esc(r.name)}</button>`
-  ).join('') || '<span class="sub2">No riders yet. Someone has to join the Academy first.</span>';
+  ).join('') || '<span class="sub2">Nobody is at the Academy. Someone has to join before there is anything here to set.</span>';
+
+  // With no rider there is nothing for the settings to belong to, and a
+  // panel full of them says the removal did not work. Taking the last
+  // rider away should leave the Director looking at an empty yard.
+  const nobody = list.length === 0;
+  $('dirFields').hidden = nobody;
+  $('btnRemoveRider').hidden = nobody;
+  $('btnDirSave').hidden = nobody;
+  $('btnDirReset').hidden = nobody;
 }
 
 function renderDirector() {
@@ -2854,6 +2877,7 @@ async function dirSelect(name) {
   dirRider = name;
   dirError('');
   closeRemove();   // an open removal must never carry over to another rider
+  if (!name) { dirSettings = null; renderDirector(); return; }
   let record = null;
   if (slugOf(name) === slugOf(progress.name)) { record = progress; }
   const res = await Academy.call('load', {name: name});
@@ -3028,12 +3052,13 @@ async function removeRider() {
 
   // The tablet's own copy has to go too, or the next save would merge it
   // straight back and the removal would look as though it had failed.
-  const wasPlaying = slugOf(progress.name || '') === slugOf(name);
   forget(name);
-  if (wasPlaying) { showPicker(); }
   closeRemove();
   await refreshRoll();
-  renderDirectorRiders();
+  // The yard behind the panel has to be right too: whoever was playing may
+  // have just been removed, and an empty roll means the title screen should
+  // be asking for a name rather than offering one.
+  showPicker();
   await dirSelect(roll.length ? roll[0].name : '');
   dirError('');
   Sound.play('select');
