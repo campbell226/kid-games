@@ -568,23 +568,27 @@
     // deskY is the desk's back edge, where it meets the bookcases. Both
     // Hoot's feet and the book have to end up below it, or one of them
     // is standing in the wall.
-    var hootP, book, deskY;
-    // The pile of words she has already asked about sits on the desk in
-    // its own band, and the book is shortened to make room rather than
-    // the two being left to argue about the same space.
-    var recH = H * 0.075;
-    var recents;
+    var hootP, book, deskY, pile;
+    // The pile of words she has already asked about stands on the desk
+    // beside him, on the same surface as the stack he perches on, so the
+    // two read as books put down in the same place.
     if (wide) {
-      deskY = H * 0.38;
-      hootP = { x: W * 0.20, y: H * 0.66, s: clamp(H * 0.0017, 0.5, 1.9) };
-      recents = { x: W * 0.65, y: H * 0.455, w: W * 0.56, h: recH };
-      book = { x: W * 0.65, y: H * 0.72, w: W * 0.56, h: H * 0.40 };
+      deskY = H * 0.40;
+      hootP = { x: W * 0.30, y: H * 0.66, s: clamp(H * 0.0017, 0.5, 1.9) };
+      pile = { x: W * 0.095, w: W * 0.15 };
+      book = { x: W * 0.70, y: H * 0.64, w: W * 0.52, h: H * 0.46 };
     } else {
       deskY = H * 0.46;
-      hootP = { x: W * 0.5, y: H * 0.53, s: clamp(Math.min(W * 0.0024, H * 0.00095), 0.5, 2.6) };
-      recents = { x: W * 0.5, y: H * 0.615, w: W * 0.92, h: recH };
-      book = { x: W * 0.5, y: H * 0.80, w: W * 0.92, h: H * 0.30 };
+      hootP = { x: W * 0.60, y: H * 0.53, s: clamp(Math.min(W * 0.0024, H * 0.00095), 0.5, 2.6) };
+      pile = { x: W * 0.20, w: W * 0.28 };
+      book = { x: W * 0.5, y: H * 0.75, w: W * 0.92, h: H * 0.38 };
     }
+    // His stack is three books, 20 units each at his scale. The pile's
+    // base is the bottom of that stack, so both rest on one surface, and
+    // a book in the pile is as tall as eight can be without leaving the
+    // top of the screen.
+    pile.base = hootP.y + 60 * hootP.s;
+    pile.h = Math.min(H * (wide ? 0.05 : 0.034), (pile.base - H * 0.08) / RECENT_MAX);
 
     // The age slider is an HTML bar sitting over the bottom of the SVG,
     // so the drawing has to know how tall it is in its own units and
@@ -592,7 +596,7 @@
     // meant re-tuning it for every screen shape that came along.
     var barVb = (74 / Math.max(1, vh)) * H;
 
-    L = { W: W, H: H, wide: wide, hoot: hootP, book: book, recents: recents,
+    L = { W: W, H: H, wide: wide, hoot: hootP, book: book, pile: pile,
          deskY: deskY, barVb: barVb };
 
     svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
@@ -711,13 +715,18 @@
   // A short stack of books under Hoot's feet, so he is standing on
   // something in a room where standing on the desk itself would look
   // like he had got up on the furniture.
+  // The books go below his feet, not above them. They used to be drawn
+  // from his feet upwards, on the scenery layer behind him, so he stood
+  // on the bare desk with books propped against the back of his legs -
+  // which from the front looks exactly like an owl hovering. Widest at
+  // the bottom, too; it had been built upside down.
   function drawStack(g) {
     var hx = L.hoot.x, hy = L.hoot.y, s = L.hoot.s;
     var w0 = 150 * s, h0 = 20 * s;
     var i, n = 3;
     for (i = 0; i < n; i++) {
-      var w = w0 * (1 - i * 0.07) * rand(0.97, 1.03);
-      var y = hy - (n - i) * h0;
+      var w = w0 * (1 - (n - 1 - i) * 0.07) * rand(0.97, 1.03);
+      var y = hy + i * h0;
       var off = rand(-6, 6) * s;
       g.appendChild(el('rect', {
         x: hx - w / 2 + off, y: y, width: w, height: h0, rx: h0 * 0.22,
@@ -855,7 +864,15 @@
   // ------------------------------------------------------------------
   // The book. Where the word and its meaning land.
   // ------------------------------------------------------------------
-  var bookWord = null, bookLines = [], bookOpen = 0;
+  var bookWord = null, bookText = '', bookRelated = [], bookOpen = 0;
+
+  // A stable colour per word, so a word is the same book wherever it
+  // turns up - on the pile, or suggested under another definition.
+  function wordHash(w) {
+    var h = 7, i;
+    for (i = 0; i < w.length; i++) { h = (h * 31 + w.charCodeAt(i)) % 100003; }
+    return h;
+  }
 
   function drawBook() {
     var g = document.getElementById('book');
@@ -863,33 +880,59 @@
     var b = L.book;
     var FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
 
-    var wordSize = Math.min(b.w * 0.15, b.h * 0.22);
-    var defSize = clamp(Math.min(b.w * 0.052, b.h * 0.09), 16, 44);
-    L.maxChars = Math.floor(b.w * 0.86 / (defSize * 0.52));
+    // The lip is the cover standing proud of the page. It has to be known
+    // before the floor below is worked out: it used to be declared after,
+    // so the floor came out as NaN and the page was never actually kept
+    // clear of the slider at all.
+    var lip = Math.max(8, b.w * 0.016);
 
-    var lines = bookLines;
-    var pad = defSize * 1.1;
+    // The room the page has: down to just above the slider, and up to the
+    // desk's back edge - or in portrait, where the book sits below him
+    // rather than beside him, up to the foot of his stack and the pile.
+    // Given the whole desk, the page climbed over his feet.
+    var ceil = L.deskY + Math.max(4, L.H * 0.01);
+    if (!L.wide && L.pile) { ceil = Math.max(ceil, L.pile.base + lip * 2); }
+    var floor = L.H - L.barVb - Math.max(6, L.H * 0.012) - lip * 2;
+    var room = floor - ceil;
+
+    var rel = bookText ? bookRelated : [];
+    var wordSize, defSize, pad, chipH, lines, blockH, f;
+
+    // The text is sized to the room, not the room to the text. It used to
+    // cap the page's height and leave the text at full size, so in
+    // landscape a long answer spilled out of both ends: the word off the
+    // top of the page, the suggestions onto the slider. Now it steps the
+    // type down until the whole block fits, rewrapping as it goes, since
+    // smaller type fits more words on each line.
+    for (f = 1; f >= 0.55; f -= 0.05) {
+      wordSize = Math.min(b.w * 0.15, b.h * 0.22) * f;
+      defSize = clamp(Math.min(b.w * 0.052, b.h * 0.09), 16, 44) * f;
+      // A character is nearer 0.56 of the font size than 0.52 in these
+      // system faces - measured once the page could finally be seen, and
+      // the first line was running into both edges of the paper.
+      L.maxChars = Math.floor(b.w * 0.82 / (defSize * 0.56));
+      lines = bookText ? wrap(bookText, L.maxChars) : [];
+      pad = defSize * 1.1;
+      chipH = defSize * 1.7;
+      blockH = wordSize * 1.05 +
+        (lines.length ? defSize * 0.9 + lines.length * defSize * 1.3 : 0) +
+        (rel.length ? defSize * 0.9 + chipH : 0);
+      if (blockH + pad * 2 <= room) { break; }
+    }
 
     // The page is cut to fit what is on it. A four-line answer sitting at
     // the top of a page-and-a-half of blank paper looks like the game has
     // stopped halfway through.
-    var blockH = wordSize * 1.05 + (lines.length ? defSize * 0.9 + lines.length * defSize * 1.3 : 0);
-    var pageH = clamp(blockH + pad * 2, b.h * 0.34, b.h);
+    var pageH = Math.min(Math.max(blockH + pad * 2, b.h * 0.34), room);
     var x = b.x - b.w / 2, y = b.y - pageH / 2;
-
-    // Keep the whole page above the slider, and off the top of the desk.
-    // The lip is the cover standing proud of the page, so the floor has
-    // to clear that too or the binding tucks under the slider.
-    var floor = L.H - L.barVb - Math.max(6, L.H * 0.012) - lip * 2;
     if (y + pageH > floor) { y = floor - pageH; }
-    if (y < L.deskY + Math.max(4, L.H * 0.01)) { y = L.deskY + Math.max(4, L.H * 0.01); }
+    if (y < ceil) { y = ceil; }
 
     // An open book lying on the desk: covers standing a little proud of
     // the pages on both sides, a block of page edges under each, and a
     // crease down the middle. The crease is a soft band rather than the
     // hard line it started as, which drew a stripe straight through the
     // middle of the word.
-    var lip = Math.max(8, b.w * 0.016);
     g.appendChild(el('rect', {
       x: x - lip, y: y - lip * 0.8, width: b.w + lip * 2, height: pageH + lip * 1.9,
       rx: lip * 1.6, fill: '#6d3f27'
@@ -963,6 +1006,53 @@
       x: x - lip, y: y - lip, width: b.w + lip * 2, height: pageH + lip * 2
     }));
 
+    // Three words to go on to, as small closed books under the answer.
+    // Drawn after the page's own target so they sit on top of it: a tap
+    // on one is a lookup, a tap anywhere else on the page is still the
+    // keyboard.
+    if (rel.length) {
+      var cs = defSize * 0.9, cgap = defSize * 0.6, widths = [], total = 0, k;
+      for (k = 0; k < rel.length; k++) {
+        widths.push(rel[k].length * cs * 0.58 + cs * 1.6);
+        total += widths[k];
+      }
+      total += cgap * (rel.length - 1);
+      // Too wide for the page: shrink the lot together rather than
+      // letting the last one fall off the edge.
+      var fit = Math.min(1, b.w * 0.92 / total);
+      var cy = startY + (lines.length - 1) * defSize * 1.3 + defSize * 0.9 + chipH * 0.35;
+      var cx = b.x - total * fit / 2;
+      for (k = 0; k < rel.length; k++) {
+        var cw = widths[k] * fit;
+        var chip = el('g', {});
+        chip.appendChild(el('rect', {
+          x: cx, y: cy, width: cw, height: chipH * fit, rx: chipH * 0.2 * fit,
+          fill: SPINES[wordHash(rel[k]) % SPINES.length]
+        }));
+        chip.appendChild(el('rect', {
+          x: cx + cw * 0.05, y: cy + chipH * fit * 0.16, width: Math.max(2, cs * 0.12),
+          height: chipH * fit * 0.68, rx: 1, fill: '#f3e3bd', opacity: 0.55
+        }));
+        chip.appendChild(el('rect', {
+          x: cx + cw * 0.95 - Math.max(2, cs * 0.12), y: cy + chipH * fit * 0.16,
+          width: Math.max(2, cs * 0.12), height: chipH * fit * 0.68, rx: 1,
+          fill: '#f3e3bd', opacity: 0.55
+        }));
+        var ct = el('text', {
+          x: cx + cw / 2, y: cy + chipH * fit * 0.5 + cs * fit * 0.35, 'text-anchor': 'middle',
+          'font-family': FONT, 'font-size': cs * fit, 'font-weight': '700', fill: '#fdf6e4'
+        });
+        ct.textContent = rel[k];
+        chip.appendChild(ct);
+        chip.appendChild(el('rect', {
+          'class': 'hit', x: cx, y: cy, width: cw, height: chipH * fit,
+          'data-related': rel[k]
+        }));
+        g.appendChild(chip);
+        cx += cw + cgap * fit;
+      }
+    }
+
     g.setAttribute('opacity', bookOpen);
 
     // The flicking pages need the page's real geometry, which is only
@@ -1030,9 +1120,13 @@
     return lines.slice(0, 7);
   }
 
-  function showInBook(word, definition) {
+  // Kept as the raw sentence, not pre-wrapped lines: the wrap depends on
+  // the type size, and the type size is only decided once drawBook knows
+  // how much room the page has.
+  function showInBook(word, definition, related) {
     bookWord = word || '';
-    bookLines = definition ? wrap(definition, L.maxChars || 34) : [];
+    bookText = definition || '';
+    bookRelated = related || [];
     drawBook();
   }
 
@@ -1061,15 +1155,17 @@
     catch (e) { /* full, or private browsing: it is a saving, not a store */ }
   }
 
+  // Answers stored before related words existed have no "r", and come
+  // back with none rather than being thrown away.
   function recall(word, age) {
     var e = answers[cacheKey(word, age)];
     if (!e) { return null; }
     e.at = Date.now();
-    return e.t;
+    return { t: e.t, r: e.r || [] };
   }
 
-  function remember(word, age, text) {
-    answers[cacheKey(word, age)] = { t: text, at: Date.now() };
+  function remember(word, age, text, related) {
+    answers[cacheKey(word, age)] = { t: text, r: related || [], at: Date.now() };
     var keys = Object.keys(answers), i;
     if (keys.length > CACHE_MAX) {
       keys.sort(function (a, b) { return answers[a].at - answers[b].at; });
@@ -1078,7 +1174,7 @@
     saveAnswers();
   }
 
-  var RECENT_MAX = 4;
+  var RECENT_MAX = 8;
 
   function noteRecent(word) {
     var r = prefs.recents || [], i;
@@ -1089,54 +1185,63 @@
     drawRecents();
   }
 
+  // The pile: books lying flat, spines towards her, newest on top - the
+  // way a real pile of books grows. Widths and the slight skew are taken
+  // from the word itself rather than from Math.random, so the pile does
+  // not reshuffle every time a new book lands on it.
   function drawRecents() {
     var g = document.getElementById('recents');
     clear(g);
     var r = prefs.recents || [];
-    if (!r.length || !L.recents) { return; }
+    if (!r.length || !L.pile) { return; }
 
-    var b = L.recents;
+    var p = L.pile;
     var n = Math.min(r.length, RECENT_MAX);
-    var gap = b.w * 0.02;
-    var cw = (b.w - gap * (n - 1)) / n;
-    var left = b.x - b.w / 2;
-    var i;
+    var FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+    var k;
 
-    for (i = 0; i < n; i++) {
-      var cx = left + i * (cw + gap) + cw / 2;
-      var word = r[i];
+    // Bottom first, so each book above sits over the one below it.
+    for (k = n - 1; k >= 0; k--) {
+      var word = r[k];
+      var h = wordHash(word);
+      var w = p.w * (0.8 + (h % 21) / 100);
+      var off = ((h >> 3) % 13 - 6) / 100 * p.w;
+      var top = p.base - (n - k) * p.h;
+      var x = p.x - w / 2 + off;
       var grp = el('g', { 'class': 'recent' });
 
       grp.appendChild(el('rect', {
-        x: cx - cw / 2, y: b.y - b.h / 2, width: cw, height: b.h,
-        rx: b.h * 0.18, fill: SPINES[i % SPINES.length]
+        x: x, y: top, width: w, height: p.h, rx: p.h * 0.2,
+        fill: SPINES[h % SPINES.length]
       }));
-      // The spine down the left edge, so it reads as a closed book seen
-      // from above rather than as a coloured tile.
+      // Shade along the bottom edge, so the books separate from each
+      // other instead of merging into one coloured column.
       grp.appendChild(el('rect', {
-        x: cx - cw / 2, y: b.y - b.h / 2, width: Math.max(4, cw * 0.06), height: b.h,
-        rx: b.h * 0.18, fill: '#00000033'
+        x: x, y: top + p.h * 0.78, width: w, height: p.h * 0.22, rx: p.h * 0.1,
+        fill: '#000', opacity: 0.18
+      }));
+      // Two bands near each end: the tooling on a spine.
+      grp.appendChild(el('rect', {
+        x: x + w * 0.06, y: top + p.h * 0.14, width: Math.max(2, w * 0.018),
+        height: p.h * 0.6, fill: '#f3e3bd', opacity: 0.5
       }));
       grp.appendChild(el('rect', {
-        x: cx + cw / 2 - Math.max(3, cw * 0.04), y: b.y - b.h * 0.4,
-        width: Math.max(3, cw * 0.035), height: b.h * 0.8, rx: 2,
-        fill: '#f2e6c8', opacity: 0.8
+        x: x + w * 0.94 - Math.max(2, w * 0.018), y: top + p.h * 0.14,
+        width: Math.max(2, w * 0.018), height: p.h * 0.6, fill: '#f3e3bd', opacity: 0.5
       }));
 
-      // Sized to the word rather than to the card, so "dinosaur" is
-      // smaller than "cat" instead of running off the cover.
-      var size = Math.min(b.h * 0.44, cw * 0.78 / Math.max(3, word.length * 0.56));
+      // Sized to the word, so "dinosaur" shrinks rather than running off
+      // the spine.
+      var size = Math.min(p.h * 0.56, w * 0.8 / Math.max(3, word.length * 0.58));
       var t = el('text', {
-        x: cx + cw * 0.02, y: b.y + size * 0.34, 'text-anchor': 'middle',
-        'font-family': 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
-        'font-size': size, 'font-weight': '700', fill: '#fdf6e4'
+        x: x + w / 2, y: top + p.h * 0.44 + size * 0.36, 'text-anchor': 'middle',
+        'font-family': FONT, 'font-size': size, 'font-weight': '700', fill: '#fdf6e4'
       });
       t.textContent = word;
       grp.appendChild(t);
 
       grp.appendChild(el('rect', {
-        'class': 'hit', x: cx - cw / 2, y: b.y - b.h / 2, width: cw, height: b.h,
-        'data-recent': word
+        'class': 'hit', x: x, y: top, width: w, height: p.h, 'data-recent': word
       }));
       g.appendChild(grp);
     }
@@ -1765,7 +1870,7 @@
       showInBook(word, '');
       setState('thinking');
       window.setTimeout(function () {
-        if (state === 'thinking') { tell(word, known); }
+        if (state === 'thinking') { tell(word, known.t, known.r); }
       }, 550);
       return;
     }
@@ -1818,7 +1923,7 @@
           (res.data.detail ? ' ' + res.data.detail : ''));
       }
       lastError = '';
-      tell(word, res.data.text);
+      tell(word, res.data.text, res.data.related);
     })['catch'](function (e) {
       if (timer) { window.clearTimeout(timer); }
       lastError = (e && e.message) ? String(e.message) : 'no answer';
@@ -1826,10 +1931,11 @@
     });
   }
 
-  function tell(word, text) {
-    remember(word, prefs.age, text);
+  function tell(word, text, related) {
+    related = (related instanceof Array) ? related.slice(0, 3) : [];
+    remember(word, prefs.age, text, related);
     noteRecent(word);
-    showInBook(word, text);
+    showInBook(word, text, related);
     setState('telling');
     starburst();
     sparkle();
@@ -1939,7 +2045,7 @@
     // balances the frame and, more to the point, teaches where words are
     // going to appear before any word ever has.
     var wantOpen = (state === 'thinking' || state === 'telling') ? 1 : 0.24;
-    if (state === 'idle' && bookLines.length) { wantOpen = 1; }
+    if (state === 'idle' && bookText) { wantOpen = 1; }
     // The cards need the page to themselves, or the ghost of the book
     // shows through the middle one.
     if (state === 'confirming') { wantOpen = 0; }
@@ -1987,6 +2093,17 @@
       clearChoices();
       hoot(true);
       lookUp(word);
+      return;
+    }
+
+    // A word suggested under the answer. Tapping it is choosing it, so it
+    // skips the confirmation that a heard word gets - exactly as a book
+    // on the pile does.
+    var next = t.getAttribute && t.getAttribute('data-related');
+    if (next) {
+      if (SS) { SS.cancel(); }
+      hoot(true);
+      lookUp(next);
       return;
     }
 

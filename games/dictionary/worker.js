@@ -52,18 +52,91 @@ const DAILY_WORDS = 1000;
 // inside real words. Anything else is somebody probing.
 const WORD = /^[a-z][a-z' -]{0,27}$/;
 
+// The definition avoids the word, because "respect means showing respect"
+// explains nothing. The example must use it, because an example that
+// avoids it leaves the child to infer the link: "when your teacher helps
+// you, it's nice to listen" never actually says that listening is the
+// respect. Saying the word inside the example is what joins the two up.
 function systemPrompt(age) {
-  const cap = age <= 4 ? 22 : (age <= 6 ? 30 : (age <= 8 ? 40 : 55));
+  const cap = age <= 4 ? 26 : (age <= 6 ? 34 : (age <= 8 ? 44 : 58));
   return 'You are a kind, twinkly owl called Hoot who explains words to a British child ' +
     'of about ' + age + ' years old.\n' +
-    'Reply with one or two very short sentences and nothing else: first what the word means, ' +
-    'then an everyday example that starts with "Like when".\n' +
-    'Use only words a ' + age + '-year-old already knows. Never use the word itself, or any ' +
-    'form of it, inside the explanation.\n' +
-    'British English. No markdown, no quotation marks, no lists, no greeting, no sign-off.\n' +
-    'Stay under ' + cap + ' words.\n' +
-    'If it is not a real word, say gently that you have not heard that one, in the same voice.\n' +
-    'Everything you say is read aloud to a small child, so keep it warm and never frightening.';
+    'Reply only with a JSON object with three fields:\n' +
+    '- definition: one short sentence saying what the word means. Do not use the word ' +
+    'itself, or any form of it, in this sentence.\n' +
+    '- example: one short sentence that starts with "Like when" and uses the word itself, ' +
+    'so the child hears it used. It must show the meaning from the definition happening, ' +
+    'not leave the child to work out the link.\n' +
+    '- related: exactly three other words a child of this age might enjoy looking up next. ' +
+    'They can be similar words, opposites, or things that go with it - not only synonyms. ' +
+    'Single everyday words, lower case, never the word itself.\n' +
+    'Use only words a ' + age + '-year-old already knows. British English. No markdown.\n' +
+    'The definition and example together stay under ' + cap + ' words.\n' +
+    'If it is not a real word, make the definition a gentle sentence saying you have not ' +
+    'heard that one, the example an empty string, and related an empty list.\n' +
+    'Everything is read aloud to a small child, so keep it warm and never frightening.';
+}
+
+const SCHEMA = {
+  type: 'object',
+  properties: {
+    definition: { type: 'string' },
+    example: { type: 'string' },
+    related: { type: 'array', items: { type: 'string' } }
+  },
+  required: ['definition', 'example', 'related'],
+  additionalProperties: false
+};
+
+// Asks with the API's structured-output mode first, which guarantees the
+// shape. If the model or account refuses that mode, asks again plainly -
+// the prompt asks for JSON either way - so an unsupported feature costs
+// one retry rather than a broken game.
+async function ask(env, word, age) {
+  const base = {
+    model: MODEL,
+    max_tokens: 300,
+    system: systemPrompt(age),
+    messages: [{ role: 'user', content: word }]
+  };
+  const call = (body) => fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-api-key': env.ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify(body)
+  });
+  const strict = await call(Object.assign({
+    output_config: { format: { type: 'json_schema', schema: SCHEMA } }
+  }, base));
+  if (strict.status !== 400) { return strict; }
+  return call(base);
+}
+
+// Whatever came back, make it {text, related}. Anything the model puts in
+// "related" goes through the same one-word check as the child's own input,
+// because those words are about to become buttons that ask this worker
+// for more.
+function shape(raw, word) {
+  let data = null;
+  try {
+    data = JSON.parse(raw.replace(/^\s*```(?:json)?\s*|\s*```\s*$/g, ''));
+  } catch (e) { /* plain prose after all; keep it as the definition */ }
+  if (!data || typeof data !== 'object') {
+    return { text: raw.replace(/\s+/g, ' ').trim(), related: [] };
+  }
+  const text = [data.definition, data.example]
+    .map((s) => String(s || '').trim()).filter(Boolean).join(' ')
+    .replace(/\s+/g, ' ');
+  const related = [];
+  for (const r of (Array.isArray(data.related) ? data.related : [])) {
+    const w = String(r || '').toLowerCase().trim();
+    if (WORD.test(w) && w !== word && related.indexOf(w) < 0) { related.push(w); }
+    if (related.length === 3) { break; }
+  }
+  return { text: text, related: related };
 }
 
 function cors(origin) {
@@ -154,20 +227,7 @@ export default {
 
     let upstream;
     try {
-      upstream = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-api-key': env.ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01'
-        },
-        body: JSON.stringify({
-          model: MODEL,
-          max_tokens: 200,
-          system: systemPrompt(age),
-          messages: [{ role: 'user', content: word }]
-        })
-      });
+      upstream = await ask(env, word, age);
     } catch (e) {
       return json({ error: 'upstream_unreachable' }, 502, origin);
     }
@@ -178,13 +238,14 @@ export default {
     }
 
     const data = await upstream.json();
-    let text = '';
+    let raw = '';
     for (const block of (data.content || [])) {
-      if (block.type === 'text') { text += block.text; }
+      if (block.type === 'text') { raw += block.text; }
     }
-    text = text.replace(/\s+/g, ' ').trim();
-    if (!text) { return json({ error: 'empty' }, 502, origin); }
+    const answer = shape(raw, word);
+    if (!answer.text) { return json({ error: 'empty' }, 502, origin); }
 
-    return json({ text: text, used: used + 1, cap: DAILY_WORDS }, 200, origin);
+    return json({ text: answer.text, related: answer.related, used: used + 1, cap: DAILY_WORDS },
+      200, origin);
   }
 };
