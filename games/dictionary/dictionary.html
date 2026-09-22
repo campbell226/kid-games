@@ -1179,74 +1179,196 @@
 
   var RECENT_MAX = 8;
 
+  // ------------------------------------------------------------------
+  // A book joining the pile.
+  //
+  // Repainting the pile made the books quietly become different books:
+  // the same eight rectangles with new colours and new words on them,
+  // nothing having moved. So the move is acted out instead. Everything
+  // above the bottom hops up, the bottom slides out from under them and
+  // away, the rest drop into the gap it left, and only then does the new
+  // word rise off the page and land on top.
+  // ------------------------------------------------------------------
+  var pileAnim = null;
+  var HOP = 0.30, SETTLE = 0.26, LAND_AT = 0.22, LAND = 0.36;
+
+  function ease(p) { return p <= 0 ? 0 : (p >= 1 ? 1 : 1 - Math.pow(1 - p, 3)); }
+
   function noteRecent(word) {
-    var r = prefs.recents || [], i;
-    for (i = r.length - 1; i >= 0; i--) { if (r[i] === word) { r.splice(i, 1); } }
-    r.unshift(word);
-    prefs.recents = r.slice(0, RECENT_MAX);
+    var old = (prefs.recents || []).slice();
+    var had = old.indexOf(word);
+    var evicted = null, list;
+
+    if (had >= 0) {
+      // Asked again: it comes back to the top and nothing is thrown away,
+      // so the pile shuffles without a book sliding out.
+      list = [word].concat(old.slice(0, had), old.slice(had + 1));
+    } else if (old.length >= RECENT_MAX) {
+      evicted = old[old.length - 1];
+      list = [word].concat(old.slice(0, RECENT_MAX - 1));
+    } else {
+      list = [word].concat(old);
+    }
+
+    prefs.recents = list;
     savePrefs();
     drawRecents();
+    if (reduced || !L.pile) { return; }
+
+    // Match the freshly drawn books to their words, so the animation can
+    // move the nodes drawRecents has just made.
+    var g = document.getElementById('recents');
+    var byWord = {}, i, node, hit;
+    for (i = 0; i < g.childNodes.length; i++) {
+      node = g.childNodes[i];
+      hit = node.querySelector ? node.querySelector('[data-recent]') : null;
+      if (hit) { byWord[hit.getAttribute('data-recent')] = node; }
+    }
+
+    var moves = [], n = list.length, wasAt;
+    for (i = 1; i < n; i++) {
+      wasAt = old.indexOf(list[i]);
+      if (wasAt < 0 || !byWord[list[i]]) { continue; }
+      moves.push({ n: byWord[list[i]], dy: slotY(wasAt, old.length) - slotY(i, n) });
+    }
+
+    var out = null;
+    if (evicted) {
+      // Drawn again where it used to be, since the pile no longer has it.
+      var gone = pileBook(evicted, slotY(old.length - 1, old.length));
+      g.insertBefore(gone, g.firstChild);
+      out = { n: gone, dx: -(L.pile.w * 1.9) };
+    }
+
+    var landing = byWord[word] || null, from = null;
+    if (landing && landing.mid) {
+      // Up off the page it has just been read from.
+      from = {
+        x: L.page.x - landing.mid.x,
+        y: (L.page.y + L.page.h * 0.35) - landing.mid.y
+      };
+      landing.setAttribute('opacity', 0);
+    }
+
+    pileAnim = { t: 0, moves: moves, out: out, landing: landing, from: from,
+                 mid: landing ? landing.mid : null };
   }
 
-  // The pile: books lying flat, spines towards her, newest on top - the
-  // way a real pile of books grows. Widths and the slight skew are taken
-  // from the word itself rather than from Math.random, so the pile does
-  // not reshuffle every time a new book lands on it.
+  function stepPile(dt) {
+    if (!pileAnim) { return; }
+    var a = pileAnim;
+    a.t += dt;
+    var hop = L.pile.h * 0.62;
+    var i, m, off;
+
+    for (i = 0; i < a.moves.length; i++) {
+      m = a.moves[i];
+      if (a.t < HOP) { off = m.dy - hop * ease(a.t / HOP); }
+      else { off = (m.dy - hop) * (1 - ease((a.t - HOP) / SETTLE)); }
+      m.n.setAttribute('transform', 'translate(0 ' + off + ')');
+    }
+
+    if (a.out) {
+      var q = ease(a.t / (HOP + SETTLE));
+      a.out.n.setAttribute('transform',
+        'translate(' + (a.out.dx * q) + ' ' + (L.pile.h * 0.5 * q) + ')');
+      a.out.n.setAttribute('opacity', 1 - q);
+    }
+
+    if (a.landing && a.from) {
+      var l = (a.t - LAND_AT) / LAND;
+      if (l <= 0) { a.landing.setAttribute('opacity', 0); }
+      else {
+        var e = ease(l), sc = 0.55 + 0.45 * e;
+        a.landing.setAttribute('opacity', Math.min(1, l * 3));
+        a.landing.setAttribute('transform',
+          'translate(' + (a.from.x * (1 - e)) + ' ' + (a.from.y * (1 - e)) + ') ' +
+          'translate(' + a.mid.x + ' ' + a.mid.y + ') scale(' + sc + ') ' +
+          'translate(' + (-a.mid.x) + ' ' + (-a.mid.y) + ')');
+      }
+    }
+
+    if (a.t >= Math.max(HOP + SETTLE, LAND_AT + LAND)) { finishPile(); }
+  }
+
+  function finishPile() {
+    var a = pileAnim, i;
+    if (!a) { return; }
+    pileAnim = null;
+    for (i = 0; i < a.moves.length; i++) { a.moves[i].n.removeAttribute('transform'); }
+    if (a.out && a.out.n.parentNode) { a.out.n.parentNode.removeChild(a.out.n); }
+    if (a.landing) {
+      a.landing.removeAttribute('transform');
+      a.landing.setAttribute('opacity', 1);
+    }
+  }
+
+  // Where the k-th book of a pile of n sits. Newest is index 0 and lies
+  // on top, so the oldest is the one resting on the desk.
+  function slotY(k, n) { return L.pile.base - (n - k) * L.pile.h; }
+
+  // One book, built on its own, so the same drawing serves both the pile
+  // and the single book that is being thrown off the bottom of it.
+  // Widths and the slight skew come from the word rather than from
+  // Math.random, so the pile does not reshuffle whenever it is redrawn.
+  function pileBook(word, top) {
+    var p = L.pile;
+    var FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+    var h = wordHash(word);
+    var w = p.w * (0.8 + (h % 21) / 100);
+    var off = ((h >> 3) % 13 - 6) / 100 * p.w;
+    var x = p.x - w / 2 + off;
+    var grp = el('g', { 'class': 'recent' });
+
+    grp.appendChild(el('rect', {
+      x: x, y: top, width: w, height: p.h, rx: p.h * 0.2,
+      fill: SPINES[h % SPINES.length]
+    }));
+    // Shade along the bottom edge, so the books separate from each other
+    // instead of merging into one coloured column.
+    grp.appendChild(el('rect', {
+      x: x, y: top + p.h * 0.78, width: w, height: p.h * 0.22, rx: p.h * 0.1,
+      fill: '#000', opacity: 0.18
+    }));
+    // Two bands near each end: the tooling on a spine.
+    grp.appendChild(el('rect', {
+      x: x + w * 0.06, y: top + p.h * 0.14, width: Math.max(2, w * 0.018),
+      height: p.h * 0.6, fill: '#f3e3bd', opacity: 0.5
+    }));
+    grp.appendChild(el('rect', {
+      x: x + w * 0.94 - Math.max(2, w * 0.018), y: top + p.h * 0.14,
+      width: Math.max(2, w * 0.018), height: p.h * 0.6, fill: '#f3e3bd', opacity: 0.5
+    }));
+
+    // Sized to the word, so "dinosaur" shrinks rather than running off
+    // the spine.
+    var size = Math.min(p.h * 0.56, w * 0.8 / Math.max(3, word.length * 0.58));
+    var t = el('text', {
+      x: x + w / 2, y: top + p.h * 0.44 + size * 0.36, 'text-anchor': 'middle',
+      'font-family': FONT, 'font-size': size, 'font-weight': '700', fill: '#fdf6e4'
+    });
+    t.textContent = word;
+    grp.appendChild(t);
+
+    grp.appendChild(el('rect', {
+      'class': 'hit', x: x, y: top, width: w, height: p.h, 'data-recent': word
+    }));
+    grp.mid = { x: x + w / 2, y: top + p.h / 2 };
+    return grp;
+  }
+
   function drawRecents() {
     var g = document.getElementById('recents');
+    pileAnim = null;
     clear(g);
     var r = prefs.recents || [];
     if (!r.length || !L.pile) { return; }
 
-    var p = L.pile;
     var n = Math.min(r.length, RECENT_MAX);
-    var FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
     var k;
-
     // Bottom first, so each book above sits over the one below it.
     for (k = n - 1; k >= 0; k--) {
-      var word = r[k];
-      var h = wordHash(word);
-      var w = p.w * (0.8 + (h % 21) / 100);
-      var off = ((h >> 3) % 13 - 6) / 100 * p.w;
-      var top = p.base - (n - k) * p.h;
-      var x = p.x - w / 2 + off;
-      var grp = el('g', { 'class': 'recent' });
-
-      grp.appendChild(el('rect', {
-        x: x, y: top, width: w, height: p.h, rx: p.h * 0.2,
-        fill: SPINES[h % SPINES.length]
-      }));
-      // Shade along the bottom edge, so the books separate from each
-      // other instead of merging into one coloured column.
-      grp.appendChild(el('rect', {
-        x: x, y: top + p.h * 0.78, width: w, height: p.h * 0.22, rx: p.h * 0.1,
-        fill: '#000', opacity: 0.18
-      }));
-      // Two bands near each end: the tooling on a spine.
-      grp.appendChild(el('rect', {
-        x: x + w * 0.06, y: top + p.h * 0.14, width: Math.max(2, w * 0.018),
-        height: p.h * 0.6, fill: '#f3e3bd', opacity: 0.5
-      }));
-      grp.appendChild(el('rect', {
-        x: x + w * 0.94 - Math.max(2, w * 0.018), y: top + p.h * 0.14,
-        width: Math.max(2, w * 0.018), height: p.h * 0.6, fill: '#f3e3bd', opacity: 0.5
-      }));
-
-      // Sized to the word, so "dinosaur" shrinks rather than running off
-      // the spine.
-      var size = Math.min(p.h * 0.56, w * 0.8 / Math.max(3, word.length * 0.58));
-      var t = el('text', {
-        x: x + w / 2, y: top + p.h * 0.44 + size * 0.36, 'text-anchor': 'middle',
-        'font-family': FONT, 'font-size': size, 'font-weight': '700', fill: '#fdf6e4'
-      });
-      t.textContent = word;
-      grp.appendChild(t);
-
-      grp.appendChild(el('rect', {
-        'class': 'hit', x: x, y: top, width: w, height: p.h, 'data-recent': word
-      }));
-      g.appendChild(grp);
+      g.appendChild(pileBook(r[k], slotY(k, n)));
     }
   }
 
@@ -1989,12 +2111,15 @@
   function tell(word, text, related) {
     related = (related instanceof Array) ? related.slice(0, 3) : [];
     remember(word, prefs.age, text, related);
-    noteRecent(word);
     showInBook(word, text, related);
     setState('telling');
     starburst();
     sparkle();
     speak(word + '. ' + text, function () {
+      // The book is put down once it has been used, not the moment the
+      // answer arrives - which is also the moment she is looking up from
+      // the page, so the pile moving is worth watching.
+      noteRecent(word);
       if (state === 'telling') { setState('idle'); }
     });
   }
@@ -2114,6 +2239,7 @@
     }
 
     stepPages(dt);
+    stepPile(dt);
     stepSparks(dt);
     requestAnimationFrame(frame);
   }
