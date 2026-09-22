@@ -556,6 +556,12 @@
   // ------------------------------------------------------------------
   var L = null;
 
+  // The stack he perches on. Named here because computeLayout has to know
+  // how tall it is to find the bottom of it, and drawStack has to draw it
+  // the same height, and the two quietly disagreeing is how he ended up
+  // hovering the first time.
+  var STACK_BOOKS = 3, STACK_THICK = 26;
+
   function computeLayout() {
     var vw = Math.max(1, window.innerWidth), vh = Math.max(1, window.innerHeight);
     var W = 1000;
@@ -572,32 +578,46 @@
     // The pile of words she has already asked about stands on the desk
     // beside him, on the same surface as the stack he perches on, so the
     // two read as books put down in the same place.
+    // He and his books sit higher and bigger than they did: there was a
+    // quarter of the screen doing nothing above his head, and the page
+    // below him was the thing that wanted it.
     if (wide) {
-      deskY = H * 0.40;
-      hootP = { x: W * 0.30, y: H * 0.66, s: clamp(H * 0.0017, 0.5, 1.9) };
+      deskY = H * 0.36;
+      hootP = { x: W * 0.30, y: H * 0.66, s: clamp(H * 0.0019, 0.5, 2.1) };
       pile = { x: W * 0.095, w: W * 0.15 };
-      book = { x: W * 0.70, y: H * 0.64, w: W * 0.52, h: H * 0.46 };
+      book = { x: W * 0.70, w: W * 0.52 };
     } else {
-      deskY = H * 0.46;
-      hootP = { x: W * 0.60, y: H * 0.53, s: clamp(Math.min(W * 0.0024, H * 0.00095), 0.5, 2.6) };
-      pile = { x: W * 0.20, w: W * 0.28 };
-      book = { x: W * 0.5, y: H * 0.75, w: W * 0.92, h: H * 0.38 };
+      deskY = H * 0.40;
+      hootP = { x: W * 0.63, y: H * 0.46, s: clamp(Math.min(W * 0.0028, H * 0.00110), 0.5, 2.8) };
+      pile = { x: W * 0.17, w: W * 0.26 };
+      book = { x: W * 0.5, w: W * 0.92 };
     }
-    // His stack is three books, 20 units each at his scale. The pile's
-    // base is the bottom of that stack, so both rest on one surface, and
-    // a book in the pile is as tall as eight can be without leaving the
-    // top of the screen.
-    pile.base = hootP.y + 60 * hootP.s;
-    pile.h = Math.min(H * (wide ? 0.05 : 0.034), (pile.base - H * 0.08) / RECENT_MAX);
+    // The pile's base is the bottom of the stack he perches on, so both
+    // rest on one surface, and a book in the pile is as tall as eight can
+    // be without climbing off the top of the screen.
+    pile.base = hootP.y + STACK_BOOKS * STACK_THICK * hootP.s;
+    pile.h = Math.min(H * (wide ? 0.055 : 0.038),
+      (pile.base - H * 0.06) / RECENT_MAX);
 
-    // The age slider is an HTML bar sitting over the bottom of the SVG,
-    // so the drawing has to know how tall it is in its own units and
-    // keep the page clear of it. Chasing this in percentages instead
-    // meant re-tuning it for every screen shape that came along.
+    // The page is worked out here, once, rather than in drawBook - so it
+    // is the same rectangle whatever is written on it. It used to be cut
+    // to fit each answer, which meant the book grew and shrank under her
+    // every time she asked something.
+    var lip = Math.max(8, book.w * 0.016);
+    var ceil = deskY + Math.max(4, H * 0.01);
+    // Portrait puts the book below him rather than beside him, so it
+    // starts under his feet and the pile, not under the desk's back edge.
+    if (!wide) { ceil = Math.max(ceil, pile.base + lip * 2); }
     var barVb = (74 / Math.max(1, vh)) * H;
+    var floorY = H - barVb - Math.max(6, H * 0.012) - lip * 2;
+    var page = { x: book.x, w: book.w, y: ceil, h: Math.max(H * 0.16, floorY - ceil), lip: lip };
 
+    // barVb above is the age slider: an HTML bar sitting over the bottom
+    // of the SVG, so the drawing has to know how tall it is in its own
+    // units and keep the page clear of it. Chasing that in percentages
+    // meant re-tuning it for every screen shape that came along.
     L = { W: W, H: H, wide: wide, hoot: hootP, book: book, pile: pile,
-         deskY: deskY, barVb: barVb };
+         page: page, deskY: deskY, barVb: barVb };
 
     svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
     drawScenery();
@@ -722,8 +742,8 @@
   // the bottom, too; it had been built upside down.
   function drawStack(g) {
     var hx = L.hoot.x, hy = L.hoot.y, s = L.hoot.s;
-    var w0 = 150 * s, h0 = 20 * s;
-    var i, n = 3;
+    var w0 = 160 * s, h0 = STACK_THICK * s;
+    var i, n = STACK_BOOKS;
     for (i = 0; i < n; i++) {
       var w = w0 * (1 - (n - 1 - i) * 0.07) * rand(0.97, 1.03);
       var y = hy + i * h0;
@@ -877,56 +897,39 @@
   function drawBook() {
     var g = document.getElementById('book');
     clear(g);
-    var b = L.book;
+    var b = L.page;
     var FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
 
-    // The lip is the cover standing proud of the page. It has to be known
-    // before the floor below is worked out: it used to be declared after,
-    // so the floor came out as NaN and the page was never actually kept
-    // clear of the slider at all.
-    var lip = Math.max(8, b.w * 0.016);
-
-    // The room the page has: down to just above the slider, and up to the
-    // desk's back edge - or in portrait, where the book sits below him
-    // rather than beside him, up to the foot of his stack and the pile.
-    // Given the whole desk, the page climbed over his feet.
-    var ceil = L.deskY + Math.max(4, L.H * 0.01);
-    if (!L.wide && L.pile) { ceil = Math.max(ceil, L.pile.base + lip * 2); }
-    var floor = L.H - L.barVb - Math.max(6, L.H * 0.012) - lip * 2;
-    var room = floor - ceil;
+    // One rectangle, decided in computeLayout and never moved. The page
+    // used to be cut to fit each answer, so the book changed size under
+    // her hands on every word - and the type stayed put while the paper
+    // moved, which is backwards.
+    var pg = L.page;
+    var lip = pg.lip;
+    var pageH = pg.h;
+    var x = pg.x - pg.w / 2, y = pg.y;
 
     var rel = bookText ? bookRelated : [];
     var wordSize, defSize, pad, chipH, lines, blockH, f;
 
-    // The text is sized to the room, not the room to the text. It used to
-    // cap the page's height and leave the text at full size, so in
-    // landscape a long answer spilled out of both ends: the word off the
-    // top of the page, the suggestions onto the slider. Now it steps the
-    // type down until the whole block fits, rewrapping as it goes, since
-    // smaller type fits more words on each line.
-    for (f = 1; f >= 0.55; f -= 0.05) {
-      wordSize = Math.min(b.w * 0.15, b.h * 0.22) * f;
-      defSize = clamp(Math.min(b.w * 0.052, b.h * 0.09), 16, 44) * f;
+    // So it is the type that gives way: it steps down until the whole
+    // block fits the page, rewrapping as it goes, since smaller type fits
+    // more words on each line.
+    for (f = 1; f >= 0.5; f -= 0.05) {
+      wordSize = Math.min(pg.w * 0.15, pageH * 0.24) * f;
+      defSize = clamp(Math.min(pg.w * 0.052, pageH * 0.105), 15, 46) * f;
       // A character is nearer 0.56 of the font size than 0.52 in these
       // system faces - measured once the page could finally be seen, and
       // the first line was running into both edges of the paper.
-      L.maxChars = Math.floor(b.w * 0.82 / (defSize * 0.56));
+      L.maxChars = Math.floor(pg.w * 0.82 / (defSize * 0.56));
       lines = bookText ? wrap(bookText, L.maxChars) : [];
       pad = defSize * 1.1;
       chipH = defSize * 1.7;
       blockH = wordSize * 1.05 +
         (lines.length ? defSize * 0.9 + lines.length * defSize * 1.3 : 0) +
         (rel.length ? defSize * 0.9 + chipH : 0);
-      if (blockH + pad * 2 <= room) { break; }
+      if (blockH + pad * 2 <= pageH) { break; }
     }
-
-    // The page is cut to fit what is on it. A four-line answer sitting at
-    // the top of a page-and-a-half of blank paper looks like the game has
-    // stopped halfway through.
-    var pageH = Math.min(Math.max(blockH + pad * 2, b.h * 0.34), room);
-    var x = b.x - b.w / 2, y = b.y - pageH / 2;
-    if (y + pageH > floor) { y = floor - pageH; }
-    if (y < ceil) { y = ceil; }
 
     // An open book lying on the desk: covers standing a little proud of
     // the pages on both sides, a block of page edges under each, and a
@@ -977,7 +980,7 @@
     if (!bookWord) {
       var kw = Math.min(b.w * 0.22, pageH * 0.42);
       var kh = kw * 0.72;
-      var kx = b.x - kw / 2, ky = b.y - kh / 2;
+      var kx = b.x - kw / 2, ky = y + pageH / 2 - kh / 2;
       var kb = el('g', { opacity: 0.3 });
       kb.appendChild(el('rect', {
         x: kx, y: ky, width: kw, height: kh, rx: kh * 0.16,
@@ -1286,12 +1289,35 @@
     }));
   }
 
+  // Which card is being said aloud. A child who cannot read still has to
+  // know which of three words she is hearing, so the one being spoken
+  // lifts and lights up while it is his turn to say it.
+  var cardNodes = [];
+
+  function lightCard(i) {
+    var k, c;
+    for (k = 0; k < cardNodes.length; k++) {
+      c = cardNodes[k];
+      var on = (k === i);
+      c.face.setAttribute('stroke', on ? '#e2a33c' : (c.best ? '#b4531c' : '#c99a4e'));
+      c.face.setAttribute('stroke-width', on ? 11 : (c.best ? 8 : 5));
+      c.face.setAttribute('fill', on ? '#fffdf4' : 'url(#dic-card)');
+      // Grown a touch about its own middle, which reads as "this one" from
+      // across a room even if the colours are lost on a dim screen.
+      c.g.setAttribute('transform', on && !reduced
+        ? 'translate(' + c.cx + ' ' + c.cy + ') scale(1.05) translate(' +
+          (-c.cx) + ' ' + (-c.cy) + ')'
+        : '');
+    }
+  }
+
   function layoutCards() {
     var g = document.getElementById('cards');
     clear(g);
+    cardNodes = [];
     if (!choices.length) { return; }
 
-    var b = L.book;
+    var b = L.page;
     // The keyboard gets a card of its own at the end, so "none of these"
     // is a place to press rather than something to know.
     var n = choices.length + 1;
@@ -1306,7 +1332,7 @@
 
     var totalH = ch * rows + gap * (rows - 1);
     var totalW = cw * cols + gap * (cols - 1);
-    var top = b.y - totalH / 2;
+    var top = b.y + b.h / 2 - totalH / 2;
     var left = b.x - totalW / 2;
     var i;
 
@@ -1318,12 +1344,14 @@
       var typer = (i === choices.length);
 
       var grp = el('g', { 'class': 'card' });
-      grp.appendChild(el('rect', {
+      var face = el('rect', {
         x: cx - cw / 2, y: cy - ch / 2, width: cw, height: ch, rx: ch * 0.28,
         fill: 'url(#dic-card)',
         stroke: best ? '#b4531c' : '#c99a4e',
         'stroke-width': best ? 8 : 5
-      }));
+      });
+      grp.appendChild(face);
+      cardNodes.push({ g: grp, face: face, cx: cx, cy: cy, best: best });
 
       if (typer) {
         keyboardGlyph(grp, cx, cy, Math.min(cw * 0.3, ch * 0.62));
@@ -1351,17 +1379,24 @@
     choices = list.slice(0, 3);
     layoutCards();
     setState('confirming');
-    // Said in turn, so she can pick by ear rather than by reading.
+    // Said in turn, and lit as it is said, so a child who cannot read the
+    // cards can still tell which word she is hearing.
     var i = 0;
     function next() {
-      if (state !== 'confirming' || i >= choices.length) { return; }
-      speak(choices[i++], function () { setTimeout(next, 260); });
+      if (state !== 'confirming' || i >= choices.length) { lightCard(-1); return; }
+      var k = i++;
+      lightCard(k);
+      speak(choices[k], function () {
+        lightCard(-1);
+        setTimeout(next, 260);
+      });
     }
     next();
   }
 
   function clearChoices() {
     choices = [];
+    cardNodes = [];
     clear(document.getElementById('cards'));
   }
 
@@ -1747,10 +1782,23 @@
 
   function earPossible() { return !!SR; }
 
+  // He says so before the ear opens, and not a moment sooner. Said while
+  // the microphone was live, "I'm listening" is simply the first thing the
+  // recogniser hears, and she is offered "listening" as her word.
   function startListening() {
     if (!earPossible()) { openTyping(); return; }
     if (state === 'listening') { stopListening(); return; }
     if (spendLeft() <= 0) { setState('asleep'); snore(); return; }
+
+    // The pose goes first, so the lean and the cupped wing answer the tap
+    // at once; only the ear itself waits for him to finish.
+    setState('listening');
+    speak("I'm listening", openEar);
+  }
+
+  function openEar() {
+    // She may have tapped away, or tapped him again, while he was talking.
+    if (state !== 'listening') { return; }
 
     try {
       rec = new SR();
@@ -1804,14 +1852,21 @@
       rec.start();
     } catch (e) { openTyping(); return; }
 
-    setState('listening');
+    // The chime marks the ear actually opening, which is now a moment
+    // later than the tap - and is the cue to speak.
     earOpen();
     recStop = window.setTimeout(function () { stopListening(); }, 9000);
   }
 
   function stopListening() {
     window.clearTimeout(recStop);
-    if (rec) { try { rec.stop(); } catch (e) { /* already gone */ } }
+    if (rec) { try { rec.stop(); } catch (e) { /* already gone */ } return; }
+    // Tapped again while he was still saying it: stop him and stand down,
+    // or the ear opens after she has already given up on him.
+    if (state === 'listening') {
+      if (SS) { SS.cancel(); }
+      setState('idle');
+    }
   }
 
   function heardNothing() {
