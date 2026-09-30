@@ -189,28 +189,64 @@
   }
 
   // ------------------------------------------------------------------
-  // Wind. Like the sky it goes round a slow cycle of its own - still, a
-  // breeze, a proper blow, still again - with gusts riding on top. The
-  // reeds and the sound of the wind both read this one number, so what
-  // you hear is always what you see.
+  // Wind comes in gusts. Each gust enters from the left, sweeps across
+  // the reed bed bending them as it passes, and is gone off the right,
+  // with stillness in between. How often they come and how hard they
+  // blow goes round a slow cycle of its own, like the sky: calm, a
+  // breeze, a proper blow, calm again. The reeds and the sound both read
+  // the same gusts, so what you hear is always what you see.
   // ------------------------------------------------------------------
-  var WIND = [0.05, 0.4, 0.15, 0.75, 0.3, 0.95, 0.1, 0.55];
-  var WIND_SEG = 28;
-  var windClock = Math.random() * WIND_SEG * WIND.length;
-  var windT = 0, wind = 0, reedPhase = 0;
+  var WEATHER = [0.05, 0.4, 0.15, 0.75, 0.3, 0.95, 0.1, 0.55];
+  var WEATHER_SEG = 28;
+  var weatherClock = Math.random() * WEATHER_SEG * WEATHER.length;
+  var weather = 0, gusts = [], nextGust = 1.5;
+  var windHeard = 0, windPan = 0, reedPhase = 0;
 
   function updateWind(dt) {
-    var lap = WIND_SEG * WIND.length;
-    windClock = (windClock + dt) % lap;
-    windT += dt;
-    var k = Math.floor(windClock / WIND_SEG);
-    var f = smooth((windClock - k * WIND_SEG) / WIND_SEG);
-    var base = WIND[k] + (WIND[(k + 1) % WIND.length] - WIND[k]) * f;
-    var gust = 0.5 + 0.3 * Math.sin(windT * 0.37) + 0.2 * Math.sin(windT * 0.91 + 1.7);
-    wind = clamp(base * (0.7 + 0.6 * gust), 0, 1);
+    var lap = WEATHER_SEG * WEATHER.length, i;
+    weatherClock = (weatherClock + dt) % lap;
+    var k = Math.floor(weatherClock / WEATHER_SEG);
+    var f = smooth((weatherClock - k * WEATHER_SEG) / WEATHER_SEG);
+    weather = WEATHER[k] + (WEATHER[(k + 1) % WEATHER.length] - WEATHER[k]) * f;
+
+    nextGust -= dt;
+    if (nextGust <= 0) {
+      gusts.push({
+        pos: -0.45,
+        speed: 0.25 + Math.random() * 0.13,
+        peak: clamp(weather * (0.55 + 0.7 * Math.random()), 0.05, 1)
+      });
+      nextGust = (9 - 6.5 * weather) * (0.6 + 0.8 * Math.random());
+    }
+
+    // What you hear is each gust as it passes the middle of the screen,
+    // from the side it is on.
+    var heard = 0, pan = 0;
+    for (i = gusts.length - 1; i >= 0; i--) {
+      var g = gusts[i];
+      g.pos += g.speed * dt;
+      if (g.pos > 1.5) { gusts.splice(i, 1); continue; }
+      var d = (g.pos - 0.5) / 0.55, on = g.peak * Math.exp(-d * d);
+      heard += on;
+      pan += on * (g.pos - 0.5);
+    }
+    windHeard = clamp(weather * 0.12 + heard, 0, 1);
+    windPan = heard > 0.01 ? clamp(pan / heard * 1.4, -0.8, 0.8) : 0;
+
     // Reeds flutter faster in a stronger wind. Kept as a running phase
     // so a change of speed never makes them jump.
-    reedPhase += dt * (1.1 + 2.6 * wind);
+    reedPhase += dt * (1.1 + 2.6 * windHeard);
+  }
+
+  // How hard it is blowing at a point across the screen, 0 at the left
+  // edge and 1 at the right.
+  function windAt(fx) {
+    var w = weather * 0.12;
+    for (var i = 0; i < gusts.length; i++) {
+      var d = (fx - gusts[i].pos) / 0.3;
+      w += gusts[i].peak * Math.exp(-d * d);
+    }
+    return clamp(w, 0, 1.2);
   }
 
   // ------------------------------------------------------------------
@@ -391,6 +427,18 @@
     home.x = cx + (xMax - xMin) * 0.32 * Math.sin(homeT * 0.071);
     home.y = cy + (yMax - yMin) * 0.34 * Math.sin(homeT * 0.113 + 1.3);
     home.z = DEPTH * (0.5 + 0.32 * Math.sin(homeT * 0.049 + 0.4));
+
+    // Somewhere just tapped is no place to come home to for a while.
+    var s = persp(home.z);
+    for (var i = 0; i < scares.length; i++) {
+      var wx = (vpx + (scares[i].x - vpx) / s) / U;
+      var wy = (horizonY + (scares[i].y - horizonY) / s) / U;
+      var dx = home.x - wx, dy = home.y - wy;
+      var d = Math.sqrt(dx * dx + dy * dy) + 1e-6, need = 0.7 * scareLeft(scares[i]);
+      if (d < need) { home.x = wx + dx / d * need; home.y = wy + dy / d * need; }
+    }
+    home.x = clamp(home.x, xMin, xMax);
+    home.y = clamp(home.y, yMin, yMax);
   }
 
   // ------------------------------------------------------------------
@@ -401,6 +449,14 @@
   var ripples = [];
 
   function fingerRadius() { return U * 0.24; }
+
+  // Where a finger lifts, the birds stay wary of the spot for a few
+  // seconds, keeping clear of it and settling somewhere else, then
+  // drift back in their own time. Without this they closed over the
+  // place the instant the finger left, as if nothing had happened.
+  var scares = [], SCARE_LIFE = 6;
+
+  function scareLeft(sc) { return smooth(clamp(sc.life / SCARE_LIFE, 0, 1)); }
 
   // The moment a finger lands, the birds near it burst outwards, and the
   // rest of the flock flinches away from it wherever it is. A child has
@@ -451,9 +507,30 @@
     }
     if (n) { mx /= n; my /= n; mz /= n; }
 
-    var fl = [], id;
-    for (id in fingers) { if (fingers.hasOwnProperty(id)) { fl.push(fingers[id]); } }
-    var FR = fingerRadius(), FR2 = FR * FR;
+    // Fingers still down frighten the birds; spots a finger has left only
+    // make them wary, less so as the seconds pass.
+    // A wary spot is wider than a finger, and pushes firmly even near its
+    // rim, so birds heading across the sky go round it, not through it.
+    var FR = fingerRadius(), SR = FR * 1.4;
+    var fl = [], id, wary = 0;
+    for (id in fingers) {
+      if (fingers.hasOwnProperty(id)) {
+        fl.push({ x: fingers[id].x, y: fingers[id].y, s: 1, r: FR, held: true });
+        wary = 1;
+      }
+    }
+    for (i = scares.length - 1; i >= 0; i--) {
+      scares[i].life -= dt;
+      if (scares[i].life <= 0) { scares.splice(i, 1); continue; }
+      var left = scareLeft(scares[i]);
+      fl.push({ x: scares[i].x, y: scares[i].y, s: left, r: SR, held: false });
+      if (left > wary) { wary = left; }
+    }
+
+    // While they are wary, the pull back towards the middle of the flock
+    // is mostly let go. After a scatter the middle is the very spot that
+    // was tapped, and that pull was what drew them straight back into it.
+    var gather = W_GATHER * (1 - 0.8 * wary);
 
     for (i = 0; i < n; i++) {
       var x = px[i], y = py[i], z = pz[i];
@@ -508,7 +585,7 @@
       ax += clamp((home.x - x) * hk, -0.3, 0.3);
       ay += clamp((home.y - y) * hk, -0.3, 0.3);
       az += clamp((home.z - z) * hk, -0.3, 0.3);
-      var gk = cnt > 2 ? W_GATHER : W_GATHER * 2;
+      var gk = cnt > 2 ? gather : gather * 2;
       ax += clamp((mx - x) * gk, -0.3, 0.3);
       ay += clamp((my - y) * gk, -0.3, 0.3);
       az += clamp((mz - z) * gk, -0.3, 0.3);
@@ -527,11 +604,13 @@
         for (var f = 0; f < fl.length; f++) {
           var fx = scrX - fl[f].x, fy = scrY - fl[f].y;
           var fd2 = fx * fx + fy * fy;
-          if (fd2 < FR2) {
-            var fd = Math.sqrt(fd2) + 0.001, k = 1 - fd / FR;
-            ax += fx / fd * k * W_FLEE;
-            ay += fy / fd * k * W_FLEE;
-            if (k > scared) { scared = k; }
+          if (fd2 < fl[f].r * fl[f].r) {
+            var fd = Math.sqrt(fd2), k = Math.max(0, 1 - fd / fl[f].r);
+            var push = (fl[f].held ? k : Math.sqrt(k)) * W_FLEE * fl[f].s;
+            fd += 0.001;
+            ax += fx / fd * push;
+            ay += fy / fd * push;
+            if (fl[f].held && k > scared) { scared = k; }
           }
         }
       }
@@ -569,6 +648,24 @@
       vx[i] *= kk; vy[i] *= kk; vz[i] *= kk;
 
       px[i] += vx[i] * dt; py[i] += vy[i] * dt; pz[i] += vz[i] * dt;
+
+      // A hard stop in depth, behind the soft one. A whole flock heading
+      // towards the viewer could otherwise carry through the front of
+      // the box to where the perspective divides by nothing, and one bird
+      // drawn at infinity is enough to spoil every bird it flies beside.
+      if (pz[i] < -0.1) { pz[i] = -0.1; if (vz[i] < 0) { vz[i] = 0; } }
+      else if (pz[i] > DEPTH + 0.15) { pz[i] = DEPTH + 0.15; if (vz[i] > 0) { vz[i] = 0; } }
+
+      // And a safety net under all of it. A bird whose numbers have gone
+      // wrong would pass the fault to every neighbour through the flocking
+      // rules until the sky was empty; instead it is quietly put back
+      // with the rest.
+      if (px[i] !== px[i] || py[i] !== py[i] || pz[i] !== pz[i] ||
+          vx[i] !== vx[i] || vy[i] !== vy[i] || vz[i] !== vz[i]) {
+        px[i] = home.x; py[i] = home.y; pz[i] = home.z;
+        vx[i] = cruise; vy[i] = 0; vz[i] = 0;
+        panic[i] = 0; bank[i] = 0;
+      }
 
       // Banking into a turn shows the wings edge-on, which is what
       // makes a real flock ripple dark and light as it wheels.
@@ -614,7 +711,7 @@
     var col = mix(sky.hor, sky.glow, 0.5);
     for (var i = 0; i < clouds.length; i++) {
       var c = clouds[i];
-      c.x += c.v * dt * (reduced ? 0.3 : 1) * (0.4 + 2.2 * wind);
+      c.x += c.v * dt * (reduced ? 0.3 : 1) * (0.4 + 2.2 * weather);
       if (c.x - c.w / 2 > 1.05) { c.x = -c.w / 2 - 0.05; }
       ctx.save();
       ctx.translate(c.x * W, c.y * horizonY);
@@ -647,7 +744,7 @@
     ctx.fill();
   }
 
-  function drawRow(row, colour, lw, t) {
+  function drawRow(row, colour, lw) {
     var i, r;
     ctx.strokeStyle = colour;
     ctx.fillStyle = colour;
@@ -656,10 +753,11 @@
     ctx.beginPath();
     for (i = 0; i < row.length; i++) {
       r = row[i];
-      // Each gust travels along the reed bed from left to right, bending
-      // the reeds downwind as it passes, with a flutter on top.
-      var local = reduced ? wind : wind * (0.8 + 0.25 * Math.sin(r.x / U * 5 - t * 1.4));
-      var ang = r.lean + local * 0.34;
+      // Each gust bends the reeds downwind as it passes along the bed,
+      // with a flutter on top. With reduced motion the gust does not
+      // travel: the whole bed leans together, gently, while it is heard.
+      var local = reduced ? windHeard : windAt(r.x / W);
+      var ang = r.lean + local * 0.45;
       if (!reduced) { ang += Math.sin(reedPhase + r.ph + r.x * 0.01) * (0.012 + 0.07 * local); }
       r.local = local;
       r.tx = r.x + Math.sin(ang) * r.h;
@@ -774,14 +872,14 @@
     }
   }
 
-  function draw(dt, t) {
+  function draw(dt) {
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     drawSky(dt);
     drawWaterAndTrees();
-    drawRow(reedsBack, rgba(mix(INK, sky.top, 0.3)), Math.max(1, U * 0.0024), t);
+    drawRow(reedsBack, rgba(mix(INK, sky.top, 0.3)), Math.max(1, U * 0.0024));
     drawBirds();
     var front = rgba(mix(INK, sky.top, 0.12));
-    drawRow(reedsFront, front, Math.max(1, U * 0.003), t);
+    drawRow(reedsFront, front, Math.max(1, U * 0.003));
     drawBank(front);
     drawRipples(dt);
   }
@@ -794,7 +892,7 @@
   // fright.
   // ------------------------------------------------------------------
   var AC = null, master = null, verb = null, padBus = null, bellBus = null;
-  var pink = null, windGain = null, windFilter = null;
+  var pink = null, windGain = null, windFilter = null, windPanner = null;
   var nextChord = 0, chordIdx = 0, nextBell = 0, soundClock = 0, lastWhoosh = 0;
 
   var CHORDS = [
@@ -902,21 +1000,35 @@
     bellDry.connect(master);
     bellBus.connect(verb);
 
-    // Wind: pink noise through a low filter that opens as it blows
-    // harder. updateSound keeps it in step with the reeds.
+    // Wind: an airy "shhh", not a rumble. Only the middle and upper part
+    // of the noise is used, through a wide band that rises as a gust
+    // builds. The low part was what hummed: a phone speaker cannot play
+    // it, and the narrow slice just above that it can play is a drone.
+    // updateSound swells, brightens and pans it with each passing gust.
     pink = pinkBuffer(6);
     var air = AC.createBufferSource();
     air.buffer = pink;
     air.loop = true;
+    var windHp = AC.createBiquadFilter();
+    windHp.type = 'highpass';
+    windHp.frequency.setValueAtTime(320, t);
+    windHp.Q.setValueAtTime(0.5, t);
     windFilter = AC.createBiquadFilter();
-    windFilter.type = 'lowpass';
-    windFilter.frequency.setValueAtTime(300, t);
-    windFilter.Q.setValueAtTime(0.9, t);
+    windFilter.type = 'bandpass';
+    windFilter.frequency.setValueAtTime(600, t);
+    windFilter.Q.setValueAtTime(0.5, t);
     windGain = AC.createGain();
     windGain.gain.setValueAtTime(0.0001, t);
-    air.connect(windFilter);
+    air.connect(windHp);
+    windHp.connect(windFilter);
     windFilter.connect(windGain);
-    windGain.connect(master);
+    var windOut = windGain;
+    if (AC.createStereoPanner) {
+      windPanner = AC.createStereoPanner();
+      windGain.connect(windPanner);
+      windOut = windPanner;
+    }
+    windOut.connect(master);
     air.start(t);
 
     nextChord = t + 0.1;
@@ -985,9 +1097,10 @@
   }
   setInterval(scheduleMusic, 250);
 
-  // Wings: one soft, low rush when the flock takes fright, bigger the
-  // more birds were startled, from the side of the screen it happened
-  // on. A tap on empty sky startles nobody, so it makes no sound.
+  // Wings: one soft rush when the flock takes fright, bigger the more
+  // birds were startled, from the side of the screen it happened on. A
+  // tap on empty sky startles nobody, so it makes no sound. Built like
+  // the wind, from the airy part of the noise, for the same reason.
   function whoosh(birds, x) {
     if (!AC || !pink || AC.state !== 'running' || birds < 3) { return; }
     var t = AC.currentTime + 0.01;
@@ -996,18 +1109,23 @@
     var k = clamp(birds / (n * 0.3), 0.25, 1);
     var src = AC.createBufferSource();
     src.buffer = pink;
-    var lp = AC.createBiquadFilter();
-    lp.type = 'lowpass';
-    lp.Q.setValueAtTime(0.7, t);
-    lp.frequency.setValueAtTime(260, t);
-    lp.frequency.exponentialRampToValueAtTime(700 + 700 * k, t + 0.15);
-    lp.frequency.exponentialRampToValueAtTime(240, t + 1.1);
+    var hp = AC.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.setValueAtTime(320, t);
+    hp.Q.setValueAtTime(0.5, t);
+    var band = AC.createBiquadFilter();
+    band.type = 'bandpass';
+    band.Q.setValueAtTime(0.5, t);
+    band.frequency.setValueAtTime(500, t);
+    band.frequency.exponentialRampToValueAtTime(1100 + 900 * k, t + 0.15);
+    band.frequency.exponentialRampToValueAtTime(450, t + 1.1);
     var g = AC.createGain();
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.2 + 0.4 * k, t + 0.1);
+    g.gain.exponentialRampToValueAtTime(0.25 + 0.45 * k, t + 0.1);
     g.gain.exponentialRampToValueAtTime(0.0001, t + 1.2);
-    src.connect(lp);
-    lp.connect(g);
+    src.connect(hp);
+    hp.connect(band);
+    band.connect(g);
     var out = g;
     if (AC.createStereoPanner) {
       var pan = AC.createStereoPanner();
@@ -1022,32 +1140,32 @@
 
   function updateSound(dt) {
     soundClock += dt;
-    if (soundClock < 0.1 || !AC || !windGain) { return; }
+    if (soundClock < 0.05 || !AC || !windGain) { return; }
     soundClock = 0;
     var now = AC.currentTime;
-    windGain.gain.setTargetAtTime(0.006 + 0.45 * Math.pow(wind, 1.4), now, 0.2);
-    windFilter.frequency.setTargetAtTime(250 + 1000 * wind, now, 0.2);
+    windGain.gain.setTargetAtTime(0.002 + 0.6 * Math.pow(windHeard, 1.5), now, 0.12);
+    windFilter.frequency.setTargetAtTime(500 + 1700 * windHeard, now, 0.12);
+    if (windPanner) { windPanner.pan.setTargetAtTime(windPan, now, 0.2); }
   }
 
   // ------------------------------------------------------------------
   // Frame loop. If the device is struggling, the flock thins a little
   // rather than stuttering; it never grows back mid-flight.
   // ------------------------------------------------------------------
-  var last = 0, clock = 0;
+  var last = 0;
   var workSum = 0, workFrames = 0, workClock = 0, slowWindows = 0;
 
   function frame(now) {
     var dt = last ? (now - last) / 1000 : 0.016;
     last = now;
     dt = clamp(dt, 0.001, 0.05);
-    clock += dt;
 
     var t0 = window.performance ? performance.now() : 0;
     updateSky(dt);
     updateWind(dt);
     updateHome(dt);
     step(dt);
-    draw(dt, clock);
+    draw(dt);
     updateSound(dt);
 
     // A single huge frame is the browser doing something else (waking,
@@ -1084,7 +1202,14 @@
     var f = fingers[e.pointerId];
     if (f) { f.x = e.clientX; f.y = e.clientY; }
   });
-  function lift(e) { delete fingers[e.pointerId]; }
+  function lift(e) {
+    var f = fingers[e.pointerId];
+    if (f) {
+      scares.push({ x: f.x, y: f.y, life: SCARE_LIFE });
+      if (scares.length > 8) { scares.shift(); }
+    }
+    delete fingers[e.pointerId];
+  }
   canvas.addEventListener('pointerup', lift);
   canvas.addEventListener('pointercancel', lift);
   canvas.addEventListener('lostpointercapture', lift);
