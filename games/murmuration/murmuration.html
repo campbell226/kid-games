@@ -189,6 +189,31 @@
   }
 
   // ------------------------------------------------------------------
+  // Wind. Like the sky it goes round a slow cycle of its own - still, a
+  // breeze, a proper blow, still again - with gusts riding on top. The
+  // reeds and the sound of the wind both read this one number, so what
+  // you hear is always what you see.
+  // ------------------------------------------------------------------
+  var WIND = [0.05, 0.4, 0.15, 0.75, 0.3, 0.95, 0.1, 0.55];
+  var WIND_SEG = 28;
+  var windClock = Math.random() * WIND_SEG * WIND.length;
+  var windT = 0, wind = 0, reedPhase = 0;
+
+  function updateWind(dt) {
+    var lap = WIND_SEG * WIND.length;
+    windClock = (windClock + dt) % lap;
+    windT += dt;
+    var k = Math.floor(windClock / WIND_SEG);
+    var f = smooth((windClock - k * WIND_SEG) / WIND_SEG);
+    var base = WIND[k] + (WIND[(k + 1) % WIND.length] - WIND[k]) * f;
+    var gust = 0.5 + 0.3 * Math.sin(windT * 0.37) + 0.2 * Math.sin(windT * 0.91 + 1.7);
+    wind = clamp(base * (0.7 + 0.6 * gust), 0, 1);
+    // Reeds flutter faster in a stronger wind. Kept as a running phase
+    // so a change of speed never makes them jump.
+    reedPhase += dt * (1.1 + 2.6 * wind);
+  }
+
+  // ------------------------------------------------------------------
   // The world. Birds live in a box measured in units of the screen's
   // shorter side, so the flock is the same size to the eye in portrait
   // and landscape. z runs away from the viewer: far birds are drawn
@@ -217,8 +242,8 @@
   // nearest, match their heading, drift towards them. Nothing else. Every
   // fold and ribbon in the flock comes out of those three at once.
   var CRUISE = 0.2, VMIN = 0.12, VMAX = 0.3;
-  var R = 0.08, R2 = R * R, SEP = 0.03, SEP2 = SEP * SEP;
-  var W_ALI = 1.6, W_COH = 1.4, W_SEP = 0.9, W_HOME = 0.12, W_EDGE = 8, W_FLEE = 3.5;
+  var R = 0.08, R2 = R * R, SEP = 0.034, SEP2 = SEP * SEP;
+  var W_ALI = 1.6, W_COH = 1.4, W_SEP = 0.9, W_HOME = 0.12, W_EDGE = 8, W_FLEE = 10;
   var MAXNB = 10, ACC_MAX = 1.6, NOISE = 0.25;
 
   // A weak pull towards the middle of the whole flock, so a party that
@@ -275,7 +300,7 @@
       var lean = (rnd() - 0.5) * 0.18;
       row.push({
         x: x, h: hMin + hVar * Math.pow(rnd(), 1.4), lean: lean, ph: rnd() * 6.283,
-        plume: U * (0.03 + rnd() * 0.03), pw: U * (0.0035 + rnd() * 0.0025),
+        plume: U * (0.022 + rnd() * 0.02), pw: U * (0.003 + rnd() * 0.002),
         droop: (lean >= 0 ? 1 : -1) * (0.7 + rnd() * 0.7),
         leaf: rnd() < 0.6 ? (rnd() - 0.5) : 0
       });
@@ -286,8 +311,8 @@
 
   function buildReeds() {
     var rnd = seeded(11), marsh = H - horizonY;
-    reedsBack = makeRow(rnd, U * 0.013, marsh * 0.5, marsh * 0.55);
-    reedsFront = makeRow(rnd, U * 0.026, marsh * 0.7, marsh * 0.9);
+    reedsBack = makeRow(rnd, U * 0.016, marsh * 0.45, marsh * 0.4);
+    reedsFront = makeRow(rnd, U * 0.034, marsh * 0.6, marsh * 0.65);
     var pts = [], step = Math.max(3, U * 0.008);
     for (var x = -step; x <= W + step * 2; x += step) {
       pts.push(x, H - marsh * (0.24 + 0.05 * Math.sin(x * 0.013) + rnd() * 0.05));
@@ -306,12 +331,14 @@
     canvas.width = Math.round(w * DPR);
     canvas.height = Math.round(h * DPR);
     W = w; H = h; U = Math.min(W, H);
-    horizonY = H * 0.84;
+    horizonY = H * 0.87;
     vpx = W / 2;
 
+    // The flock is allowed right down to the reed tops, so that now and
+    // then it sweeps in low over the water.
     var m = 0.12;
     xMin = m; xMax = W / U - m;
-    yMin = m + 0.03; yMax = (H * 0.66) / U;
+    yMin = m + 0.03; yMax = (H * 0.8) / U;
 
     // Keep the flock where it was, in proportion, rather than letting
     // a turned screen fling it against one side.
@@ -362,7 +389,7 @@
     homeT += dt * (reduced ? 0.6 : 1);
     var cx = (xMin + xMax) / 2, cy = (yMin + yMax) / 2;
     home.x = cx + (xMax - xMin) * 0.32 * Math.sin(homeT * 0.071);
-    home.y = cy + (yMax - yMin) * 0.25 * Math.sin(homeT * 0.113 + 1.3);
+    home.y = cy + (yMax - yMin) * 0.34 * Math.sin(homeT * 0.113 + 1.3);
     home.z = DEPTH * (0.5 + 0.32 * Math.sin(homeT * 0.049 + 0.4));
   }
 
@@ -373,7 +400,35 @@
   var fingers = {};
   var ripples = [];
 
-  function fingerRadius() { return U * 0.17; }
+  function fingerRadius() { return U * 0.24; }
+
+  // The moment a finger lands, the birds near it burst outwards, and the
+  // rest of the flock flinches away from it wherever it is. A child has
+  // to see straight away that the tap did that, so this happens at once
+  // rather than waiting for the steering to catch up. Returns how many
+  // birds took real fright, which is what the wing sound follows.
+  function startle(x0, y0) {
+    var near = fingerRadius() * 2, far = U * 1.3, spd = reduced ? 0.6 : 1, hit = 0;
+    for (var i = 0; i < n; i++) {
+      var dx = SX[i] - x0, dy = SY[i] - y0;
+      var d = Math.sqrt(dx * dx + dy * dy) + 0.001;
+      var k;
+      if (d < near) {
+        k = 1 - d / near;
+        var kick = (0.3 + 0.7 * k) * 0.8 * spd;
+        vx[i] += dx / d * kick;
+        vy[i] += dy / d * kick;
+        panic[i] = Math.max(panic[i], 0.4 + 0.6 * k);
+        hit += 1;
+      } else if (d < far) {
+        k = 1 - d / far;
+        vx[i] += dx / d * k * 0.15 * spd;
+        vy[i] += dy / d * k * 0.15 * spd;
+        panic[i] = Math.max(panic[i], 0.25 * k);
+      }
+    }
+    return hit;
+  }
 
   // ------------------------------------------------------------------
   // One step of the flock
@@ -474,8 +529,8 @@
           var fd2 = fx * fx + fy * fy;
           if (fd2 < FR2) {
             var fd = Math.sqrt(fd2) + 0.001, k = 1 - fd / FR;
-            ax += fx / fd * k * k * W_FLEE;
-            ay += fy / fd * k * k * W_FLEE;
+            ax += fx / fd * k * W_FLEE;
+            ay += fy / fd * k * W_FLEE;
             if (k > scared) { scared = k; }
           }
         }
@@ -490,8 +545,8 @@
       // Alarm rises towards what the neighbours feel, a beat behind them,
       // so it travels outwards through the flock as a ripple.
       var np = Math.max(0, p - dt * 0.8);
-      var fromNb = pmax * 0.72;
-      if (fromNb > np) { np += (fromNb - np) * Math.min(1, dt * 8); }
+      var fromNb = pmax * 0.75;
+      if (fromNb > np) { np += (fromNb - np) * Math.min(1, dt * 12); }
       if (scared > np) { np = scared; }
       panicNext[i] = np;
     }
@@ -500,15 +555,16 @@
       var q = panicNext[i];
       panic[i] = q;
       var bx = AX[i], by = AY[i], bz = AZ[i];
-      var am = Math.sqrt(bx * bx + by * by + bz * bz), amax = ACC_MAX * (1 + 2 * q);
+      // A frightened bird may turn hard and fly fast; a calm one may not.
+      var am = Math.sqrt(bx * bx + by * by + bz * bz), amax = ACC_MAX + 12 * q;
       if (am > amax) { var r = amax / am; bx *= r; by *= r; bz *= r; }
 
       var ovx = vx[i], ovy = vy[i];
       vx[i] += bx * dt; vy[i] += by * dt; vz[i] += bz * dt;
 
       var sp = Math.sqrt(vx[i] * vx[i] + vy[i] * vy[i] + vz[i] * vz[i]) || 1e-6;
-      var want = cruise * (1 + 0.45 * q);
-      var ns = clamp(sp + (want - sp) * Math.min(1, dt * 0.8), vmin, vmax * (1 + 0.45 * q));
+      var want = cruise * (1 + 1.2 * q);
+      var ns = clamp(sp + (want - sp) * Math.min(1, dt * 0.8), vmin, vmax * (1 + 2.2 * q));
       var kk = ns / sp;
       vx[i] *= kk; vy[i] *= kk; vz[i] *= kk;
 
@@ -526,7 +582,7 @@
         flapping[i] = flapping[i] ? 0 : 1;
         flapT[i] = flapping[i] ? 0.5 + Math.random() * 1.1 : 0.3 + Math.random() * 0.9;
       }
-      if (flapping[i] || q > 0.2) { phase[i] += dt * 6.283 * 6; }
+      if (flapping[i] || q > 0.2) { phase[i] += dt * 6.283 * (6 + 6 * q); }
     }
   }
 
@@ -558,7 +614,7 @@
     var col = mix(sky.hor, sky.glow, 0.5);
     for (var i = 0; i < clouds.length; i++) {
       var c = clouds[i];
-      c.x += c.v * dt * (reduced ? 0.3 : 1);
+      c.x += c.v * dt * (reduced ? 0.3 : 1) * (0.4 + 2.2 * wind);
       if (c.x - c.w / 2 > 1.05) { c.x = -c.w / 2 - 0.05; }
       ctx.save();
       ctx.translate(c.x * W, c.y * horizonY);
@@ -592,7 +648,6 @@
   }
 
   function drawRow(row, colour, lw, t) {
-    var gust = reduced ? 0 : 0.6 + 0.4 * Math.sin(t * 0.13);
     var i, r;
     ctx.strokeStyle = colour;
     ctx.fillStyle = colour;
@@ -601,7 +656,12 @@
     ctx.beginPath();
     for (i = 0; i < row.length; i++) {
       r = row[i];
-      var ang = r.lean + (reduced ? 0 : Math.sin(t * 0.7 + r.ph + r.x * 0.01) * gust * 0.05);
+      // Each gust travels along the reed bed from left to right, bending
+      // the reeds downwind as it passes, with a flutter on top.
+      var local = reduced ? wind : wind * (0.8 + 0.25 * Math.sin(r.x / U * 5 - t * 1.4));
+      var ang = r.lean + local * 0.34;
+      if (!reduced) { ang += Math.sin(reedPhase + r.ph + r.x * 0.01) * (0.012 + 0.07 * local); }
+      r.local = local;
       r.tx = r.x + Math.sin(ang) * r.h;
       r.ty = H - Math.cos(ang) * r.h;
       r.ang = ang;
@@ -618,7 +678,10 @@
     ctx.beginPath();
     for (i = 0; i < row.length; i++) {
       r = row[i];
+      // Plumes that hang any old way when it is still stream out
+      // downwind when it blows.
       var pa = r.ang - Math.PI / 2 + r.droop;
+      pa += (0.35 - pa) * clamp(r.local * 0.9, 0, 0.85);
       var ex = r.tx + Math.cos(pa) * r.plume * 0.42, ey = r.ty + Math.sin(pa) * r.plume * 0.42;
       var rx = r.plume / 2;
       ctx.moveTo(ex + Math.cos(pa) * rx, ey + Math.sin(pa) * rx);
@@ -673,23 +736,15 @@
   }
 
   var HAZE = [0, 0.14, 0.28, 0.42];
-  var stats = { bank: 0, panic: 0, speed: 0, z: 0, x: 0 };
 
   function drawBirds() {
-    var base = U * 0.02, i, b;
-    var sb = 0, sp = 0, ss = 0, sz = 0, sx = 0;
+    var base = U * 0.026, i, b;
     for (i = 0; i < n; i++) {
       var s = persp(pz[i]);
       SS[i] = s;
       SX[i] = vpx + (px[i] * U - vpx) * s;
       SY[i] = horizonY + (py[i] * U - horizonY) * s;
       bucket[i] = clamp(Math.floor(pz[i] / DEPTH * 4), 0, 3);
-      sb += Math.abs(bank[i]); sp += panic[i]; sz += pz[i]; sx += SX[i];
-      ss += Math.sqrt(vx[i] * vx[i] + vy[i] * vy[i] + vz[i] * vz[i]);
-    }
-    if (n) {
-      stats.bank = sb / n; stats.panic = sp / n; stats.speed = ss / n;
-      stats.z = sz / n; stats.x = sx / n;
     }
 
     var haze = mix(sky.mid, sky.hor, 0.35);
@@ -712,7 +767,7 @@
       if (r.age > 1.4) { ripples.splice(i, 1); continue; }
       var k = r.age / 1.4;
       var rad = FR * (reduced ? 0.6 : 0.25 + 0.75 * smooth(k));
-      ctx.strokeStyle = 'rgba(255,255,255,' + (0.32 * (1 - k)).toFixed(3) + ')';
+      ctx.strokeStyle = 'rgba(255,255,255,' + (0.45 * (1 - k)).toFixed(3) + ')';
       ctx.beginPath();
       ctx.arc(r.x, r.y, rad, 0, 6.2832);
       ctx.stroke();
@@ -723,10 +778,10 @@
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     drawSky(dt);
     drawWaterAndTrees();
-    drawRow(reedsBack, rgba(mix(INK, sky.top, 0.3)), Math.max(1, U * 0.0028), t);
+    drawRow(reedsBack, rgba(mix(INK, sky.top, 0.3)), Math.max(1, U * 0.0024), t);
     drawBirds();
-    var front = rgba(mix(INK, sky.top, 0.08));
-    drawRow(reedsFront, front, Math.max(1.2, U * 0.004), t);
+    var front = rgba(mix(INK, sky.top, 0.12));
+    drawRow(reedsFront, front, Math.max(1, U * 0.003), t);
     drawBank(front);
     drawRipples(dt);
   }
@@ -734,12 +789,13 @@
   // ------------------------------------------------------------------
   // Sound, synthesised from nothing so the game is never silent and
   // never waits on a download. A slow pad that drifts between chords
-  // which all share their notes, a quiet bed of air, now and then a
-  // far-off chime, and a hush of wings that swells when the flock turns.
+  // which all share their notes, now and then a far-off chime, the wind
+  // that is bending the reeds, and a rush of wings when the flock takes
+  // fright.
   // ------------------------------------------------------------------
   var AC = null, master = null, verb = null, padBus = null, bellBus = null;
-  var hushGain = null, hushFilter = null, hushPan = null;
-  var nextChord = 0, chordIdx = 0, nextBell = 0, soundClock = 0;
+  var pink = null, windGain = null, windFilter = null;
+  var nextChord = 0, chordIdx = 0, nextBell = 0, soundClock = 0, lastWhoosh = 0;
 
   var CHORDS = [
     [50, 57, 64, 66],   // D, with the ninth
@@ -752,13 +808,26 @@
   var CHORD_LEN = 16, CHORD_GAP = 10;
   var BELLS = [74, 76, 78, 81, 83, 86];
 
-  function noiseBuffer(secs, brown) {
-    var len = Math.floor(AC.sampleRate * secs);
-    var buf = AC.createBuffer(1, len, AC.sampleRate), d = buf.getChannelData(0), last = 0;
-    for (var i = 0; i < len; i++) {
+  // Pink noise, which sounds like moving air rather than hiss. The end of
+  // the loop is faded into its start so it never clicks going round.
+  function pinkBuffer(secs) {
+    var len = Math.floor(AC.sampleRate * secs), fade = Math.floor(AC.sampleRate * 0.25);
+    var raw = new Float32Array(len + fade), i;
+    var b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+    for (i = 0; i < raw.length; i++) {
       var w = Math.random() * 2 - 1;
-      if (brown) { last = (last + 0.02 * w) / 1.02; d[i] = last * 3.5; }
-      else { d[i] = w; }
+      b0 = 0.99886 * b0 + w * 0.0555179;
+      b1 = 0.99332 * b1 + w * 0.0750759;
+      b2 = 0.969 * b2 + w * 0.153852;
+      b3 = 0.8665 * b3 + w * 0.3104856;
+      b4 = 0.55 * b4 + w * 0.5329522;
+      b5 = -0.7616 * b5 - w * 0.016898;
+      raw[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11;
+      b6 = w * 0.115926;
+    }
+    var buf = AC.createBuffer(1, len, AC.sampleRate), d = buf.getChannelData(0);
+    for (i = 0; i < len; i++) {
+      d[i] = i < fade ? raw[i] * (i / fade) + raw[len + i] * (1 - i / fade) : raw[i];
     }
     return buf;
   }
@@ -833,54 +902,22 @@
     bellDry.connect(master);
     bellBus.connect(verb);
 
-    // Air: brown noise, low and steady, with slow gusts.
+    // Wind: pink noise through a low filter that opens as it blows
+    // harder. updateSound keeps it in step with the reeds.
+    pink = pinkBuffer(6);
     var air = AC.createBufferSource();
-    air.buffer = noiseBuffer(5, true);
+    air.buffer = pink;
     air.loop = true;
-    var airLp = AC.createBiquadFilter();
-    airLp.type = 'lowpass';
-    airLp.frequency.setValueAtTime(450, t);
-    var airGain = AC.createGain();
-    airGain.gain.setValueAtTime(0.05, t);
-    var gust = AC.createOscillator(), gustAmt = AC.createGain();
-    gust.frequency.setValueAtTime(0.07, t);
-    gustAmt.gain.setValueAtTime(0.03, t);
-    gust.connect(gustAmt);
-    gustAmt.connect(airGain.gain);
-    gust.start(t);
-    air.connect(airLp);
-    airLp.connect(airGain);
-    airGain.connect(master);
+    windFilter = AC.createBiquadFilter();
+    windFilter.type = 'lowpass';
+    windFilter.frequency.setValueAtTime(300, t);
+    windFilter.Q.setValueAtTime(0.9, t);
+    windGain = AC.createGain();
+    windGain.gain.setValueAtTime(0.0001, t);
+    air.connect(windFilter);
+    windFilter.connect(windGain);
+    windGain.connect(master);
     air.start(t);
-
-    // Wings: a band of noise whose loudness follows the flock.
-    var wings = AC.createBufferSource();
-    wings.buffer = noiseBuffer(4, false);
-    wings.loop = true;
-    hushFilter = AC.createBiquadFilter();
-    hushFilter.type = 'bandpass';
-    hushFilter.frequency.setValueAtTime(800, t);
-    hushFilter.Q.setValueAtTime(0.6, t);
-    var hushLp = AC.createBiquadFilter();
-    hushLp.type = 'lowpass';
-    hushLp.frequency.setValueAtTime(2400, t);
-    hushGain = AC.createGain();
-    hushGain.gain.setValueAtTime(0.0001, t);
-    wings.connect(hushFilter);
-    hushFilter.connect(hushLp);
-    hushLp.connect(hushGain);
-    var hushOut = hushGain;
-    if (AC.createStereoPanner) {
-      hushPan = AC.createStereoPanner();
-      hushGain.connect(hushPan);
-      hushOut = hushPan;
-    }
-    hushOut.connect(master);
-    var hushSend = AC.createGain();
-    hushSend.gain.setValueAtTime(0.25, t);
-    hushOut.connect(hushSend);
-    hushSend.connect(verb);
-    wings.start(t);
 
     nextChord = t + 0.1;
     nextBell = t + 6 + Math.random() * 6;
@@ -943,20 +980,48 @@
   }
   setInterval(scheduleMusic, 250);
 
+  // Wings: one soft, low rush when the flock takes fright, bigger the
+  // more birds were startled, from the side of the screen it happened
+  // on. A tap on empty sky startles nobody, so it makes no sound.
+  function whoosh(birds, x) {
+    if (!AC || !pink || AC.state !== 'running' || birds < 3) { return; }
+    var t = AC.currentTime + 0.01;
+    if (t - lastWhoosh < 0.2) { return; }
+    lastWhoosh = t;
+    var k = clamp(birds / (n * 0.3), 0.25, 1);
+    var src = AC.createBufferSource();
+    src.buffer = pink;
+    var lp = AC.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.Q.setValueAtTime(0.7, t);
+    lp.frequency.setValueAtTime(260, t);
+    lp.frequency.exponentialRampToValueAtTime(700 + 700 * k, t + 0.15);
+    lp.frequency.exponentialRampToValueAtTime(240, t + 1.1);
+    var g = AC.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.2 + 0.4 * k, t + 0.1);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.2);
+    src.connect(lp);
+    lp.connect(g);
+    var out = g;
+    if (AC.createStereoPanner) {
+      var pan = AC.createStereoPanner();
+      pan.pan.setValueAtTime(clamp((x / W - 0.5) * 1.2, -0.8, 0.8), t);
+      g.connect(pan);
+      out = pan;
+    }
+    out.connect(master);
+    src.start(t, Math.random() * 5);
+    src.stop(t + 1.3);
+  }
+
   function updateSound(dt) {
     soundClock += dt;
-    if (soundClock < 0.1 || !AC || !hushGain) { return; }
+    if (soundClock < 0.1 || !AC || !windGain) { return; }
     soundClock = 0;
     var now = AC.currentTime;
-    var cruise = CRUISE * (reduced ? 0.6 : 1);
-    var act = clamp(stats.bank * 1.4 + stats.panic * 1.2 + Math.max(0, stats.speed / cruise - 1) * 0.8, 0, 1);
-    var near = clamp(1 - stats.z / DEPTH, 0, 1);
-    var level = (0.02 + 0.1 * act) * (0.6 + 0.6 * near);
-    hushGain.gain.setTargetAtTime(level, now, 0.3);
-    hushFilter.frequency.setTargetAtTime(500 + 1300 * act + 300 * near, now, 0.3);
-    if (hushPan) {
-      hushPan.pan.setTargetAtTime(clamp((stats.x / W - 0.5) * 1.2, -0.8, 0.8), now, 0.4);
-    }
+    windGain.gain.setTargetAtTime(0.006 + 0.45 * Math.pow(wind, 1.4), now, 0.2);
+    windFilter.frequency.setTargetAtTime(250 + 1000 * wind, now, 0.2);
   }
 
   // ------------------------------------------------------------------
@@ -974,6 +1039,7 @@
 
     var t0 = window.performance ? performance.now() : 0;
     updateSky(dt);
+    updateWind(dt);
     updateHome(dt);
     step(dt);
     draw(dt, clock);
@@ -1006,6 +1072,7 @@
     initAudio();
     fingers[e.pointerId] = { x: e.clientX, y: e.clientY };
     ripples.push({ x: e.clientX, y: e.clientY, age: 0 });
+    whoosh(startle(e.clientX, e.clientY), e.clientX);
     try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* not every browser */ }
   });
   canvas.addEventListener('pointermove', function (e) {
@@ -1042,6 +1109,7 @@
 
   layout();
   updateSky(0);
+  updateWind(0);
   updateHome(0);
   spawnFlock();
   requestAnimationFrame(frame);
