@@ -459,9 +459,12 @@
   // from, and the alarm spreads from bird to bird a little way beyond it.
   // ------------------------------------------------------------------
   var fingers = {};
-  var ripples = [];
 
   function fingerRadius() { return U * 0.24; }
+
+  // A wary spot is wider than a finger, so birds heading across the sky
+  // go round it rather than clipping its edge.
+  function scareRadius() { return fingerRadius() * 1.4; }
 
   // Where a finger lifts, the birds stay wary of the spot for a few
   // seconds, keeping clear of it and settling somewhere else, then
@@ -522,9 +525,9 @@
 
     // Fingers still down frighten the birds; spots a finger has left only
     // make them wary, less so as the seconds pass.
-    // A wary spot is wider than a finger, and pushes firmly even near its
-    // rim, so birds heading across the sky go round it, not through it.
-    var FR = fingerRadius(), SR = FR * 1.4;
+    // A wary spot pushes firmly even near its rim, so birds heading
+    // across the sky go round it, not through it.
+    var FR = fingerRadius(), SR = scareRadius();
     var fl = [], id, wary = 0;
     for (id in fingers) {
       if (fingers.hasOwnProperty(id)) {
@@ -941,19 +944,40 @@
     }
   }
 
-  function drawRipples(dt) {
-    var FR = fingerRadius();
+  // The circle shows exactly the place the birds are keeping out of. A
+  // finger's circle opens out to the edge of the hole it is making and
+  // follows the finger about. When the finger lifts, the circle widens
+  // to the edge of the wary spot it leaves behind, and fades exactly as
+  // the birds' wariness does, so it has gone by the time they drift
+  // back in.
+  function ring(x, y, r, a) {
+    if (a < 0.01) { return; }
+    var g = ctx.createRadialGradient(x, y, r * 0.4, x, y, r);
+    g.addColorStop(0, 'rgba(255,255,255,0)');
+    g.addColorStop(1, 'rgba(255,255,255,' + (a * 0.3).toFixed(3) + ')');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, 6.2832);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,' + a.toFixed(3) + ')';
+    ctx.stroke();
+  }
+
+  function drawMarks(dt) {
+    var FR = fingerRadius(), SR = scareRadius(), id, i;
+    var k = reduced ? 1 : Math.min(1, dt * 7);
     ctx.lineWidth = Math.max(1.5, U * 0.004);
-    for (var i = ripples.length - 1; i >= 0; i--) {
-      var r = ripples[i];
-      r.age += dt;
-      if (r.age > 1.4) { ripples.splice(i, 1); continue; }
-      var k = r.age / 1.4;
-      var rad = FR * (reduced ? 0.6 : 0.25 + 0.75 * smooth(k));
-      ctx.strokeStyle = 'rgba(255,255,255,' + (0.45 * (1 - k)).toFixed(3) + ')';
-      ctx.beginPath();
-      ctx.arc(r.x, r.y, rad, 0, 6.2832);
-      ctx.stroke();
+    for (id in fingers) {
+      if (fingers.hasOwnProperty(id)) {
+        var f = fingers[id];
+        f.r += (FR - f.r) * k;
+        ring(f.x, f.y, f.r, 0.45);
+      }
+    }
+    for (i = 0; i < scares.length; i++) {
+      var sc = scares[i];
+      sc.r += (SR - sc.r) * k;
+      ring(sc.x, sc.y, sc.r, 0.45 * scareLeft(sc));
     }
   }
 
@@ -966,7 +990,7 @@
     var front = rgba(mix(INK, sky.top, 0.12));
     drawRow(reedsFront, front, Math.max(1, U * 0.003));
     drawBank(front);
-    drawRipples(dt);
+    drawMarks(dt);
   }
 
   // ------------------------------------------------------------------
@@ -1280,8 +1304,7 @@
   // ------------------------------------------------------------------
   canvas.addEventListener('pointerdown', function (e) {
     initAudio();
-    fingers[e.pointerId] = { x: e.clientX, y: e.clientY };
-    ripples.push({ x: e.clientX, y: e.clientY, age: 0 });
+    fingers[e.pointerId] = { x: e.clientX, y: e.clientY, r: fingerRadius() * (reduced ? 1 : 0.25) };
     whoosh(startle(e.clientX, e.clientY), e.clientX);
     try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* not every browser */ }
   });
@@ -1292,7 +1315,7 @@
   function lift(e) {
     var f = fingers[e.pointerId];
     if (f) {
-      scares.push({ x: f.x, y: f.y, life: SCARE_LIFE });
+      scares.push({ x: f.x, y: f.y, life: SCARE_LIFE, r: f.r });
       if (scares.length > 8) { scares.shift(); }
     }
     delete fingers[e.pointerId];
