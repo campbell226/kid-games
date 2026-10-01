@@ -278,7 +278,10 @@
   var px = new Float64Array(MAX), py = new Float64Array(MAX), pz = new Float64Array(MAX);
   var vx = new Float64Array(MAX), vy = new Float64Array(MAX), vz = new Float64Array(MAX);
   var AX = new Float64Array(MAX), AY = new Float64Array(MAX), AZ = new Float64Array(MAX);
-  var bank = new Float64Array(MAX), phase = new Float64Array(MAX), flapT = new Float64Array(MAX);
+  var phase = new Float64Array(MAX), flapT = new Float64Array(MAX);
+  // How hard each bird is being pulled sideways round a turn, smoothed.
+  // It banks into that, the way a real bird or a bicycle leans.
+  var LX = new Float64Array(MAX), LY = new Float64Array(MAX), LZ = new Float64Array(MAX);
   var size = new Float64Array(MAX), flapping = new Uint8Array(MAX);
   var panic = new Float64Array(MAX), panicNext = new Float64Array(MAX);
   var SX = new Float64Array(MAX), SY = new Float64Array(MAX), SS = new Float64Array(MAX);
@@ -417,7 +420,7 @@
       vx[i] = CRUISE * (0.9 + Math.random() * 0.2);
       vy[i] = (Math.random() - 0.5) * 0.05;
       vz[i] = (Math.random() - 0.5) * 0.05;
-      bank[i] = 0; panic[i] = 0;
+      LX[i] = 0; LY[i] = 0; LZ[i] = 0; panic[i] = 0;
       phase[i] = Math.random() * 6.283;
       flapping[i] = Math.random() < 0.6 ? 1 : 0;
       flapT[i] = Math.random();
@@ -648,7 +651,7 @@
       var am = Math.sqrt(bx * bx + by * by + bz * bz), amax = ACC_MAX + 9 * q;
       if (am > amax) { var r = amax / am; bx *= r; by *= r; bz *= r; }
 
-      var ovx = vx[i], ovy = vy[i];
+      var ovx = vx[i], ovy = vy[i], ovz = vz[i];
       vx[i] += bx * dt; vy[i] += by * dt; vz[i] += bz * dt;
 
       var sp = Math.sqrt(vx[i] * vx[i] + vy[i] * vy[i] + vz[i] * vz[i]) || 1e-6;
@@ -674,15 +677,20 @@
           vx[i] !== vx[i] || vy[i] !== vy[i] || vz[i] !== vz[i]) {
         px[i] = home.x; py[i] = home.y; pz[i] = home.z;
         vx[i] = cruise; vy[i] = 0; vz[i] = 0;
-        panic[i] = 0; bank[i] = 0;
+        ovx = cruise; ovy = 0; ovz = 0;
+        panic[i] = 0; LX[i] = 0; LY[i] = 0; LZ[i] = 0;
       }
 
-      // Banking into a turn shows the wings edge-on, which is what
-      // makes a real flock ripple dark and light as it wheels.
-      var o = Math.sqrt(ovx * ovx + ovy * ovy), nn = Math.sqrt(vx[i] * vx[i] + vy[i] * vy[i]);
-      var turn = (o > 1e-6 && nn > 1e-6) ? (ovx * vy[i] - ovy * vx[i]) / (o * nn) / dt : 0;
-      var tb = clamp(turn * 0.35, -1, 1);
-      bank[i] += (tb - bank[i]) * Math.min(1, dt * 5);
+      // The sideways part of this step's change of velocity: whatever is
+      // turning the bird, as opposed to speeding it up or slowing it.
+      var tx = (vx[i] - ovx) / dt, ty = (vy[i] - ovy) / dt, tz = (vz[i] - ovz) / dt;
+      var v2 = vx[i] * vx[i] + vy[i] * vy[i] + vz[i] * vz[i] || 1e-6;
+      var along = (tx * vx[i] + ty * vy[i] + tz * vz[i]) / v2;
+      tx -= along * vx[i]; ty -= along * vy[i]; tz -= along * vz[i];
+      var kl = Math.min(1, dt * 4);
+      LX[i] += (tx - LX[i]) * kl;
+      LY[i] += (ty - LY[i]) * kl;
+      LZ[i] += (tz - LZ[i]) * kl;
 
       flapT[i] -= dt;
       if (flapT[i] <= 0) {
@@ -809,37 +817,97 @@
     ctx.fill();
   }
 
-  // A starling from below: pointed wings swept back, short tail.
-  var bX = 0, bY = 0, bFx = 0, bFy = 0;
-  function pt(a, b, first) {
-    var x = bX + bFx * a - bFy * b, y = bY + bFy * a + bFx * b;
-    if (first) { ctx.moveTo(x, y); } else { ctx.lineTo(x, y); }
+  // A starling in three dimensions, drawn as it looks from the ground.
+  // Its body points the way it is flying. Its wings lie square to that,
+  // tipped over by however hard it is banking into a turn, and swept up
+  // and down as it beats them. Then it is seen from below at the angle
+  // you would be looking up at it: a bird high overhead mostly shows
+  // its underside, one low over the reeds is seen side-on, and a bird
+  // crossing level in front of you is little more than a dash.
+  var BANK = 4, BANK_MAX = 2.5;
+
+  // Every piece of every bird is wound the same way round, so that where
+  // a wing crosses the body the two add up rather than cancelling into
+  // a hole.
+  function tri(x1, y1, x2, y2, x3, y3) {
+    if ((x2 - x1) * (y3 - y1) - (y2 - y1) * (x3 - x1) > 0) {
+      var t = x2; x2 = x3; x3 = t;
+      t = y2; y2 = y3; y3 = t;
+    }
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.lineTo(x3, y3);
+    ctx.closePath();
   }
 
   function birdPath(i, base) {
-    var span = base * SS[i] * size[i];
-    var hx = vx[i], hy = vy[i];
-    var hl = Math.sqrt(hx * hx + hy * hy) || 1e-6;
-    var sp = Math.sqrt(hl * hl + vz[i] * vz[i]) || 1e-6;
-    bFx = hx / hl; bFy = hy / hl;
-    bX = SX[i]; bY = SY[i];
+    var span = base * SS[i] * size[i], half = span * 0.5, len = span * 0.6;
+    var oX = SX[i], oY = SY[i];
 
-    var L = span * (0.45 + 0.55 * hl / sp);
-    var open = 1 - 0.6 * Math.abs(bank[i]);
-    if (!reduced && (flapping[i] || panic[i] > 0.2)) {
-      open *= 0.3 + 0.7 * (0.5 + 0.5 * Math.cos(phase[i]));
+    // How far you are looking up to see it. Straight ahead at the
+    // horizon; steeper the higher it is.
+    var h = Math.max(0, horizonY - oY), foc = H * 0.75, hyp = Math.sqrt(h * h + foc * foc);
+    var ce = foc / hyp, se = h / hyp;
+
+    var sp = Math.sqrt(vx[i] * vx[i] + vy[i] * vy[i] + vz[i] * vz[i]) || 1e-6;
+    var fx = vx[i] / sp, fy = vy[i] / sp, fz = vz[i] / sp;
+
+    // Its up: straight up (which is -y here), leaned into the turn.
+    var lx = LX[i] * BANK, ly = LY[i] * BANK, lz = LZ[i] * BANK;
+    var lm = Math.sqrt(lx * lx + ly * ly + lz * lz);
+    if (lm > BANK_MAX) { var q = BANK_MAX / lm; lx *= q; ly *= q; lz *= q; }
+    var ux = lx, uy = ly - 1, uz = lz;
+    var d = ux * fx + uy * fy + uz * fz;
+    ux -= d * fx; uy -= d * fy; uz -= d * fz;
+    var um = Math.sqrt(ux * ux + uy * uy + uz * uz);
+    if (um < 1e-4) { ux = 0; uy = 0; uz = 1; um = 1; }
+    ux /= um; uy /= um; uz /= um;
+
+    // Its right, square to both.
+    var rx = fy * uz - fz * uy, ry = fz * ux - fx * uz, rz = fx * uy - fy * ux;
+
+    // Wings held almost flat in a glide; beating up and down otherwise.
+    var a = 0.06;
+    if (!reduced && (flapping[i] || panic[i] > 0.2)) { a = 0.15 + 0.75 * Math.sin(phase[i]); }
+    var ca = Math.cos(a) * half, sa = Math.sin(a) * half;
+    var bw = span * 0.08;
+
+    // Each wing: the front of the shoulder, the swept-back tip, the back
+    // of the shoulder, each projected onto the screen as seen from below.
+    for (var side = 1; side >= -1; side -= 2) {
+      var wx = rx * side, wy = ry * side, wz = rz * side;
+      var ax = fx * 0.1 * len + wx * bw, ay = fy * 0.1 * len + wy * bw, az = fz * 0.1 * len + wz * bw;
+      var tx = wx * ca + ux * sa - fx * 0.27 * len;
+      var ty = wy * ca + uy * sa - fy * 0.27 * len;
+      var tz = wz * ca + uz * sa - fz * 0.27 * len;
+      var cx = -fx * 0.12 * len + wx * bw, cy = -fy * 0.12 * len + wy * bw, cz = -fz * 0.12 * len + wz * bw;
+      tri(oX + ax, oY + ay * ce + az * se,
+          oX + tx, oY + ty * ce + tz * se,
+          oX + cx, oY + cy * ce + cz * se);
     }
-    var e = span * 0.5 * open, bw = span * 0.07;
 
-    pt(0.3 * L, 0, true);
-    pt(0.08 * L, bw);
-    pt(-0.16 * L, e);
-    pt(-0.08 * L, bw * 0.85);
-    pt(-0.28 * L, bw);
-    pt(-0.28 * L, -bw);
-    pt(-0.08 * L, -bw * 0.85);
-    pt(-0.16 * L, -e);
-    pt(0.08 * L, -bw);
+    // The body is round, so it looks much the same from any side: a
+    // spindle from beak to tail with a width of its own on screen, which
+    // keeps a bird seen edge-on from vanishing altogether.
+    var nx = fx * 0.5 * len, ny = (fy * ce + fz * se) * 0.5 * len;
+    var kx = -fx * 0.47 * len, ky = -(fy * ce + fz * se) * 0.47 * len;
+    var dx = kx - nx, dy = ky - ny, dl = Math.sqrt(dx * dx + dy * dy);
+    if (dl < bw * 2) {
+      // Coming straight at you or going straight away: just a small
+      // round body between the wings.
+      ctx.moveTo(oX, oY - bw);
+      ctx.lineTo(oX - bw, oY);
+      ctx.lineTo(oX, oY + bw);
+      ctx.lineTo(oX + bw, oY);
+      ctx.closePath();
+      return;
+    }
+    var wpx = -dy / dl * bw, wpy = dx / dl * bw;
+    var mx = nx + dx * 0.35, my = ny + dy * 0.35;
+    ctx.moveTo(oX + nx, oY + ny);
+    ctx.lineTo(oX + mx + wpx, oY + my + wpy);
+    ctx.lineTo(oX + kx, oY + ky);
+    ctx.lineTo(oX + mx - wpx, oY + my - wpy);
     ctx.closePath();
   }
 
@@ -855,14 +923,21 @@
       bucket[i] = clamp(Math.floor(pz[i] / DEPTH * 4), 0, 3);
     }
 
+    // Filled, and also traced with a hairline, so a wing seen exactly
+    // edge-on still shows as a thin line rather than disappearing.
     var haze = mix(sky.mid, sky.hor, 0.35);
+    ctx.lineJoin = 'round';
     for (b = 3; b >= 0; b--) {
       ctx.beginPath();
       for (i = 0; i < n; i++) {
         if (bucket[i] === b) { birdPath(i, base); }
       }
-      ctx.fillStyle = rgba(mix(INK, haze, HAZE[b]));
+      var col = rgba(mix(INK, haze, HAZE[b]));
+      ctx.fillStyle = col;
+      ctx.strokeStyle = col;
+      ctx.lineWidth = Math.max(0.5, base * persp((b + 0.5) / 4 * DEPTH) * 0.04);
       ctx.fill();
+      ctx.stroke();
     }
   }
 
