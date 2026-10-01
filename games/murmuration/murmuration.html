@@ -199,8 +199,8 @@
   var WEATHER = [0.05, 0.4, 0.15, 0.75, 0.3, 0.95, 0.1, 0.55];
   var WEATHER_SEG = 28;
   var weatherClock = Math.random() * WEATHER_SEG * WEATHER.length;
-  var weather = 0, gusts = [], nextGust = 1.5;
-  var windHeard = 0, windPan = 0, reedPhase = 0;
+  var weather = 0, gusts = [], nextGust = 3;
+  var windHeard = 0, gustHeard = 0, windPan = 0, reedPhase = 0;
 
   function updateWind(dt) {
     var lap = WEATHER_SEG * WEATHER.length, i;
@@ -209,29 +209,39 @@
     var f = smooth((weatherClock - k * WEATHER_SEG) / WEATHER_SEG);
     weather = WEATHER[k] + (WEATHER[(k + 1) % WEATHER.length] - WEATHER[k]) * f;
 
+    // Gusts are brief and well apart, and a new one waits until the last
+    // has nearly gone, so even in a blow they never run together into
+    // one long roar.
     nextGust -= dt;
     if (nextGust <= 0) {
-      gusts.push({
-        pos: -0.45,
-        speed: 0.25 + Math.random() * 0.13,
-        peak: clamp(weather * (0.55 + 0.7 * Math.random()), 0.05, 1)
-      });
-      nextGust = (9 - 6.5 * weather) * (0.6 + 0.8 * Math.random());
+      var busy = false;
+      for (i = 0; i < gusts.length; i++) { if (gusts[i].pos < 0.75) { busy = true; } }
+      if (busy) {
+        nextGust = 1;
+      } else {
+        gusts.push({
+          pos: -0.45,
+          speed: 0.32 + Math.random() * 0.13,
+          peak: clamp(weather * (0.55 + 0.7 * Math.random()), 0.05, 1)
+        });
+        nextGust = (12 - 6 * weather) * (0.75 + 0.75 * Math.random());
+      }
     }
 
     // What you hear is each gust as it passes the middle of the screen,
-    // from the side it is on.
+    // from the side it is on, and nothing at all between gusts.
     var heard = 0, pan = 0;
     for (i = gusts.length - 1; i >= 0; i--) {
       var g = gusts[i];
       g.pos += g.speed * dt;
       if (g.pos > 1.5) { gusts.splice(i, 1); continue; }
-      var d = (g.pos - 0.5) / 0.55, on = g.peak * Math.exp(-d * d);
+      var d = (g.pos - 0.5) / 0.38, on = g.peak * Math.exp(-d * d);
       heard += on;
       pan += on * (g.pos - 0.5);
     }
+    gustHeard = clamp(heard, 0, 1);
     windHeard = clamp(weather * 0.12 + heard, 0, 1);
-    windPan = heard > 0.01 ? clamp(pan / heard * 1.4, -0.8, 0.8) : 0;
+    windPan = heard > 0.01 ? clamp(pan / heard, -0.5, 0.5) : 0;
 
     // Reeds flutter faster in a stronger wind. Kept as a running phase
     // so a change of speed never makes them jump.
@@ -1143,8 +1153,10 @@
     if (soundClock < 0.05 || !AC || !windGain) { return; }
     soundClock = 0;
     var now = AC.currentTime;
-    windGain.gain.setTargetAtTime(0.002 + 0.6 * Math.pow(windHeard, 1.5), now, 0.12);
-    windFilter.frequency.setTargetAtTime(500 + 1700 * windHeard, now, 0.12);
+    // Kept well under the music: a gust is something passing, not a
+    // sound to listen to. Small gusts are barely there at all.
+    windGain.gain.setTargetAtTime(0.0001 + 0.2 * Math.pow(gustHeard, 1.8), now, 0.15);
+    windFilter.frequency.setTargetAtTime(600 + 1400 * gustHeard, now, 0.15);
     if (windPanner) { windPanner.pan.setTargetAtTime(windPan, now, 0.2); }
   }
 
