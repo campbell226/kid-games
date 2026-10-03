@@ -185,11 +185,11 @@
   // light is, the sky reflected on the surface, and a wash over all of it.
   // ------------------------------------------------------------------
   var MOODS = [
-    { deep: '#1f4a4a', shallow: '#6b9a84', caus: 0.17, sky: '#d8ecf0', skyA: 0.1, grade: '#fff2d6', gradeA: 0.04, rain: 0 },
-    { deep: '#16505c', shallow: '#62ab9f', caus: 0.26, sky: '#e8f6ff', skyA: 0.13, grade: '#ffffff', gradeA: 0, rain: 0 },
-    { deep: '#33473a', shallow: '#93945f', caus: 0.2, sky: '#ffdcaa', skyA: 0.12, grade: '#ffb35c', gradeA: 0.08, rain: 0 },
+    { deep: '#123436', shallow: '#5f8f7a', caus: 0.17, sky: '#d8ecf0', skyA: 0.1, grade: '#fff2d6', gradeA: 0.04, rain: 0 },
+    { deep: '#0c3a46', shallow: '#56a094', caus: 0.26, sky: '#e8f6ff', skyA: 0.13, grade: '#ffffff', gradeA: 0, rain: 0 },
+    { deep: '#22342a', shallow: '#878a56', caus: 0.2, sky: '#ffdcaa', skyA: 0.12, grade: '#ffb35c', gradeA: 0.08, rain: 0 },
     { deep: '#0e1a26', shallow: '#2a404c', caus: 0, sky: '#5a64a0', skyA: 0.1, grade: '#121c44', gradeA: 0.46, rain: 0, night: 1 },
-    { deep: '#2a4144', shallow: '#73887f', caus: 0.06, sky: '#dfe5e8', skyA: 0.08, grade: '#55636c', gradeA: 0.1, rain: 1 }
+    { deep: '#1d3133', shallow: '#687d75', caus: 0.06, sky: '#dfe5e8', skyA: 0.08, grade: '#55636c', gradeA: 0.1, rain: 1 }
   ].map(function (m) {
     return {
       deep: hex(m.deep), shallow: hex(m.shallow), caus: m.caus, sky: hex(m.sky), skyA: m.skyA,
@@ -628,7 +628,16 @@
     { fx: 0.18, fy: 0.83, ox: 0.1, oy: -0.08, r: 0.04 },
     { fx: 0.5, fy: 0.07, ox: 0, oy: 0, r: 0.05 },
     { fx: 0.06, fy: 0.42, ox: 0, oy: 0, r: 0.06 },
-    { fx: 0.93, fy: 0.62, ox: 0, oy: 0, r: 0.055, flower: 1 }
+    { fx: 0.93, fy: 0.62, ox: 0, oy: 0, r: 0.055, flower: 1 },
+    { fx: 0.8, fy: 0.17, ox: -0.23, oy: 0.1, r: 0.048, clump: 1 },
+    { fx: 0.8, fy: 0.17, ox: 0.17, oy: 0.21, r: 0.044, clump: 1 },
+    { fx: 0.18, fy: 0.83, ox: 0.21, oy: -0.01, r: 0.046 },
+    { fx: 0.18, fy: 0.83, ox: -0.05, oy: -0.24, r: 0.05 },
+    { fx: 0.12, fy: 0.12, ox: 0, oy: 0, r: 0.062 },
+    { fx: 0.12, fy: 0.12, ox: 0.115, oy: 0.03, r: 0.046, flower: 1 },
+    { fx: 0.86, fy: 0.86, ox: 0, oy: 0, r: 0.066 },
+    { fx: 0.86, fy: 0.86, ox: -0.125, oy: 0.025, r: 0.05 },
+    { fx: 0.86, fy: 0.86, ox: -0.03, oy: -0.125, r: 0.046 }
   ];
   var pads = [], shyHome = { x: 0, y: 0 };
 
@@ -698,14 +707,14 @@
   // exactly this, because the others learn from watching it.
   // ------------------------------------------------------------------
   var KINDS = [
-    { len: 0.22, girth: 0.165, body: '#9b7548', fin: '#b8925f', net: '#6b4c2c', trust: 0.6, learn: 1.6 },
-    { len: 0.2, girth: 0.15, body: '#f7f2e9', fin: '#f1e9df', trust: 0.24, learn: 1,
+    { len: 0.165, girth: 0.165, body: '#9b7548', fin: '#b8925f', net: '#6b4c2c', trust: 0.6, learn: 1.6 },
+    { len: 0.15, girth: 0.15, body: '#f7f2e9', fin: '#f1e9df', trust: 0.24, learn: 1,
       patches: [[0.13, 0.05, 0.1, 0.85, '#df4429'], [0.4, 0.3, 0.12, 0.75, '#df4429'], [0.65, -0.25, 0.09, 0.7, '#e3502f']] },
-    { len: 0.19, girth: 0.15, body: '#1f1d22', fin: '#3a3438', trust: 0.18, learn: 1,
+    { len: 0.145, girth: 0.15, body: '#1f1d22', fin: '#3a3438', trust: 0.18, learn: 1,
       patches: [[0.14, -0.1, 0.11, 0.9, '#d9472b'], [0.33, 0.55, 0.08, 0.5, '#f3efe6'], [0.47, -0.35, 0.1, 0.65, '#d9472b'],
         [0.66, 0.35, 0.08, 0.55, '#f3efe6'], [0.8, -0.2, 0.06, 0.6, '#d9472b']] },
-    { len: 0.19, girth: 0.15, body: '#efb534', fin: '#f5c860', net: '#c98d1c', metal: 1, trust: 0.3, learn: 1 },
-    { len: 0.11, girth: 0.135, body: '#f4f4f6', fin: '#e8eef4', longFins: 1, trust: 0, learn: 0.55, shy: 1,
+    { len: 0.145, girth: 0.15, body: '#efb534', fin: '#f5c860', net: '#c98d1c', metal: 1, trust: 0.3, learn: 1 },
+    { len: 0.085, girth: 0.135, body: '#f4f4f6', fin: '#e8eef4', longFins: 1, trust: 0, learn: 0.55, shy: 1,
       patches: [[0.1, 0.1, 0.06, 0.65, '#f4a46a']] }
   ];
 
@@ -1286,9 +1295,11 @@
 
   // ------------------------------------------------------------------
   // Food. A tap throws a small handful, which lands a pellet at a time
-  // around the spot. Most of it floats, so a fish has to come right up to
-  // the top, near the hand, to take it. About a third sinks after a moment,
-  // and that is all the little one dares to eat at first.
+  // around the spot. It floats only for a few seconds, so a fish that
+  // wants it from the top, near the hand, has to come up quickly; a third
+  // of it sinks almost at once. Whatever is not taken drifts down into
+  // the deep and out of sight, and what sinks near the lily pads is all
+  // the little one dares to eat at first.
   // ------------------------------------------------------------------
   var pellets = [], MAXP = 60;
   var flowT = Math.random() * 100, CX = 0, CY = 0;
@@ -1321,8 +1332,8 @@
       var air = 0.12 + i * 0.045 + Math.random() * 0.06;
       pellets.push({
         x: KX, y: KY, fx: x, fy: y, z: 0, vx: 0, vy: 0, air: air, airMax: air,
-        age: 0, sinkAt: Math.random() < 0.32 ? 1.2 + Math.random() * 2 : 22 + Math.random() * 10,
-        sinking: false, bottom: 0, fade: 1, r: U * (0.011 + Math.random() * 0.002),
+        age: 0, sinkAt: Math.random() < 0.32 ? 1 + Math.random() * 1.5 : 4 + Math.random() * 4,
+        sinking: false, bottom: 0, fade: 1, r: U * (0.0072 + Math.random() * 0.0012),
         tone: Math.random(), gone: false
       });
     }
@@ -1658,7 +1669,7 @@
   // How much of a fish can be seen through the water over it: all of it
   // at the top, a dim shape half way down, almost nothing near the
   // bottom. This is what makes one rising out of the deep an event.
-  function seen(z) { return 1 - smooth(clamp((z - 0.12) / 0.75, 0, 1)); }
+  function seen(z) { return 1 - smooth(clamp((z - 0.08) / 0.62, 0, 1)); }
 
   function drawFishShadow(f) {
     var h = leapHeight(f), off = (1 - f.z) * U * 0.045 + U * 0.004 + h * U * 0.12;
@@ -1837,9 +1848,9 @@
     // The colour of the water itself: deep in the middle, clear in the
     // shallows, so the bottom fades from sight towards the centre.
     var g = ctx.createRadialGradient(PCX, PCY, 0, PCX, PCY, Math.max(PX1 - PX0, PY1 - PY0) * 0.6);
-    g.addColorStop(0, rgba(mood.deep, 0.8));
-    g.addColorStop(0.55, rgba(mix(mood.deep, mood.shallow, 0.5), 0.6));
-    g.addColorStop(1, rgba(mood.shallow, 0.4));
+    g.addColorStop(0, rgba(mood.deep, 0.92));
+    g.addColorStop(0.5, rgba(mix(mood.deep, mood.shallow, 0.35), 0.78));
+    g.addColorStop(1, rgba(mood.shallow, 0.48));
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, H);
   }
@@ -2079,7 +2090,7 @@
     for (i = 0; i < pellets.length; i++) {
       p = pellets[i];
       if (!p.sinking || p.gone) { continue; }
-      drawPellet(p.x, p.y, p.r * (1 - 0.2 * p.z), mix(PELLET, mood.deep, 0.2 + 0.45 * p.z), p.fade);
+      drawPellet(p.x, p.y, p.r * (1 - 0.25 * p.z), mix(PELLET, mood.deep, 0.25 + 0.6 * p.z), p.fade * (1 - 0.6 * p.z));
     }
 
     if (order.length !== fish.length) { order = fish.slice(); }
@@ -2206,7 +2217,7 @@
     dab: -1, dabbed: false, visit: 0, tail: 0, flick: 0, taps: 0, tapAt: -9, clock: 0
   };
 
-  function catLen() { return U * 0.15; }
+  function catLen() { return U * 0.18; }
 
   function catAround() { return cat.state !== 'away'; }
 
@@ -2560,6 +2571,13 @@
     fx: 0, fy: 0, fh: 0.5, tx: 0, ty: 0, th: 0.5, t: 0, u: 1, dur: 1, pad: -1, ox: 0, oy: 0,
     visit: 0, wing: 0, fast: 1
   };
+
+  // A tap on the dragonfly sends it off, and throws no food.
+  function dragonflyHit(x, y) {
+    if (dfly.state === 'away' || dfly.state === 'leave') { return false; }
+    var dx = x - dfly.x, dy = y - dfly.y, r = U * (0.06 + 0.03 * dfly.h);
+    return dx * dx + dy * dy < r * r;
+  }
 
   function dragonflyLow(x, y, r) {
     if (dfly.state !== 'hover' && dfly.state !== 'rest') { return false; }
@@ -3232,6 +3250,7 @@
     var x = e.clientX, y = e.clientY;
     // A tap on the cat is a try at shooing it, not food.
     if (catHit(x, y)) { catTapped(x, y); return; }
+    if (dragonflyHit(x, y)) { dragonflyStartle(x, y); return; }
     fingers[e.pointerId] = { x: x, y: y, held: 0, alive: true, rip: 0, trail: 0 };
     dragonflyStartle(x, y);
     scatter(x, y);
