@@ -2797,28 +2797,39 @@
 
   // ------------------------------------------------------------------
   // Sound, all synthesised, so the game is never silent and never waits
-  // on a download. A slow, soft pad; now and then a plucked note, like a
-  // koto heard from across a garden; and the pond itself: a plip for every
-  // pellet, a bloop for every gulp, the tiny kiss of a fish at your finger,
-  // the cat, splashes, and rain when it comes.
+  // on a download. A Japanese garden: a koto heard from across it, playing
+  // a short phrase now and then with a note bent up the way a player
+  // presses the string; once in a while a shakuhachi, a breathy bamboo
+  // flute, holding a long note; and under them a quiet drone. Then the
+  // pond itself: a plip for every pellet, a bloop for every gulp, the tiny
+  // kiss of a fish at your finger, the cat, splashes, and rain.
   //
-  // Everything melodic is drawn from one pentatonic scale, so a handful of
-  // food landing makes a little tune and nothing can clash.
+  // By day the music uses the yo scale, bright and folk-like. As dusk
+  // falls it changes to the in scale, the wistful one a koto is known for.
+  // Both have five notes, the plips of food landing use whichever is
+  // playing, and the drone is built only from the notes the two share, so
+  // nothing can ever clash.
   // ------------------------------------------------------------------
-  var AC = null, master = null, verb = null, padBus = null, fxBus = null, noise = null;
-  var rainGain = null, nextChord = 0, chordIdx = 0, nextPluck = 0, lastPlip = 0, lastGulp = 0, lastKiss = 0;
-  var SCALE = [0, 2, 4, 7, 9];
+  var AC = null, master = null, verb = null, padBus = null, fxBus = null, musBus = null, noise = null;
+  var rainGain = null, nextChord = 0, chordIdx = 0, nextPluck = 0, nextFlute = 0, lastPlip = 0, lastGulp = 0, lastKiss = 0;
+  var ROOT = 50;                    // D
+  var YO = [0, 2, 5, 7, 9];         // D E G A B
+  var IN = [0, 1, 5, 7, 8];         // D E-flat G A B-flat
+  // Open fifths and fourths on D, G and A, which both scales contain.
   var CHORDS = [
-    [43, 50, 59, 62],   // G, with the third on top
-    [40, 47, 55, 62],   // E minor seventh
-    [36, 43, 52, 59],   // C major seventh
-    [38, 45, 54, 57]    // D, open
+    [38, 45, 50, 57],
+    [43, 50, 55, 57],
+    [38, 45, 50, 55],
+    [45, 50, 57, 62]
   ];
   var CHORD_LEN = 18, CHORD_GAP = 12;
 
-  function note(base, i) {
+  function curScale() { return mood.night > 0.5 ? IN : YO; }
+
+  function note(base, i, sc) {
+    sc = sc || curScale();
     var oct = Math.floor(i / 5), d = ((i % 5) + 5) % 5;
-    return base + SCALE[d] + 12 * oct;
+    return base + sc[d] + 12 * oct;
   }
 
   function pan(x) {
@@ -2887,7 +2898,7 @@
     verbOut.connect(master);
 
     padBus = AC.createGain();
-    padBus.gain.setValueAtTime(0.38, t);
+    padBus.gain.setValueAtTime(0.24, t);
     var padLp = AC.createBiquadFilter();
     padLp.type = 'lowpass';
     padLp.frequency.setValueAtTime(800, t);
@@ -2903,6 +2914,16 @@
     fxWet.gain.setValueAtTime(0.35, t);
     fxBus.connect(fxWet);
     fxWet.connect(verb);
+
+    // The koto and the flute: clear rather than muffled like the drone,
+    // and further back in the garden, so more of them is reverb.
+    musBus = AC.createGain();
+    musBus.gain.setValueAtTime(0.8, t);
+    musBus.connect(master);
+    var musWet = AC.createGain();
+    musWet.gain.setValueAtTime(0.7, t);
+    musBus.connect(musWet);
+    musWet.connect(verb);
 
     // Rain: only the top of the noise, a soft hiss, and silent unless it
     // is actually raining.
@@ -2952,19 +2973,27 @@
     });
   }
 
-  // A plucked string: a sharp start with a touch of brightness that dies
-  // away first, leaving a round tone that rings on.
-  function pluck(t, midi, level, x, bus) {
-    var f = mtof(midi), g = AC.createGain();
+  // A koto string: a bright, twanging start with a tiny click of the
+  // plectrum, the upper partials dying away first, leaving a round tone
+  // that rings on. With a bend, the player presses the string down behind
+  // the bridge just after plucking it, and the note slides up to the next
+  // one in the scale.
+  function pluck(t, midi, level, x, bus, bend, ring) {
+    var f = mtof(midi), g = AC.createGain(), len = ring || 2.6;
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(level, t + 0.006);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 2.6);
+    g.gain.exponentialRampToValueAtTime(level, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(level * 0.4, t + 0.3);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + len);
     out(g, x, bus || fxBus);
-    [[1, 1, 2.6], [2, 0.35, 0.7], [3, 0.12, 0.3]].forEach(function (v) {
+    [[1, 1, len, 'triangle'], [2, 0.4, len * 0.4, 'sine'], [3, 0.2, len * 0.2, 'sine'], [4, 0.1, 0.15, 'sine']].forEach(function (v) {
       var o = AC.createOscillator(), og = AC.createGain();
-      o.type = 'sine';
-      o.frequency.setValueAtTime(f * v[0] * 1.01, t);
-      o.frequency.exponentialRampToValueAtTime(f * v[0], t + 0.05);
+      o.type = v[3];
+      o.frequency.setValueAtTime(f * v[0] * 1.008, t);
+      o.frequency.exponentialRampToValueAtTime(f * v[0], t + 0.04);
+      if (bend) {
+        o.frequency.setValueAtTime(f * v[0], t + 0.15);
+        o.frequency.exponentialRampToValueAtTime(f * v[0] * Math.pow(2, bend / 12), t + 0.34);
+      }
       og.gain.setValueAtTime(v[1], t);
       og.gain.exponentialRampToValueAtTime(0.0001, t + v[2]);
       o.connect(og);
@@ -2972,6 +3001,86 @@
       o.start(t);
       o.stop(t + v[2] + 0.05);
     });
+    if (noise) {
+      var c = AC.createBufferSource(), hp = AC.createBiquadFilter(), cg = AC.createGain();
+      c.buffer = noise;
+      hp.type = 'highpass';
+      hp.frequency.setValueAtTime(3000, t);
+      cg.gain.setValueAtTime(level * 0.25, t);
+      cg.gain.exponentialRampToValueAtTime(0.0001, t + 0.02);
+      c.connect(hp);
+      hp.connect(cg);
+      out(cg, x, bus || fxBus);
+      c.start(t, Math.random() * 2);
+      c.stop(t + 0.03);
+    }
+  }
+
+  // A koto phrase: three to five notes wandering up and down the scale,
+  // unhurried and a little uneven, sometimes with a note bent up, sometimes
+  // one plucked twice quickly, and the last left to ring.
+  var STEPS = [-2, -1, -1, 1, 1, 2, 0];
+  function kotoPhrase(t) {
+    var sc = curScale(), i = 5 + Math.floor(Math.random() * 4), n = 3 + Math.floor(Math.random() * 3);
+    var x = W * (0.2 + 0.6 * Math.random());
+    for (var k = 0; k < n; k++) {
+      var last = k === n - 1, m = note(ROOT, i, sc), bend = 0;
+      if (!last && Math.random() < 0.25) { bend = note(ROOT, i + 1, sc) - m; }
+      pluck(t, m, last ? 0.08 : 0.065, x, musBus, bend, last ? 3.4 : 2.2);
+      if (!last && !bend && Math.random() < 0.15) { pluck(t + 0.13, m, 0.045, x, musBus, 0, 1.4); }
+      t += 0.34 + Math.random() * 0.32 + (Math.random() < 0.2 ? 0.35 : 0);
+      i = clamp(i + STEPS[Math.floor(Math.random() * STEPS.length)], 3, 11);
+    }
+  }
+
+  // The shakuhachi: a long, breathy note. It starts a little flat and
+  // slides up onto the pitch, a slow vibrato grows as it is held, and the
+  // breath is heard as well as the tone, strongest as it begins.
+  function flute(t, midi, dur, x) {
+    var f = mtof(midi), g = AC.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.05, t + 0.45);
+    g.gain.setValueAtTime(0.05, t + dur - 0.8);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    out(g, x, musBus);
+    var vib = AC.createOscillator();
+    vib.frequency.setValueAtTime(4.8, t);
+    [[1, 1], [2, 0.16], [3, 0.05]].forEach(function (v) {
+      var o = AC.createOscillator(), og = AC.createGain(), vg = AC.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(f * v[0] * 0.94, t);
+      o.frequency.exponentialRampToValueAtTime(f * v[0], t + 0.4);
+      vg.gain.setValueAtTime(0, t);
+      vg.gain.setValueAtTime(0, t + 0.9);
+      vg.gain.linearRampToValueAtTime(f * v[0] * 0.012, t + dur * 0.85);
+      vib.connect(vg);
+      vg.connect(o.frequency);
+      og.gain.setValueAtTime(v[1], t);
+      o.connect(og);
+      og.connect(g);
+      o.start(t);
+      o.stop(t + dur + 0.05);
+    });
+    vib.start(t);
+    vib.stop(t + dur + 0.05);
+    if (noise) {
+      var b = AC.createBufferSource(), bp = AC.createBiquadFilter(), bg = AC.createGain();
+      b.buffer = noise;
+      b.loop = true;
+      bp.type = 'bandpass';
+      bp.frequency.setValueAtTime(f * 2, t);
+      bp.Q.setValueAtTime(1.5, t);
+      bg.gain.setValueAtTime(0.0001, t);
+      bg.gain.exponentialRampToValueAtTime(0.03, t + 0.12);
+      bg.gain.exponentialRampToValueAtTime(0.01, t + 0.6);
+      bg.gain.setValueAtTime(0.01, t + dur - 0.6);
+      bg.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      b.connect(bp);
+      bp.connect(bg);
+      out(bg, x, musBus);
+      b.start(t, Math.random() * 2);
+      b.stop(t + dur + 0.05);
+    }
   }
 
   function scheduleMusic() {
@@ -2979,6 +3088,7 @@
     var now = AC.currentTime;
     if (nextChord < now) { nextChord = now + 0.1; }
     if (nextPluck < now) { nextPluck = now + 1 + Math.random() * 3; }
+    if (nextFlute < now) { nextFlute = now + 20 + Math.random() * 20; }
     while (nextChord < now + 0.5) {
       var ch = CHORDS[chordIdx % CHORDS.length];
       for (var k = 0; k < ch.length; k++) { padNote(nextChord, ch[k], CHORD_LEN); }
@@ -2986,10 +3096,22 @@
       nextChord += CHORD_GAP;
     }
     if (nextPluck < now + 0.5) {
-      var i = 5 + Math.floor(Math.random() * 6);
-      pluck(nextPluck, note(55, i), 0.07, W * Math.random(), padBus);
-      if (Math.random() < 0.4) { pluck(nextPluck + 0.35, note(55, i + (Math.random() < 0.5 ? 1 : -2)), 0.05, W * Math.random(), padBus); }
-      nextPluck += 5 + Math.random() * 7;
+      kotoPhrase(nextPluck);
+      nextPluck += 8 + Math.random() * 8;
+    }
+    if (nextFlute < now + 0.5) {
+      // One long note, and sometimes a second a step below it. Kept clear
+      // of the koto, which waits until the flute has finished.
+      var fi2 = 3 + Math.floor(Math.random() * 4), d1 = 2.6 + Math.random() * 1.2, x = W * Math.random();
+      flute(nextFlute, note(ROOT + 12, fi2), d1, x);
+      var end = nextFlute + d1;
+      if (Math.random() < 0.5) {
+        var d2 = 2.4 + Math.random() * 1.2;
+        flute(nextFlute + d1 - 0.25, note(ROOT + 12, fi2 - 1), d2, x);
+        end += d2;
+      }
+      nextPluck = Math.max(nextPluck, end + 1.5);
+      nextFlute += 30 + Math.random() * 30;
     }
   }
   setInterval(scheduleMusic, 250);
@@ -2999,7 +3121,7 @@
     if (!live()) { return; }
     var t = Math.max(AC.currentTime + 0.005, lastPlip + 0.03);
     lastPlip = t;
-    var f = mtof(note(79, Math.floor(tone * 6)));
+    var f = mtof(note(ROOT + 24, Math.floor(tone * 6)));
     var o = AC.createOscillator(), g = AC.createGain();
     o.type = 'sine';
     o.frequency.setValueAtTime(f * 0.7, t);
@@ -3059,7 +3181,7 @@
   function chime(x) {
     if (!live()) { return; }
     var t = AC.currentTime + 0.05;
-    for (var i = 0; i < 4; i++) { pluck(t + i * 0.16, note(67, 2 + i), 0.11, x); }
+    for (var i = 0; i < 4; i++) { pluck(t + i * 0.16, note(ROOT + 12, 5 + i), 0.11, x, musBus); }
   }
 
   function plop(x) {
