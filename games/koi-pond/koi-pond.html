@@ -179,35 +179,40 @@
   // ------------------------------------------------------------------
   // The light goes slowly round a day: a fresh morning, full sun with the
   // light dancing on the bottom, a golden afternoon, then a grey spell
-  // with a shower of rain, and round to morning again. Dusk comes between
-  // the afternoon and the rain, with fireflies over the pads. Each row is the
+  // with a shower of rain, and round to morning again. A short dusk comes
+  // between the afternoon and the rain, now and then with a few fireflies
+  // over the pads. Each row is the
   // colour of the deep water, of the shallows, how bright the dancing
   // light is, the sky reflected on the surface, and a wash over all of it.
   // ------------------------------------------------------------------
   var MOODS = [
-    { deep: '#123436', shallow: '#5f8f7a', caus: 0.17, sky: '#d8ecf0', skyA: 0.1, grade: '#fff2d6', gradeA: 0.04, rain: 0 },
-    { deep: '#0c3a46', shallow: '#56a094', caus: 0.26, sky: '#e8f6ff', skyA: 0.13, grade: '#ffffff', gradeA: 0, rain: 0 },
-    { deep: '#22342a', shallow: '#878a56', caus: 0.2, sky: '#ffdcaa', skyA: 0.12, grade: '#ffb35c', gradeA: 0.08, rain: 0 },
-    { deep: '#0e1a26', shallow: '#2a404c', caus: 0, sky: '#5a64a0', skyA: 0.1, grade: '#121c44', gradeA: 0.46, rain: 0, night: 1 },
-    { deep: '#1d3133', shallow: '#687d75', caus: 0.06, sky: '#dfe5e8', skyA: 0.08, grade: '#55636c', gradeA: 0.1, rain: 1 }
+    { deep: '#123436', shallow: '#5f8f7a', caus: 0.17, sky: '#d8ecf0', skyA: 0.1, grade: '#fff2d6', gradeA: 0.04, rain: 0, len: 55 },
+    { deep: '#0c3a46', shallow: '#56a094', caus: 0.26, sky: '#e8f6ff', skyA: 0.13, grade: '#ffffff', gradeA: 0, rain: 0, len: 55 },
+    { deep: '#22342a', shallow: '#878a56', caus: 0.2, sky: '#ffdcaa', skyA: 0.12, grade: '#ffb35c', gradeA: 0.08, rain: 0, len: 30 },
+    { deep: '#0e1a26', shallow: '#2a404c', caus: 0, sky: '#5a64a0', skyA: 0.1, grade: '#121c44', gradeA: 0.46, rain: 0, night: 1, len: 25 },
+    { deep: '#1d3133', shallow: '#687d75', caus: 0.06, sky: '#dfe5e8', skyA: 0.08, grade: '#55636c', gradeA: 0.1, rain: 1, len: 55 }
   ].map(function (m) {
     return {
       deep: hex(m.deep), shallow: hex(m.shallow), caus: m.caus, sky: hex(m.sky), skyA: m.skyA,
-      grade: hex(m.grade), gradeA: m.gradeA, rain: m.rain, night: m.night || 0
+      grade: hex(m.grade), gradeA: m.gradeA, rain: m.rain, night: m.night || 0, len: m.len
     };
   });
 
-  var MOOD_SEG = 55;
-  // Never open on the rain: start somewhere in the morning or the sun.
-  var moodClock = Math.random() * MOOD_SEG * 1.5;
+  // Each row's len is how many seconds the light takes to move on from
+  // it to the next. Dusk comes in and goes again quickly, so the dark
+  // part is short: about half a minute in a lap of nearly four.
+  var MOOD_LAP = 0;
+  MOODS.forEach(function (m) { m.at = MOOD_LAP; MOOD_LAP += m.len; });
+  // Never open on the rain or the dark: start in the morning or the sun.
+  var moodClock = Math.random() * 80;
   var mood = {};
 
   function updateMood(dt) {
-    var lap = MOOD_SEG * MOODS.length;
-    moodClock = (moodClock + dt) % lap;
-    var k = Math.floor(moodClock / MOOD_SEG);
-    var f = smooth((moodClock - k * MOOD_SEG) / MOOD_SEG);
+    moodClock = (moodClock + dt) % MOOD_LAP;
+    var k = MOODS.length - 1;
+    while (k > 0 && MOODS[k].at > moodClock) { k--; }
     var a = MOODS[k], b = MOODS[(k + 1) % MOODS.length];
+    var f = smooth((moodClock - a.at) / a.len);
     mood.deep = mix(a.deep, b.deep, f);
     mood.shallow = mix(a.shallow, b.shallow, f);
     mood.caus = lerp(a.caus, b.caus, f);
@@ -883,7 +888,7 @@
       var sunkCost = !top && t > BRAVE ? U * 0.3 * (t - BRAVE) * 2 : 0;
       if (shy && top && t < SURFACE) { continue; }
       // A wary fish lets the splash settle before it goes near.
-      if (p.age < (1 - t) * (shy ? 2.4 : 1.6)) { continue; }
+      if (p.age < (1 - t) * (shy ? 2 : 1)) { continue; }
       if (shy && t < 0.9) {
         var hx2 = p.x - shyHome.x, hy2 = p.y - shyHome.y;
         if (hx2 * hx2 + hy2 * hy2 > range * range) { continue; }
@@ -933,7 +938,7 @@
       f.mode = 'food';
       if (p !== f.target) {
         f.target = p;
-        f.patience = 0.5 + (BRAVE - f.trust) * 5 * (0.6 + 0.8 * Math.random());
+        f.patience = 0.4 + (BRAVE - f.trust) * 3.2 * (0.6 + 0.8 * Math.random());
       }
       return;
     }
@@ -1009,7 +1014,7 @@
       var p = f.target, dx = p.x - hx, dy = p.y - hy, d = Math.sqrt(dx * dx + dy * dy) || 1e-6;
       var pz = p.z >= 1 ? 0.9 : p.z;
       tx = p.x; ty = p.y; urg = 0.6;
-      vw = U * (0.09 + 0.12 * t);
+      vw = U * (0.14 + 0.14 * t);
       // It rises towards the food as it closes in on it.
       var near = clamp(1 - (d - f.L * 0.3) / (f.L * 2.2), 0, 1);
       zw = lerp(f.wz, pz, near);
@@ -1026,7 +1031,7 @@
         }
       }
       if (f.dared) { vw = U * 0.3; urg = 1; zw = pz; zRate = 1.4; }
-      else if (near > 0.5) { zRate = 0.6; }
+      else if (near > 0.5) { zRate = 0.9; }
     } else if (f.mode === 'rush') {
       f.excite -= dt;
       if (f.excite <= 0) { f.mode = 'wander'; }
@@ -1361,7 +1366,7 @@
       var air = 0.12 + i * 0.045 + Math.random() * 0.06;
       pellets.push({
         x: KX, y: KY, fx: x, fy: y, z: 0, vx: 0, vy: 0, air: air, airMax: air,
-        age: 0, sinkAt: Math.random() < 0.32 ? 1 + Math.random() * 1.5 : 4 + Math.random() * 4,
+        age: 0, sinkAt: Math.random() < 0.3 ? 1.5 + Math.random() * 1.5 : 6 + Math.random() * 5,
         sinking: false, bottom: 0, fade: 1, r: U * (0.0048 + Math.random() * 0.0008),
         tone: Math.random(), gone: false
       });
@@ -1380,7 +1385,7 @@
     // A fish that trusts you has learned what a hand over the water means.
     for (i = 0; i < fish.length; i++) {
       var f = fish[i];
-      if (f.trust > 0.6 && f.mode !== 'food' && f.retreat <= 0) {
+      if (f.trust > 0.5 && f.mode !== 'food' && f.retreat <= 0) {
         f.excite = 1.5; f.ex = x; f.ey = y;
         if (f.mode !== 'finger') { f.mode = 'rush'; }
       }
@@ -1414,7 +1419,7 @@
         offPads(p, U * 0.008);
         if (p.age > p.sinkAt) { p.sinking = true; }
       } else if (p.z < 1) {
-        p.z = Math.min(1, p.z + dt * 0.12);
+        p.z = Math.min(1, p.z + dt * 0.08);
         p.x += p.vx * dt * (1 - p.z);
         p.y += p.vy * dt * (1 - p.z);
       } else {
@@ -2500,7 +2505,7 @@
     if (cat.clock - cat.tapAt > 5) { cat.taps = 0; }
     cat.taps += 1;
     cat.tapAt = cat.clock;
-    if (Math.random() < 0.35 + 0.3 * (cat.taps - 1)) {
+    if (Math.random() < Math.min(0.7, 0.12 + 0.12 * (cat.taps - 1))) {
       // Off it goes, ears flat, low and quick.
       cat.flat = 1;
       meowSound(cat.x);
@@ -2949,17 +2954,23 @@
   }
 
   // ------------------------------------------------------------------
-  // Fireflies at dusk, drifting over the pads and the bank, each blinking
-  // in its own time. The paler fish near the top catch the moonlight.
+  // Fireflies: a rare treat. Most evenings there are none; now and then
+  // two or three come drifting over the pads and the bank, each blinking
+  // in its own time. The paler fish near the top catch the moonlight
+  // every evening.
   // ------------------------------------------------------------------
-  var flies = [];
-  for (var fi = 0; fi < 16; fi++) {
+  var flies = [], fliesTonight = 0, wasNight = false;
+  for (var fi = 0; fi < 3; fi++) {
     flies.push({ u: Math.random(), v: Math.random(), p: Math.random() * TAU, q: Math.random() * TAU, blink: Math.random() * 3, on: 0 });
   }
 
   function updateFireflies(dt) {
-    if (mood.night < 0.02) { return; }
-    for (var i = 0; i < flies.length; i++) {
+    // Decide as each evening begins whether this is one of the evenings.
+    var night = mood.night > 0.02;
+    if (night && !wasNight) { fliesTonight = Math.random() < 0.3 ? 2 + Math.floor(Math.random() * 2) : 0; }
+    wasNight = night;
+    if (!night) { return; }
+    for (var i = 0; i < fliesTonight; i++) {
       var f = flies[i];
       f.p += dt * (0.15 + 0.1 * Math.sin(i)) * (reduced ? 0.4 : 1);
       f.q += dt * (0.12 + 0.08 * Math.cos(i)) * (reduced ? 0.4 : 1);
@@ -2987,7 +2998,7 @@
       ctx.arc(gx, gy, gr, 0, TAU);
       ctx.fill();
     }
-    for (i = 0; i < flies.length; i++) {
+    for (i = 0; i < fliesTonight; i++) {
       var fl = flies[i], a = fl.on * n;
       if (a < 0.02) { continue; }
       var x = W * (0.05 + 0.9 * (0.5 + 0.5 * Math.sin(fl.p * 1.3 + fl.u * 9))), y = H * (0.05 + 0.9 * (0.5 + 0.5 * Math.sin(fl.q * 1.1 + fl.v * 9)));
