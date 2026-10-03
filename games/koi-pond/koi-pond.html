@@ -2477,10 +2477,10 @@
 
   // The most visible fish near the cat, which is what it watches.
   function catQuarry() {
-    var best = null, bd = U * 0.45;
+    var best = null, bd = U * 0.5;
     for (var i = 0; i < fish.length; i++) {
       var f = fish[i];
-      if (seen(f.z) < 0.3) { continue; }
+      if (seen(f.z) < 0.05) { continue; }
       var d = Math.sqrt(Math.pow(f.qx[2] - cat.hx, 2) + Math.pow(f.qy[2] - cat.hy, 2));
       if (d < bd) { bd = d; best = f; }
     }
@@ -2497,9 +2497,10 @@
     cat.x = RX - Math.cos(RW) * out; cat.y = RY - Math.sin(RW) * out;
     cat.a = RW;
     cat.dir = Math.random() < 0.5 ? 1 : -1;
-    cat.visit = 25 + Math.random() * 25;
+    cat.visit = 45 + Math.random() * 30;
     cat.taps = 0;
     cat.pounced = false;
+    cat.hunting = false;
     catGo('enter');
   }
 
@@ -2513,11 +2514,49 @@
     catGo(run ? 'shoo' : 'leave');
   }
 
-  // What to do next while on the bank.
+  // The place on the rim nearest a point in the water.
+  function rimNearest(x, y) {
+    var best = 0, bd = Infinity;
+    for (var i = 0; i < rimS.length; i++) {
+      var dx = rimPts[2 * i] - x, dy = rimPts[2 * i + 1] - y, d = dx * dx + dy * dy;
+      if (d < bd) { bd = d; best = rimS[i]; }
+    }
+    return best;
+  }
+
+  // Any fish the cat can make out anywhere in the pond, nearest first.
+  function catSighting() {
+    var best = null, bd = Infinity;
+    for (var i = 0; i < fish.length; i++) {
+      var f = fish[i];
+      if (seen(f.z) < 0.02) { continue; }
+      var d = Math.pow(f.qx[2] - cat.hx, 2) + Math.pow(f.qy[2] - cat.hy, 2);
+      if (d < bd) { bd = d; best = f; }
+    }
+    return best;
+  }
+
+  // What to do next while on the bank. A fish close in front of it gets
+  // stalked. A fish it can see further off, it goes after: it walks
+  // round the bank to the nearest point to it, slowly and purposefully,
+  // and then sees what it can do. Otherwise it sits, or wanders on.
   function catNext() {
     if (cat.visit <= 0 || mood.rain > 0.2) { catLeave(false); return; }
     var r = Math.random(), q = catQuarry();
-    if (q && r < 0.45) {
+    if (!q && r < 0.8) {
+      var far = catSighting();
+      if (far) {
+        var ds = rimNearest(far.qx[2], far.qy[2]) - cat.s;
+        ds = ((ds % rimLen) + rimLen * 1.5) % rimLen - rimLen / 2;
+        if (Math.abs(ds) > U * 0.08) {
+          cat.goalS = cat.s + ds;
+          cat.hunting = true;
+          catGo('move');
+          return;
+        }
+      }
+    }
+    if (q && r < 0.65) {
       catGo('stalk', 3 + Math.random() * 3);
       // Real cats chatter their teeth at prey they cannot reach.
       if (Math.random() < 0.5) { catVoice(cat.x, 'chatter'); }
@@ -2558,6 +2597,7 @@
       cat.lookX = x; cat.lookY = y;
       catVoice(cat.x, ['mrow', 'grumble']);
       cat.goalS = cat.s + (Math.random() < 0.5 ? 1 : -1) * rimLen * (0.2 + Math.random() * 0.25);
+      cat.hunting = false;
       catGo('move');
     } else {
       cat.lookX = x; cat.lookY = y;
@@ -2654,13 +2694,16 @@
     } else if (c.state === 'move') {
       // Put out, it takes itself off briskly along the bank and settles
       // somewhere else.
-      var ds = c.goalS - c.s, stp = Math.min(Math.abs(ds), walk * 1.8 * dt) * (ds < 0 ? -1 : 1);
+      var ds = c.goalS - c.s, stp = Math.min(Math.abs(ds), walk * (c.hunting ? 1.15 : 1.8) * dt) * (ds < 0 ? -1 : 1);
       c.s += stp;
       rimAt(c.s);
       c.x = RX; c.y = RY;
       goal = stp >= 0 ? RA : RA + Math.PI;
       moving = 1.6;
-      if (Math.abs(ds) < 2) { catGo('sit', 3 + Math.random() * 4); }
+      if (Math.abs(ds) < 2) {
+        if (c.hunting) { c.hunting = false; catNext(); }
+        else { catGo('sit', 3 + Math.random() * 4); }
+      }
     } else if (c.state === 'pounce' || c.state === 'fall') {
       // In the air: out over the water and down with a splash.
       c.fu = Math.min(1, c.fu + dt / c.fdur);
@@ -2688,7 +2731,7 @@
       moving = 1.3;
       c.rip -= dt;
       if (c.rip <= 0) { c.rip = 0.32; addRipple(c.x + Math.cos(c.a) * CL * 0.3, c.y + Math.sin(c.a) * CL * 0.3, U * 0.05, 0.6); }
-      poke(c.x, c.y, CL * 0.2, 0.25 * dt * 60);
+      poke(c.x, c.y, CL * 0.2, 0.1 * dt * 60);
       if (sd < U * 0.015 || c.t <= 0) { c.fsx = c.x; c.fsy = c.y; catGo('climb', 0.6); }
     } else if (c.state === 'climb') {
       // Scrambling out onto the bank.
@@ -2729,8 +2772,8 @@
         crouchW = 1;
         if (c.t <= 0) {
           var prey = catQuarry();
-          if (prey && !c.pounced && !reduced && Math.random() < 0.2) { catPounce(prey); }
-          else if (Math.random() < 0.55) { c.dab = 0; c.dabbed = false; catGo('dab', 0.9); }
+          if (prey && !c.pounced && !reduced && Math.random() < 0.3) { catPounce(prey); }
+          else if (Math.random() < 0.65) { c.dab = 0; c.dabbed = false; catGo('dab', 0.9); }
           else { catNext(); }
         }
       } else if (c.state === 'dab') {
