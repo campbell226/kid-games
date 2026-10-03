@@ -1700,17 +1700,37 @@
   }
 
   // Each pad is held by its stem: it drifts when pushed and comes back.
+  // The pads ride the water. Each feels the height of the waves at four
+  // points round its rim: it slides a little down the slope as a ripple
+  // or a wake passes under it, turns a little if one side is lifted
+  // further forward than the other, and rises and falls with the swell,
+  // and its stem draws it gently back to where it grows.
   function updatePads(dt) {
     for (var i = 0; i < pads.length; i++) {
-      var p = pads[i];
+      var p = pads[i], r = p.r * 1.05;
+      var hE = waveHeight(p.x + r, p.y), hW = waveHeight(p.x - r, p.y);
+      var hS = waveHeight(p.x, p.y + r), hN = waveHeight(p.x, p.y - r);
+      // However big the splash, a pad is only ever nudged, not flung.
+      var gx = clamp(hE - hW, -0.25, 0.25), gy = clamp(hS - hN, -0.25, 0.25);
+      var k = U * 0.35 * (reduced ? 0.5 : 1);
       p.dx = p.x - p.ax; p.dy = p.y - p.ay;
-      p.vx += (-p.dx * 0.8 - p.vx * 1.2) * dt;
-      p.vy += (-p.dy * 0.8 - p.vy * 1.2) * dt;
+      p.vx += (-p.dx * 0.8 - p.vx * 1.2 - gx * k) * dt;
+      p.vy += (-p.dy * 0.8 - p.vy * 1.2 - gy * k) * dt;
       p.x += p.vx * dt;
       p.y += p.vy * dt;
-      p.rot += p.spin * dt * (reduced ? 0.4 : 1);
+      p.turn = (p.turn || 0) + ((gx - gy) * 0.6 - (p.turn || 0) * 2) * dt;
+      p.rot += (p.spin + p.turn) * dt * (reduced ? 0.4 : 1);
+      p.heave = (p.heave || 0) + (((hE + hW + hS + hN) * 0.25) - (p.heave || 0)) * Math.min(1, dt * 6);
       p.dip *= Math.exp(-dt * 3);
     }
+  }
+
+  // The height of the water at a point, from the wave sheet.
+  function waveHeight(x, y) {
+    if (!WV.a) { return 0; }
+    var i = Math.floor(x / WV.cs), j = Math.floor(y / WV.cs);
+    if (i < 1 || j < 1 || i > WV.gw - 2 || j > WV.gh - 2) { return 0; }
+    return WV.a[j * WV.gw + i];
   }
 
   // ------------------------------------------------------------------
@@ -2186,7 +2206,8 @@
     ctx.save();
     ctx.translate(p.x, p.y);
     ctx.rotate(p.rot);
-    var r = p.r * (1 - p.dip * 0.05), cut = 0.2;
+    // A dimple under it lets it sink a touch; a crest lifts it.
+    var r = p.r * (1 - p.dip * 0.05 - clamp(p.heave || 0, -1, 1) * 0.025), cut = 0.2;
     var g = ctx.createRadialGradient(-r * 0.2, -r * 0.2, r * 0.1, 0, 0, r);
     g.addColorStop(0, p.hue < 0.5 ? '#79a64e' : '#73a352');
     g.addColorStop(1, p.hue < 0.5 ? '#4d7a33' : '#4a7838');
@@ -2425,7 +2446,7 @@
   }
 
   var cat = {
-    state: 'away', next: 40 + Math.random() * 30, t: 0, s: 0, dir: 1, run: 0,
+    state: 'away', next: 30 + Math.random() * 25, t: 0, s: 0, dir: 1, run: 0,
     x: -999, y: -999, a: 0, aim: 0, head: 0, hx: -999, hy: -999, lookX: 0, lookY: 0,
     sx: 0, sy: 0, ex: 0, ey: 0, stride: 0, moving: 0, sit: 0, crouch: 0, flat: 0,
     dab: -1, dabbed: false, visit: 0, tail: 0, flick: 0, taps: 0, tapAt: -9, clock: 0
@@ -2546,7 +2567,7 @@
       if (d < 2) {
         if (c.state === 'enter') { catGo('patrol', 3 + Math.random() * 4); }
         else {
-          c.next = (c.state === 'shoo' ? 70 : 50) + Math.random() * 60;
+          c.next = (c.state === 'shoo' ? 45 : 30) + Math.random() * 35;
           catGo('away');
           c.x = -999; c.hx = -999;
           return;
