@@ -119,8 +119,9 @@
 <canvas id="pond" aria-label="Koi Pond"></canvas>
 
 <script>
-// A garden pond seen from above, with eight koi in it. A tap scatters a
-// handful of food, and the fish come for it.
+// A garden pond seen from above, with four koi and one little white fish
+// in it. A tap scatters a handful of food, and the fish come up for it out
+// of the deep water, where they are hard to see.
 //
 // What the game is quietly about is trust. Every fish starts out wary of
 // the hand above the water, and each learns at its own pace that the hand
@@ -178,7 +179,8 @@
   // ------------------------------------------------------------------
   // The light goes slowly round a day: a fresh morning, full sun with the
   // light dancing on the bottom, a golden afternoon, then a grey spell
-  // with a shower of rain, and round to morning again. Each row is the
+  // with a shower of rain, and round to morning again. Dusk comes between
+  // the afternoon and the rain, with fireflies over the pads. Each row is the
   // colour of the deep water, of the shallows, how bright the dancing
   // light is, the sky reflected on the surface, and a wash over all of it.
   // ------------------------------------------------------------------
@@ -186,11 +188,12 @@
     { deep: '#1f4a4a', shallow: '#6b9a84', caus: 0.17, sky: '#d8ecf0', skyA: 0.1, grade: '#fff2d6', gradeA: 0.04, rain: 0 },
     { deep: '#16505c', shallow: '#62ab9f', caus: 0.26, sky: '#e8f6ff', skyA: 0.13, grade: '#ffffff', gradeA: 0, rain: 0 },
     { deep: '#33473a', shallow: '#93945f', caus: 0.2, sky: '#ffdcaa', skyA: 0.12, grade: '#ffb35c', gradeA: 0.08, rain: 0 },
+    { deep: '#0e1a26', shallow: '#2a404c', caus: 0, sky: '#5a64a0', skyA: 0.1, grade: '#121c44', gradeA: 0.46, rain: 0, night: 1 },
     { deep: '#2a4144', shallow: '#73887f', caus: 0.06, sky: '#dfe5e8', skyA: 0.08, grade: '#55636c', gradeA: 0.1, rain: 1 }
   ].map(function (m) {
     return {
       deep: hex(m.deep), shallow: hex(m.shallow), caus: m.caus, sky: hex(m.sky), skyA: m.skyA,
-      grade: hex(m.grade), gradeA: m.gradeA, rain: m.rain
+      grade: hex(m.grade), gradeA: m.gradeA, rain: m.rain, night: m.night || 0
     };
   });
 
@@ -214,6 +217,7 @@
     mood.gradeA = lerp(a.gradeA, b.gradeA, f);
     // The shower comes and goes inside the grey spell rather than
     // starting the moment the sky begins to cloud over.
+    mood.night = lerp(a.night, b.night, f);
     var r = lerp(a.rain, b.rain, f);
     mood.rain = smooth(clamp((r - 0.35) / 0.5, 0, 1));
   }
@@ -319,8 +323,10 @@
     var g = bottomCanvas.getContext('2d'), rnd = seeded(5), i, k;
     var reach = Math.max(PX1 - PX0, PY1 - PY0) * 0.62;
     var rg = g.createRadialGradient(PCX, PCY, 0, PCX, PCY, reach);
-    rg.addColorStop(0, '#59604a');
-    rg.addColorStop(0.6, '#8a8463');
+    // The middle is deep: the bottom there is dark and far away.
+    rg.addColorStop(0, '#273128');
+    rg.addColorStop(0.45, '#4f5843');
+    rg.addColorStop(0.75, '#8a8463');
     rg.addColorStop(1, '#b4a77f');
     g.fillStyle = rg;
     g.fillRect(0, 0, W, H);
@@ -603,17 +609,26 @@
   }
 
   // ------------------------------------------------------------------
-  // Lily pads: a clump in one corner, which is where the little one
-  // hides, and two more across the pond. Each is tethered to its spot by
-  // its stem, so it drifts and turns a little and is nudged by ripples,
-  // but always comes back.
+  // Lily pads: a raft of them in one corner, which is where the little
+  // one hides, another in the opposite corner, and a few on their own.
+  // Fish pass under them and out of sight, which is half of what makes
+  // one coming out again worth watching. Each pad is tethered to its spot
+  // by its stem, so it drifts and turns a little and is nudged by
+  // ripples, but always comes back.
   // ------------------------------------------------------------------
   var PAD_SPEC = [
     { fx: 0.8, fy: 0.17, ox: 0, oy: 0, r: 0.085, flower: 1, clump: 1 },
     { fx: 0.8, fy: 0.17, ox: -0.14, oy: 0.04, r: 0.064, clump: 1 },
     { fx: 0.8, fy: 0.17, ox: 0.01, oy: 0.15, r: 0.058, clump: 1 },
-    { fx: 0.17, fy: 0.85, ox: 0, oy: 0, r: 0.07, flower: 1 },
-    { fx: 0.17, fy: 0.85, ox: 0.105, oy: 0.04, r: 0.042 }
+    { fx: 0.8, fy: 0.17, ox: 0.13, oy: 0.1, r: 0.05, clump: 1 },
+    { fx: 0.8, fy: 0.17, ox: -0.11, oy: 0.15, r: 0.042, clump: 1 },
+    { fx: 0.18, fy: 0.83, ox: 0, oy: 0, r: 0.075, flower: 1 },
+    { fx: 0.18, fy: 0.83, ox: 0.11, oy: 0.05, r: 0.05 },
+    { fx: 0.18, fy: 0.83, ox: -0.02, oy: -0.13, r: 0.056 },
+    { fx: 0.18, fy: 0.83, ox: 0.1, oy: -0.08, r: 0.04 },
+    { fx: 0.5, fy: 0.07, ox: 0, oy: 0, r: 0.05 },
+    { fx: 0.06, fy: 0.42, ox: 0, oy: 0, r: 0.06 },
+    { fx: 0.93, fy: 0.62, ox: 0, oy: 0, r: 0.055, flower: 1 }
   ];
   var pads = [], shyHome = { x: 0, y: 0 };
 
@@ -649,12 +664,13 @@
     canvas.width = Math.round(w * DPR);
     canvas.height = Math.round(h * DPR);
     W = w; H = h; U = Math.min(W, H);
-    BANK = U * 0.075;
+    BANK = U * 0.09;
     CR = U * 0.13;
     PX0 = BANK; PY0 = BANK; PX1 = W - BANK; PY1 = H - BANK;
     PCX = (PX0 + PX1) / 2; PCY = (PY0 + PY1) / 2;
 
     buildEdge();
+    buildRim();
     buildBottom();
     buildBank();
     if (!causticA) {
@@ -682,20 +698,14 @@
   // exactly this, because the others learn from watching it.
   // ------------------------------------------------------------------
   var KINDS = [
-    { len: 0.21, girth: 0.165, body: '#9b7548', fin: '#b8925f', net: '#6b4c2c', trust: 0.6, learn: 1.6 },
-    { len: 0.19, girth: 0.15, body: '#f7f2e9', fin: '#f1e9df', trust: 0.24, learn: 1,
+    { len: 0.22, girth: 0.165, body: '#9b7548', fin: '#b8925f', net: '#6b4c2c', trust: 0.6, learn: 1.6 },
+    { len: 0.2, girth: 0.15, body: '#f7f2e9', fin: '#f1e9df', trust: 0.24, learn: 1,
       patches: [[0.13, 0.05, 0.1, 0.85, '#df4429'], [0.4, 0.3, 0.12, 0.75, '#df4429'], [0.65, -0.25, 0.09, 0.7, '#e3502f']] },
-    { len: 0.18, girth: 0.15, body: '#1f1d22', fin: '#3a3438', trust: 0.18, learn: 1,
+    { len: 0.19, girth: 0.15, body: '#1f1d22', fin: '#3a3438', trust: 0.18, learn: 1,
       patches: [[0.14, -0.1, 0.11, 0.9, '#d9472b'], [0.33, 0.55, 0.08, 0.5, '#f3efe6'], [0.47, -0.35, 0.1, 0.65, '#d9472b'],
         [0.66, 0.35, 0.08, 0.55, '#f3efe6'], [0.8, -0.2, 0.06, 0.6, '#d9472b']] },
-    { len: 0.18, girth: 0.15, body: '#efb534', fin: '#f5c860', net: '#c98d1c', metal: 1, trust: 0.3, learn: 1 },
-    { len: 0.17, girth: 0.145, body: '#93a6b9', fin: '#d0a68a', net: '#5f7488', trust: 0.22, learn: 1,
-      patches: [[0.55, 1.05, 0.32, 0.32, '#df7438'], [0.55, -1.05, 0.32, 0.32, '#df7438'], [0.07, 0, 0.07, 0.8, '#c7d2dc']] },
-    { len: 0.17, girth: 0.145, body: '#f8f5ef', fin: '#f2eee8', trust: 0.26, learn: 1,
-      patches: [[0.12, 0, 0.055, 0.6, '#d8331f']] },
-    { len: 0.16, girth: 0.13, body: '#f0892e', fin: '#f6b36d', longFins: 1, trust: 0.28, learn: 1,
-      patches: [[0.3, 0.4, 0.1, 0.55, '#fbf3e8'], [0.56, -0.45, 0.11, 0.55, '#fbf3e8'], [0.07, 0, 0.06, 0.7, '#fbf3e8']] },
-    { len: 0.105, girth: 0.135, body: '#f4f4f6', fin: '#e8eef4', longFins: 1, trust: 0, learn: 0.55, shy: 1,
+    { len: 0.19, girth: 0.15, body: '#efb534', fin: '#f5c860', net: '#c98d1c', metal: 1, trust: 0.3, learn: 1 },
+    { len: 0.11, girth: 0.135, body: '#f4f4f6', fin: '#e8eef4', longFins: 1, trust: 0, learn: 0.55, shy: 1,
       patches: [[0.1, 0.1, 0.06, 0.65, '#f4a46a']] }
   ];
 
@@ -707,6 +717,11 @@
 
   var N = 9;
   var fish = [], fingers = {};
+
+  // How far round a held finger nothing should happen, because the
+  // finger itself is in the way. A fingertip is about 9 mm across, which
+  // is roughly 30 CSS pixels' radius on a phone and nearer 45 on a tablet.
+  function fingerR() { return clamp(U * 0.085, 30, 46); }
   var lastFeed = { x: 0, y: 0, age: 99 };
 
   function setSize(f) {
@@ -735,7 +750,9 @@
       trust: k.trust, mode: 'wander', target: null, finger: null,
       think: Math.random() * 0.3, wx: 0, wy: 0, wz: 0.5, wt: 0, cruise: 0, hover: 0,
       retreat: 0, rx: 0, ry: 0, hold: 0, patience: 2, dared: false, idle: 0,
-      excite: 0, ex: 0, ey: 0, gulp: -1, kissT: 0.5, firstTop: false, firstKiss: false
+      excite: 0, ex: 0, ey: 0, gulp: -1, kissT: 0.5, firstTop: false, firstKiss: false,
+      fear: 0, beat: true, beatT: Math.random() * 2, tailA: 0, tailV: 0, pedX: 0, pedY: 0,
+      leap: -1, wantLeap: 0, look: 0
     };
     setSize(f);
     return f;
@@ -762,31 +779,47 @@
 
   function addTrust(f, d) { f.trust = Math.min(1, f.trust + d); }
 
-  // Where to idle next. The little one keeps to the shade of the lily
-  // pads, less so as it grows braver; a fish that trusts you hangs about
-  // where you last fed it; everyone else goes where it likes.
+  // Where to idle next. Mostly down in the deep, where a fish is only a
+  // shadow, so that one coming up into the light is an event. The little
+  // one keeps to the shade of the lily pads, less so as it grows braver; a
+  // fish that trusts you hangs about where you last fed it, a little
+  // higher; now and then a tame one cruises right along the top. Wherever
+  // it is, a frightened fish goes deeper, and nobody idles near the cat.
   function newWaypoint(f) {
-    var t = f.trust, r = Math.random(), x, y;
-    if (f.k.shy && r < 0.8 - 0.65 * t) {
-      var a = Math.random() * TAU, rr = U * (0.02 + 0.08 * Math.random());
-      x = shyHome.x + Math.cos(a) * rr; y = shyHome.y + Math.sin(a) * rr;
-      f.wz = 0.72;
-    } else if (lastFeed.age < 25 && t > BRAVE && r < 0.55) {
-      x = lastFeed.x + (Math.random() - 0.5) * U * 0.35;
-      y = lastFeed.y + (Math.random() - 0.5) * U * 0.35;
-      f.wz = lerp(0.45, 0.15, t);
-    } else if (f.k.shy && t < 0.9) {
-      // Venturing out, but never further than it feels safe to.
-      var va = Math.random() * TAU, vr = U * (0.1 + 0.7 * t) * Math.random();
-      x = shyHome.x + Math.cos(va) * vr; y = shyHome.y + Math.sin(va) * vr;
-      f.wz = 0.4 + 0.4 * (1 - t);
-    } else {
-      x = PX0 + Math.random() * (PX1 - PX0);
-      y = PY0 + Math.random() * (PY1 - PY0);
-      f.wz = 0.25 + 0.5 * (1 - t) * Math.random() + 0.15 * Math.random();
+    var t = f.trust, r = Math.random(), x, y, best = 9, bx = 0, by = 0, bz = 0.6;
+    // Only a fish that has had a fright, or the little one, takes care to
+    // keep away from the cat. The rest wander where they like until they
+    // come too close and get one.
+    var careful = f.fear > 0.2 || f.k.shy ? 4 : 1;
+    for (var tries = 0; tries < careful; tries++) {
+      if (f.k.shy && (r < 0.8 - 0.65 * t || f.fear > 0.3)) {
+        var a = Math.random() * TAU, rr = U * (0.02 + 0.08 * Math.random());
+        x = shyHome.x + Math.cos(a) * rr; y = shyHome.y + Math.sin(a) * rr;
+        f.wz = 0.82;
+      } else if (lastFeed.age < 25 && t > BRAVE && r < 0.55) {
+        x = lastFeed.x + (Math.random() - 0.5) * U * 0.35;
+        y = lastFeed.y + (Math.random() - 0.5) * U * 0.35;
+        f.wz = lerp(0.55, 0.3, t);
+      } else if (f.k.shy && t < 0.9) {
+        // Venturing out, but never further than it feels safe to.
+        var va = Math.random() * TAU, vr = U * (0.1 + 0.7 * t) * Math.random();
+        x = shyHome.x + Math.cos(va) * vr; y = shyHome.y + Math.sin(va) * vr;
+        f.wz = 0.6 + 0.25 * (1 - t);
+      } else {
+        x = PX0 + Math.random() * (PX1 - PX0);
+        y = PY0 + Math.random() * (PY1 - PY0);
+        f.wz = t > TAME && Math.random() < 0.18 ? 0.12 : 0.5 + 0.4 * (1 - t) * Math.random() + 0.1 * Math.random();
+      }
+      var s = catThreatAt(x, y);
+      if (s < best) { best = s; bx = x; by = y; bz = f.wz; }
+      if (s < 0.05) { break; }
+      r = Math.random();
     }
+    x = bx; y = by;
     // In the rain the braver fish come up to look at the drops.
-    f.wz *= 1 - 0.45 * mood.rain * t;
+    f.wz = bz * (1 - 0.4 * mood.rain * t);
+    if (f.fear > 0.05) { f.wz = Math.max(f.wz, 0.55 + 0.35 * f.fear); }
+    f.wz = Math.min(0.9, f.wz);
     keepIn(x, y, f.L * 0.8);
     f.wx = KX; f.wy = KY;
     f.wt = 6 + Math.random() * 8;
@@ -809,11 +842,13 @@
   // bothers with food near the hand or right under its nose. Otherwise a
   // pellet forgotten in a far corner would always win over your finger.
   function choosePellet(f, hand) {
-    var best = null, bestScore = Infinity, hx = f.px[0], hy = f.py[0], t = f.trust, shy = f.k.shy;
+    var best = null, bestScore = Infinity, hx = f.px[0], hy = f.py[0], t = braveNow(f), shy = f.k.shy;
     var range = U * (0.22 + 1.2 * t);
     for (var i = 0; i < pellets.length; i++) {
       var p = pellets[i];
       if (p.gone || p.air > 0) { continue; }
+      // Food right under the cat's nose is left where it is.
+      if (catThreatAt(p.x, p.y) > 0.25 + 0.6 * f.trust) { continue; }
       if (hand) {
         var gx = p.x - hand.x, gy = p.y - hand.y, nx = p.x - hx, ny = p.y - hy;
         if (gx * gx + gy * gy > U * U * 0.0625 && nx * nx + ny * ny > U * U * 0.0225) { continue; }
@@ -854,12 +889,21 @@
     return best;
   }
 
+  // How brave a fish is being right now: its trust in you, held back by
+  // however frightened the cat has made it. Trust itself never drops; the
+  // fright fades of its own accord once the cat has gone.
+  function braveNow(f) { return f.trust * (1 - 0.6 * f.fear); }
+
   // A few times a second each fish decides what it is doing. The steering
   // below follows that decision smoothly every frame.
   function think(f) {
-    if (f.retreat > 0) { return; }
-    var g = nearestFinger(f, U * 2);
-    var p = choosePellet(f, g && f.trust >= CURIOUS ? g : null);
+    if (f.retreat > 0 || f.leap >= 0 || f.wantLeap > 0) { return; }
+    var g = nearestFinger(f, U * 2), bn = braveNow(f);
+    if (g && catThreatAt(g.x, g.y) > 0.5) { g = null; }
+    // A fish that trusts you comes to your hand when the cat frightens
+    // it, as well as when it does not.
+    var toHand = g && (bn >= CURIOUS || (f.trust >= TAME && f.fear > 0.3));
+    var p = choosePellet(f, toHand ? g : null);
     if (p) {
       if (f.mode !== 'food') { f.idle = 0; }
       f.mode = 'food';
@@ -872,8 +916,14 @@
     f.target = null;
     f.dared = false;
     if (f.excite > 0) { f.mode = 'rush'; return; }
-    if (g && f.trust >= CURIOUS) { f.mode = 'finger'; f.finger = g; return; }
-    if (f.mode !== 'wander') { newWaypoint(f); }
+    if (toHand) { f.mode = 'finger'; f.finger = g; return; }
+    // Something hovering just over the water is worth coming up to see.
+    if (f.look > 0 || (bn >= 0.4 && f.fear < 0.3 && dragonflyLow(f.px[0], f.py[0], U * 0.3) && Math.random() < 0.25)) {
+      if (f.look <= 0) { f.look = 3 + Math.random() * 4; }
+      f.mode = 'look';
+      return;
+    }
+    if (f.mode !== 'wander' || (f.fear > 0.3 && catThreatAt(f.wx, f.wy) > 0.15)) { newWaypoint(f); }
     f.mode = 'wander';
     // A fish that does not trust you yet moves away from a hand that
     // comes near it, unhurried.
@@ -894,8 +944,16 @@
         (f.mode === 'finger' && (!f.finger || !f.finger.alive))) {
       think(f);
     }
-    var hx = f.px[0], hy = f.py[0], t = f.trust, tx = hx, ty = hy, vw = 0, zw = f.wz, urg = 0;
+    if (f.leap >= 0) { leapStep(f, dt); return; }
+    var hx = f.px[0], hy = f.py[0], tx = hx, ty = hy, vw = 0, zw = f.wz, urg = 0;
     var face = null, zRate = 0.3, i;
+
+    // Fright comes quickly when the cat is near and goes slowly after it
+    // has left, so the fish come back in their own time.
+    var threat = catThreatAt(hx, hy);
+    if (threat > f.fear) { f.fear += (threat - f.fear) * Math.min(1, dt * 3); }
+    else { f.fear = Math.max(threat, f.fear - dt * 0.07); }
+    var t = braveNow(f);
 
     if (f.mode === 'food') {
       f.idle = 0;
@@ -907,6 +965,22 @@
     if (f.retreat > 0) {
       f.retreat -= dt;
       tx = f.rx; ty = f.ry; vw = U * 0.24; zw = 0.75; urg = 1;
+    } else if (f.wantLeap > 0) {
+      // Gathering speed up towards the surface for a leap.
+      f.wantLeap -= dt;
+      tx = f.lx; ty = f.ly; vw = U * 0.24; zw = 0; zRate = 0.9; urg = 0.8;
+      if (f.z < 0.06 && f.v > U * 0.15) { tryLeap(f); }
+      if (f.wantLeap <= 0) { f.mode = 'wander'; newWaypoint(f); }
+    } else if (f.mode === 'look' && dfly.state !== 'away') {
+      // Come up under the dragonfly and look at it.
+      f.look -= dt;
+      if (f.look <= 0) { f.mode = 'wander'; newWaypoint(f); }
+      var lkx = hx - dfly.x, lky = hy - dfly.y, lkd = Math.sqrt(lkx * lkx + lky * lky) || 1e-6;
+      tx = dfly.x + lkx / lkd * f.L * 0.35; ty = dfly.y + lky / lkd * f.L * 0.35;
+      vw = U * 0.06; zw = 0.15; zRate = 0.4; face = dfly; urg = 0.3;
+      if (!reduced && f.trust >= 0.6 && f.fear < 0.15 && leapCool <= 0 && dfly.state === 'hover' && lkd < f.L * 1.8) {
+        planLeap(f, dfly.x, dfly.y, 2.5);
+      }
     } else if (f.mode === 'food' && f.target && !f.target.gone) {
       var p = f.target, dx = p.x - hx, dy = p.y - hy, d = Math.sqrt(dx * dx + dy * dy) || 1e-6;
       var pz = p.z >= 1 ? 0.9 : p.z;
@@ -937,7 +1011,7 @@
       var g = f.finger, gx = hx - g.x, gy = hy - g.y, gd = Math.sqrt(gx * gx + gy * gy) || 1e-6;
       // Each fish keeps the distance its trust allows: a tame one puts
       // its lips to your fingertip, a curious one hangs back and looks.
-      var tame = t >= TAME;
+      var tame = f.trust >= TAME;
       // Each keeps its own place round the finger, nudging along from its
       // neighbours, so a crowd of them opens out like the petals of a
       // flower with their noses in the middle, instead of piling up on
@@ -956,8 +1030,11 @@
         if (Math.abs(dA) < sep) { push += (dA >= 0 ? 1 : -1) * (sep - Math.abs(dA)); }
       }
       f.slotA = wrapAngle(f.slotA + push * Math.min(1, dt * 1.5));
-      var ring = tame ? Math.max(U * 0.022 + f.half * 0.3, cnt * U * 0.05 / TAU)
-        : f.L * 0.6 + U * 0.3 * (TAME - t) / (TAME - CURIOUS);
+      // The ring is kept outside the fingertip, so the fish are never
+      // hidden under the very finger they have come to.
+      var FR = fingerR();
+      var ring = tame ? Math.max(FR + f.half * 0.15, cnt * f.half * 2.8 / TAU)
+        : FR + f.L * 0.4 + U * 0.3 * clamp((TAME - t) / (TAME - CURIOUS), 0, 1);
       // It comes in along its own spoke, so its body trails out behind it
       // rather than back the way it happened to arrive. Off its spoke, it
       // first swims round to the outer end of it.
@@ -967,7 +1044,7 @@
       tx = g.x + sx2 * reach; ty = g.y + sy2 * reach;
       vw = clamp((gd - ring) * 1.3, U * 0.01, U * 0.13);
       face = g; urg = 0.4;
-      zw = tame ? 0.02 : lerp(0.55, 0.25, (t - CURIOUS) / (TAME - CURIOUS));
+      zw = tame ? 0.02 : lerp(0.6, 0.3, clamp((t - CURIOUS) / (TAME - CURIOUS), 0, 1));
       zRate = 0.5;
       if (gd < ring + f.L * 0.6) { addTrust(f, 0.012 * f.k.learn * dt); }
       if (tame && gd < ring + f.half * 1.5 && f.z < 0.15) {
@@ -985,6 +1062,10 @@
         vw = U * 0.008;
       } else {
         tx = f.wx; ty = f.wy; vw = f.cruise;
+      }
+      // Now and then a fish at ease rises and leaps clear of the water.
+      if (!reduced && leapCool <= 0 && f.trust >= 0.6 && f.fear < 0.1 && Math.random() < dt * 0.04) {
+        planLeap(f, hx + Math.cos(f.a) * U * 0.5, hy + Math.sin(f.a) * U * 0.5, 4);
       }
     }
 
@@ -1040,34 +1121,122 @@
       f.py[i] = f.py[i - 1] + by / bd * f.seg;
     }
 
-    // On top of that, the swimming wave running down to the tail: faster
-    // and wider the harder it swims, and a flick through a sharp turn.
+    // On top of that, the swimming wave running down to the tail. A koi
+    // cruising does not swim steadily: it gives a few slow, wide strokes
+    // and then glides with its body straightening out, and strokes again.
+    // Hurrying, it beats faster and does not stop to glide. A sharp turn
+    // adds a flick.
+    f.beatT -= dt;
+    if (f.beatT <= 0) {
+      f.beat = !f.beat;
+      f.beatT = f.beat ? 1.2 + Math.random() * 1.8 : 0.9 + Math.random() * 1.6;
+    }
     var moving = clamp(f.v / (U * 0.15), 0, 1);
-    f.phase += dt * TAU * (1 + 2.2 * moving) * (reduced ? 0.6 : 1);
-    f.amp += ((0.3 + 0.7 * moving + Math.min(0.5, Math.abs(da) * 0.3)) - f.amp) * Math.min(1, dt * 3);
+    var beating = f.beat || urg > 0.3 || vw > U * 0.07;
+    var ampW = (beating ? 0.5 + 0.5 * moving : 0.05) + Math.min(0.4, Math.abs(da) * 0.25);
+    f.amp += (ampW - f.amp) * Math.min(1, dt * (beating ? 2.5 : 1.1));
+    f.phase += dt * TAU * (0.75 + 1.9 * moving) * (0.3 + 0.7 * Math.min(1, f.amp / 0.5)) * (reduced ? 0.6 : 1);
+    if (!beating) { f.v *= 1 - dt * 0.35; }
     f.finOpen += (clamp(1 - f.v / (U * 0.12), 0.15, 1) - f.finOpen) * Math.min(1, dt * 3);
     f.flap += dt * TAU * (1.2 + 1.6 * f.finOpen);
     if (f.gulp >= 0) { f.gulp += dt; if (f.gulp > 0.4) { f.gulp = -1; } }
     if (f.excite > 0 && f.mode !== 'rush') { f.excite -= dt; }
 
-    shapeFish(f);
+    shapeFish(f, dt);
     if (f.target && !f.target.gone) { tryEat(f, f.target); }
   }
 
   // Where every point of the body actually is this frame, wave included,
   // and which way is sideways at each. Drawing and eating both use it.
-  function shapeFish(f) {
-    var amp = f.amp * f.L * 0.055 * (reduced ? 0.5 : 1);
-    for (var i = 0; i < N; i++) {
+  // The wave lives almost all in the back half, as it does in a koi: the
+  // head hardly sways, the tail sweeps.
+  function shapeFish(f, dt) {
+    var amp = f.amp * f.L * 0.075 * (reduced ? 0.5 : 1), i;
+    for (i = 0; i < N; i++) {
       var a = i > 0 ? i - 1 : 0, b = i < N - 1 ? i + 1 : N - 1;
       var tx = f.px[a] - f.px[b], ty = f.py[a] - f.py[b], tl = Math.sqrt(tx * tx + ty * ty) || 1e-6;
       var nx = -ty / tl, ny = tx / tl, t = i / (N - 1);
-      var off = Math.sin(f.phase - t * 4.2) * amp * (0.08 + 0.92 * Math.pow(t, 1.5));
+      var env = 0.06 + 0.94 * smooth(clamp((t - 0.2) / 0.8, 0, 1));
+      var off = Math.sin(f.phase - t * 4.6) * amp * env;
       f.nx[i] = nx; f.ny[i] = ny;
       f.qx[i] = f.px[i] + nx * off;
       f.qy[i] = f.py[i] + ny * off;
     }
+    // The tail fin is soft and hangs off the root of the tail on a
+    // spring: as the root swings one way the fin trails the other, a
+    // moment behind, and through a turn it follows round and settles.
+    // The little one's long fin is softer still.
+    var e = N - 1;
+    if (dt > 0) {
+      var lat = ((f.qx[e] - f.pedX) * f.nx[e] + (f.qy[e] - f.pedY) * f.ny[e]) / dt / U;
+      var soft = f.k.longFins ? 0.55 : 1;
+      var aim = clamp(lat * 7, -0.9, 0.9);
+      f.tailV += ((aim - f.tailA) * 42 * soft - f.tailV * 8 * Math.sqrt(soft)) * dt;
+      f.tailA = clamp(f.tailA + f.tailV * dt, -1.1, 1.1);
+    }
+    f.pedX = f.qx[e]; f.pedY = f.qy[e];
   }
+
+  // ------------------------------------------------------------------
+  // Leaping. Once in a while a fish that is at ease comes up fast, breaks
+  // the surface and arcs clear of the water, landing a body's length or
+  // so further on with a splash. Seen from above, a fish in the air
+  // grows as it rises towards you and shrinks as it falls, and its shadow
+  // runs out across the water away from it.
+  // ------------------------------------------------------------------
+  var leapCool = 30 + Math.random() * 30, LEAP_TIME = 0.85;
+
+  function planLeap(f, x, y, time) {
+    f.lx = x; f.ly = y; f.wantLeap = time;
+    f.mode = 'leapRun';
+    leapCool = time + 1;
+  }
+
+  function tryLeap(f) {
+    var lx = f.px[0] + Math.cos(f.a) * f.L * 1.8, ly = f.py[0] + Math.sin(f.a) * f.L * 1.8;
+    if (edgeDist(lx, ly) < f.L * 0.7) { return; }
+    for (var i = 0; i < pads.length; i++) {
+      var dx = lx - pads[i].x, dy = ly - pads[i].y;
+      if (dx * dx + dy * dy < pads[i].r * pads[i].r * 1.4) { return; }
+    }
+    f.wantLeap = 0;
+    f.leap = 0;
+    f.z = 0;
+    leapCool = 40 + Math.random() * 50;
+    splash(f.qx[0], f.qy[0], 0.6);
+    if (dfly.state !== 'away') { dragonflyStartle(f.qx[0], f.qy[0]); }
+  }
+
+  function leapStep(f, dt) {
+    f.leap += dt / LEAP_TIME;
+    var spd = f.L * 1.8 / LEAP_TIME;
+    f.px[0] += Math.cos(f.a) * spd * dt;
+    f.py[0] += Math.sin(f.a) * spd * dt;
+    keepIn(f.px[0], f.py[0], U * 0.015);
+    f.px[0] = KX; f.py[0] = KY;
+    for (var i = 1; i < N; i++) {
+      var bx = f.px[i] - f.px[i - 1], by = f.py[i] - f.py[i - 1], bd = Math.sqrt(bx * bx + by * by) || 1e-6;
+      f.px[i] = f.px[i - 1] + bx / bd * f.seg;
+      f.py[i] = f.py[i - 1] + by / bd * f.seg;
+    }
+    // Held almost still in the air, with a last flick of the tail.
+    f.amp += (0.12 - f.amp) * Math.min(1, dt * 4);
+    f.phase += dt * TAU * 1.5;
+    f.finOpen += (0.9 - f.finOpen) * Math.min(1, dt * 4);
+    shapeFish(f, dt);
+    if (f.leap >= 1) {
+      f.leap = -1;
+      f.z = 0.25;
+      f.v = U * 0.12;
+      f.mode = 'wander';
+      f.wz = 0.6;
+      splash(f.qx[3], f.qy[3], 1);
+      newWaypoint(f);
+    }
+  }
+
+  // Leap height, 0 in the water to 1 at the top of the arc.
+  function leapHeight(f) { return f.leap >= 0 ? Math.sin(Math.PI * clamp(f.leap, 0, 1)) : 0; }
 
   function tryEat(f, p) {
     var dx = p.x - f.qx[0], dy = p.y - f.qy[0], r = f.half * 0.9 + U * 0.008;
@@ -1097,8 +1266,8 @@
       if (o.k.shy) { addTrust(o, 0.002); }
     }
     if (f.k.shy && top && !f.firstTop) { f.firstTop = true; milestone(f); }
-    // Still wary, it takes its prize and dashes off.
-    if (f.trust < BRAVE) {
+    // Still wary, or frightened, it takes its prize and dashes off.
+    if (braveNow(f) < BRAVE) {
       var away = f.a + Math.PI + (Math.random() - 0.5) * 1.2, dist = U * (0.12 + 0.4 * (BRAVE - f.trust));
       if (f.k.shy) { keepIn(shyHome.x + (Math.random() - 0.5) * U * 0.08, shyHome.y + (Math.random() - 0.5) * U * 0.08, f.L); }
       else { keepIn(f.px[0] + Math.cos(away) * dist, f.py[0] + Math.sin(away) * dist, f.L); }
@@ -1143,15 +1312,17 @@
   function scatter(x, y) {
     keepIn(x, y, U * 0.05);
     x = KX; y = KY;
-    var n = 5 + Math.floor(Math.random() * 2), i;
+    // Thrown round the fingertip rather than under it, where it could not
+    // be seen landing.
+    var n = 5 + Math.floor(Math.random() * 2), i, a0 = Math.random() * TAU, FR = fingerR();
     for (i = 0; i < n; i++) {
-      var a = Math.random() * TAU, r = U * (0.015 + Math.sqrt(Math.random()) * 0.06);
+      var a = a0 + (i + Math.random() * 0.7) / n * TAU, r = FR * 0.9 + Math.random() * U * 0.06;
       keepIn(x + Math.cos(a) * r, y + Math.sin(a) * r, U * 0.035);
       var air = 0.12 + i * 0.045 + Math.random() * 0.06;
       pellets.push({
         x: KX, y: KY, fx: x, fy: y, z: 0, vx: 0, vy: 0, air: air, airMax: air,
         age: 0, sinkAt: Math.random() < 0.32 ? 1.2 + Math.random() * 2 : 22 + Math.random() * 10,
-        sinking: false, bottom: 0, fade: 1, r: U * (0.009 + Math.random() * 0.002),
+        sinking: false, bottom: 0, fade: 1, r: U * (0.011 + Math.random() * 0.002),
         tone: Math.random(), gone: false
       });
     }
@@ -1248,40 +1419,71 @@
         var p = pellets[j];
         if (p.air <= 0 && !p.sinking) { pushBy(p, rp, 0.9, dt); }
       }
-      for (j = 0; j < petals.length; j++) { pushBy(petals[j], rp, 0.9, dt); }
+      for (j = 0; j < leaves.length; j++) { pushBy(leaves[j], rp, 0.9, dt); }
       for (j = 0; j < pads.length; j++) { pushBy(pads[j], rp, 0.05, dt); }
     }
   }
 
   // ------------------------------------------------------------------
-  // Blossom petals afloat, turning slowly in the current.
+  // A few big fallen leaves afloat, turning slowly in the current. Far
+  // bigger than a pellet and leaf-shaped, so nothing on the water can be
+  // taken for food except food.
   // ------------------------------------------------------------------
-  var petals = [];
+  var leaves = [];
 
-  function spawnPetals() {
-    petals = [];
-    var PINK = ['#f7c6d4', '#f9d7e1', '#f2b3c6', '#fbe4ea'];
-    for (var i = 0; i < 9; i++) {
-      keepIn(PX0 + Math.random() * (PX1 - PX0), PY0 + Math.random() * (PY1 - PY0), U * 0.04);
-      petals.push({
-        x: KX, y: KY, vx: 0, vy: 0, rot: Math.random() * TAU, spin: (Math.random() - 0.5) * 0.5,
-        size: U * (0.008 + Math.random() * 0.005), col: PINK[i % PINK.length]
+  function spawnLeaves() {
+    leaves = [];
+    var LEAF = [['#c8452c', '#8e2a1c'], ['#e2862e', '#a5541a'], ['#d8a933', '#9c7520'], ['#c86a2a', '#8a4318']];
+    for (var i = 0; i < 4; i++) {
+      keepIn(PX0 + Math.random() * (PX1 - PX0), PY0 + Math.random() * (PY1 - PY0), U * 0.06);
+      leaves.push({
+        x: KX, y: KY, vx: 0, vy: 0, rot: Math.random() * TAU, spin: (Math.random() - 0.5) * 0.3,
+        size: U * (0.032 + Math.random() * 0.012), col: LEAF[i][0], vein: LEAF[i][1]
       });
     }
   }
 
-  function updatePetals(dt) {
-    for (var i = 0; i < petals.length; i++) {
-      var p = petals[i];
+  function updateLeaves(dt) {
+    for (var i = 0; i < leaves.length; i++) {
+      var p = leaves[i];
       current(p.x, p.y);
       p.vx += (CX - p.vx) * Math.min(1, dt * 0.6);
       p.vy += (CY - p.vy) * Math.min(1, dt * 0.6);
       p.x += p.vx * dt;
       p.y += p.vy * dt;
       p.rot += (p.spin + (Math.abs(p.vx) + Math.abs(p.vy)) / U * 2) * dt * (reduced ? 0.4 : 1);
-      offPads(p, U * 0.006);
-      keepIn(p.x, p.y, U * 0.03);
+      offPads(p, p.size * 0.6);
+      keepIn(p.x, p.y, p.size);
       p.x = KX; p.y = KY;
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Splashes: a leaping fish going out and coming back in, a cat's paw.
+  // Droplets fly up and out, fall back, and each makes its own ring.
+  // ------------------------------------------------------------------
+  var drops = [];
+
+  function splash(x, y, k) {
+    var n = Math.round(8 + 12 * k);
+    for (var i = 0; i < n; i++) {
+      var a = Math.random() * TAU, s = U * (0.06 + Math.random() * 0.16) * k;
+      drops.push({ x: x, y: y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, h: 0, vh: (0.5 + Math.random() * 0.9) * k });
+    }
+    addRipple(x, y, U * (0.06 + 0.1 * k), 1);
+    addRipple(x, y, U * (0.03 + 0.05 * k), 0.8);
+    splashSound(x, k);
+  }
+
+  function updateDrops(dt) {
+    for (var i = drops.length - 1; i >= 0; i--) {
+      var d = drops[i];
+      d.x += d.vx * dt; d.y += d.vy * dt;
+      d.vh -= 3.2 * dt; d.h += d.vh * dt;
+      if (d.h < 0) {
+        if (edgeDist(d.x, d.y) > 0) { addRipple(d.x, d.y, U * 0.016, 0.4); }
+        drops.splice(i, 1);
+      }
     }
   }
 
@@ -1402,23 +1604,25 @@
     ctx.closePath();
   }
 
-  // The tail fin, swinging a beat behind the body. The long-finned ones
-  // trail a much bigger, softer one.
+  // The tail fin, hung off the root of the tail on its spring (see
+  // shapeFish). It bends along its length: the root turns a little, the
+  // tips a lot, so it reads as a soft fin flowing rather than a paddle
+  // being waved. The little one trails a longer, softer one.
   function tailPath(f) {
     var e = N - 1, bx = f.qx[e], by = f.qy[e], k = f.k;
     var len = f.L * (k.longFins ? 0.4 : 0.27), spread = k.longFins ? 0.5 : 0.42;
-    var base = Math.atan2(f.qy[e] - f.qy[e - 1], f.qx[e] - f.qx[e - 1]);
-    base += Math.sin(f.phase - 5.2) * 0.3 * f.amp * (reduced ? 0.5 : 1);
-    var w0 = f.half * 0.2, nx = -Math.sin(base), ny = Math.cos(base);
-    var lag = k.longFins ? Math.sin(f.phase - 6) * 0.15 : 0;
+    var seg = Math.atan2(f.qy[e] - f.qy[e - 1], f.qx[e] - f.qx[e - 1]);
+    var bend = f.tailA * (reduced ? 0.5 : 1);
+    var root = seg + bend * 0.35, tip = seg + bend * (k.longFins ? 1.3 : 1);
+    var w0 = f.half * 0.2, nx = -Math.sin(root), ny = Math.cos(root);
     ctx.moveTo(bx + nx * w0, by + ny * w0);
-    ctx.quadraticCurveTo(bx + Math.cos(base + spread * 1.2) * len * 0.55, by + Math.sin(base + spread * 1.2) * len * 0.55,
-      bx + Math.cos(base + spread + lag) * len, by + Math.sin(base + spread + lag) * len);
-    ctx.quadraticCurveTo(bx + Math.cos(base + spread * 0.35) * len * 0.8, by + Math.sin(base + spread * 0.35) * len * 0.8,
-      bx + Math.cos(base) * len * 0.55, by + Math.sin(base) * len * 0.55);
-    ctx.quadraticCurveTo(bx + Math.cos(base - spread * 0.35) * len * 0.8, by + Math.sin(base - spread * 0.35) * len * 0.8,
-      bx + Math.cos(base - spread + lag) * len, by + Math.sin(base - spread + lag) * len);
-    ctx.quadraticCurveTo(bx + Math.cos(base - spread * 1.2) * len * 0.55, by + Math.sin(base - spread * 1.2) * len * 0.55,
+    ctx.quadraticCurveTo(bx + Math.cos(root + spread * 1.15) * len * 0.55, by + Math.sin(root + spread * 1.15) * len * 0.55,
+      bx + Math.cos(tip + spread) * len, by + Math.sin(tip + spread) * len);
+    ctx.quadraticCurveTo(bx + Math.cos(tip + spread * 0.35) * len * 0.8, by + Math.sin(tip + spread * 0.35) * len * 0.8,
+      bx + Math.cos((root + tip) / 2) * len * 0.55, by + Math.sin((root + tip) / 2) * len * 0.55);
+    ctx.quadraticCurveTo(bx + Math.cos(tip - spread * 0.35) * len * 0.8, by + Math.sin(tip - spread * 0.35) * len * 0.8,
+      bx + Math.cos(tip - spread) * len, by + Math.sin(tip - spread) * len);
+    ctx.quadraticCurveTo(bx + Math.cos(root - spread * 1.15) * len * 0.55, by + Math.sin(root - spread * 1.15) * len * 0.55,
       bx - nx * w0, by - ny * w0);
     ctx.closePath();
   }
@@ -1451,11 +1655,16 @@
 
   function shadowStrength() { return clamp(0.45 + mood.caus * 2.4, 0.4, 1); }
 
+  // How much of a fish can be seen through the water over it: all of it
+  // at the top, a dim shape half way down, almost nothing near the
+  // bottom. This is what makes one rising out of the deep an event.
+  function seen(z) { return 1 - smooth(clamp((z - 0.12) / 0.75, 0, 1)); }
+
   function drawFishShadow(f) {
-    var off = (1 - f.z) * U * 0.045 + U * 0.004;
+    var h = leapHeight(f), off = (1 - f.z) * U * 0.045 + U * 0.004 + h * U * 0.12;
     ctx.save();
     ctx.translate(SUNX * off, SUNY * off);
-    ctx.fillStyle = 'rgba(8,24,22,' + ((0.15 + 0.1 * f.z) * shadowStrength()).toFixed(3) + ')';
+    ctx.fillStyle = 'rgba(8,24,22,' + ((0.08 + 0.12 * seen(f.z)) * (1 - 0.4 * h) * shadowStrength()).toFixed(3) + ')';
     ctx.beginPath();
     bodyPath(f);
     tailPath(f);
@@ -1464,15 +1673,16 @@
   }
 
   function drawFish(f) {
-    var k = f.k, z = f.z, tint = 0.06 + 0.58 * z, deep = mood.deep, i;
-    var s = 1 + 0.1 * (1 - z), cx = f.qx[4], cy = f.qy[4];
+    var k = f.k, z = f.z, vis = seen(z), tint = 0.05 + 0.85 * (1 - vis), deep = mood.deep, i;
+    var s = 1 + 0.1 * (1 - z) + 0.55 * leapHeight(f), cx = f.qx[4], cy = f.qy[4];
     ctx.save();
+    ctx.globalAlpha = 0.22 + 0.78 * vis;
     ctx.translate(cx, cy);
     ctx.scale(s, s);
     ctx.translate(-cx, -cy);
 
     // Fins, under the body, translucent.
-    var finA = 0.72 - 0.25 * z;
+    var finA = 0.72 - 0.3 * (1 - vis);
     ctx.fillStyle = rgba(mix(k.finC, deep, tint), finA);
     ctx.beginPath();
     tailPath(f);
@@ -1590,7 +1800,7 @@
     ctx.fill();
   }
 
-  var PELLET = hex('#a8622c');
+  var PELLET = hex('#7e4521');
 
   function drawShadows() {
     var k = shadowStrength(), i, off = U * 0.045;
@@ -1704,23 +1914,49 @@
     }
   }
 
-  function drawPetal(p) {
+  function drawLeaf(p) {
     ctx.save();
     ctx.translate(p.x, p.y);
     ctx.rotate(p.rot);
-    var s = p.size;
-    ctx.fillStyle = 'rgba(8,24,22,0.15)';
-    ctx.beginPath();
-    ctx.ellipse(s * 0.5, s * 0.7, s, s * 0.7, 0, 0, TAU);
+    var s = p.size, j;
+    // A maple leaf: five pointed lobes, the middle one longest, with
+    // deep notches between them, a stem and a vein to every point.
+    var LOBE = [[0, 1], [0.95, 0.82], [-0.95, 0.82], [1.9, 0.52], [-1.9, 0.52]];
+    function leafPath(ox, oy) {
+      var order = [4, 2, 0, 1, 3], first = true;
+      ctx.beginPath();
+      for (var n = 0; n < order.length; n++) {
+        var lb = LOBE[order[n]], a = lb[0], L = lb[1] * s;
+        var pts = [[a - 0.36, L * 0.55], [a - 0.17, L * 0.68], [a, L], [a + 0.17, L * 0.68], [a + 0.36, L * 0.55]];
+        for (var m = 0; m < pts.length; m++) {
+          var x = ox + Math.cos(pts[m][0]) * pts[m][1], y = oy + Math.sin(pts[m][0]) * pts[m][1];
+          if (first) { ctx.moveTo(x, y); first = false; } else { ctx.lineTo(x, y); }
+        }
+        if (n < order.length - 1) {
+          var na = (a + LOBE[order[n + 1]][0]) / 2;
+          ctx.lineTo(ox + Math.cos(na) * s * 0.3, oy + Math.sin(na) * s * 0.3);
+        }
+      }
+      ctx.lineTo(ox + Math.cos(Math.PI) * s * 0.18, oy);
+      ctx.closePath();
+    }
+    ctx.fillStyle = 'rgba(8,24,22,' + (0.2 * shadowStrength()).toFixed(3) + ')';
+    leafPath(s * 0.35, s * 0.5);
     ctx.fill();
     ctx.fillStyle = p.col;
-    ctx.beginPath();
-    ctx.moveTo(-s, 0);
-    ctx.quadraticCurveTo(-s * 0.4, -s * 0.8, s * 0.7, -s * 0.45);
-    ctx.lineTo(s * 0.45, 0);
-    ctx.lineTo(s * 0.7, s * 0.45);
-    ctx.quadraticCurveTo(-s * 0.4, s * 0.8, -s, 0);
+    leafPath(0, 0);
     ctx.fill();
+    ctx.strokeStyle = p.vein;
+    ctx.lineWidth = Math.max(0.8, s * 0.05);
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    for (j = 0; j < LOBE.length; j++) {
+      ctx.moveTo(0, 0);
+      ctx.lineTo(Math.cos(LOBE[j][0]) * LOBE[j][1] * s * 0.68, Math.sin(LOBE[j][0]) * LOBE[j][1] * s * 0.68);
+    }
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-s * 0.6, 0);
+    ctx.stroke();
     ctx.restore();
   }
 
@@ -1791,19 +2027,22 @@
   function drawFingers() {
     for (var id in fingers) {
       if (!fingers.hasOwnProperty(id)) { continue; }
-      var g = fingers[id], a = clamp(g.held / 0.35, 0, 1), r = U * 0.035;
+      // The fingertip's ring: the edge of the space the finger itself
+      // covers. Fish come to its rim and no further, so they are always
+      // in sight round the finger rather than hidden under it.
+      var g = fingers[id], a = clamp(g.held / 0.35, 0, 1), r = fingerR();
       if (a <= 0) { continue; }
-      var rg = ctx.createRadialGradient(g.x, g.y, 0, g.x, g.y, r);
-      rg.addColorStop(0, 'rgba(255,255,255,' + (0.22 * a).toFixed(3) + ')');
-      rg.addColorStop(1, 'rgba(255,255,255,0)');
+      var rg = ctx.createRadialGradient(g.x, g.y, r * 0.5, g.x, g.y, r);
+      rg.addColorStop(0, 'rgba(255,255,255,0)');
+      rg.addColorStop(1, 'rgba(255,255,255,' + (0.2 * a).toFixed(3) + ')');
       ctx.fillStyle = rg;
       ctx.beginPath();
       ctx.arc(g.x, g.y, r, 0, TAU);
       ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,' + (0.4 * a).toFixed(3) + ')';
-      ctx.lineWidth = Math.max(1, U * 0.003);
+      ctx.strokeStyle = 'rgba(255,255,255,' + (0.55 * a).toFixed(3) + ')';
+      ctx.lineWidth = Math.max(1.5, U * 0.004);
       ctx.beginPath();
-      ctx.arc(g.x, g.y, r * 0.7, 0, TAU);
+      ctx.arc(g.x, g.y, r, 0, TAU);
       ctx.stroke();
     }
   }
@@ -1845,9 +2084,10 @@
 
     if (order.length !== fish.length) { order = fish.slice(); }
     order.sort(function (a, b) { return b.z - a.z; });
-    for (i = 0; i < order.length; i++) { drawFish(order[i]); }
+    for (i = 0; i < order.length; i++) { if (order[i].leap < 0) { drawFish(order[i]); } }
 
     drawSky(dt);
+    drawMoon();
     drawRipples();
 
     for (i = 0; i < pellets.length; i++) {
@@ -1860,233 +2100,680 @@
         drawPellet(p.x, p.y + (reduced ? 0 : Math.sin(drawClock * 2 + p.tone * 6) * U * 0.0006), p.r, PELLET, 1);
       }
     }
-    for (i = 0; i < petals.length; i++) { drawPetal(petals[i]); }
+    for (i = 0; i < leaves.length; i++) { drawLeaf(leaves[i]); }
     for (i = 0; i < pads.length; i++) { drawPad(pads[i]); }
     for (i = 0; i < pads.length; i++) { if (pads[i].flower) { drawFlower(pads[i], drawClock); } }
-    drawFrog();
+    // A fish in the air is above everything on the water.
+    for (i = 0; i < fish.length; i++) { if (fish[i].leap >= 0) { drawFish(fish[i]); } }
+    drawDrops();
     drawFingers();
     drawSparkles();
     ctx.drawImage(bankCanvas, 0, 0, W, H);
+    drawCat();
+    drawDragonfly();
     if (mood.gradeA > 0.002) {
       ctx.fillStyle = rgba(mood.grade, mood.gradeA);
       ctx.fillRect(0, 0, W, H);
     }
+    drawFireflies();
+  }
+
+  function drawDrops() {
+    var r = Math.max(1, U * 0.0035), i, d, o;
+    ctx.fillStyle = 'rgba(8,24,22,0.18)';
+    ctx.beginPath();
+    for (i = 0; i < drops.length; i++) {
+      d = drops[i]; o = d.h * U * 0.08;
+      ctx.moveTo(d.x + SUNX * o + r, d.y + SUNY * o);
+      ctx.arc(d.x + SUNX * o, d.y + SUNY * o, r, 0, TAU);
+    }
+    ctx.fill();
+    ctx.fillStyle = 'rgba(235,248,255,0.9)';
+    ctx.beginPath();
+    for (i = 0; i < drops.length; i++) {
+      d = drops[i];
+      ctx.moveTo(d.x + r * (1 + d.h), d.y);
+      ctx.arc(d.x, d.y, r * (1 + d.h), 0, TAU);
+    }
+    ctx.fill();
+  }
+
+  // At dusk the moon is reflected in the water, drifting slowly across.
+  function drawMoon() {
+    if (mood.night < 0.05) { return; }
+    var x = PX0 + (PX1 - PX0) * (0.5 + 0.22 * Math.sin(drawClock * 0.012)), y = PY0 + (PY1 - PY0) * 0.3, r = U * 0.05;
+    var g = ctx.createRadialGradient(x, y, 0, x, y, r * 3);
+    g.addColorStop(0, 'rgba(255,250,225,' + (0.5 * mood.night).toFixed(3) + ')');
+    g.addColorStop(0.3, 'rgba(255,250,225,' + (0.18 * mood.night).toFixed(3) + ')');
+    g.addColorStop(1, 'rgba(255,250,225,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, r * 3, 0, TAU);
+    ctx.fill();
   }
 
   // ------------------------------------------------------------------
-  // A frog lives on the lily pads. It turns to look when food lands near
-  // it, croaks if you tap it, and every so often turns to face another
-  // pad and hops across to it, landing with a bob and a ripple.
+  // The cat. Away most of the time; then it comes through the hedge onto
+  // the bank and walks along the edge of the pond. Sometimes it sits and
+  // watches the water, sometimes it crouches with its tail twitching, and
+  // now and then it dabs a paw in. It never catches anything.
+  //
+  // The fish feel it. Near its side of the pond they go deep and keep
+  // away, the little one hides under the pads, and the wary ones will not
+  // take food near it. When it goes, they come back in their own time.
+  //
+  // A tap on it shoos it, but not always: a cat does as it pleases. Each
+  // tap that is ignored makes the next more likely to work.
   // ------------------------------------------------------------------
-  var frog = {
-    pad: 1, x: 0, y: 0, a: Math.PI * 0.8, aw: Math.PI * 0.8, state: 'sit', t: 0,
-    next: 25 + Math.random() * 20, to: 0, sx: 0, sy: 0, dur: 1, h: 0,
-    blink: 3, blinkV: 1, croak: -1, croakNext: 12 + Math.random() * 12
+  var rimPts = [], rimS = [], rimLen = 1;
+
+  // The path the cat walks: along the middle of the bank, all the way
+  // round. Measured so a distance along it can be turned into a place.
+  function buildRim() {
+    rimPts = []; rimS = [];
+    var n = edgePts.length / 2, acc = 0, off = BANK * 0.4, i;
+    for (i = 0; i < n; i++) {
+      edgeNormal(edgePts[2 * i], edgePts[2 * i + 1]);
+      rimPts.push(edgePts[2 * i] - NX * off, edgePts[2 * i + 1] - NY * off);
+    }
+    for (i = 0; i < n; i++) {
+      rimS.push(acc);
+      var j = (i + 1) % n;
+      acc += Math.sqrt(Math.pow(rimPts[2 * j] - rimPts[2 * i], 2) + Math.pow(rimPts[2 * j + 1] - rimPts[2 * i + 1], 2));
+    }
+    rimLen = acc || 1;
+  }
+
+  // A place on the rim, its direction along the rim, and which way the
+  // water lies from it, left in RX, RY, RA and RW.
+  var RX = 0, RY = 0, RA = 0, RW = 0;
+  function rimAt(s) {
+    s = ((s % rimLen) + rimLen) % rimLen;
+    var n = rimS.length, lo = 0, hi = n - 1;
+    while (lo < hi) { var mid = (lo + hi + 1) >> 1; if (rimS[mid] <= s) { lo = mid; } else { hi = mid - 1; } }
+    var j = (lo + 1) % n, seg = (j ? rimS[j] : rimLen) - rimS[lo] || 1, u = (s - rimS[lo]) / seg;
+    var ax = rimPts[2 * lo], ay = rimPts[2 * lo + 1], bx = rimPts[2 * j], by = rimPts[2 * j + 1];
+    RX = ax + (bx - ax) * u; RY = ay + (by - ay) * u;
+    RA = Math.atan2(by - ay, bx - ax);
+    edgeNormal(RX, RY);
+    RW = Math.atan2(NY, NX);
+  }
+
+  var cat = {
+    state: 'away', next: 40 + Math.random() * 30, t: 0, s: 0, dir: 1, run: 0,
+    x: -999, y: -999, a: 0, aim: 0, head: 0, hx: -999, hy: -999, lookX: 0, lookY: 0,
+    sx: 0, sy: 0, ex: 0, ey: 0, stride: 0, moving: 0, sit: 0, crouch: 0, flat: 0,
+    dab: -1, dabbed: false, visit: 0, tail: 0, flick: 0, taps: 0, tapAt: -9, clock: 0
   };
 
-  // Where on a pad the frog sits: off to the side away from the flower.
-  function seat(i) {
-    var p = pads[i];
-    if (!p.flower) { KX = p.x; KY = p.y; return; }
-    var a = p.rot + 2.2 + Math.PI;
-    KX = p.x + Math.cos(a) * p.r * 0.3;
-    KY = p.y + Math.sin(a) * p.r * 0.3;
+  function catLen() { return U * 0.15; }
+
+  function catAround() { return cat.state !== 'away'; }
+
+  // How frightening the cat is at a point: nothing when it is away, most
+  // right in front of its face, more while it is crouching to pounce.
+  function catThreatAt(x, y) {
+    if (!catAround()) { return 0; }
+    var level = cat.state === 'stalk' || cat.state === 'dab' ? 1
+      : cat.state === 'shoo' || cat.state === 'leave' ? 0.5 : 0.8;
+    var R = U * (0.32 + 0.12 * cat.crouch);
+    var dx = x - cat.hx, dy = y - cat.hy, d = Math.sqrt(dx * dx + dy * dy);
+    return level * (1 - smooth(clamp(d / R, 0, 1)));
   }
 
-  function frogLook(x, y) {
-    if (frog.state !== 'sit') { return; }
-    var dx = x - frog.x, dy = y - frog.y;
-    if (dx * dx + dy * dy < U * U * 0.16) { frog.aw = Math.atan2(dy, dx); }
+  // The most visible fish near the cat, which is what it watches.
+  function catQuarry() {
+    var best = null, bd = U * 0.45;
+    for (var i = 0; i < fish.length; i++) {
+      var f = fish[i];
+      if (seen(f.z) < 0.3) { continue; }
+      var d = Math.sqrt(Math.pow(f.qx[2] - cat.hx, 2) + Math.pow(f.qy[2] - cat.hy, 2));
+      if (d < bd) { bd = d; best = f; }
+    }
+    return best;
   }
 
-  function frogCroak() {
-    if (frog.croak >= 0) { return; }
-    frog.croak = 0;
-    croakSound(frog.x);
+  function catGo(state, t) { cat.state = state; cat.t = t || 0; }
+
+  function catArrive() {
+    cat.s = Math.random() * rimLen;
+    rimAt(cat.s);
+    cat.ex = RX; cat.ey = RY;
+    var out = CL_OUT();
+    cat.x = RX - Math.cos(RW) * out; cat.y = RY - Math.sin(RW) * out;
+    cat.a = RW;
+    cat.dir = Math.random() < 0.5 ? 1 : -1;
+    cat.visit = 25 + Math.random() * 25;
+    cat.taps = 0;
+    catGo('enter');
   }
 
-  function frogHit(x, y) {
-    var dx = x - frog.x, dy = y - frog.y;
-    return dx * dx + dy * dy < U * U * 0.0036;
+  function CL_OUT() { return BANK * 0.6 + catLen() * 1.4; }
+
+  function catLeave(run) {
+    rimAt(cat.s);
+    var out = CL_OUT();
+    cat.ex = RX - Math.cos(RW) * out; cat.ey = RY - Math.sin(RW) * out;
+    cat.run = run ? 1 : 0;
+    catGo(run ? 'shoo' : 'leave');
   }
 
-  function updateFrog(dt) {
-    var f = frog;
-    f.blink -= dt;
-    if (f.blink <= 0) { f.blink = 2 + Math.random() * 5; f.blinkV = 0; }
-    f.blinkV = Math.min(1, f.blinkV + dt * 6);
-    if (f.croak >= 0) { f.croak += dt; if (f.croak > 0.7) { f.croak = -1; } }
-
-    if (f.state === 'sit') {
-      seat(f.pad);
-      f.x = KX; f.y = KY;
-      f.a += clamp(wrapAngle(f.aw - f.a), -2 * dt, 2 * dt);
-      f.croakNext -= dt;
-      if (f.croakNext <= 0) { frogCroak(); f.croakNext = 15 + Math.random() * 25; }
-      f.next -= dt;
-      if (f.next <= 0 && !reduced) {
-        // Pick another pad, nearer ones more often.
-        var best = -1, bs = Infinity;
-        for (var i = 0; i < pads.length; i++) {
-          if (i === f.pad) { continue; }
-          var dx = pads[i].x - f.x, dy = pads[i].y - f.y;
-          var s = Math.sqrt(dx * dx + dy * dy) * (0.5 + Math.random());
-          if (s < bs) { bs = s; best = i; }
-        }
-        f.to = best;
-        seat(best);
-        f.aw = Math.atan2(KY - f.y, KX - f.x);
-        f.state = 'turn';
-      } else if (f.next <= 0) {
-        f.next = 30;
-      }
-    } else if (f.state === 'turn') {
-      seat(f.pad);
-      f.x = KX; f.y = KY;
-      seat(f.to);
-      f.aw = Math.atan2(KY - f.y, KX - f.x);
-      var da = wrapAngle(f.aw - f.a);
-      f.a += clamp(da, -2.4 * dt, 2.4 * dt);
-      if (Math.abs(da) < 0.05) { f.state = 'crouch'; f.t = 0; }
-    } else if (f.state === 'crouch') {
-      seat(f.pad);
-      f.x = KX; f.y = KY;
-      f.t += dt;
-      if (f.t > 0.3) {
-        f.state = 'jump'; f.t = 0; f.sx = f.x; f.sy = f.y;
-        seat(f.to);
-        var jd = Math.sqrt((KX - f.x) * (KX - f.x) + (KY - f.y) * (KY - f.y));
-        f.dur = 0.5 + jd / U * 0.6;
-        pads[f.pad].dip = 0.6;
-      }
-    } else if (f.state === 'jump') {
-      f.t += dt;
-      var u = clamp(f.t / f.dur, 0, 1);
-      seat(f.to);
-      f.x = lerp(f.sx, KX, u);
-      f.y = lerp(f.sy, KY, u);
-      f.h = Math.sin(Math.PI * u);
-      if (u >= 1) {
-        f.state = 'sit'; f.h = 0; f.pad = f.to;
-        var p = pads[f.pad];
-        p.dip = 1;
-        p.vx += Math.cos(f.a) * U * 0.03;
-        p.vy += Math.sin(f.a) * U * 0.03;
-        addRipple(p.x, p.y, p.r * 1.7, 0.7);
-        plop(p.x);
-        f.next = 40 + Math.random() * 60;
-        f.aw = f.a + (Math.random() - 0.5) * 1.5;
-      }
+  // What to do next while on the bank.
+  function catNext() {
+    if (cat.visit <= 0 || mood.rain > 0.2) { catLeave(false); return; }
+    var r = Math.random(), q = catQuarry();
+    if (q && r < 0.45) { catGo('stalk', 3 + Math.random() * 3); }
+    else if (r < 0.75) { catGo('sit', 4 + Math.random() * 5); }
+    else {
+      if (Math.random() < 0.35) { cat.dir = -cat.dir; }
+      catGo('patrol', 3 + Math.random() * 4);
     }
   }
 
-  function drawFrog() {
-    var f = frog, FL = U * 0.058, s = 1 + f.h * 0.45, jumping = f.state === 'jump';
-    var crouch = f.state === 'crouch' ? 0.12 : 0;
-    // Shadow: under it on the pad while it sits, out across the water
-    // while it is in the air.
-    var off = U * (0.006 + f.h * 0.06);
+  function catHit(x, y) {
+    if (!catAround() || cat.state === 'shoo' || cat.state === 'leave') { return false; }
+    var dx = x - cat.x, dy = y - cat.y;
+    return dx * dx + dy * dy < Math.pow(catLen() * 0.75, 2);
+  }
+
+  function catTapped(x, y) {
+    if (cat.clock - cat.tapAt > 5) { cat.taps = 0; }
+    cat.taps += 1;
+    cat.tapAt = cat.clock;
+    if (Math.random() < 0.35 + 0.3 * (cat.taps - 1)) {
+      // Off it goes, ears flat, low and quick.
+      cat.flat = 1;
+      meowSound(cat.x);
+      catLeave(true);
+    } else {
+      // Not today. It looks round at you, flicks its tail, and stays.
+      cat.lookX = x; cat.lookY = y;
+      cat.flick = 1;
+      mrrpSound(cat.x);
+      if (cat.state === 'patrol' || cat.state === 'stalk') { catGo('sit', 3 + Math.random() * 3); }
+    }
+  }
+
+  function updateCat(dt) {
+    var c = cat, CL = catLen(), walk = U * 0.085, goal = c.a, k;
+    c.clock += dt;
+    c.flick = Math.max(0, c.flick - dt * 1.5);
+    c.flat = Math.max(0, c.flat - dt * 0.5);
+    if (c.state === 'away') {
+      c.next -= dt;
+      if (c.next <= 0) {
+        if (mood.rain > 0.15) { c.next = 20; } else { catArrive(); }
+      }
+      return;
+    }
+    c.t -= dt;
+    c.visit -= dt;
+    var moving = 0, sitW = 0, crouchW = 0;
+    if (c.state === 'enter' || c.state === 'leave' || c.state === 'shoo') {
+      var speed = walk * (c.state === 'shoo' ? 3.2 : 1);
+      var dx = c.ex - c.x, dy = c.ey - c.y, d = Math.sqrt(dx * dx + dy * dy);
+      goal = Math.atan2(dy, dx);
+      if (Math.abs(wrapAngle(goal - c.a)) < 1.2 || c.state === 'shoo') {
+        var stepLen = Math.min(d, speed * dt);
+        c.x += dx / (d || 1) * stepLen; c.y += dy / (d || 1) * stepLen;
+        moving = c.state === 'shoo' ? 2.4 : 1;
+      }
+      if (d < 2) {
+        if (c.state === 'enter') { catGo('patrol', 3 + Math.random() * 4); }
+        else {
+          c.next = (c.state === 'shoo' ? 70 : 50) + Math.random() * 60;
+          catGo('away');
+          c.x = -999; c.hx = -999;
+          return;
+        }
+      }
+    } else if (c.state === 'patrol') {
+      c.s += c.dir * walk * dt;
+      rimAt(c.s);
+      c.x = RX; c.y = RY;
+      goal = c.dir > 0 ? RA : RA + Math.PI;
+      moving = 1;
+      if (c.t <= 0) { catNext(); }
+    } else {
+      // Sitting, stalking or dabbing: it turns to face the water, or
+      // whatever it is watching in it.
+      rimAt(c.s);
+      c.x = RX; c.y = RY;
+      var q = catQuarry();
+      if (q) { c.lookX = q.qx[0]; c.lookY = q.qy[0]; }
+      else if (c.flick <= 0) { c.lookX = c.x + Math.cos(RW) * U * 0.3; c.lookY = c.y + Math.sin(RW) * U * 0.3; }
+      goal = RW + clamp(wrapAngle(Math.atan2(c.lookY - c.y, c.lookX - c.x) - RW), -0.7, 0.7);
+      if (c.state === 'sit') {
+        sitW = 1;
+        if (c.t <= 0) { catNext(); }
+      } else if (c.state === 'stalk') {
+        crouchW = 1;
+        if (c.t <= 0) {
+          if (Math.random() < 0.55) { c.dab = 0; c.dabbed = false; catGo('dab', 0.9); }
+          else { catNext(); }
+        }
+      } else if (c.state === 'dab') {
+        crouchW = 1;
+        c.dab = clamp(1 - c.t / 0.9, 0, 1);
+        if (!c.dabbed && c.dab > 0.4) {
+          // The paw goes in. Everything near it bolts.
+          c.dabbed = true;
+          var px = c.x + Math.cos(c.a) * CL * 0.85, py = c.y + Math.sin(c.a) * CL * 0.85;
+          splash(px, py, 0.35);
+          for (k = 0; k < fish.length; k++) {
+            var f = fish[k], fx = f.px[0] - px, fy = f.py[0] - py, fd = Math.sqrt(fx * fx + fy * fy) || 1;
+            if (fd < U * 0.3 && f.leap < 0) {
+              f.fear = 1;
+              keepIn(f.px[0] + fx / fd * U * 0.3, f.py[0] + fy / fd * U * 0.3, f.L);
+              f.rx = KX; f.ry = KY; f.retreat = 0.9; f.wantLeap = 0;
+              f.target = null; f.mode = 'wander';
+            }
+          }
+        }
+        if (c.t <= 0) { c.dab = -1; catGo('sit', 2 + Math.random() * 3); }
+      }
+    }
+    c.a += clamp(wrapAngle(goal - c.a), -3 * dt, 3 * dt);
+    c.moving += (moving - c.moving) * Math.min(1, dt * 6);
+    c.sit += (sitW - c.sit) * Math.min(1, dt * 3);
+    c.crouch += (crouchW - c.crouch) * Math.min(1, dt * 3);
+    c.stride += dt * TAU * 1.6 * c.moving * (reduced ? 0.6 : 1);
+    c.tail += dt * (c.crouch > 0.5 ? 9 : 1.6) * (reduced ? 0.4 : 1);
+    // Its head turns towards what it is looking at, within reason.
+    var want = c.state === 'patrol' || c.state === 'enter' || c.state === 'leave' || c.state === 'shoo'
+      ? (c.flick > 0 ? Math.atan2(c.lookY - c.y, c.lookX - c.x) : c.a) : Math.atan2(c.lookY - c.y, c.lookX - c.x);
+    var hd = clamp(wrapAngle(want - c.a), -1, 1);
+    c.head += (hd - c.head) * Math.min(1, dt * 4);
+    var reach = CL * (0.42 + 0.08 * c.crouch);
+    c.hx = c.x + Math.cos(c.a) * reach;
+    c.hy = c.y + Math.sin(c.a) * reach;
+  }
+
+  function drawCat() {
+    var c = cat;
+    if (c.state === 'away') { return; }
+    var CL = catLen(), sit = c.sit, cr = c.crouch, flat = Math.max(c.flat, c.state === 'shoo' ? 1 : 0);
+    var GINGER = '#e09b55', STRIPE = '#b4662c', CREAM = '#f6e2c2', i, e;
     ctx.save();
-    ctx.translate(f.x + SUNX * off, f.y + SUNY * off);
-    ctx.rotate(f.a);
-    ctx.fillStyle = 'rgba(8,24,22,' + (0.25 * shadowStrength()).toFixed(3) + ')';
+    ctx.translate(c.x, c.y);
+    ctx.rotate(c.a);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // Shadow.
+    ctx.fillStyle = 'rgba(15,25,12,' + (0.25 * shadowStrength()).toFixed(3) + ')';
     ctx.beginPath();
-    ctx.ellipse(-FL * 0.05, 0, FL * (jumping ? 0.6 : 0.45), FL * 0.33, 0, 0, TAU);
+    ctx.ellipse(-CL * 0.02 + CL * 0.06, CL * 0.08, CL * (0.42 - 0.1 * sit), CL * (0.18 + 0.06 * sit), 0, 0, TAU);
+    ctx.fill();
+
+    // The tail: a soft curve behind it as it walks, wrapped round its
+    // feet when it sits, and held low and straight with the tip
+    // twitching while it stalks.
+    var tx = -CL * (0.42 - 0.12 * sit), ty = 0, ta = Math.PI, seg = CL * 0.11;
+    ctx.strokeStyle = GINGER;
+    ctx.lineWidth = CL * (0.075 + 0.03 * flat);
+    ctx.beginPath();
+    ctx.moveTo(tx, ty);
+    for (i = 0; i < 8; i++) {
+      var u = i / 7;
+      var walkB = Math.sin(c.tail * 2 - i * 0.6) * 0.16 * (reduced ? 0.4 : 1);
+      var sitB = 0.42 + (u > 0.75 ? Math.sin(c.tail * 3) * 0.3 * c.flick : 0);
+      var crB = u > 0.7 ? Math.sin(c.tail * 2.2 + i) * 0.45 * (reduced ? 0.3 : 1) : 0;
+      ta += lerp(lerp(walkB, sitB, sit), crB, cr) + (u > 0.7 ? Math.sin(c.clock * 9) * 0.5 * c.flick : 0);
+      tx += Math.cos(ta) * seg; ty += Math.sin(ta) * seg;
+      ctx.lineTo(tx, ty);
+    }
+    ctx.stroke();
+    ctx.strokeStyle = STRIPE;
+    ctx.lineWidth = CL * 0.075;
+    ctx.setLineDash([CL * 0.03, CL * 0.07]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Paws: stepping in diagonal pairs as it walks, tucked as it sits.
+    var st = Math.sin(c.stride) * CL * 0.09 * c.moving / Math.max(1, c.moving);
+    ctx.fillStyle = GINGER;
+    var PAWS = [[0.24, 0.12, 1], [0.24, -0.12, -1], [-0.26, 0.13, -1], [-0.26, -0.13, 1]];
+    for (i = 0; i < 4; i++) {
+      var pxw = PAWS[i][0] * CL + st * PAWS[i][2], pyw = PAWS[i][1] * CL;
+      var pxs = (i < 2 ? 0.26 : -0.08) * CL, pys = PAWS[i][1] * CL * (i < 2 ? 0.45 : 1.6);
+      ctx.beginPath();
+      ctx.ellipse(lerp(pxw, pxs, sit), lerp(pyw, pys, sit), CL * 0.055, CL * 0.04, 0, 0, TAU);
+      ctx.fill();
+    }
+
+    // Body: chest and hips, a long low shape walking or crouching, a
+    // round pear with big haunches sitting.
+    var puff = 1 + 0.15 * flat;
+    ctx.fillStyle = GINGER;
+    ctx.beginPath();
+    ctx.ellipse(CL * lerp(0.12, 0.06, sit) + cr * CL * 0.04, 0, CL * lerp(0.21, 0.17, sit), CL * 0.14 * puff, 0, 0, TAU);
+    ctx.moveTo(CL * 0.1, 0);
+    ctx.ellipse(-CL * lerp(0.15, 0.14, sit), 0, CL * lerp(0.26, 0.23, sit), CL * lerp(0.17, 0.23, sit) * puff, 0, 0, TAU);
+    ctx.fill();
+    // Shoulder blades up while it crouches.
+    if (cr > 0.05) {
+      ctx.fillStyle = 'rgba(180,100,40,' + (0.35 * cr).toFixed(3) + ')';
+      for (e = -1; e <= 1; e += 2) {
+        ctx.beginPath();
+        ctx.ellipse(CL * 0.12, e * CL * 0.07, CL * 0.07, CL * 0.035, 0, 0, TAU);
+        ctx.fill();
+      }
+    }
+    // Tabby stripes across the back.
+    ctx.strokeStyle = STRIPE;
+    ctx.lineWidth = CL * 0.035;
+    ctx.beginPath();
+    for (i = 0; i < 6; i++) {
+      var sx = CL * (-0.32 + i * 0.1), sw = CL * (i < 3 ? 0.11 + 0.05 * sit : 0.08);
+      ctx.moveTo(sx - CL * 0.02, -sw);
+      ctx.quadraticCurveTo(sx + CL * 0.03, 0, sx - CL * 0.02, sw);
+    }
+    ctx.stroke();
+
+    // The paw going into the water.
+    if (c.dab >= 0) {
+      var reachP = CL * 0.48 * Math.sin(Math.PI * c.dab);
+      ctx.strokeStyle = GINGER;
+      ctx.lineWidth = CL * 0.07;
+      ctx.beginPath();
+      ctx.moveTo(CL * 0.22, CL * 0.07);
+      ctx.lineTo(CL * 0.3 + reachP, CL * 0.05);
+      ctx.stroke();
+      ctx.fillStyle = CREAM;
+      ctx.beginPath();
+      ctx.arc(CL * 0.3 + reachP, CL * 0.05, CL * 0.045, 0, TAU);
+      ctx.fill();
+    }
+
+    // Head, turned towards whatever it is watching.
+    ctx.translate(CL * (0.33 + 0.06 * cr - 0.05 * sit), 0);
+    ctx.rotate(c.head);
+    // Ears: up and forward normally, flattened back when it is startled
+    // or creeping up on something.
+    var ef = Math.max(flat, cr * 0.5);
+    for (e = -1; e <= 1; e += 2) {
+      var bx1 = -CL * 0.06, by1 = e * CL * 0.04, bx2 = CL * 0.05, by2 = e * CL * 0.13;
+      var tipx = lerp(-CL * 0.04, -CL * 0.15, ef), tipy = e * lerp(CL * 0.2, CL * 0.17, ef);
+      ctx.fillStyle = GINGER;
+      ctx.beginPath();
+      ctx.moveTo(bx1, by1); ctx.lineTo(tipx, tipy); ctx.lineTo(bx2, by2); ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#eeb1a2';
+      ctx.beginPath();
+      ctx.moveTo(lerp(bx1, tipx, 0.25), lerp(by1, tipy, 0.25)); ctx.lineTo(lerp(bx1, tipx, 0.8), lerp(by1, tipy, 0.8));
+      ctx.lineTo(lerp(bx2, tipx, 0.3), lerp(by2, tipy, 0.3)); ctx.closePath();
+      ctx.fill();
+    }
+    ctx.fillStyle = GINGER;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, CL * 0.135, CL * 0.15, 0, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = CREAM;
+    ctx.beginPath();
+    ctx.ellipse(CL * 0.08, 0, CL * 0.055, CL * 0.07, 0, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = '#e48b96';
+    ctx.beginPath();
+    ctx.moveTo(CL * 0.135, 0); ctx.lineTo(CL * 0.115, -CL * 0.018); ctx.lineTo(CL * 0.115, CL * 0.018); ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = STRIPE;
+    ctx.lineWidth = CL * 0.022;
+    ctx.beginPath();
+    ctx.moveTo(-CL * 0.06, 0); ctx.lineTo(CL * 0.02, 0);
+    ctx.moveTo(-CL * 0.05, -CL * 0.045); ctx.lineTo(CL * 0.01, -CL * 0.03);
+    ctx.moveTo(-CL * 0.05, CL * 0.045); ctx.lineTo(CL * 0.01, CL * 0.03);
+    ctx.stroke();
+    // Eyes, just visible from above at the front of the head.
+    for (e = -1; e <= 1; e += 2) {
+      ctx.fillStyle = '#a9c94c';
+      ctx.beginPath();
+      ctx.ellipse(CL * 0.075, e * CL * 0.06, CL * 0.025, CL * 0.018, e * 0.5, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = '#1d1d14';
+      ctx.beginPath();
+      ctx.ellipse(CL * 0.08, e * CL * 0.06, CL * 0.006, CL * 0.015, e * 0.5, 0, TAU);
+      ctx.fill();
+    }
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+    ctx.lineWidth = Math.max(0.6, CL * 0.008);
+    ctx.beginPath();
+    for (e = -1; e <= 1; e += 2) {
+      for (i = -1; i <= 1; i++) {
+        ctx.moveTo(CL * 0.1, e * CL * 0.04);
+        ctx.lineTo(CL * (0.12 + 0.02 * i), e * CL * (0.17 + 0.03 * i));
+      }
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // ------------------------------------------------------------------
+  // A dragonfly. It comes on fine days, darts about in quick straight
+  // dashes with sudden stops, hovers, settles on a pad for a while, and
+  // now and then touches the water. Fish come up underneath to look at
+  // it, and one that trusts you may leap for it. It always gets away.
+  // A tap near it sends it off in a hurry.
+  // ------------------------------------------------------------------
+  var dfly = {
+    state: 'away', next: 25 + Math.random() * 30, x: -999, y: -999, h: 0.5, a: 0,
+    fx: 0, fy: 0, fh: 0.5, tx: 0, ty: 0, th: 0.5, t: 0, u: 1, dur: 1, pad: -1, ox: 0, oy: 0,
+    visit: 0, wing: 0, fast: 1
+  };
+
+  function dragonflyLow(x, y, r) {
+    if (dfly.state !== 'hover' && dfly.state !== 'rest') { return false; }
+    var dx = x - dfly.x, dy = y - dfly.y;
+    return dfly.h < 0.5 && dx * dx + dy * dy < r * r;
+  }
+
+  function dflyDart(tx, ty, th, fast) {
+    var d = dfly;
+    d.fx = d.x; d.fy = d.y; d.fh = d.h;
+    d.tx = tx; d.ty = ty; d.th = th;
+    var dist = Math.sqrt((tx - d.x) * (tx - d.x) + (ty - d.y) * (ty - d.y));
+    d.dur = clamp(dist / (U * (fast ? 1.6 : 0.9)), 0.15, 1.2);
+    d.u = 0;
+    d.pad = -1;
+    d.state = 'dart';
+  }
+
+  function dflyOffscreen() {
+    var a = Math.random() * TAU, r = Math.max(W, H);
+    KX = W / 2 + Math.cos(a) * r; KY = H / 2 + Math.sin(a) * r;
+  }
+
+  function dragonflyStartle(x, y) {
+    var d = dfly;
+    if (d.state === 'away' || d.state === 'leave') { return; }
+    var dx = d.x - x, dy = d.y - y, dd = Math.sqrt(dx * dx + dy * dy) || 1;
+    if (dd > U * 0.25) { return; }
+    keepIn(d.x + dx / dd * U * 0.45, d.y + dy / dd * U * 0.45, U * 0.05);
+    dflyDart(KX, KY, 0.8, true);
+  }
+
+  function updateDragonfly(dt) {
+    var d = dfly;
+    d.wing += dt * 60;
+    if (d.state === 'away') {
+      d.next -= dt;
+      if (d.next <= 0) {
+        // Too quick and darting for anyone who has asked for less motion.
+        if (mood.rain > 0.1 || mood.night > 0.3 || reduced) { d.next = 20; return; }
+        dflyOffscreen();
+        d.x = KX; d.y = KY; d.h = 0.8;
+        d.visit = 20 + Math.random() * 25;
+        dflyDart(PX0 + (0.2 + 0.6 * Math.random()) * (PX1 - PX0), PY0 + (0.2 + 0.6 * Math.random()) * (PY1 - PY0), 0.6, false);
+      }
+      return;
+    }
+    d.visit -= dt;
+    if (d.state === 'dart' || d.state === 'leave') {
+      d.u = Math.min(1, d.u + dt / d.dur);
+      var e = 1 - Math.pow(1 - d.u, 3);
+      var nx = lerp(d.fx, d.tx, e), ny = lerp(d.fy, d.ty, e);
+      if (Math.abs(nx - d.x) + Math.abs(ny - d.y) > 0.5) { d.a = Math.atan2(ny - d.y, nx - d.x); }
+      d.x = nx; d.y = ny; d.h = lerp(d.fh, d.th, e);
+      if (d.u >= 1) {
+        if (d.state === 'leave') { d.state = 'away'; d.next = 45 + Math.random() * 50; d.x = -999; return; }
+        if (d.dip) { d.dip = false; addRipple(d.x, d.y, U * 0.03, 0.7); d.th = 0.25; }
+        if (d.pad >= 0) { d.state = 'rest'; d.t = 3 + Math.random() * 6; }
+        else { d.state = 'hover'; d.t = 0.5 + Math.random() * 1.8; }
+      }
+    } else if (d.state === 'hover') {
+      d.t -= dt;
+      if (!reduced) { d.x += Math.sin(d.wing * 0.05) * U * 0.004 * dt * 10; d.h = d.th + Math.sin(d.wing * 0.03) * 0.03; }
+      if (d.t <= 0) { dflyNext(); }
+    } else if (d.state === 'rest') {
+      d.t -= dt;
+      var p = pads[d.restPad];
+      if (p) { d.x = p.x + d.ox; d.y = p.y + d.oy; }
+      if (d.t <= 0) { dflyNext(); }
+    }
+  }
+
+  function dflyNext() {
+    var d = dfly, r = Math.random();
+    if (d.visit <= 0 || mood.rain > 0.1) {
+      dflyOffscreen();
+      d.fx = d.x; d.fy = d.y; d.fh = d.h; d.tx = KX; d.ty = KY; d.th = 0.9; d.u = 0;
+      d.dur = 1.2; d.state = 'leave';
+      return;
+    }
+    if (r < 0.25) {
+      // Settle on a pad, off to one side of it.
+      var i = Math.floor(Math.random() * pads.length), p = pads[i], a = Math.random() * TAU;
+      d.ox = Math.cos(a) * p.r * 0.45; d.oy = Math.sin(a) * p.r * 0.45;
+      dflyDart(p.x + d.ox, p.y + d.oy, 0.05, false);
+      d.pad = i; d.restPad = i;
+    } else if (r < 0.4) {
+      // Dip to touch the water, and up again.
+      dflyDart(d.x + (Math.random() - 0.5) * U * 0.1, d.y + (Math.random() - 0.5) * U * 0.1, 0.02, false);
+      d.dip = true;
+    } else {
+      keepIn(d.x + (Math.random() - 0.5) * U * 0.6, d.y + (Math.random() - 0.5) * U * 0.6, U * 0.05);
+      dflyDart(KX, KY, Math.random() < 0.5 ? 0.15 + Math.random() * 0.15 : 0.4 + Math.random() * 0.3, false);
+    }
+  }
+
+  function drawDragonfly() {
+    var d = dfly;
+    if (d.state === 'away') { return; }
+    var S =U * 0.05 * (1 + 0.5 * d.h), off = U * (0.01 + 0.12 * d.h), i, e;
+    var flying = d.state !== 'rest';
+    // Shadow on the water.
+    ctx.fillStyle = 'rgba(8,24,22,' + (0.2 * shadowStrength()).toFixed(3) + ')';
+    ctx.save();
+    ctx.translate(d.x + SUNX * off, d.y + SUNY * off);
+    ctx.rotate(d.a);
+    ctx.beginPath();
+    ctx.ellipse(-S * 0.2, 0, S * 0.55, S * 0.06, 0, 0, TAU);
+    ctx.moveTo(S * 0.15, 0);
+    ctx.ellipse(0, 0, S * 0.08, S * 0.55, 0, 0, TAU);
     ctx.fill();
     ctx.restore();
 
     ctx.save();
-    ctx.translate(f.x, f.y);
-    ctx.rotate(f.a);
-    ctx.scale(s * (1 - crouch), s * (1 + crouch * 0.5));
-    var leg = '#4f8a32', dark = '#3d6e27';
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.strokeStyle = leg;
-    for (var e = -1; e <= 1; e += 2) {
-      ctx.lineWidth = FL * 0.12;
-      ctx.beginPath();
-      if (jumping) {
-        // Back legs flung out straight behind.
-        ctx.moveTo(-FL * 0.25, e * FL * 0.15);
-        ctx.lineTo(-FL * 0.65, e * FL * 0.24);
-        ctx.lineTo(-FL * 1.0, e * FL * 0.22);
-      } else {
-        // Folded under it, knees forward, ready to go.
-        ctx.moveTo(-FL * 0.25, e * FL * 0.17);
-        ctx.lineTo(FL * 0.03, e * FL * 0.42);
-        ctx.lineTo(-FL * 0.36, e * FL * 0.46);
-      }
-      ctx.stroke();
-      var fx = jumping ? -FL * 1.0 : -FL * 0.36, fy = jumping ? e * FL * 0.22 : e * FL * 0.46;
-      ctx.fillStyle = dark;
-      ctx.beginPath();
-      ctx.moveTo(fx, fy);
-      ctx.lineTo(fx - FL * 0.2, fy + e * FL * 0.1);
-      ctx.lineTo(fx - FL * 0.22, fy - e * FL * 0.04);
-      ctx.closePath();
-      ctx.fill();
-      // Front legs.
-      ctx.lineWidth = FL * 0.08;
-      ctx.beginPath();
-      ctx.moveTo(FL * 0.18, e * FL * 0.15);
-      ctx.lineTo(jumping ? FL * 0.5 : FL * 0.34, e * FL * (jumping ? 0.2 : 0.3));
-      ctx.stroke();
-    }
-    // Vocal sacs swell out at the sides of the head: rib, bit.
-    if (f.croak >= 0) {
-      var sac = Math.max(0, Math.sin(Math.PI * clamp(f.croak / 0.7, 0, 1) * 2));
-      ctx.fillStyle = '#e8efc4';
-      for (e = -1; e <= 1; e += 2) {
-        ctx.beginPath();
-        ctx.arc(FL * 0.28, e * FL * 0.24, FL * 0.15 * sac + 0.1, 0, TAU);
-        ctx.fill();
-      }
-    }
-    var bg = ctx.createRadialGradient(FL * 0.05, -FL * 0.08, FL * 0.05, 0, 0, FL * 0.45);
-    bg.addColorStop(0, '#86bf4f');
-    bg.addColorStop(1, '#5c9636');
-    ctx.fillStyle = bg;
-    ctx.beginPath();
-    ctx.ellipse(-FL * 0.06, 0, FL * 0.38, FL * 0.27, 0, 0, TAU);
-    ctx.moveTo(FL * 0.48, 0);
-    ctx.ellipse(FL * 0.26, 0, FL * 0.22, FL * 0.23, 0, 0, TAU);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(50,90,30,0.55)';
-    ctx.beginPath();
-    ctx.ellipse(-FL * 0.18, FL * 0.06, FL * 0.07, FL * 0.05, 0.4, 0, TAU);
-    ctx.moveTo(-FL * 0.02, -FL * 0.08);
-    ctx.ellipse(-FL * 0.06, -FL * 0.08, FL * 0.06, FL * 0.045, -0.3, 0, TAU);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(190,225,130,0.7)';
-    ctx.lineWidth = FL * 0.035;
-    ctx.beginPath();
-    ctx.moveTo(FL * 0.2, -FL * 0.16); ctx.quadraticCurveTo(-FL * 0.1, -FL * 0.21, -FL * 0.36, -FL * 0.12);
-    ctx.moveTo(FL * 0.2, FL * 0.16); ctx.quadraticCurveTo(-FL * 0.1, FL * 0.21, -FL * 0.36, FL * 0.12);
-    ctx.stroke();
-    // Eyes on top of the head, gold with a dark bar, and lids that blink.
-    var bk = reduced ? 1 : clamp(f.blinkV, 0.05, 1);
+    ctx.translate(d.x, d.y);
+    ctx.rotate(d.a);
+    // Four long wings: a glassy blur in flight, laid flat and still at rest.
     for (e = -1; e <= 1; e += 2) {
-      ctx.fillStyle = '#5c9636';
-      ctx.beginPath();
-      ctx.arc(FL * 0.3, e * FL * 0.14, FL * 0.1, 0, TAU);
-      ctx.fill();
-      ctx.fillStyle = '#e6bf3c';
-      ctx.beginPath();
-      ctx.ellipse(FL * 0.31, e * FL * 0.15, FL * 0.075, FL * 0.075 * bk, 0, 0, TAU);
-      ctx.fill();
-      if (bk > 0.3) {
-        ctx.fillStyle = '#1c1a14';
+      for (i = 0; i < 2; i++) {
+        var wx = i ? -S * 0.03 : S * 0.1, len = S * (i ? 0.52 : 0.56);
+        var sweep = (i ? 0.4 : -0.3) * e;
+        var beat = flying && !reduced ? Math.sin(d.wing + i * 1.4) * 0.35 : 0;
+        var ang = e * Math.PI / 2 + sweep + beat * e;
+        ctx.fillStyle = flying ? 'rgba(220,240,255,0.32)' : 'rgba(225,240,255,0.5)';
+        ctx.strokeStyle = 'rgba(80,110,130,0.45)';
+        ctx.lineWidth = Math.max(0.5, S * 0.012);
         ctx.beginPath();
-        ctx.ellipse(FL * 0.31, e * FL * 0.15, FL * 0.025, FL * 0.06 * bk, 0, 0, TAU);
+        ctx.ellipse(wx + Math.cos(ang) * len * 0.5, Math.sin(ang) * len * 0.5, len * 0.5, S * 0.085, ang, 0, TAU);
         ctx.fill();
+        ctx.stroke();
       }
     }
-    ctx.fillStyle = '#2c4a1c';
+    // Long thin body in segments, a thorax, and two big round eyes.
+    ctx.strokeStyle = '#2a86b0';
+    ctx.lineCap = 'round';
+    ctx.lineWidth = S * 0.06;
     ctx.beginPath();
-    ctx.arc(FL * 0.45, -FL * 0.045, FL * 0.015, 0, TAU);
-    ctx.arc(FL * 0.45, FL * 0.045, FL * 0.015, 0, TAU);
+    ctx.moveTo(S * 0.02, 0);
+    ctx.lineTo(-S * 0.62, 0);
+    ctx.stroke();
+    ctx.strokeStyle = '#123c52';
+    ctx.lineWidth = S * 0.065;
+    ctx.setLineDash([S * 0.02, S * 0.07]);
+    ctx.beginPath();
+    ctx.moveTo(-S * 0.05, 0);
+    ctx.lineTo(-S * 0.6, 0);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#2f9c8a';
+    ctx.beginPath();
+    ctx.ellipse(S * 0.08, 0, S * 0.1, S * 0.06, 0, 0, TAU);
     ctx.fill();
+    ctx.fillStyle = '#4fc0b0';
+    for (e = -1; e <= 1; e += 2) {
+      ctx.beginPath();
+      ctx.arc(S * 0.2, e * S * 0.035, S * 0.045, 0, TAU);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // ------------------------------------------------------------------
+  // Fireflies at dusk, drifting over the pads and the bank, each blinking
+  // in its own time. The paler fish near the top catch the moonlight.
+  // ------------------------------------------------------------------
+  var flies = [];
+  for (var fi = 0; fi < 16; fi++) {
+    flies.push({ u: Math.random(), v: Math.random(), p: Math.random() * TAU, q: Math.random() * TAU, blink: Math.random() * 3, on: 0 });
+  }
+
+  function updateFireflies(dt) {
+    if (mood.night < 0.02) { return; }
+    for (var i = 0; i < flies.length; i++) {
+      var f = flies[i];
+      f.p += dt * (0.15 + 0.1 * Math.sin(i)) * (reduced ? 0.4 : 1);
+      f.q += dt * (0.12 + 0.08 * Math.cos(i)) * (reduced ? 0.4 : 1);
+      f.blink -= dt;
+      if (f.blink <= 0) { f.blink = f.on > 0.5 ? 1 + Math.random() * 2.5 : 0.5 + Math.random() * 0.8; f.lit = !f.lit; }
+      f.on += ((f.lit ? 1 : 0) - f.on) * Math.min(1, dt * 5);
+    }
+  }
+
+  function drawFireflies() {
+    if (mood.night < 0.02) { return; }
+    var n = mood.night, i;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    // The pale fish near the top, glowing faintly.
+    for (i = 0; i < fish.length; i++) {
+      var f = fish[i], v = seen(f.z);
+      if (v < 0.3 || (f.k.bodyC[0] + f.k.bodyC[1] + f.k.bodyC[2]) < 500) { continue; }
+      var gx = f.qx[3], gy = f.qy[3], gr = f.L * 0.6;
+      var gg = ctx.createRadialGradient(gx, gy, 0, gx, gy, gr);
+      gg.addColorStop(0, 'rgba(200,220,255,' + (0.16 * n * v).toFixed(3) + ')');
+      gg.addColorStop(1, 'rgba(200,220,255,0)');
+      ctx.fillStyle = gg;
+      ctx.beginPath();
+      ctx.arc(gx, gy, gr, 0, TAU);
+      ctx.fill();
+    }
+    for (i = 0; i < flies.length; i++) {
+      var fl = flies[i], a = fl.on * n;
+      if (a < 0.02) { continue; }
+      var x = W * (0.05 + 0.9 * (0.5 + 0.5 * Math.sin(fl.p * 1.3 + fl.u * 9))), y = H * (0.05 + 0.9 * (0.5 + 0.5 * Math.sin(fl.q * 1.1 + fl.v * 9)));
+      var r = U * 0.03;
+      var g = ctx.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, 'rgba(235,255,140,' + (0.9 * a).toFixed(3) + ')');
+      g.addColorStop(0.15, 'rgba(210,255,100,' + (0.45 * a).toFixed(3) + ')');
+      g.addColorStop(1, 'rgba(180,255,80,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, TAU);
+      ctx.fill();
+    }
     ctx.restore();
   }
 
@@ -2095,7 +2782,7 @@
   // on a download. A slow, soft pad; now and then a plucked note, like a
   // koto heard from across a garden; and the pond itself: a plip for every
   // pellet, a bloop for every gulp, the tiny kiss of a fish at your finger,
-  // the frog, and rain when it comes.
+  // the cat, splashes, and rain when it comes.
   //
   // Everything melodic is drawn from one pentatonic scale, so a handful of
   // food landing makes a little tune and nothing can clash.
@@ -2373,39 +3060,86 @@
     o.stop(t + 0.22);
   }
 
-  // Rib-bit: two short buzzy pulses, the second a touch higher.
-  function croakSound(x) {
+  // The cat ignoring you: a short rolled "mrrp?", rising at the end.
+  function mrrpSound(x) {
     if (!live()) { return; }
-    var t0 = AC.currentTime + 0.02;
-    [[0, 1], [0.2, 1.12]].forEach(function (b) {
-      var t = t0 + b[0], dur = 0.13;
-      var o = AC.createOscillator(), bp = AC.createBiquadFilter(), g = AC.createGain();
-      var am = AC.createOscillator(), amg = AC.createGain(), pulse = AC.createGain();
-      o.type = 'sawtooth';
-      o.frequency.setValueAtTime(135 * b[1], t);
-      o.frequency.linearRampToValueAtTime(115 * b[1], t + dur);
+    var t = AC.currentTime + 0.02, dur = 0.24;
+    var o = AC.createOscillator(), bp = AC.createBiquadFilter(), g = AC.createGain();
+    var am = AC.createOscillator(), amg = AC.createGain(), pulse = AC.createGain();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(260, t);
+    o.frequency.exponentialRampToValueAtTime(430, t + dur);
+    bp.type = 'bandpass';
+    bp.frequency.setValueAtTime(1100, t);
+    bp.Q.setValueAtTime(1.5, t);
+    // The roll: switched on and off nearly thirty times a second, inside
+    // the envelope so it stops when the sound does.
+    am.type = 'square';
+    am.frequency.setValueAtTime(28, t);
+    amg.gain.setValueAtTime(0.4, t);
+    pulse.gain.setValueAtTime(0.6, t);
+    am.connect(amg);
+    amg.connect(pulse.gain);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.12, t + 0.03);
+    g.gain.setValueAtTime(0.12, t + dur * 0.7);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(bp);
+    bp.connect(pulse);
+    pulse.connect(g);
+    out(g, x, fxBus);
+    o.start(t); o.stop(t + dur + 0.02);
+    am.start(t); am.stop(t + dur + 0.02);
+  }
+
+  // The cat shooed: an indignant little "mew!", up and down, through two
+  // vowel-like resonances so it sounds like a voice and not a whistle.
+  function meowSound(x) {
+    if (!live()) { return; }
+    var t = AC.currentTime + 0.02, dur = 0.42;
+    var o = AC.createOscillator(), g = AC.createGain();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(560, t);
+    o.frequency.exponentialRampToValueAtTime(880, t + 0.12);
+    o.frequency.exponentialRampToValueAtTime(600, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.14, t + 0.05);
+    g.gain.setValueAtTime(0.14, t + dur * 0.5);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    [[950, 4, 1], [2500, 5, 0.6]].forEach(function (fm) {
+      var bp = AC.createBiquadFilter(), lv = AC.createGain();
       bp.type = 'bandpass';
-      bp.frequency.setValueAtTime(750, t);
-      bp.Q.setValueAtTime(2, t);
-      // The buzz: the sound switched on and off thirty times a second,
-      // inside the envelope so it stops when the croak does.
-      am.type = 'square';
-      am.frequency.setValueAtTime(32, t);
-      amg.gain.setValueAtTime(0.5, t);
-      pulse.gain.setValueAtTime(0.5, t);
-      am.connect(amg);
-      amg.connect(pulse.gain);
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(0.16, t + 0.015);
-      g.gain.setValueAtTime(0.16, t + dur * 0.6);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      bp.frequency.setValueAtTime(fm[0], t);
+      bp.Q.setValueAtTime(fm[1], t);
+      lv.gain.setValueAtTime(fm[2], t);
       o.connect(bp);
-      bp.connect(pulse);
-      pulse.connect(g);
-      out(g, x, fxBus);
-      o.start(t); o.stop(t + dur + 0.02);
-      am.start(t); am.stop(t + dur + 0.02);
+      bp.connect(lv);
+      lv.connect(g);
     });
+    out(g, x, fxBus);
+    o.start(t);
+    o.stop(t + dur + 0.02);
+  }
+
+  // A splash: a burst of the airy part of the noise, and a plop under it.
+  function splashSound(x, k) {
+    if (!live() || !noise) { return; }
+    var t = AC.currentTime + 0.01, dur = 0.3 + 0.35 * k;
+    var src = AC.createBufferSource(), bp = AC.createBiquadFilter(), g = AC.createGain();
+    src.buffer = noise;
+    bp.type = 'bandpass';
+    bp.frequency.setValueAtTime(1800, t);
+    bp.frequency.exponentialRampToValueAtTime(700, t + dur);
+    bp.Q.setValueAtTime(0.8, t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.22 * k + 0.05, t + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(bp);
+    bp.connect(g);
+    out(g, x, fxBus);
+    src.start(t, Math.random() * 2);
+    src.stop(t + dur + 0.05);
+    plop(x);
   }
 
   function rainDrop(x) {
@@ -2459,12 +3193,18 @@
       var p = pellets[i];
       p.x = mx(p.x); p.y = my(p.y); p.fx = mx(p.fx); p.fy = my(p.fy); p.r *= k; p.vx *= k; p.vy *= k;
     }
-    for (i = 0; i < petals.length; i++) {
-      petals[i].x = mx(petals[i].x); petals[i].y = my(petals[i].y); petals[i].size *= k;
+    for (i = 0; i < leaves.length; i++) {
+      leaves[i].x = mx(leaves[i].x); leaves[i].y = my(leaves[i].y); leaves[i].size *= k;
     }
     lastFeed.x = mx(lastFeed.x); lastFeed.y = my(lastFeed.y);
     ripples = [];
     sparkles = [];
+    drops = [];
+    // The visitors take a turned screen as their cue to go, and come back
+    // to the new shape of pond later.
+    for (i = 0; i < fish.length; i++) { if (fish[i].leap >= 0) { fish[i].leap = -1; fish[i].z = 0.3; } }
+    if (catAround()) { cat.state = 'away'; cat.next = 20; cat.x = -999; cat.hx = -999; }
+    if (dfly.state !== 'away') { dfly.state = 'away'; dfly.next = 15; dfly.x = -999; }
     for (var id in fingers) { if (fingers.hasOwnProperty(id)) { fingers[id].alive = false; } }
     fingers = {};
   }
@@ -2490,9 +3230,10 @@
   canvas.addEventListener('pointerdown', function (e) {
     initAudio();
     var x = e.clientX, y = e.clientY;
+    // A tap on the cat is a try at shooing it, not food.
+    if (catHit(x, y)) { catTapped(x, y); return; }
     fingers[e.pointerId] = { x: x, y: y, held: 0, alive: true, rip: 0, trail: 0 };
-    if (frogHit(x, y)) { frogCroak(); }
-    frogLook(x, y);
+    dragonflyStartle(x, y);
     scatter(x, y);
     try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* not every browser */ }
   });
@@ -2595,18 +3336,20 @@
     }
     updateRipples(dt);
     updatePads(dt);
-    updatePetals(dt);
+    updateLeaves(dt);
     updateRain(dt);
     updateSparkles(dt);
-    updateFrog(dt);
+    updateDrops(dt);
+    leapCool -= dt;
+    updateCat(dt);
+    updateDragonfly(dt);
+    updateFireflies(dt);
   }
 
   updateMood(0);
   layout();
   spawnFish();
-  spawnPetals();
-  seat(frog.pad);
-  frog.x = KX; frog.y = KY;
+  spawnLeaves();
   requestAnimationFrame(frame);
 })();
 </script>

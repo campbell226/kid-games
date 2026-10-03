@@ -1340,27 +1340,20 @@
           <g fill="#f3efe6"><ellipse cx="2" cy="-5" rx="5" ry="3"/><ellipse cx="-18" cy="1" rx="4" ry="2.5"/></g>
           <circle cx="15" cy="-6.5" r="1.5" fill="#d0ccc4"/><circle cx="15" cy="6.5" r="1.5" fill="#d0ccc4"/>
         </g>
-        <g transform="translate(129 127) rotate(325) scale(0.75)">
-          <path d="M-29 0L-54-15Q-45 0-54 15Z M10-8Q4-26-8-22Q0-14 4-8Z M10 8Q4 26-8 22Q0 14 4 8Z" fill="#f6b36d" opacity="0.8"/>
-          <path d="M22 0C22-7 14-10 4-10C-10-10-22-5-30-2V2C-22 5-10 10 4 10C14 10 22 7 22 0Z" fill="#f0892e"/>
-          <g fill="#fbf3e8"><ellipse cx="6" cy="4" rx="6" ry="4"/><ellipse cx="-12" cy="-3" rx="6" ry="3.5"/></g>
-          <circle cx="15" cy="-6.5" r="1.5" fill="#1a1a1a"/><circle cx="15" cy="6.5" r="1.5" fill="#1a1a1a"/>
-        </g>
-        <!-- and one on its way -->
-        <g transform="translate(74 150) rotate(-28) scale(0.75)">
-          <path d="M-29 0L-45-10Q-39 0-45 10Z M10-8Q6-20-2-17Q2-12 4-8Z M10 8Q6 20-2 17Q2 12 4 8Z" fill="#d0a68a" opacity="0.85"/>
-          <path d="M22 0C22-7 14-10 4-10C-10-10-22-5-30-2V2C-22 5-10 10 4 10C14 10 22 7 22 0Z" fill="#93a6b9"/>
-          <g fill="#df7438"><ellipse cx="-6" cy="-8.5" rx="12" ry="2"/><ellipse cx="-6" cy="8.5" rx="12" ry="2"/></g>
-          <path d="M6-4a3 3 0 0 0 0 4M6 1a3 3 0 0 0 0 4M0-5a3 3 0 0 0 0 4M0 1a3 3 0 0 0 0 4M-6-4a3 3 0 0 0 0 4M-6 1a3 3 0 0 0 0 3M-12-3a2.5 2.5 0 0 0 0 4" fill="none" stroke="#5f7488" stroke-width="1"/>
-          <circle cx="15" cy="-6.5" r="1.5" fill="#1a1a1a"/><circle cx="15" cy="6.5" r="1.5" fill="#1a1a1a"/>
+        <!-- and one down in the deep, only a shadow -->
+        <g transform="translate(78 140) rotate(-28) scale(0.8)" opacity="0.32">
+          <path d="M-29 0L-45-10Q-39 0-45 10Z M10-8Q6-20-2-17Q2-12 4-8Z M10 8Q6 20-2 17Q2 12 4 8Z M22 0C22-7 14-10 4-10C-10-10-22-5-30-2V2C-22 5-10 10 4 10C14 10 22 7 22 0Z" fill="#163a3a"/>
         </g>
 
-        <!-- lily pads, a flower, and the frog -->
+        <!-- lily pads, two flowers -->
         <g fill="#5e8c3e" stroke="#9fc46e" stroke-width="1.2">
           <path d="M262 48L286 38A26 26 0 1 1 280 30Z"/>
           <path d="M226 64L241.6 57.4A17 17 0 1 1 238 52Z"/>
           <path d="M270 92L284 98A16 16 0 1 1 286 90Z"/>
           <path d="M52 160L70 152A20 20 0 1 1 66 146Z"/>
+          <path d="M84 168L95 165A11 11 0 1 1 93 160Z"/>
+          <path d="M150 32L162 29A12 12 0 1 1 159 23Z"/>
+          <path d="M34 92L46 88A13 13 0 1 1 43 83Z"/>
         </g>
         <g fill="#f1aec4">
           <path d="M262 40l-8-9 10 3zM262 40l9-9-2 10zM262 40l10 6-11 1zM262 40l-2 12-3-11zM262 40l-11 2 9-6z"/>
@@ -1368,19 +1361,21 @@
         </g>
         <circle cx="262" cy="40" r="3" fill="#f5c443"/>
         <circle cx="48" cy="156" r="2.6" fill="#f5c443"/>
-        <g transform="translate(266 94) rotate(200)">
-          <path d="M-5-4L1-9L-8-10M-5 4L1 9L-8 10" fill="none" stroke="#4f8a32" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-          <ellipse cx="-1" cy="0" rx="7" ry="5.5" fill="#6faa42"/>
-          <ellipse cx="5" cy="0" rx="4.5" ry="4.8" fill="#6faa42"/>
-          <circle cx="6" cy="-3" r="2" fill="#e6bf3c"/><circle cx="6" cy="3" r="2" fill="#e6bf3c"/>
-          <rect x="5.5" y="-4.2" width="1" height="2.4" fill="#1c1a14"/><rect x="5.5" y="1.8" width="1" height="2.4" fill="#1c1a14"/>
+        <!-- a dragonfly resting on a pad -->
+        <g transform="translate(272 92) rotate(-30)">
+          <g fill="#e2f1ff" fill-opacity="0.6" stroke="#5a7a8c" stroke-width="0.5">
+            <ellipse cx="2" cy="-6" rx="2" ry="6.5" transform="rotate(-18 2 -6)"/><ellipse cx="2" cy="6" rx="2" ry="6.5" transform="rotate(18 2 6)"/>
+            <ellipse cx="-1" cy="-6" rx="1.8" ry="6" transform="rotate(22 -1 -6)"/><ellipse cx="-1" cy="6" rx="1.8" ry="6" transform="rotate(-22 -1 6)"/>
+          </g>
+          <path d="M2 0H-13" stroke="#2a86b0" stroke-width="1.6" stroke-linecap="round"/>
+          <circle cx="4" cy="-0.9" r="1.2" fill="#4fc0b0"/><circle cx="4" cy="0.9" r="1.2" fill="#4fc0b0"/>
         </g>
 
-        <!-- petals afloat -->
-        <g fill="#f7c6d4">
-          <ellipse cx="92" cy="44" rx="3" ry="1.8" transform="rotate(30 92 44)"/>
-          <ellipse cx="236" cy="158" rx="3" ry="1.8" transform="rotate(-20 236 158)"/>
-          <ellipse cx="200" cy="34" rx="2.6" ry="1.6"/>
+        <!-- fallen leaves afloat -->
+        <g fill="#e2862e">
+          <path d="M96 40l3-7 1 5 4-3-2 6 5 0-6 3 2 4-5-2-1 5-2-5-4 2 2-4-5-1 5-2-2-5z"/>
+          <path d="M230 156l3-7 1 5 4-3-2 6 5 0-6 3 2 4-5-2-1 5-2-5-4 2 2-4-5-1 5-2-2-5z" fill="#c8452c"/>
+          <path d="M196 30l3-7 1 5 4-3-2 6 5 0-6 3 2 4-5-2-1 5-2-5-4 2 2-4-5-1 5-2-2-5z" fill="#d8a933"/>
         </g>
 
         <!-- stones round the edge -->
@@ -1399,6 +1394,20 @@
         <!-- a fern hanging over the corner -->
         <g fill="none" stroke="#5d8a3a" stroke-width="3" stroke-linecap="round" stroke-dasharray="2 2.5">
           <path d="M318 198Q300 180 286 176M318 198Q306 176 300 160M318 198Q292 190 276 194"/>
+        </g>
+
+        <!-- the cat, on the bank, peering in -->
+        <g transform="translate(186 191) rotate(-90)">
+          <path d="M-14 1Q-22 9-15 15Q-9 17-6 13" fill="none" stroke="#e09b55" stroke-width="3.6" stroke-linecap="round"/>
+          <ellipse cx="-6" cy="0" rx="11" ry="9.5" fill="#e09b55"/>
+          <ellipse cx="4" cy="0" rx="8" ry="6.8" fill="#e09b55"/>
+          <path d="M-13-6q2 6 0 12M-8-8q2 8 0 16M-3-7q2 7 0 14M2-5q1.5 5 0 10" fill="none" stroke="#b4662c" stroke-width="1.5" stroke-linecap="round"/>
+          <path d="M9-2.5L6-10.5L14-5.5Z M9 2.5L6 10.5L14 5.5Z" fill="#e09b55"/>
+          <path d="M9-4.5L7.5-8.5L11.5-5.8Z M9 4.5L7.5 8.5L11.5 5.8Z" fill="#eeb1a2"/>
+          <ellipse cx="12" cy="0" rx="6.2" ry="6.8" fill="#e09b55"/>
+          <ellipse cx="16" cy="0" rx="2.6" ry="3.2" fill="#f6e2c2"/>
+          <circle cx="15.4" cy="-2.8" r="1.2" fill="#a9c94c"/><circle cx="15.4" cy="2.8" r="1.2" fill="#a9c94c"/>
+          <path d="M17-1.5l5-4M17-1l6-1.5M17 1.5l5 4M17 1l6 1.5" stroke="#ffffff" stroke-width="0.5" opacity="0.8"/>
         </g>
       </svg>
       <span>Koi Pond</span>
