@@ -637,7 +637,21 @@
     { fx: 0.12, fy: 0.12, ox: 0.115, oy: 0.03, r: 0.046, flower: 1 },
     { fx: 0.86, fy: 0.86, ox: 0, oy: 0, r: 0.066 },
     { fx: 0.86, fy: 0.86, ox: -0.125, oy: 0.025, r: 0.05 },
-    { fx: 0.86, fy: 0.86, ox: -0.03, oy: -0.125, r: 0.046 }
+    { fx: 0.86, fy: 0.86, ox: -0.03, oy: -0.125, r: 0.046 },
+    { fx: 0.5, fy: 0.07, ox: 0.1, oy: 0.03, r: 0.042 },
+    { fx: 0.5, fy: 0.07, ox: -0.09, oy: 0.04, r: 0.04 },
+    { fx: 0.06, fy: 0.42, ox: 0.04, oy: 0.11, r: 0.045 },
+    { fx: 0.06, fy: 0.42, ox: 0.02, oy: -0.11, r: 0.04, flower: 1 },
+    { fx: 0.93, fy: 0.62, ox: -0.03, oy: -0.12, r: 0.048 },
+    { fx: 0.93, fy: 0.62, ox: -0.1, oy: 0.05, r: 0.04 },
+    { fx: 0.52, fy: 0.94, ox: 0, oy: 0, r: 0.055 },
+    { fx: 0.52, fy: 0.94, ox: 0.1, oy: -0.01, r: 0.042, flower: 1 },
+    { fx: 0.52, fy: 0.94, ox: -0.09, oy: 0.01, r: 0.04 },
+    // Two small islands out in the open water, somewhere to slip under
+    // between the edges.
+    { fx: 0.36, fy: 0.4, ox: 0, oy: 0, r: 0.05 },
+    { fx: 0.36, fy: 0.4, ox: 0.07, oy: 0.05, r: 0.038 },
+    { fx: 0.64, fy: 0.62, ox: 0, oy: 0, r: 0.048 }
   ];
   var pads = [], shyHome = { x: 0, y: 0 };
 
@@ -689,6 +703,7 @@
       patB = ctx.createPattern(causticB, 'repeat');
     }
     placePads();
+    buildWaves();
     // A page can be laid out before it has any width at all, so the pond
     // may first be dug at the size of a pinhead. Everything in it is
     // carried over to the real size when that arrives.
@@ -1153,6 +1168,18 @@
 
     shapeFish(f, dt);
     if (f.target && !f.target.gone) { tryEat(f, f.target); }
+
+    // Just under the top, a fish pushes the water aside as it goes and
+    // leaves a wake spreading behind it. Deeper down, nothing shows.
+    if (f.z < 0.3 && f.v > U * 0.01) {
+      var shallow = 1 - f.z / 0.3;
+      poke(f.qx[1], f.qy[1], f.half * 1.1, 0.12 * shallow * clamp(f.v / (U * 0.1), 0.2, 1.6) * dt * 60);
+    }
+    f.bubbleT = (f.bubbleT === undefined ? 2 + Math.random() * 8 : f.bubbleT) - dt;
+    if (f.bubbleT <= 0) {
+      f.bubbleT = 6 + Math.random() * 10;
+      if (f.z > 0.35) { bubbleUp(f.qx[0], f.qy[0], f.z); }
+    }
   }
 
   // Where every point of the body actually is this frame, wave included,
@@ -1304,11 +1331,13 @@
   var pellets = [], MAXP = 60;
   var flowT = Math.random() * 100, CX = 0, CY = 0;
 
-  // The surface turns slowly round the pond, with a meander on top.
+  // A garden pond has no current to speak of: only the faintest breath of
+  // air across the top, which a floating leaf shows over a minute or so
+  // and a pellet hardly at all. A stronger one read as the water flowing.
   function current(x, y) {
     var k = reduced ? 0.5 : 1;
-    CX = (-(y - PCY) * 0.012 + Math.sin(y / U * 5 + flowT * 0.3) * U * 0.004) * k;
-    CY = ((x - PCX) * 0.012 + Math.sin(x / U * 4.3 - flowT * 0.27) * U * 0.004) * k;
+    CX = (-(y - PCY) * 0.0015 + Math.sin(y / U * 5 + flowT * 0.3) * U * 0.0008) * k;
+    CY = ((x - PCX) * 0.0015 + Math.sin(x / U * 4.3 - flowT * 0.27) * U * 0.0008) * k;
   }
 
   // Floating things slide off lily pads rather than sitting on them.
@@ -1333,7 +1362,7 @@
       pellets.push({
         x: KX, y: KY, fx: x, fy: y, z: 0, vx: 0, vy: 0, air: air, airMax: air,
         age: 0, sinkAt: Math.random() < 0.32 ? 1 + Math.random() * 1.5 : 4 + Math.random() * 4,
-        sinking: false, bottom: 0, fade: 1, r: U * (0.0072 + Math.random() * 0.0012),
+        sinking: false, bottom: 0, fade: 1, r: U * (0.0048 + Math.random() * 0.0008),
         tone: Math.random(), gone: false
       });
     }
@@ -1375,9 +1404,11 @@
       }
       p.age += dt;
       if (!p.sinking) {
+        // It stays where it fell, give or take the faintest drift; the
+        // waves only rock it, which is drawn, not moved.
         current(p.x, p.y);
-        p.vx += (CX - p.vx) * Math.min(1, dt * 0.8);
-        p.vy += (CY - p.vy) * Math.min(1, dt * 0.8);
+        p.vx += (CX - p.vx) * Math.min(1, dt * 2);
+        p.vy += (CY - p.vy) * Math.min(1, dt * 2);
         p.x += p.vx * dt;
         p.y += p.vy * dt;
         offPads(p, U * 0.008);
@@ -1399,14 +1430,18 @@
 
   // ------------------------------------------------------------------
   // Ripples. Every pellet, every gulp, every finger in the water and
-  // every raindrop sends one out, and the bigger ones push floating
-  // things aside as they pass, so a handful of food spreads itself out.
+  // every raindrop sends one out. Each is two things at once: a fine,
+  // sharp ring drawn on the surface, and a dimple pressed into the water
+  // itself (see the waves below), which spreads, crosses other ripples
+  // and comes back off the bank. A passing ring nudges a leaf or a pad a
+  // little, but not the food, which stays where it fell.
   // ------------------------------------------------------------------
   var ripples = [];
 
   function addRipple(x, y, size, strength) {
     ripples.push({ x: x, y: y, r: 0, max: size, life: 0, dur: 0.8 + size / U * 10, a: strength });
     if (ripples.length > 90) { ripples.shift(); }
+    poke(x, y, Math.max(WV.cs * 1.3, size * 0.15), strength * WAVE_POKE * (0.5 + size / (U * 0.06)));
   }
 
   function pushBy(o, rp, k, dt) {
@@ -1426,13 +1461,174 @@
       rp.r = rp.max * (1 - (1 - u) * (1 - u));
       if (rp.a < 0.5) { continue; }
       var j;
-      for (j = 0; j < pellets.length; j++) {
-        var p = pellets[j];
-        if (p.air <= 0 && !p.sinking) { pushBy(p, rp, 0.9, dt); }
-      }
-      for (j = 0; j < leaves.length; j++) { pushBy(leaves[j], rp, 0.9, dt); }
-      for (j = 0; j < pads.length; j++) { pushBy(pads[j], rp, 0.05, dt); }
+      for (j = 0; j < leaves.length; j++) { pushBy(leaves[j], rp, 0.12, dt); }
+      for (j = 0; j < pads.length; j++) { pushBy(pads[j], rp, 0.03, dt); }
     }
+  }
+
+  // Bubbles. Now and then a fish down in the deep lets out a breath of
+  // them; they rise, glinting, and pop at the top in little rings, which
+  // is sometimes the only sign there is a fish there at all.
+  var bubbles = [];
+
+  function bubbleUp(x, y, z) {
+    var n = 1 + Math.floor(Math.random() * 3);
+    for (var i = 0; i < n; i++) {
+      bubbles.push({ x: x + (Math.random() - 0.5) * U * 0.012, y: y + (Math.random() - 0.5) * U * 0.012, z: z, rise: 0.35 + Math.random() * 0.15 });
+    }
+  }
+
+  function updateBubbles(dt) {
+    for (var i = bubbles.length - 1; i >= 0; i--) {
+      var b = bubbles[i];
+      b.z -= b.rise * dt;
+      if (b.z <= 0) {
+        addRipple(b.x, b.y, U * 0.018, 0.5);
+        bubbles.splice(i, 1);
+      }
+    }
+  }
+
+  function drawBubbles() {
+    for (var i = 0; i < bubbles.length; i++) {
+      var b = bubbles[i], s = seen(b.z), r = U * (0.002 + 0.002 * (1 - b.z));
+      ctx.fillStyle = 'rgba(235,250,255,' + (0.15 + 0.6 * s).toFixed(3) + ')';
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, r, 0, TAU);
+      ctx.fill();
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Waves. The surface of the pond is a sheet of water simulated on a
+  // coarse grid: each point is pulled level by its neighbours, overshoots
+  // and swings back, which is all a ripple is. Anything that touches the
+  // water presses a dimple into it and the rings spread from there by
+  // themselves, cross one another, and come back off the bank. A fish
+  // swimming just under the top drags a wake behind it the same way. The
+  // lily pads lie flat on the water and calm it where they are.
+  //
+  // The sheet is drawn by its slopes, lit from the top left: water tilted
+  // towards the light catches it, water tilted away is in shade. The grid
+  // is far coarser than the screen and is smoothed when it is scaled up,
+  // which is what keeps it cheap enough to run on a phone.
+  // ------------------------------------------------------------------
+  var WV = { cs: 4, gw: 0, gh: 0, a: null, b: null, damp: null, wet: null, can: null, g: null, img: null, acc: 0, padT: 0, wake: 0 };
+  var WAVE_C2 = 0.1, WAVE_DAMP = 0.988, PAD_DAMP = 0.93, WAVE_GAIN = 0.45, WAVE_POKE = 1.1;
+
+  function buildWaves() {
+    var cs = Math.max(3, U / 110), i, j;
+    WV.cs = cs;
+    WV.gw = Math.ceil(W / cs) + 2;
+    WV.gh = Math.ceil(H / cs) + 2;
+    var n = WV.gw * WV.gh;
+    WV.a = new Float32Array(n);
+    WV.b = new Float32Array(n);
+    WV.damp = new Float32Array(n);
+    WV.wet = new Uint8Array(n);
+    for (j = 1; j < WV.gh - 1; j++) {
+      for (i = 1; i < WV.gw - 1; i++) {
+        WV.wet[j * WV.gw + i] = edgeDist((i + 0.5) * cs, (j + 0.5) * cs) > -cs ? 1 : 0;
+      }
+    }
+    WV.can = document.createElement('canvas');
+    WV.can.width = WV.gw;
+    WV.can.height = WV.gh;
+    WV.g = WV.can.getContext('2d');
+    WV.img = WV.g.createImageData(WV.gw, WV.gh);
+    padDamp();
+  }
+
+  // Calm water under the pads, open water everywhere else.
+  function padDamp() {
+    if (!WV.damp) { return; }
+    var cs = WV.cs, gw = WV.gw, gh = WV.gh, i, j, k;
+    WV.damp.fill(WAVE_DAMP);
+    for (k = 0; k < pads.length; k++) {
+      var p = pads[k], r = p.r / cs, ci = p.x / cs, cj = p.y / cs;
+      for (j = Math.max(1, Math.floor(cj - r)); j <= Math.min(gh - 2, Math.ceil(cj + r)); j++) {
+        for (i = Math.max(1, Math.floor(ci - r)); i <= Math.min(gw - 2, Math.ceil(ci + r)); i++) {
+          var dx = i + 0.5 - ci, dy = j + 0.5 - cj;
+          if (dx * dx + dy * dy < r * r) { WV.damp[j * gw + i] = PAD_DAMP; }
+        }
+      }
+    }
+  }
+
+  // Press a soft dimple into the water at x, y.
+  function poke(x, y, r, amt) {
+    if (!WV.a || amt === 0) { return; }
+    var cs = WV.cs, gw = WV.gw, gh = WV.gh, ci = x / cs, cj = y / cs, rr = r / cs, R = Math.ceil(rr * 2), i, j;
+    for (j = Math.max(1, Math.floor(cj - R)); j <= Math.min(gh - 2, Math.ceil(cj + R)); j++) {
+      for (i = Math.max(1, Math.floor(ci - R)); i <= Math.min(gw - 2, Math.ceil(ci + R)); i++) {
+        var k = j * gw + i;
+        if (!WV.wet[k]) { continue; }
+        var dx = i + 0.5 - ci, dy = j + 0.5 - cj;
+        WV.a[k] -= amt * Math.exp(-(dx * dx + dy * dy) / (rr * rr));
+      }
+    }
+  }
+
+  // The slope of the water at a point, left in SX, SY, so floating
+  // things can be drawn rocking on it.
+  var SX = 0, SY = 0;
+  function waveSlope(x, y) {
+    SX = 0; SY = 0;
+    if (!WV.a) { return; }
+    var gw = WV.gw, i = Math.floor(x / WV.cs), j = Math.floor(y / WV.cs);
+    if (i < 1 || j < 1 || i > gw - 2 || j > WV.gh - 2) { return; }
+    var k = j * gw + i, a = WV.a;
+    SX = a[k + 1] - a[k - 1];
+    SY = a[k + gw] - a[k - gw];
+  }
+
+  function stepWaves(dt) {
+    if (!WV.a || lowPower) { return; }
+    WV.padT -= dt;
+    if (WV.padT <= 0) { WV.padT = 1; padDamp(); }
+    WV.acc += dt;
+    var steps = 0;
+    while (WV.acc >= 1 / 60 && steps < 3) { WV.acc -= 1 / 60; steps++; waveStep(); }
+    if (steps === 3) { WV.acc = 0; }
+  }
+
+  function waveStep() {
+    var a = WV.a, b = WV.b, gw = WV.gw, gh = WV.gh, damp = WV.damp, wet = WV.wet, c2 = WAVE_C2 * (reduced ? 0.6 : 1);
+    for (var j = 1; j < gh - 1; j++) {
+      var row = j * gw;
+      for (var i = 1; i < gw - 1; i++) {
+        var k = row + i;
+        if (!wet[k]) { b[k] = 0; continue; }
+        b[k] = (2 * a[k] - b[k] + c2 * (a[k - 1] + a[k + 1] + a[k - gw] + a[k + gw] - 4 * a[k])) * damp[k];
+      }
+    }
+    WV.a = b;
+    WV.b = a;
+  }
+
+  function drawWaves() {
+    if (!WV.a || lowPower) { return; }
+    var a = WV.a, d = WV.img.data, gw = WV.gw, gh = WV.gh, wet = WV.wet;
+    var lit = 110 + 60 * clamp(mood.caus * 4, 0, 1) * (1 - mood.night * 0.6), gain = WAVE_GAIN;
+    for (var j = 1; j < gh - 1; j++) {
+      var row = j * gw;
+      for (var i = 1; i < gw - 1; i++) {
+        var k = row + i, p = k * 4;
+        if (!wet[k]) { d[p + 3] = 0; continue; }
+        // Facing the light (up and to the left) or turned away from it.
+        var v = ((a[k + 1] - a[k - 1]) * 0.6 + (a[k + gw] - a[k - gw]) * 0.8) * gain;
+        if (v > 0) {
+          d[p] = 255; d[p + 1] = 255; d[p + 2] = 248;
+          d[p + 3] = v > 1 ? lit : v * lit;
+        } else {
+          d[p] = 6; d[p + 1] = 24; d[p + 2] = 28;
+          d[p + 3] = v < -1 ? 110 : -v * 110;
+        }
+      }
+    }
+    WV.g.putImageData(WV.img, 0, 0);
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(WV.can, 0, 0, gw, gh, 0, 0, gw * WV.cs, gh * WV.cs);
   }
 
   // ------------------------------------------------------------------
@@ -1519,12 +1715,12 @@
 
   function updateRain(dt) {
     if (mood.rain < 0.02) { rainAcc = 0; return; }
-    rainAcc += dt * 20 * mood.rain * (reduced ? 0.5 : 1);
+    rainAcc += dt * 28 * mood.rain * (reduced ? 0.5 : 1);
     while (rainAcc >= 1) {
       rainAcc -= 1;
       var x = PX0 + Math.random() * (PX1 - PX0), y = PY0 + Math.random() * (PY1 - PY0);
       if (edgeDist(x, y) < U * 0.01) { continue; }
-      addRipple(x, y, U * (0.014 + Math.random() * 0.02), 0.28);
+      addRipple(x, y, U * (0.014 + Math.random() * 0.02), 0.36);
       if (Math.random() < 0.3) { rainDrop(x); }
     }
   }
@@ -1902,24 +2098,34 @@
     }
   }
 
+  // The fine rings on top of the waves. Each crest catches the light on
+  // the side facing it, up and to the left, and is shaded on the far
+  // side, so a ring looks raised rather than drawn on. A bigger ripple is
+  // a little train of rings, each fainter than the one before, and every
+  // ring thins and fades as it spreads, the way its energy does.
+  var LIT = -Math.PI * 0.75;
   function drawRipples() {
-    var lw = Math.max(1, U * 0.0028);
-    ctx.lineWidth = lw;
+    var base = Math.max(0.8, U * 0.0026);
     for (var i = 0; i < ripples.length; i++) {
-      var rp = ripples[i], u = rp.life / rp.dur, a = rp.a * Math.pow(1 - u, 1.5);
+      var rp = ripples[i], u = rp.life / rp.dur, a = rp.a * Math.pow(1 - u, 1.4);
       if (rp.r < 1 || a < 0.01) { continue; }
-      ctx.strokeStyle = 'rgba(255,255,255,' + (a * 0.55).toFixed(3) + ')';
-      ctx.beginPath();
-      ctx.arc(rp.x, rp.y, rp.r, 0, TAU);
-      if (rp.max > U * 0.04 && rp.r * 0.62 > lw * 2) {
-        ctx.moveTo(rp.x + rp.r * 0.62, rp.y);
-        ctx.arc(rp.x, rp.y, rp.r * 0.62, 0, TAU);
-      }
-      ctx.stroke();
-      if (rp.r > lw * 3) {
-        ctx.strokeStyle = 'rgba(10,30,30,' + (a * 0.22).toFixed(3) + ')';
+      var trains = rp.max > U * 0.04 ? 3 : 1, gap = Math.max(base * 3, rp.max * 0.16);
+      for (var n = 0; n < trains; n++) {
+        var r = rp.r - n * gap;
+        if (r < base * 2) { break; }
+        var k = a * (1 - n * 0.3), lw = base * (1.2 - 0.5 * u);
+        ctx.lineWidth = lw;
+        ctx.strokeStyle = 'rgba(255,255,250,' + (k * 0.6).toFixed(3) + ')';
         ctx.beginPath();
-        ctx.arc(rp.x, rp.y, rp.r - lw * 1.5, 0, TAU);
+        ctx.arc(rp.x, rp.y, r, LIT - 1.9, LIT + 1.9);
+        ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,255,250,' + (k * 0.2).toFixed(3) + ')';
+        ctx.beginPath();
+        ctx.arc(rp.x, rp.y, r, LIT + 1.9, LIT + TAU - 1.9);
+        ctx.stroke();
+        ctx.strokeStyle = 'rgba(6,24,28,' + (k * 0.3).toFixed(3) + ')';
+        ctx.beginPath();
+        ctx.arc(rp.x, rp.y, r - lw * 1.4, LIT + Math.PI - 1.6, LIT + Math.PI + 1.6);
         ctx.stroke();
       }
     }
@@ -2096,9 +2302,11 @@
     if (order.length !== fish.length) { order = fish.slice(); }
     order.sort(function (a, b) { return b.z - a.z; });
     for (i = 0; i < order.length; i++) { if (order[i].leap < 0) { drawFish(order[i]); } }
+    drawBubbles();
 
     drawSky(dt);
     drawMoon();
+    drawWaves();
     drawRipples();
 
     for (i = 0; i < pellets.length; i++) {
@@ -2108,7 +2316,8 @@
         var a = pelletAirPos(p);
         drawPellet(a.x, a.y, p.r * (1 + a.h * 0.8), PELLET, 1);
       } else {
-        drawPellet(p.x, p.y + (reduced ? 0 : Math.sin(drawClock * 2 + p.tone * 6) * U * 0.0006), p.r, PELLET, 1);
+        waveSlope(p.x, p.y);
+        drawPellet(p.x + SX * U * 0.002, p.y + SY * U * 0.002, p.r, PELLET, 1);
       }
     }
     for (i = 0; i < leaves.length; i++) { drawLeaf(leaves[i]); }
@@ -3340,6 +3549,7 @@
     ripples = [];
     sparkles = [];
     drops = [];
+    bubbles = [];
     // The visitors take a turned screen as their cue to go, and come back
     // to the new shape of pond later.
     for (i = 0; i < fish.length; i++) { if (fish[i].leap >= 0) { fish[i].leap = -1; fish[i].z = 0.3; } }
@@ -3476,6 +3686,8 @@
       steer(f, dt);
     }
     updateRipples(dt);
+    updateBubbles(dt);
+    stepWaves(dt);
     updatePads(dt);
     updateLeaves(dt);
     updateRain(dt);
