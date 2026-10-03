@@ -1121,10 +1121,10 @@
       }
     }
     // And the bank, felt for a little way ahead.
-    var ed = edgeDist(hx, hy), wallR = f.L * 0.9;
+    var wallK = f.mode === "food" && f.target && edgeDist(f.target.x, f.target.y) < f.L * 1.2 ? 0.25 : 1, ed = edgeDist(hx, hy), wallR = f.L * 0.9 * wallK;
     if (ed < wallR) { edgeNormal(hx, hy); ax += NX * (1 - ed / wallR) * 2.2; ay += NY * (1 - ed / wallR) * 2.2; }
     var lx = hx + Math.cos(f.a) * f.L * 0.7, ly = hy + Math.sin(f.a) * f.L * 0.7;
-    if (edgeDist(lx, ly) < f.L * 0.35) { edgeNormal(lx, ly); ax += NX * 1.2; ay += NY * 1.2; }
+    if (wallK === 1 && edgeDist(lx, ly) < f.L * 0.35) { edgeNormal(lx, ly); ax += NX * 1.2; ay += NY * 1.2; }
 
     var want = Math.atan2(uy + ay * 1.3, ux + ax * 1.3);
     var turn = (1.1 + 2.6 * urg) * Math.sqrt(0.17 / f.k.len);
@@ -1280,7 +1280,7 @@
   function leapHeight(f) { return f.leap >= 0 ? Math.sin(Math.PI * clamp(f.leap, 0, 1)) : 0; }
 
   function tryEat(f, p) {
-    var dx = p.x - f.qx[0], dy = p.y - f.qy[0], r = f.half * 0.9 + U * 0.008;
+    var dx = p.x - f.qx[0], dy = p.y - f.qy[0], r = f.half * 0.9 + U * 0.012;
     if (dx * dx + dy * dy > r * r) { return; }
     var pz = p.z >= 1 ? 0.9 : p.z;
     if (Math.abs(f.z - pz) > (p.z < 0.05 ? 0.12 : 0.2)) { return; }
@@ -1355,14 +1355,14 @@
   }
 
   function scatter(x, y) {
-    keepIn(x, y, U * 0.05);
+    keepIn(x, y, U * 0.07);
     x = KX; y = KY;
     // Thrown round the fingertip rather than under it, where it could not
     // be seen landing.
     var n = 5 + Math.floor(Math.random() * 2), i, a0 = Math.random() * TAU, FR = fingerR();
     for (i = 0; i < n; i++) {
       var a = a0 + (i + Math.random() * 0.7) / n * TAU, r = FR * 0.9 + Math.random() * U * 0.06;
-      keepIn(x + Math.cos(a) * r, y + Math.sin(a) * r, U * 0.035);
+      keepIn(x + Math.cos(a) * r, y + Math.sin(a) * r, U * 0.055);
       var air = 0.12 + i * 0.045 + Math.random() * 0.06;
       pellets.push({
         x: KX, y: KY, fx: x, fy: y, z: 0, vx: 0, vy: 0, air: air, airMax: air,
@@ -1428,7 +1428,7 @@
         if (p.bottom > 25) { p.fade -= dt / 5; }
         if (p.fade <= 0) { p.gone = true; }
       }
-      keepIn(p.x, p.y, U * 0.03);
+      keepIn(p.x, p.y, U * 0.05);
       p.x = KX; p.y = KY;
     }
   }
@@ -2449,20 +2449,28 @@
     state: 'away', next: 30 + Math.random() * 25, t: 0, s: 0, dir: 1, run: 0,
     x: -999, y: -999, a: 0, aim: 0, head: 0, hx: -999, hy: -999, lookX: 0, lookY: 0,
     sx: 0, sy: 0, ex: 0, ey: 0, stride: 0, moving: 0, sit: 0, crouch: 0, flat: 0,
-    dab: -1, dabbed: false, visit: 0, tail: 0, flick: 0, taps: 0, tapAt: -9, clock: 0
+    dab: -1, dabbed: false, visit: 0, tail: 0, flick: 0, taps: 0, tapAt: -9, clock: 0,
+    goalS: 0, fu: 0, fdur: 1, fh: 0, tumble: 0, pounced: false, wet: 0, shakeP: 0, rip: 0, dripT: 0
   };
 
   function catLen() { return U * 0.18; }
 
   function catAround() { return cat.state !== 'away'; }
 
+  function catInWater() {
+    var s = cat.state;
+    return s === 'pounce' || s === 'fall' || s === 'swim' || s === 'climb';
+  }
+
   // How frightening the cat is at a point: nothing when it is away, most
-  // right in front of its face, more while it is crouching to pounce.
+  // right in front of its face, more while it is crouching to pounce, and
+  // most of all when it is actually in the pond.
   function catThreatAt(x, y) {
     if (!catAround()) { return 0; }
-    var level = cat.state === 'stalk' || cat.state === 'dab' ? 1
-      : cat.state === 'shoo' || cat.state === 'leave' ? 0.5 : 0.8;
-    var R = U * (0.32 + 0.12 * cat.crouch);
+    var s = cat.state, wetNow = catInWater();
+    var level = wetNow || s === 'stalk' || s === 'dab' ? 1
+      : s === 'shoo' || s === 'leave' || s === 'shake' ? 0.5 : 0.8;
+    var R = U * (wetNow ? 0.42 : 0.32 + 0.12 * cat.crouch);
     var dx = x - cat.hx, dy = y - cat.hy, d = Math.sqrt(dx * dx + dy * dy);
     return level * (1 - smooth(clamp(d / R, 0, 1)));
   }
@@ -2491,6 +2499,7 @@
     cat.dir = Math.random() < 0.5 ? 1 : -1;
     cat.visit = 25 + Math.random() * 25;
     cat.taps = 0;
+    cat.pounced = false;
     catGo('enter');
   }
 
@@ -2508,36 +2517,97 @@
   function catNext() {
     if (cat.visit <= 0 || mood.rain > 0.2) { catLeave(false); return; }
     var r = Math.random(), q = catQuarry();
-    if (q && r < 0.45) { catGo('stalk', 3 + Math.random() * 3); }
-    else if (r < 0.75) { catGo('sit', 4 + Math.random() * 5); }
-    else {
+    if (q && r < 0.45) {
+      catGo('stalk', 3 + Math.random() * 3);
+      // Real cats chatter their teeth at prey they cannot reach.
+      if (Math.random() < 0.5) { catVoice(cat.x, 'chatter'); }
+    } else if (r < 0.75) {
+      catGo('sit', 4 + Math.random() * 5);
+      if (Math.random() < 0.2) { catVoice(cat.x, 'purr'); }
+    } else {
       if (Math.random() < 0.35) { cat.dir = -cat.dir; }
       catGo('patrol', 3 + Math.random() * 4);
     }
   }
 
   function catHit(x, y) {
-    if (!catAround() || cat.state === 'shoo' || cat.state === 'leave') { return false; }
+    var s = cat.state;
+    if (!catAround() || s === 'shoo' || s === 'leave' || s === 'shake' || catInWater()) { return false; }
     var dx = x - cat.x, dy = y - cat.y;
     return dx * dx + dy * dy < Math.pow(catLen() * 0.75, 2);
   }
 
+  // A tap on the cat does one of three things. Seldom, it shoos it: off
+  // it goes, ears flat, and once in a while it is in such a hurry that
+  // it slips and falls in the pond. Otherwise it is either put out and
+  // stalks off to another part of the bank, grumbling, or it simply looks
+  // round at you, flicks its tail, says something, and stays put. Each
+  // tap makes the next likelier to shoo it.
   function catTapped(x, y) {
     if (cat.clock - cat.tapAt > 5) { cat.taps = 0; }
     cat.taps += 1;
     cat.tapAt = cat.clock;
+    var onRim = cat.state !== 'enter';
     if (Math.random() < Math.min(0.7, 0.12 + 0.12 * (cat.taps - 1))) {
-      // Off it goes, ears flat, low and quick.
       cat.flat = 1;
-      meowSound(cat.x);
+      if (onRim && Math.random() < 0.15) { catFallIn(); return; }
+      catVoice(cat.x, ['meow', 'mewHigh', 'mrow']);
       catLeave(true);
+    } else if (onRim && cat.state !== 'move' && Math.random() < 0.45) {
+      cat.flat = 0.6;
+      cat.lookX = x; cat.lookY = y;
+      catVoice(cat.x, ['mrow', 'grumble']);
+      cat.goalS = cat.s + (Math.random() < 0.5 ? 1 : -1) * rimLen * (0.2 + Math.random() * 0.25);
+      catGo('move');
     } else {
-      // Not today. It looks round at you, flicks its tail, and stays.
       cat.lookX = x; cat.lookY = y;
       cat.flick = 1;
-      mrrpSound(cat.x);
+      catVoice(cat.x, ['mrrp', 'trill', 'mewQ']);
       if (cat.state === 'patrol' || cat.state === 'stalk') { catGo('sit', 3 + Math.random() * 3); }
     }
+  }
+
+  // Everything near a splash bolts.
+  function scareFish(px, py, R) {
+    for (var k = 0; k < fish.length; k++) {
+      var f = fish[k], fx = f.px[0] - px, fy = f.py[0] - py, fd = Math.sqrt(fx * fx + fy * fy) || 1;
+      if (fd < R && f.leap < 0) {
+        f.fear = 1;
+        keepIn(f.px[0] + fx / fd * R, f.py[0] + fy / fd * R, f.L);
+        f.rx = KX; f.ry = KY; f.retreat = 0.9; f.wantLeap = 0;
+        f.target = null; f.mode = 'wander';
+      }
+    }
+  }
+
+  // Rarely, from a stalk, the cat launches itself into the pond after the
+  // fish it has been watching. It lands with a great splash a little way
+  // out, and by then every fish is long gone.
+  function catPounce(q) {
+    var c = cat;
+    c.pounced = true;
+    c.fsx = c.x; c.fsy = c.y;
+    keepIn(q.qx[2], q.qy[2], U * 0.08);
+    var dx = KX - c.x, dy = KY - c.y, d = Math.sqrt(dx * dx + dy * dy) || 1, far = U * 0.26;
+    if (d > far) { KX = c.x + dx / d * far; KY = c.y + dy / d * far; }
+    c.fex = KX; c.fey = KY;
+    c.a = Math.atan2(c.fey - c.fsy, c.fex - c.fsx);
+    c.fdur = 0.55; c.fu = 0; c.tumble = 0; c.run = 0;
+    catVoice(c.x, 'chirp');
+    catGo('pounce');
+  }
+
+  // Shooed in too much of a hurry: it scrabbles, slips, and tumbles in
+  // just off the bank.
+  function catFallIn() {
+    var c = cat;
+    rimAt(c.s);
+    c.fsx = c.x; c.fsy = c.y;
+    c.fex = RX + Math.cos(RW) * (BANK * 0.4 + U * 0.06);
+    c.fey = RY + Math.sin(RW) * (BANK * 0.4 + U * 0.06);
+    c.fdur = 0.45; c.fu = 0; c.tumble = (Math.random() < 0.5 ? 1 : -1) * 8; c.run = 1;
+    catVoice(c.x, 'yowl');
+    catGo('fall');
   }
 
   function updateCat(dt) {
@@ -2545,6 +2615,7 @@
     c.clock += dt;
     c.flick = Math.max(0, c.flick - dt * 1.5);
     c.flat = Math.max(0, c.flat - dt * 0.5);
+    c.wet = Math.max(0, c.wet - dt / 25);
     if (c.state === 'away') {
       c.next -= dt;
       if (c.next <= 0) {
@@ -2580,6 +2651,68 @@
       goal = c.dir > 0 ? RA : RA + Math.PI;
       moving = 1;
       if (c.t <= 0) { catNext(); }
+    } else if (c.state === 'move') {
+      // Put out, it takes itself off briskly along the bank and settles
+      // somewhere else.
+      var ds = c.goalS - c.s, stp = Math.min(Math.abs(ds), walk * 1.8 * dt) * (ds < 0 ? -1 : 1);
+      c.s += stp;
+      rimAt(c.s);
+      c.x = RX; c.y = RY;
+      goal = stp >= 0 ? RA : RA + Math.PI;
+      moving = 1.6;
+      if (Math.abs(ds) < 2) { catGo('sit', 3 + Math.random() * 4); }
+    } else if (c.state === 'pounce' || c.state === 'fall') {
+      // In the air: out over the water and down with a splash.
+      c.fu = Math.min(1, c.fu + dt / c.fdur);
+      c.x = lerp(c.fsx, c.fex, c.fu); c.y = lerp(c.fsy, c.fey, c.fu);
+      c.fh = Math.sin(Math.PI * c.fu) * (c.state === 'pounce' ? 1 : 0.4);
+      c.a += c.tumble * dt;
+      moving = c.state === 'pounce' ? 0 : 2;
+      goal = c.a;
+      if (c.fu >= 1) {
+        c.fh = 0; c.wet = 1;
+        splash(c.x, c.y, c.state === 'pounce' ? 1.2 : 0.9);
+        scareFish(c.x, c.y, U * 0.38);
+        catGo('swim', 20);
+      }
+    } else if (c.state === 'swim') {
+      // Paddling back, head up and ears flat, to where it went in.
+      rimAt(c.s);
+      var ex2 = RX + Math.cos(RW) * BANK * 0.35, ey2 = RY + Math.sin(RW) * BANK * 0.35;
+      var sx2 = ex2 - c.x, sy2 = ey2 - c.y, sd = Math.sqrt(sx2 * sx2 + sy2 * sy2) || 1;
+      goal = Math.atan2(sy2, sx2);
+      if (Math.abs(wrapAngle(goal - c.a)) < 1.4) {
+        var sw = Math.min(sd, U * 0.07 * dt);
+        c.x += sx2 / sd * sw; c.y += sy2 / sd * sw;
+      }
+      moving = 1.3;
+      c.rip -= dt;
+      if (c.rip <= 0) { c.rip = 0.32; addRipple(c.x + Math.cos(c.a) * CL * 0.3, c.y + Math.sin(c.a) * CL * 0.3, U * 0.05, 0.6); }
+      poke(c.x, c.y, CL * 0.2, 0.25 * dt * 60);
+      if (sd < U * 0.015 || c.t <= 0) { c.fsx = c.x; c.fsy = c.y; catGo('climb', 0.6); }
+    } else if (c.state === 'climb') {
+      // Scrambling out onto the bank.
+      rimAt(c.s);
+      var cu = clamp(1 - c.t / 0.6, 0, 1);
+      c.x = lerp(c.fsx, RX, cu); c.y = lerp(c.fsy, RY, cu);
+      goal = Math.atan2(RY - c.fsy, RX - c.fsx);
+      moving = 2;
+      if (c.t <= 0) { c.shakeP = 0; catGo('shake', 1.4); shakeSound(c.x); }
+    } else if (c.state === 'shake') {
+      // A good shake, drops flying everywhere, then off, damp and cross.
+      rimAt(c.s);
+      c.x = RX; c.y = RY;
+      c.shakeP += dt * TAU * 8;
+      c.dripT -= dt;
+      if (c.dripT <= 0 && !reduced) {
+        c.dripT = 0.05;
+        var da = Math.random() * TAU, sp = U * (0.1 + Math.random() * 0.25);
+        drops.push({ x: c.x, y: c.y, vx: Math.cos(da) * sp, vy: Math.sin(da) * sp, h: 0.2, vh: 0.4 + Math.random() * 0.6 });
+      }
+      if (c.t <= 0) {
+        if (c.run) { catLeave(true); }
+        else { catVoice(c.x, 'grumble'); catLeave(false); }
+      }
     } else {
       // Sitting, stalking or dabbing: it turns to face the water, or
       // whatever it is watching in it.
@@ -2595,7 +2728,9 @@
       } else if (c.state === 'stalk') {
         crouchW = 1;
         if (c.t <= 0) {
-          if (Math.random() < 0.55) { c.dab = 0; c.dabbed = false; catGo('dab', 0.9); }
+          var prey = catQuarry();
+          if (prey && !c.pounced && !reduced && Math.random() < 0.2) { catPounce(prey); }
+          else if (Math.random() < 0.55) { c.dab = 0; c.dabbed = false; catGo('dab', 0.9); }
           else { catNext(); }
         }
       } else if (c.state === 'dab') {
@@ -2606,15 +2741,7 @@
           c.dabbed = true;
           var px = c.x + Math.cos(c.a) * CL * 0.85, py = c.y + Math.sin(c.a) * CL * 0.85;
           splash(px, py, 0.35);
-          for (k = 0; k < fish.length; k++) {
-            var f = fish[k], fx = f.px[0] - px, fy = f.py[0] - py, fd = Math.sqrt(fx * fx + fy * fy) || 1;
-            if (fd < U * 0.3 && f.leap < 0) {
-              f.fear = 1;
-              keepIn(f.px[0] + fx / fd * U * 0.3, f.py[0] + fy / fd * U * 0.3, f.L);
-              f.rx = KX; f.ry = KY; f.retreat = 0.9; f.wantLeap = 0;
-              f.target = null; f.mode = 'wander';
-            }
-          }
+          scareFish(px, py, U * 0.3);
         }
         if (c.t <= 0) { c.dab = -1; catGo('sit', 2 + Math.random() * 3); }
       }
@@ -2626,8 +2753,8 @@
     c.stride += dt * TAU * 1.6 * c.moving * (reduced ? 0.6 : 1);
     c.tail += dt * (c.crouch > 0.5 ? 9 : 1.6) * (reduced ? 0.4 : 1);
     // Its head turns towards what it is looking at, within reason.
-    var want = c.state === 'patrol' || c.state === 'enter' || c.state === 'leave' || c.state === 'shoo'
-      ? (c.flick > 0 ? Math.atan2(c.lookY - c.y, c.lookX - c.x) : c.a) : Math.atan2(c.lookY - c.y, c.lookX - c.x);
+    var going = c.state !== 'sit' && c.state !== 'stalk' && c.state !== 'dab';
+    var want = going ? (c.flick > 0 ? Math.atan2(c.lookY - c.y, c.lookX - c.x) : c.a) : Math.atan2(c.lookY - c.y, c.lookX - c.x);
     var hd = clamp(wrapAngle(want - c.a), -1, 1);
     c.head += (hd - c.head) * Math.min(1, dt * 4);
     var reach = CL * (0.42 + 0.08 * c.crouch);
@@ -2638,19 +2765,28 @@
   function drawCat() {
     var c = cat;
     if (c.state === 'away') { return; }
-    var CL = catLen(), sit = c.sit, cr = c.crouch, flat = Math.max(c.flat, c.state === 'shoo' ? 1 : 0);
-    var GINGER = '#e09b55', STRIPE = '#b4662c', CREAM = '#f6e2c2', i, e;
+    var CL = catLen(), sit = c.sit, cr = c.crouch, i, e;
+    var flat = Math.max(c.flat, c.state === 'shoo' || c.wet > 0.3 ? 1 : 0);
+    // A wet cat is darker, and a soaked one flat-eared and sorry for itself.
+    var GINGER = rgba(mix(hex('#e09b55'), [70, 45, 25], c.wet * 0.4));
+    var STRIPE = rgba(mix(hex('#b4662c'), [50, 30, 15], c.wet * 0.4));
+    var CREAM = rgba(mix(hex('#f6e2c2'), [120, 100, 80], c.wet * 0.4));
+    if (c.state === 'swim') { drawCatSwimming(c, CL, GINGER, STRIPE, CREAM); return; }
+    var lift = 1 + 0.35 * (c.fh || 0);
     ctx.save();
     ctx.translate(c.x, c.y);
     ctx.rotate(c.a);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    // Shadow.
+    // Shadow, thrown out across the water while it is in the air.
+    var so = (c.fh || 0) * U * 0.1;
     ctx.fillStyle = 'rgba(15,25,12,' + (0.25 * shadowStrength()).toFixed(3) + ')';
     ctx.beginPath();
-    ctx.ellipse(-CL * 0.02 + CL * 0.06, CL * 0.08, CL * (0.42 - 0.1 * sit), CL * (0.18 + 0.06 * sit), 0, 0, TAU);
+    ctx.ellipse(-CL * 0.02 + CL * 0.06 + so, CL * 0.08 + so * 0.5, CL * (0.42 - 0.1 * sit), CL * (0.18 + 0.06 * sit), 0, 0, TAU);
     ctx.fill();
+    ctx.scale(lift, lift);
+    if (c.state === 'shake') { ctx.rotate(Math.sin(c.shakeP) * 0.22 * clamp(c.t / 1.4, 0, 1)); }
 
     // The tail: a soft curve behind it as it walks, wrapped round its
     // feet when it sits, and held low and straight with the tip
@@ -2791,6 +2927,73 @@
       }
     }
     ctx.stroke();
+    ctx.restore();
+  }
+
+  // The cat in the pond: only its head and the line of its back above
+  // the water, ears flat, paddling, with the rest of it a dim shape under
+  // the surface and its tail trailing out behind.
+  function drawCatSwimming(c, CL, GINGER, STRIPE, CREAM) {
+    var e, pad = Math.sin(c.stride * 1.5);
+    ctx.save();
+    ctx.translate(c.x, c.y);
+    ctx.rotate(c.a);
+    ctx.lineCap = 'round';
+    // Under the water: body, paddling legs and tail, all tinted by it.
+    var under = rgba(mix(hex('#c88a4c'), mood.deep, 0.55), 0.6);
+    ctx.fillStyle = under;
+    ctx.strokeStyle = under;
+    ctx.beginPath();
+    ctx.ellipse(-CL * 0.12, 0, CL * 0.3, CL * 0.14, 0, 0, TAU);
+    ctx.fill();
+    ctx.lineWidth = CL * 0.06;
+    ctx.beginPath();
+    for (e = -1; e <= 1; e += 2) {
+      ctx.moveTo(CL * 0.12, e * CL * 0.1);
+      ctx.lineTo(CL * (0.22 + 0.06 * pad * e), e * CL * 0.2);
+      ctx.moveTo(-CL * 0.28, e * CL * 0.1);
+      ctx.lineTo(-CL * (0.3 + 0.06 * pad * e), e * CL * 0.2);
+    }
+    ctx.moveTo(-CL * 0.42, 0);
+    ctx.quadraticCurveTo(-CL * 0.6, Math.sin(c.tail * 2) * CL * 0.1, -CL * 0.78, Math.sin(c.tail * 2 - 1) * CL * 0.12);
+    ctx.stroke();
+    // Above it: a wet streak of back and the head.
+    ctx.fillStyle = GINGER;
+    ctx.beginPath();
+    ctx.ellipse(-CL * 0.02, 0, CL * 0.14, CL * 0.06, 0, 0, TAU);
+    ctx.fill();
+    ctx.translate(CL * 0.24, 0);
+    for (e = -1; e <= 1; e += 2) {
+      ctx.fillStyle = GINGER;
+      ctx.beginPath();
+      ctx.moveTo(-CL * 0.05, e * CL * 0.05);
+      ctx.lineTo(-CL * 0.16, e * CL * 0.15);
+      ctx.lineTo(CL * 0.03, e * CL * 0.12);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.beginPath();
+    ctx.ellipse(0, 0, CL * 0.13, CL * 0.14, 0, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = CREAM;
+    ctx.beginPath();
+    ctx.ellipse(CL * 0.08, 0, CL * 0.05, CL * 0.065, 0, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = '#e48b96';
+    ctx.beginPath();
+    ctx.moveTo(CL * 0.13, 0); ctx.lineTo(CL * 0.11, -CL * 0.016); ctx.lineTo(CL * 0.11, CL * 0.016); ctx.closePath();
+    ctx.fill();
+    // Eyes wide.
+    for (e = -1; e <= 1; e += 2) {
+      ctx.fillStyle = '#a9c94c';
+      ctx.beginPath();
+      ctx.arc(CL * 0.07, e * CL * 0.06, CL * 0.03, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = '#1d1d14';
+      ctx.beginPath();
+      ctx.arc(CL * 0.075, e * CL * 0.06, CL * 0.018, 0, TAU);
+      ctx.fill();
+    }
     ctx.restore();
   }
 
@@ -3441,65 +3644,159 @@
     o.stop(t + 0.22);
   }
 
-  // The cat ignoring you: a short rolled "mrrp?", rising at the end.
-  function mrrpSound(x) {
-    if (!live()) { return; }
-    var t = AC.currentTime + 0.02, dur = 0.24;
-    var o = AC.createOscillator(), bp = AC.createBiquadFilter(), g = AC.createGain();
-    var am = AC.createOscillator(), amg = AC.createGain(), pulse = AC.createGain();
-    o.type = 'sawtooth';
-    o.frequency.setValueAtTime(260, t);
-    o.frequency.exponentialRampToValueAtTime(430, t + dur);
-    bp.type = 'bandpass';
-    bp.frequency.setValueAtTime(1100, t);
-    bp.Q.setValueAtTime(1.5, t);
-    // The roll: switched on and off nearly thirty times a second, inside
-    // the envelope so it stops when the sound does.
-    am.type = 'square';
-    am.frequency.setValueAtTime(28, t);
-    amg.gain.setValueAtTime(0.4, t);
-    pulse.gain.setValueAtTime(0.6, t);
-    am.connect(amg);
-    amg.connect(pulse.gain);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.12, t + 0.03);
-    g.gain.setValueAtTime(0.12, t + dur * 0.7);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(bp);
-    bp.connect(pulse);
-    pulse.connect(g);
-    out(g, x, fxBus);
-    o.start(t); o.stop(t + dur + 0.02);
-    am.start(t); am.stop(t + dur + 0.02);
-  }
+  // The cat's voice. Each kind is a pitch that moves over its length,
+  // shaped by one or two resonances so it sounds like a throat rather than
+  // a whistle, and some have the roll of a trill. Every one is pitched a
+  // little differently each time. Given a list, it picks one, never the
+  // same as the last thing it said.
+  var CAT_VOICES = {
+    mrrp: { f: [260, 430], dur: 0.24, roll: 28, form: [[1100, 1.5, 1]], gain: 0.12 },
+    trill: { f: [380, 560, 470], dur: 0.38, roll: 32, form: [[1300, 2, 1]], gain: 0.11 },
+    mewQ: { f: [620, 860], dur: 0.3, form: [[1000, 4, 1], [2600, 5, 0.6]], gain: 0.12 },
+    meow: { f: [560, 880, 600], dur: 0.45, form: [[950, 4, 1], [2500, 5, 0.6]], gain: 0.14 },
+    mewHigh: { f: [800, 1050, 900], dur: 0.25, form: [[1200, 4, 1], [2900, 5, 0.6]], gain: 0.12 },
+    mrow: { f: [360, 520, 320], dur: 0.6, form: [[800, 3, 1], [2200, 4, 0.5]], gain: 0.14 },
+    grumble: { f: [230, 200], dur: 0.45, roll: 22, form: [[700, 1.5, 1]], gain: 0.1 },
+    yowl: { f: [480, 900, 1050, 700], dur: 0.85, form: [[1000, 4, 1], [2800, 5, 0.7]], gain: 0.16 },
+    chirp: { f: [700, 1000], dur: 0.12, form: [[1500, 3, 1]], gain: 0.1 }
+  };
+  var lastVoice = '';
 
-  // The cat shooed: an indignant little "mew!", up and down, through two
-  // vowel-like resonances so it sounds like a voice and not a whistle.
-  function meowSound(x) {
+  function catVoice(x, kind) {
+    if (typeof kind !== 'string') {
+      var opts = kind.filter(function (k) { return k !== lastVoice; });
+      kind = opts[Math.floor(Math.random() * opts.length)];
+    }
+    lastVoice = kind;
     if (!live()) { return; }
-    var t = AC.currentTime + 0.02, dur = 0.42;
-    var o = AC.createOscillator(), g = AC.createGain();
+    if (kind === 'chatter') { chatterSound(x); return; }
+    if (kind === 'purr') { purrSound(x); return; }
+    var v = CAT_VOICES[kind], t = AC.currentTime + 0.02, i;
+    var dur = v.dur * (0.9 + Math.random() * 0.2), pitch = 0.92 + Math.random() * 0.16;
+    var o = AC.createOscillator(), g = AC.createGain(), body = AC.createGain();
     o.type = 'sawtooth';
-    o.frequency.setValueAtTime(560, t);
-    o.frequency.exponentialRampToValueAtTime(880, t + 0.12);
-    o.frequency.exponentialRampToValueAtTime(600, t + dur);
+    o.frequency.setValueAtTime(v.f[0] * pitch, t);
+    for (i = 1; i < v.f.length; i++) {
+      o.frequency.exponentialRampToValueAtTime(v.f[i] * pitch, t + dur * i / (v.f.length - 1));
+    }
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.14, t + 0.05);
-    g.gain.setValueAtTime(0.14, t + dur * 0.5);
+    g.gain.exponentialRampToValueAtTime(v.gain, t + 0.04);
+    g.gain.setValueAtTime(v.gain, t + dur * 0.7);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    [[950, 4, 1], [2500, 5, 0.6]].forEach(function (fm) {
+    o.connect(body);
+    var am = null;
+    if (v.roll) {
+      // The roll: switched on and off many times a second, inside the
+      // envelope so it stops when the sound does.
+      am = AC.createOscillator();
+      var amg = AC.createGain();
+      am.type = 'square';
+      am.frequency.setValueAtTime(v.roll, t);
+      amg.gain.setValueAtTime(0.4, t);
+      body.gain.setValueAtTime(0.6, t);
+      am.connect(amg);
+      amg.connect(body.gain);
+    }
+    v.form.forEach(function (fm) {
       var bp = AC.createBiquadFilter(), lv = AC.createGain();
       bp.type = 'bandpass';
-      bp.frequency.setValueAtTime(fm[0], t);
+      bp.frequency.setValueAtTime(fm[0] * pitch, t);
       bp.Q.setValueAtTime(fm[1], t);
       lv.gain.setValueAtTime(fm[2], t);
-      o.connect(bp);
+      body.connect(bp);
       bp.connect(lv);
       lv.connect(g);
     });
     out(g, x, fxBus);
     o.start(t);
     o.stop(t + dur + 0.02);
+    if (am) { am.start(t); am.stop(t + dur + 0.02); }
+  }
+
+  // Chattering at a fish it cannot reach: a quick run of little clicks.
+  function chatterSound(x) {
+    var n = 5 + Math.floor(Math.random() * 3);
+    for (var i = 0; i < n; i++) {
+      var t = AC.currentTime + 0.05 + i * 0.075 + Math.random() * 0.012;
+      var o = AC.createOscillator(), bp = AC.createBiquadFilter(), g = AC.createGain();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(950, t);
+      o.frequency.exponentialRampToValueAtTime(700, t + 0.04);
+      bp.type = 'bandpass';
+      bp.frequency.setValueAtTime(2000, t);
+      bp.Q.setValueAtTime(3, t);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.08, t + 0.006);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+      o.connect(bp);
+      bp.connect(g);
+      out(g, x, fxBus);
+      o.start(t);
+      o.stop(t + 0.06);
+    }
+  }
+
+  // A contented purr, while it sits: a soft rumble pulsing twenty-odd
+  // times a second.
+  function purrSound(x) {
+    if (!noise) { return; }
+    var t = AC.currentTime + 0.05, dur = 3 + Math.random() * 1.5;
+    var src = AC.createBufferSource(), lp = AC.createBiquadFilter(), hp = AC.createBiquadFilter();
+    var body = AC.createGain(), am = AC.createOscillator(), amg = AC.createGain(), g = AC.createGain();
+    src.buffer = noise;
+    src.loop = true;
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(700, t);
+    hp.type = 'highpass';
+    hp.frequency.setValueAtTime(120, t);
+    am.type = 'square';
+    am.frequency.setValueAtTime(24, t);
+    amg.gain.setValueAtTime(0.5, t);
+    body.gain.setValueAtTime(0.5, t);
+    am.connect(amg);
+    amg.connect(body.gain);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.07, t + 0.5);
+    g.gain.setValueAtTime(0.07, t + dur - 0.7);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(lp);
+    lp.connect(hp);
+    hp.connect(body);
+    body.connect(g);
+    out(g, x, fxBus);
+    src.start(t, Math.random() * 2);
+    src.stop(t + dur + 0.05);
+    am.start(t);
+    am.stop(t + dur + 0.05);
+  }
+
+  // A wet cat shaking itself: a fluttering rush of spray.
+  function shakeSound(x) {
+    if (!live() || !noise) { return; }
+    var t = AC.currentTime + 0.02, dur = 1.1;
+    var src = AC.createBufferSource(), bp = AC.createBiquadFilter(), body = AC.createGain();
+    var am = AC.createOscillator(), amg = AC.createGain(), g = AC.createGain();
+    src.buffer = noise;
+    bp.type = 'bandpass';
+    bp.frequency.setValueAtTime(2600, t);
+    bp.Q.setValueAtTime(0.8, t);
+    am.type = 'square';
+    am.frequency.setValueAtTime(14, t);
+    amg.gain.setValueAtTime(0.5, t);
+    body.gain.setValueAtTime(0.5, t);
+    am.connect(amg);
+    amg.connect(body.gain);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.12, t + 0.05);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(bp);
+    bp.connect(body);
+    body.connect(g);
+    out(g, x, fxBus);
+    src.start(t, Math.random() * 1.5);
+    src.stop(t + dur + 0.05);
+    am.start(t);
+    am.stop(t + dur + 0.05);
   }
 
   // A splash: a burst of the airy part of the noise, and a plop under it.
