@@ -1054,15 +1054,92 @@
   // sun, which is under the horizon, so they mostly stream upwards.
   // ------------------------------------------------------------------
   var comets = [];
+
+  // Stars a comet is never drawn across: the Pole Star, the Plough, the
+  // W of Cassiopeia, and the brightest stars of all.
+  var COMET_CLEAR = ['Polaris', 'Kochab', 'Dubhe', 'Merak', 'Phecda', 'Megrez', 'Alioth', 'Mizar', 'Alkaid',
+    'Caph', 'Schedar', 'Navi', 'Ruchbah', 'Segin'];
+  var cometKeys = stars.filter(function (s, i) {
+    return s.mag < 1.6 || COMET_CLEAR.some(function (n) { return byName[n] === i; });
+  });
+
+  // The sun under the northern horizon, as a direction among the stars
+  // at a given sidereal time (see drawComets).
+  function cometSun(th) {
+    var sn = Math.cos(22 * D2R), su = -Math.sin(22 * D2R), k = -SIN_LAT * sn + COS_LAT * su;
+    return [k * Math.cos(th), k * Math.sin(th), COS_LAT * sn + SIN_LAT * su];
+  }
+
+  // How many points of a comet's head and tail lie over one of those
+  // stars at sidereal time th, counting only what would be above the
+  // horizon then.
+  function cometCrossing(v, len, size, th, worst) {
+    var bad = 0, j, k, ct = Math.cos(th), st = Math.sin(th), SV = cometSun(th);
+    var sv = SV[0] * v[0] + SV[1] * v[1] + SV[2] * v[2];
+    var t = norm3([sv * v[0] - SV[0], sv * v[1] - SV[1], sv * v[2] - SV[2]]), w = cross3(v, t);
+    for (j = 0; j <= 16; j++) {
+      var pt = v, clear = 5;
+      if (j > 0) {
+        var dust = j > 8, f = ((dust ? j - 8 : j) / 8) * 0.85, u = len * (dust ? 1 : 1.25) * f, tn = Math.tan(u);
+        var cv = dust ? 0.22 * u * f : 0;
+        pt = norm3([v[0] + t[0] * tn + w[0] * cv, v[1] + t[1] * tn + w[1] * cv, v[2] + t[2] * tn + w[2] * cv]);
+        clear = 2 + (0.45 + (dust ? 1.8 : 0.5) * f) * size;
+      }
+      if (COS_LAT * (pt[0] * ct + pt[1] * st) + SIN_LAT * pt[2] < 0) { continue; }
+      var cc = Math.cos(clear * D2R);
+      for (k = 0; k < cometKeys.length; k++) {
+        var s = cometKeys[k];
+        if (s.x * pt[0] + s.y * pt[1] + s.z * pt[2] > cc && ++bad >= worst) { return bad; }
+      }
+    }
+    return bad;
+  }
+
+  // The tail turns among the stars as the night goes round, so a place
+  // is tried every half hour through a whole turn of the sky.
+  function cometScore(v, len, size, worst) {
+    var bad = 0;
+    for (var h = 0; h < 48 && bad < worst; h++) {
+      bad += cometCrossing(v, len, size, (lst + h * 7.5) * D2R, worst - bad);
+    }
+    return bad;
+  }
+
+  // On the odd night when nowhere is clear all night long, a comet
+  // quietly fades while it is over one of them and comes back after.
+  function updateComets(dt) {
+    for (var k = 0; k < comets.length; k++) {
+      var c = comets[k];
+      var over = c.crossing > 0 && cometCrossing([c.x, c.y, c.z], c.len, c.size, lst * D2R, 1) > 0;
+      c.veil = clamp(c.veil + (over ? dt : -dt) / 2.5, 0, 1);
+    }
+  }
+
+  // One big comet low in the north-west and a smaller one elsewhere, at
+  // the first place found where neither ever crosses those stars, going
+  // further afield if the usual places are no good, and at worst the
+  // place that crosses them least.
   function makeComets() {
     var rnd = Math.random;
     var specs = [
-      { alt: (22 + rnd() * 10) * D2R, az: (305 + rnd() * 22) * D2R, len: 20 + rnd() * 6, size: 1 },
-      { alt: (14 + rnd() * 12) * D2R, az: (rnd() < 0.5 ? 40 + rnd() * 40 : 255 + rnd() * 25) * D2R, len: 8 + rnd() * 4, size: 0.6 }
+      { len: 20 + rnd() * 6, size: 1, place: function (wide) {
+        return wide > 1 ? [15 + rnd() * 35, 240 + rnd() * 180] :
+          wide ? [18 + rnd() * 24, 280 + rnd() * 80] : [22 + rnd() * 10, 305 + rnd() * 22];
+      } },
+      { len: 8 + rnd() * 4, size: 0.6, place: function (wide) {
+        var east = rnd() < 0.5;
+        return wide ? [12 + rnd() * 26, east ? 30 + rnd() * 80 : 230 + rnd() * 70]
+          : [14 + rnd() * 12, east ? 40 + rnd() * 40 : 255 + rnd() * 25];
+      } }
     ];
     specs.forEach(function (c) {
-      var p = altAz(c.alt, c.az), v = enuToEq(p[0], p[1], p[2]);
-      comets.push({ x: v[0], y: v[1], z: v[2], len: c.len * D2R, size: c.size, flare: 0, sx: 0, sy: 0, front: false });
+      var best = null, fewest = 1e9, len = c.len * D2R;
+      for (var tries = 0; tries < 800 && fewest > 0; tries++) {
+        var aa = c.place(tries < 150 ? 0 : tries < 400 ? 1 : 2), p = altAz(aa[0] * D2R, aa[1] * D2R), v = enuToEq(p[0], p[1], p[2]);
+        var bad = cometScore(v, len, c.size, fewest);
+        if (bad < fewest) { fewest = bad; best = v; }
+      }
+      comets.push({ x: best[0], y: best[1], z: best[2], len: len, size: c.size, flare: 0, sx: 0, sy: 0, front: false, crossing: fewest, veil: 0 });
     });
   }
 
@@ -1072,24 +1149,37 @@
   // ------------------------------------------------------------------
   var meteors = [], nextMeteor = 14, shower = null, nextShower = 210 + Math.random() * 120;
 
-  // Only one shooting star from a tap at a time: tapping again while it
-  // is still flying just makes the sky glint where the finger lands.
-  var tapMeteor = null, glints = [];
+  // A tap on empty sky just makes it glint where the finger lands.
+  var glints = [];
 
-  function addMeteor(p, t, bright, tapped) {
+  function addMeteor(p, t, bright) {
     var m = {
       p: p, t: t, w: (15 + Math.random() * 18) * D2R, path: (10 + Math.random() * 14) * D2R,
       streak: (5 + Math.random() * 4) * D2R, age: 0, bright: bright, sx: 0, sy: 0, front: false, dead: false
     };
-    if (tapped) { tapMeteor = m; }
     m.dur = reduced ? 1.8 : m.path / m.w;
     meteors.push(m);
-    if (bright > 0.55 || tapped) {
+    if (bright > 0.55) {
       var a = Math.min(m.path, 0.3);
       projENU(p[0] * Math.cos(a) + t[0] * Math.sin(a), p[1] * Math.cos(a) + t[1] * Math.sin(a), p[2] * Math.cos(a) + t[2] * Math.sin(a));
-      swish(clamp((PX / W - 0.5) * 1.2, -0.8, 0.8), tapped ? 1 : bright);
+      swish(clamp((PX / W - 0.5) * 1.2, -0.8, 0.8), bright);
     }
     return m;
+  }
+
+  // Dad is telling her about a picture: it is still drawing, it has
+  // only just finished, or he is naming it or saying something about it,
+  // or is about to. No shooting star cuts across that.
+  function talkingPictures() {
+    for (var k = 0; k < lit.length; k++) {
+      if (!lit[k].done || clock - lit[k].doneAt < 2.5) { return true; }
+    }
+    var busy = (speaking && !speaking.ended && !speaking.paused && clock < speakingHardStop) || clock < speakingUntil;
+    if (busy && /^(name|fact)-/.test(sayingId)) { return true; }
+    for (k = 0; k < voiceQueue.length; k++) {
+      if (/^(name|fact)-/.test(voiceQueue[k].id)) { return true; }
+    }
+    return false;
   }
 
   // A direction across the sky from p: mostly downwards, but not always.
@@ -1102,25 +1192,27 @@
     return [dx * Math.cos(b) + s[0] * Math.sin(b), dy * Math.cos(b) + s[1] * Math.sin(b), dz * Math.cos(b) + s[2] * Math.sin(b)];
   }
 
-  function meteorAt(X, Y, tapped) {
+  function meteorAt(X, Y) {
     var q = unproject(X, Y, [0, 0, 0]);
     var p = norm3(q);
-    return addMeteor(p, downish(p, tapped ? 1.6 : 2.4), tapped ? 1 : 0.25 + Math.random() * 0.75, tapped);
+    return addMeteor(p, downish(p, 2.4), 0.25 + Math.random() * 0.75);
   }
 
   function updateMeteors(dt) {
-    var i;
-    if (dusk > 0.6) {
+    var i, hush = talkingPictures();
+    // None until it is properly dark and the Milky Way is out.
+    if (dusk > 0.98) {
       nextMeteor -= dt;
+      if (hush) { nextMeteor = Math.max(nextMeteor, 3); }
       if (nextMeteor <= 0) {
         // Somewhere in view and well up in the sky, wherever the horizon
         // happens to be lying.
         var m = null;
         for (var tries = 0; tries < 8 && !m; tries++) {
           var mx = W * (0.08 + Math.random() * 0.84), my = H * (0.05 + Math.random() * 0.7);
-          if (unproject(mx, my, tmpDir)[2] > 0.12) { m = meteorAt(mx, my, false); }
+          if (unproject(mx, my, tmpDir)[2] > 0.12) { m = meteorAt(mx, my); }
         }
-        nextMeteor = 7 + Math.random() * 14;
+        nextMeteor = 10 + Math.random() * 16;
         // A bright one gets a word from Dad.
         if (m && m.bright > 0.75) { shootingStarLine(); }
       }
@@ -1129,12 +1221,13 @@
       nextShower -= dt;
       if (nextShower <= 0 && !shower) {
         var rad = altAz((35 + Math.random() * 30) * D2R, lookAt + (Math.random() - 0.5) * 1.2);
-        shower = { r: rad, left: 14 + Math.floor(Math.random() * 8), next: 0 };
+        shower = { r: rad, left: 10 + Math.floor(Math.random() * 6), next: 0 };
         nextShower = 240 + Math.random() * 160;
       }
     }
     if (shower) {
       shower.next -= dt;
+      if (hush) { shower.next = Math.max(shower.next, 2); }
       if (shower.next <= 0) {
         var R = shower.r, ang = (8 + Math.random() * 34) * D2R, dir = Math.random() * TAU;
         var s1 = norm3(cross3(R, [0, 0, 1])), s2 = cross3(R, s1);
@@ -1142,7 +1235,7 @@
         var p = norm3([R[0] * Math.cos(ang) + off[0] * Math.sin(ang), R[1] * Math.cos(ang) + off[1] * Math.sin(ang), R[2] * Math.cos(ang) + off[2] * Math.sin(ang)]);
         var k = R[0] * p[0] + R[1] * p[1] + R[2] * p[2];
         var t = norm3([p[0] * k - R[0], p[1] * k - R[1], p[2] * k - R[2]]);
-        if (p[2] > 0.05) { addMeteor(p, t, 0.3 + Math.random() * 0.7, false); }
+        if (p[2] > 0.05) { addMeteor(p, t, 0.3 + Math.random() * 0.7); }
         shower.left -= 1;
         shower.next = 0.6 + Math.random() * 1.8;
         if (shower.left <= 0) { shower = null; }
@@ -1152,7 +1245,6 @@
       meteors[i].age += dt;
       if (meteors[i].age > meteors[i].dur) {
         meteors[i].dead = true;
-        if (meteors[i] === tapMeteor) { tapMeteor = null; }
         meteors.splice(i, 1);
       }
     }
@@ -1654,7 +1746,8 @@
       var sv = SV[0] * vx + SV[1] * vy + SV[2] * vz;
       var t = norm3([sv * vx - SV[0], sv * vy - SV[1], sv * vz - SV[2]]);
       var w = cross3([vx, vy, vz], t);
-      var bright = nf * (1 + c.flare * 0.9);
+      var bright = nf * (1 + c.flare * 0.9) * (1 - smooth(c.veil));
+      if (bright < 0.003) { c.front = false; continue; }
       // The straight blue tail of gas, and the broader, curving tail of
       // dust beside it.
       // The puffs are packed closer near the head, where they are
@@ -2036,7 +2129,9 @@
     ctx.closePath();
     ctx.fill();
 
-    // Lone trees on the skyline.
+    // Lone trees on the skyline. Each is drawn upright to the land, in
+    // its own frame turned to match the way up is lying on the screen
+    // just there, so when her head tips the trees tip with the hills.
     for (var i = 0; i < trees.length; i++) {
       var t = trees[i];
       var ground = profAt(t.az) * D2R, crown = ground + t.h;
@@ -2046,27 +2141,38 @@
       var r = t.r * K2 / PD, tx = PX, ty = PY;
       var gp = altAz(ground - 0.3 * D2R, t.az);
       projENU(gp[0], gp[1], gp[2]);
+      var ux = tx - PX, uy = ty - PY, ul = Math.sqrt(ux * ux + uy * uy) || 1, d = ul;
+      ux /= ul; uy /= ul;
+      ctx.setTransform(-DPR * uy, DPR * ux, -DPR * ux, -DPR * uy, DPR * tx, DPR * ty);
       ctx.beginPath();
-      ctx.moveTo(PX - r * 0.09, PY);
-      ctx.lineTo(tx - r * 0.06 + t.lean * r, ty + r * 0.4);
-      ctx.lineTo(tx + r * 0.06 + t.lean * r, ty + r * 0.4);
-      ctx.lineTo(PX + r * 0.09, PY);
+      ctx.moveTo(-r * 0.09, d);
+      ctx.lineTo(-r * 0.06 + t.lean * r, r * 0.4);
+      ctx.lineTo(r * 0.06 + t.lean * r, r * 0.4);
+      ctx.lineTo(r * 0.09, d);
       ctx.closePath();
       ctx.fill();
       ctx.beginPath();
-      ctx.arc(tx + t.lean * r, ty, r, 0, TAU);
-      ctx.arc(tx + t.lean * r - r * 0.55, ty + r * 0.25, r * 0.72, 0, TAU);
-      ctx.arc(tx + t.lean * r + r * 0.55, ty + r * 0.2, r * 0.75, 0, TAU);
-      ctx.arc(tx + t.lean * r, ty - r * 0.45, r * 0.68, 0, TAU);
+      ctx.arc(t.lean * r, 0, r, 0, TAU);
+      ctx.arc(t.lean * r - r * 0.55, r * 0.25, r * 0.72, 0, TAU);
+      ctx.arc(t.lean * r + r * 0.55, r * 0.2, r * 0.75, 0, TAU);
+      ctx.arc(t.lean * r, -r * 0.45, r * 0.68, 0, TAU);
       ctx.fill();
     }
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 
-    // The cottage, with its one lit window.
+    // The cottage, with its one lit window, upright to the land in the
+    // same way.
     var base = profAt(COTTAGE_AZ) * D2R - 0.15 * D2R;
+    var c1 = altAz(base + 1.2 * D2R, COTTAGE_AZ);
+    projENU(c1[0], c1[1], c1[2]);
+    var topX = PX, topY = PY;
     var c0 = altAz(base, COTTAGE_AZ);
     projENU(c0[0], c0[1], c0[2]);
     if (PD > 0.3 && PX > -60 && PX < W + 60) {
-      var u = 1.0 * D2R * K2 / PD, bx = PX, by = PY;
+      var u = 1.0 * D2R * K2 / PD, bx = 0, by = 0;
+      var cux = topX - PX, cuy = topY - PY, cul = Math.sqrt(cux * cux + cuy * cuy) || 1;
+      cux /= cul; cuy /= cul;
+      ctx.setTransform(-DPR * cuy, DPR * cux, -DPR * cux, -DPR * cuy, DPR * PX, DPR * PY);
       ctx.beginPath();
       ctx.moveTo(bx - u * 0.9, by);
       ctx.lineTo(bx - u * 0.9, by - u * 0.65);
@@ -2087,6 +2193,7 @@
       ctx.globalCompositeOperation = 'source-over';
       ctx.fillStyle = 'rgba(255,206,130,0.95)';
       ctx.fillRect(wx - ws / 2, wy - ws / 2, ws, ws);
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     }
   }
 
@@ -2429,8 +2536,7 @@
     ctx.globalCompositeOperation = 'source-over';
   }
 
-  // A tap on empty sky while a shooting star is still flying just makes
-  // the sky glint under the finger.
+  // A tap on empty sky makes it glint under the finger.
   function drawGlints() {
     ctx.globalCompositeOperation = 'lighter';
     for (var i = 0; i < glints.length; i++) {
@@ -2629,14 +2735,8 @@
       return;
     }
 
-    // Empty sky: a shooting star from under the finger, one at a time.
-    if (tapMeteor) {
-      if (glints.length < 4) { glints.push({ x: x, y: y, age: 0 }); }
-      return;
-    }
-    var m = meteorAt(x, y, true);
-    herPoint({ obj: m }, 1.4);
-    if (Math.random() < 0.3) { shootingStarLine(); }
+    // Empty sky: it glints under the finger.
+    if (glints.length < 4) { glints.push({ x: x, y: y, age: 0 }); }
   }
 
   // Dad picks a picture that is well up in the sky, points at it, says
@@ -2968,7 +3068,7 @@
     'aurora-1', 'aurora-2', 'look-1', 'look-2'];
   groups.forEach(function (g) { VOICE.push('name-' + g.slug, 'fact-' + g.slug); });
 
-  var clips = {}, clipsPrimed = false, speakingUntil = 0, speakingHardStop = 0, speaking = null;
+  var clips = {}, clipsPrimed = false, speakingUntil = 0, speakingHardStop = 0, speaking = null, sayingId = '';
   var voiceQueue = [], said = {}, lastSaidAt = {};
 
   function clipFor(id) {
@@ -3039,6 +3139,7 @@
   }
 
   function speak(id) {
+    sayingId = id;
     said[id] = true;
     lastSaidAt[id] = clock;
     var a = VOICE.indexOf(id) >= 0 ? clipFor(id) : null;
@@ -3236,6 +3337,7 @@
     windAmt = (0.5 + 0.5 * Math.sin(clock * 0.045)) * (0.5 + 0.5 * Math.sin(clock * 0.11 + 1.7));
 
     updateMeteors(dt);
+    updateComets(dt);
     updateSats(dt);
     updateAurora(dt);
     updateClouds(dt);
