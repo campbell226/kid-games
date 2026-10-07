@@ -952,7 +952,7 @@
   var mitten = makeHand(false), dadHand = makeHand(true);
 
   // Her breath, misting up into the cold now and then.
-  var breaths = [], nextBreath = 6;
+  var nextBreath = 6;
 
   // ------------------------------------------------------------------
   // Layout
@@ -1271,7 +1271,7 @@
     }
     var g = l.g;
     later(1.2, function () { say('fact-' + g.slug, { wait: 8, once: true }); });
-    if (breaths.length < 2) { breathe(); }
+    later(0.4, breathe);
   }
 
   // Where the pen is, along whichever line is being drawn: Dad's finger
@@ -1335,8 +1335,13 @@
       h.ang += clamp(d, -maxTurn, maxTurn);
       var dist = Math.sqrt((pt[0] - sh[0]) * (pt[0] - sh[0]) + (pt[1] - sh[1]) * (pt[1] - sh[1]));
       // Arms reach about halfway: the direction says where, and the
-      // hand stays low enough never to hide what it points at.
+      // hand stays low enough never to hide what it points at. But the
+      // hand always comes up into the sky, because a dark hand against
+      // the dark ground can't be seen at all.
       var full = clamp(dist * 0.5, U * 0.28, U * (h.dad ? 0.55 : 0.5));
+      var up = -Math.sin(h.ang);
+      if (up > 0.15) { full = Math.max(full, (sh[1] - (hy - U * 0.14)) / up); }
+      full = Math.min(full, Math.max(U * 0.28, dist - U * 0.14));
       h.len += (full - h.len) * Math.min(1, dt * 3);
     }
     var k = Math.min(1, dt * (pt ? 2.6 : 1.5) * (reduced ? 0.6 : 1));
@@ -1942,155 +1947,259 @@
   }
 
   // ------------------------------------------------------------------
-  // The arms. Each is a coat sleeve from the shoulder, below the edge of
-  // the view, out to the wrist, narrowing as it goes away from her eye;
-  // then her knitted mitten, or Dad's hand with one finger pointing.
-  // Both are dark against the sky, with a thin rim of the sky's light
-  // along their edges so they read as solid things in front of it.
+  // The arms, as you would really see them at night: dark shapes against
+  // the sky, with only a thin rim of starlight round their edges. Each
+  // runs from a shoulder below the bottom of the view, bends a little
+  // at the elbow, and narrows as it reaches away from her eye; then her
+  // woolly mitten, or Dad's hand with its first finger out and the
+  // others curled. So close to her eye, their edges are a little soft,
+  // and they are never quite still.
   // ------------------------------------------------------------------
-  var MITTEN = hex('#7e2b3e'), CUFF = hex('#a9465c'), COAT = hex('#141a2c'), DAD_COAT = hex('#181d19');
-  var DAD_CUFF = hex('#262e27'), SKIN = hex('#3a2f2a');
+  var SIL = hex('#05070d'), MITTEN_SIL = hex('#150b12'), MITTEN_CUFF = hex('#1e1018');
 
   function rimColour(a) {
-    return rgba(mix(hex('#9aaee8'), hex('#5fd9a0'), aur.s * 0.6), ((0.3 + 0.15 * aur.s) * a).toFixed(3));
+    return rgba(mix(hex('#9aaee8'), hex('#5fd9a0'), aur.s * 0.6), ((0.42 + 0.15 * aur.s) * a).toFixed(3));
+  }
+
+  // Fill a shape that is already traced: a soft dark edge first, then
+  // the shape, then its rim of light.
+  function silhouette(fill, rim) {
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = rgba(fill, 0.35);
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.fillStyle = rgba(fill);
+    ctx.fill();
+    ctx.strokeStyle = rimColour(rim);
+    ctx.lineWidth = 1.1;
+    ctx.stroke();
   }
 
   function drawArm(h) {
     if (h.raise < 0.01) { return; }
     var sh = shoulderOf(h), r = smooth(h.raise), L = h.len * r;
-    var c = Math.cos(h.ang), s = Math.sin(h.ang), px = -s, py = c;
+    var sway = reduced ? 0 : 0.012 * Math.sin(clock * 1.3 + (h.dad ? 1.7 : 0)) + 0.005 * Math.sin(clock * 3.1 + (h.dad ? 0.4 : 2));
+    var ang = h.ang + sway, c = Math.cos(ang), s = Math.sin(ang), side = h.dad ? 1 : -1;
+    // The elbow sits a little out to the side; the wrist is on the line
+    // to whatever is being pointed at.
+    var ex = sh[0] + c * L * 0.45 - s * side * L * 0.07, ey = sh[1] + s * L * 0.45 + c * side * L * 0.07;
     var wx = sh[0] + c * L, wy = sh[1] + s * L;
-    var w0 = U * (h.dad ? 0.21 : 0.17), w1 = U * (h.dad ? 0.075 : 0.068);
-    var mx = sh[0] + c * L * 0.5, my = sh[1] + s * L * 0.5, wm = (w0 + w1) / 2 * 1.08;
+    var w0 = U * (h.dad ? 0.22 : 0.18), we = U * (h.dad ? 0.13 : 0.11), ww = U * (h.dad ? 0.07 : 0.062);
+    var ux = ex - sh[0], uy = ey - sh[1], ul = Math.sqrt(ux * ux + uy * uy) || 1;
+    ux /= ul; uy /= ul;
+    var fx = wx - ex, fy = wy - ey, fl = Math.sqrt(fx * fx + fy * fy) || 1;
+    fx /= fl; fy /= fl;
+    var nx = -(uy + fy) / 2, ny = (ux + fx) / 2, nm = Math.sqrt(nx * nx + ny * ny) || 1;
+    nx /= nm; ny /= nm;
+
+    // The sleeve.
     ctx.beginPath();
-    ctx.moveTo(sh[0] + px * w0 / 2, sh[1] + py * w0 / 2);
-    ctx.quadraticCurveTo(mx + px * wm / 2, my + py * wm / 2, wx + px * w1 / 2, wy + py * w1 / 2);
-    ctx.lineTo(wx - px * w1 / 2, wy - py * w1 / 2);
-    ctx.quadraticCurveTo(mx - px * wm / 2, my - py * wm / 2, sh[0] - px * w0 / 2, sh[1] - py * w0 / 2);
+    ctx.moveTo(sh[0] - uy * w0 / 2, sh[1] + ux * w0 / 2);
+    ctx.quadraticCurveTo(ex + nx * we / 2, ey + ny * we / 2, wx - fy * ww / 2, wy + fx * ww / 2);
+    ctx.lineTo(wx + fy * ww / 2, wy - fx * ww / 2);
+    ctx.quadraticCurveTo(ex - nx * we / 2, ey - ny * we / 2, sh[0] + uy * w0 / 2, sh[1] - ux * w0 / 2);
     ctx.closePath();
-    ctx.fillStyle = rgba(h.dad ? DAD_COAT : COAT);
-    ctx.fill();
-    ctx.strokeStyle = rimColour(1);
-    ctx.lineWidth = 1.2;
+    silhouette(SIL, 1);
+
+    // Creases where the sleeve gathers on the inside of the elbow.
+    ctx.strokeStyle = rimColour(0.4);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    var ix = ex - side * nx * we * 0.42, iy = ey - side * ny * we * 0.42;
+    for (var k = -1; k <= 1; k++) {
+      var px = ix + fx * we * 0.55 * k, py = iy + fy * we * 0.55 * k;
+      ctx.moveTo(px, py);
+      ctx.quadraticCurveTo(px + side * nx * we * 0.2 + fx * we * 0.12, py + side * ny * we * 0.2 + fy * we * 0.12,
+        px + side * nx * we * 0.34 + fx * we * 0.3, py + side * ny * we * 0.34 + fy * we * 0.3);
+    }
     ctx.stroke();
 
     ctx.save();
     ctx.translate(wx, wy);
-    ctx.rotate(h.ang);
-    if (h.dad) { dadHandShape(U * 0.085); } else { mittenShape(U * 0.078); }
+    ctx.rotate(ang);
+    if (h.dad) { drawDadHand(U * 0.085); } else { drawMitten(U * 0.08); }
     ctx.restore();
   }
 
-  // Her mitten, pointing the way her arm points: a knitted cuff, a
-  // rounded mitten and its thumb. The x axis runs along her arm.
-  function mittenShape(m) {
-    ctx.lineJoin = 'round';
+  // Dad's hand from the back, x along his pointing finger, his thumb
+  // and first finger on the same side: the cuff of his jacket, the
+  // knuckles of the three curled fingers, the first finger straight out
+  // with its middle joint, and the thumb tucked alongside.
+  function drawDadHand(m) {
     ctx.beginPath();
-    ctx.ellipse(0.72 * m, 0, 0.6 * m, 0.48 * m, 0, 0, TAU);
-    ctx.moveTo(0.7 * m, 0.42 * m);
-    ctx.ellipse(0.5 * m, 0.5 * m, 0.27 * m, 0.14 * m, 0.65, 0, TAU);
-    ctx.fillStyle = rgba(MITTEN);
-    ctx.fill();
-    ctx.strokeStyle = rimColour(1);
-    ctx.lineWidth = 1.2;
-    ctx.stroke();
-    // The knit: faint rows across it.
-    ctx.strokeStyle = rgba(CUFF, 0.35);
+    ctx.moveTo(-0.34 * m, -0.5 * m);
+    ctx.quadraticCurveTo(-0.18 * m, -0.56 * m, -0.02 * m, -0.53 * m);
+    ctx.lineTo(-0.02 * m, 0.53 * m);
+    ctx.quadraticCurveTo(-0.18 * m, 0.56 * m, -0.34 * m, 0.5 * m);
+    ctx.closePath();
+    silhouette(SIL, 1);
+
+    ctx.beginPath();
+    ctx.moveTo(-0.04 * m, 0.4 * m);
+    ctx.quadraticCurveTo(0.3 * m, 0.47 * m, 0.56 * m, 0.42 * m);
+    ctx.quadraticCurveTo(0.73 * m, 0.45 * m, 0.71 * m, 0.3 * m);
+    ctx.quadraticCurveTo(0.81 * m, 0.28 * m, 0.79 * m, 0.13 * m);
+    ctx.quadraticCurveTo(0.87 * m, 0.1 * m, 0.84 * m, -0.05 * m);
+    ctx.quadraticCurveTo(0.86 * m, -0.12 * m, 0.95 * m, -0.13 * m);
+    ctx.quadraticCurveTo(1.17 * m, -0.14 * m, 1.38 * m, -0.17 * m);
+    ctx.quadraticCurveTo(1.5 * m, -0.19 * m, 1.49 * m, -0.25 * m);
+    ctx.quadraticCurveTo(1.47 * m, -0.32 * m, 1.37 * m, -0.32 * m);
+    ctx.quadraticCurveTo(1.16 * m, -0.33 * m, 0.98 * m, -0.345 * m);
+    ctx.quadraticCurveTo(0.8 * m, -0.36 * m, 0.64 * m, -0.38 * m);
+    ctx.quadraticCurveTo(0.7 * m, -0.47 * m, 0.63 * m, -0.55 * m);
+    ctx.quadraticCurveTo(0.52 * m, -0.62 * m, 0.38 * m, -0.54 * m);
+    ctx.quadraticCurveTo(0.2 * m, -0.47 * m, -0.04 * m, -0.42 * m);
+    ctx.closePath();
+    silhouette(SIL, 1.1);
+
+    // The ridge of his knuckles, the crease of his thumb and the joint
+    // of his finger, caught faintly.
+    ctx.strokeStyle = rimColour(0.45);
     ctx.lineWidth = 1;
     ctx.beginPath();
-    for (var k = 0; k < 4; k++) {
-      var x = (0.35 + k * 0.22) * m;
-      ctx.moveTo(x, -0.36 * m);
-      ctx.quadraticCurveTo(x + 0.08 * m, 0, x, 0.36 * m);
-    }
+    ctx.moveTo(0.55 * m, 0.33 * m);
+    ctx.quadraticCurveTo(0.63 * m, 0.04 * m, 0.6 * m, -0.3 * m);
+    ctx.moveTo(0.4 * m, -0.45 * m);
+    ctx.quadraticCurveTo(0.52 * m, -0.47 * m, 0.6 * m, -0.42 * m);
+    ctx.moveTo(1.12 * m, -0.31 * m);
+    ctx.quadraticCurveTo(1.14 * m, -0.24 * m, 1.12 * m, -0.18 * m);
     ctx.stroke();
-    // The cuff, ribbed.
+  }
+
+  // Her mitten, pointing the way her arm points: a ribbed knitted cuff,
+  // a rounded mitten with its thumb, and a woolly, slightly fuzzy edge.
+  function drawMitten(m) {
     ctx.beginPath();
-    ctx.moveTo(-0.2 * m, -0.5 * m);
-    ctx.lineTo(0.22 * m, -0.52 * m);
-    ctx.lineTo(0.22 * m, 0.52 * m);
-    ctx.lineTo(-0.2 * m, 0.5 * m);
+    ctx.moveTo(-0.36 * m, -0.5 * m);
+    ctx.lineTo(0.08 * m, -0.54 * m);
+    ctx.lineTo(0.08 * m, 0.54 * m);
+    ctx.lineTo(-0.36 * m, 0.5 * m);
     ctx.closePath();
-    ctx.fillStyle = rgba(CUFF);
-    ctx.fill();
-    ctx.strokeStyle = rimColour(1);
-    ctx.stroke();
-    ctx.strokeStyle = rgba(MITTEN, 0.6);
+    silhouette(MITTEN_CUFF, 0.9);
+    ctx.strokeStyle = rimColour(0.3);
+    ctx.lineWidth = 1;
     ctx.beginPath();
     for (var j = -3; j <= 3; j++) {
-      ctx.moveTo(-0.18 * m, j * 0.14 * m);
-      ctx.lineTo(0.2 * m, j * 0.14 * m);
+      ctx.moveTo(-0.33 * m, j * 0.135 * m);
+      ctx.lineTo(0.05 * m, j * 0.135 * m);
     }
     ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(0.04 * m, 0.46 * m);
+    ctx.quadraticCurveTo(0.4 * m, 0.58 * m, 0.8 * m, 0.51 * m);
+    ctx.quadraticCurveTo(1.22 * m, 0.41 * m, 1.25 * m, 0.02 * m);
+    ctx.quadraticCurveTo(1.23 * m, -0.37 * m, 0.86 * m, -0.45 * m);
+    ctx.lineTo(0.7 * m, -0.47 * m);
+    ctx.quadraticCurveTo(0.68 * m, -0.73 * m, 0.46 * m, -0.75 * m);
+    ctx.quadraticCurveTo(0.27 * m, -0.73 * m, 0.31 * m, -0.53 * m);
+    ctx.quadraticCurveTo(0.16 * m, -0.47 * m, 0.04 * m, -0.46 * m);
+    ctx.closePath();
+    silhouette(MITTEN_SIL, 0.9);
+    // Wool: a broken, bumpy edge over the clean one.
+    ctx.setLineDash([1.3, 1.9]);
+    ctx.lineWidth = 2.4;
+    ctx.strokeStyle = rgba(MITTEN_SIL);
+    ctx.stroke();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = rimColour(0.7);
+    ctx.stroke();
+    ctx.setLineDash([]);
   }
 
-  // Dad's hand, from the back: the cuff of his jacket, his hand with
-  // the fingers curled, and his first finger straight out, pointing.
-  function dadHandShape(m) {
-    ctx.lineJoin = 'round';
-    ctx.beginPath();
-    // Back of the hand and the curled fingers.
-    ctx.moveTo(0.05 * m, -0.4 * m);
-    ctx.quadraticCurveTo(0.45 * m, -0.48 * m, 0.7 * m, -0.42 * m);
-    // The pointing finger.
-    ctx.lineTo(1.45 * m, -0.4 * m);
-    ctx.quadraticCurveTo(1.6 * m, -0.3 * m, 1.45 * m, -0.18 * m);
-    ctx.lineTo(0.82 * m, -0.16 * m);
-    // Knuckles of the curled fingers.
-    ctx.quadraticCurveTo(0.95 * m, -0.05 * m, 0.88 * m, 0.08 * m);
-    ctx.quadraticCurveTo(0.97 * m, 0.2 * m, 0.86 * m, 0.3 * m);
-    ctx.quadraticCurveTo(0.9 * m, 0.42 * m, 0.7 * m, 0.44 * m);
-    ctx.quadraticCurveTo(0.4 * m, 0.48 * m, 0.05 * m, 0.4 * m);
-    ctx.closePath();
-    // The thumb, tucked along the near side.
-    ctx.moveTo(0.3 * m, -0.38 * m);
-    ctx.quadraticCurveTo(0.55 * m, -0.62 * m, 0.78 * m, -0.5 * m);
-    ctx.quadraticCurveTo(0.7 * m, -0.38 * m, 0.45 * m, -0.34 * m);
-    ctx.closePath();
-    ctx.fillStyle = rgba(SKIN);
-    ctx.fill();
-    ctx.strokeStyle = rimColour(1);
-    ctx.lineWidth = 1.2;
-    ctx.stroke();
-    // The cuff of his jacket.
-    ctx.beginPath();
-    ctx.moveTo(-0.16 * m, -0.6 * m);
-    ctx.lineTo(0.1 * m, -0.56 * m);
-    ctx.lineTo(0.1 * m, 0.56 * m);
-    ctx.lineTo(-0.16 * m, 0.6 * m);
-    ctx.closePath();
-    ctx.fillStyle = rgba(DAD_CUFF);
-    ctx.fill();
-    ctx.stroke();
-  }
+  // ------------------------------------------------------------------
+  // Her breath. Each breath out is a little cloud of mist pushed up from
+  // just below the view: billowy puffs that rise fast and slow down,
+  // spread, turn and curl as they go, drift with the wind and thin
+  // away, faintly lit by the sky. With it comes a soft breath of sound.
+  // With reduced motion the mist rises slowly and gently fades.
+  // ------------------------------------------------------------------
+  // A puff of mist is not a smooth ball: each of these is a clump of
+  // soft blobs, faded at the edges, so that overlapping them makes
+  // curls and wisps.
+  var mistSprites = (function () {
+    var out = [], rnd = seeded(77);
+    for (var v = 0; v < 4; v++) {
+      var c = makeCanvas(128, 128), g = c.getContext('2d');
+      for (var k = 0; k < 34; k++) {
+        var a = rnd() * TAU, d = Math.pow(rnd(), 0.7) * 38, r = 8 + rnd() * 20;
+        var x = 64 + Math.cos(a) * d, y = 64 + Math.sin(a) * d * 0.8;
+        var gr = g.createRadialGradient(x, y, 0, x, y, r);
+        gr.addColorStop(0, 'rgba(232,238,252,0.22)');
+        gr.addColorStop(1, 'rgba(232,238,252,0)');
+        g.fillStyle = gr;
+        g.fillRect(x - r, y - r, 2 * r, 2 * r);
+      }
+      g.globalCompositeOperation = 'destination-in';
+      var edge = g.createRadialGradient(64, 64, 20, 64, 64, 64);
+      edge.addColorStop(0, 'rgba(0,0,0,1)');
+      edge.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = edge;
+      g.fillRect(0, 0, 128, 128);
+      out.push(c);
+    }
+    return out;
+  })();
+  var puffs = [], exhaling = 0, breathX = 0;
 
-  // Her breath: a soft white puff rising from below the view and
-  // fading, every so often, and once more when a picture is finished.
-  var mistSprite = radialSprite([236, 240, 250], PUFF);
   function breathe() {
-    breaths.push({ x: W * (0.46 + Math.random() * 0.08), age: 0, life: 3.2, drift: (Math.random() - 0.5) * 0.08 });
+    if (exhaling > 0) { return; }
+    exhaling = 0.6;
+    breathX = W * (0.47 + Math.random() * 0.06);
+    breathSound();
   }
+
   function updateBreath(dt) {
     nextBreath -= dt;
-    if (nextBreath <= 0) { breathe(); nextBreath = 9 + Math.random() * 8; }
-    for (var i = breaths.length - 1; i >= 0; i--) {
-      breaths[i].age += dt;
-      if (breaths[i].age > breaths[i].life) { breaths.splice(i, 1); }
-    }
-  }
-  function drawBreath() {
-    ctx.globalCompositeOperation = 'lighter';
-    for (var i = 0; i < breaths.length; i++) {
-      var b = breaths[i], t = b.age / b.life;
-      var a = 0.11 * Math.pow(Math.sin(Math.PI * t), 1.3);
-      var rise = reduced ? 0.04 : 0.32 * (1 - (1 - t) * (1 - t));
-      var y = H + U * 0.04 - U * rise, x = b.x + b.drift * W * t;
-      for (var k = 0; k < 3; k++) {
-        var r = U * (0.07 + 0.16 * t) * (1 - k * 0.22);
-        ctx.globalAlpha = a * (1 - k * 0.25);
-        ctx.drawImage(mistSprite, x + (k - 1) * r * 0.45 - r, y - k * r * 0.25 - r, 2 * r, 2 * r);
+    if (nextBreath <= 0) { breathe(); nextBreath = 7 + Math.random() * 5; }
+    var slow = reduced ? 0.35 : 1, i;
+    if (exhaling > 0) {
+      exhaling -= dt;
+      // Strong at first and tailing off: fewer, slower puffs at the end
+      // of the breath, so they don't pile up at the bottom of the view.
+      var strength = clamp(exhaling / 0.6, 0.45, 1);
+      var n = Math.floor(40 * dt * strength * strength + Math.random());
+      for (i = 0; i < n; i++) {
+        puffs.push({
+          x: breathX + (Math.random() - 0.5) * U * 0.05, y: H + U * 0.13,
+          vx: (Math.random() - 0.5) * U * 0.26, vy: -U * (0.85 + Math.random() * 0.4) * strength * slow,
+          r0: U * (0.03 + Math.random() * 0.03), grow: U * (0.13 + Math.random() * 0.11),
+          age: 0, life: 2.2 + Math.random() * 1.1, img: Math.floor(Math.random() * 4),
+          rot: Math.random() * TAU, spin: (Math.random() - 0.5) * 1.6 * slow,
+          ph: Math.random() * TAU, curl: (Math.random() - 0.5) * 2.4
+        });
       }
     }
+    for (i = puffs.length - 1; i >= 0; i--) {
+      var p = puffs[i];
+      p.age += dt;
+      if (p.age > p.life) { puffs.splice(i, 1); continue; }
+      p.vy *= Math.exp(-dt * 1.35);
+      p.vx *= Math.exp(-dt * 1.2);
+      p.vx += (windAmt * U * 0.08 + p.curl * Math.sin(p.age * 2.6 + p.ph) * U * 0.09) * dt * slow;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.rot += p.spin * dt;
+    }
+  }
+
+  function drawBreath() {
+    if (!puffs.length) { return; }
+    ctx.globalCompositeOperation = 'lighter';
+    for (var i = 0; i < puffs.length; i++) {
+      var p = puffs[i], t = p.age / p.life;
+      var r = p.r0 + p.grow * Math.pow(t, 0.6);
+      // Dim while still small and bunched together, so the mist is
+      // brightest where it has spread out, not where it starts.
+      var a = 0.3 * smooth(p.age / 0.6) * Math.pow(1 - t, 1.4) * Math.min(1, r / (U * 0.09));
+      if (a < 0.01) { continue; }
+      var c = Math.cos(p.rot), s = Math.sin(p.rot);
+      ctx.setTransform(DPR * c, DPR * s, -DPR * s, DPR * c, DPR * p.x, DPR * p.y);
+      ctx.globalAlpha = a;
+      ctx.drawImage(mistSprites[p.img], -r, -r, 2 * r, 2 * r);
+    }
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
   }
@@ -2737,6 +2846,35 @@
     });
   }
 
+  // Her breath out: a soft, close "haaa" of air that starts bright and
+  // falls away, quiet enough to sit under the music. Not while Dad is
+  // talking.
+  function breathSound() {
+    if (!AC || !noise || AC.state !== 'running' || speaking) { return; }
+    var t = AC.currentTime + 0.02;
+    var src = AC.createBufferSource();
+    src.buffer = noise;
+    var hp = AC.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.setValueAtTime(280, t);
+    var band = AC.createBiquadFilter();
+    band.type = 'bandpass';
+    band.Q.setValueAtTime(0.7, t);
+    band.frequency.setValueAtTime(1350, t);
+    band.frequency.exponentialRampToValueAtTime(650, t + 1.1);
+    var g = AC.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.075, t + 0.14);
+    g.gain.setValueAtTime(0.075, t + 0.3);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.2);
+    src.connect(hp);
+    hp.connect(band);
+    band.connect(g);
+    g.connect(master);
+    src.start(t, Math.random() * 4.5);
+    src.stop(t + 1.3);
+  }
+
   function cometSound(pan) {
     if (!AC || AC.state !== 'running') { return; }
     var t = AC.currentTime + 0.02;
@@ -2797,10 +2935,17 @@
     gameDays += 60 * rate * dt / 86400;
     updateMoon(DAYS + gameDays);
 
-    // Turning: her head follows the finger, but no faster than a head
-    // turns, and stops the moment the finger lifts.
-    var turn = A0goal - A0, maxTurn = (reduced ? 25 : 40) * D2R * dt;
-    A0 += clamp(turn, -maxTurn, maxTurn);
+    // Turning: the sky stays under the finger, up to half a turn a
+    // second, and after a flick it glides a little and settles.
+    if (drag) {
+      var turn = A0goal - A0, maxTurn = (reduced ? 90 : 180) * D2R * dt;
+      A0 += clamp(turn, -maxTurn, maxTurn);
+    } else if (A0vel !== 0) {
+      A0 += A0vel * dt;
+      A0vel *= Math.exp(-dt / 0.35);
+      if (Math.abs(A0vel) < 0.01) { A0vel = 0; }
+      A0goal = A0;
+    }
     var wrap = ((A0 + Math.PI) % TAU + TAU) % TAU - Math.PI - A0;
     A0 += wrap;
     A0goal += wrap;
@@ -2834,6 +2979,9 @@
   var last = 0, workSum = 0, workFrames = 0, workClock = 0, slowWindows = 0;
 
   function frame(now) {
+    // The next frame is asked for first, so that if anything in this
+    // one ever goes wrong the sky carries on rather than freezing.
+    requestAnimationFrame(frame);
     var dt = last ? (now - last) / 1000 : 0.016;
     last = now;
     dt = clamp(dt, 0.001, 0.05);
@@ -2855,14 +3003,14 @@
         workSum = 0; workFrames = 0; workClock = 0;
       }
     }
-    requestAnimationFrame(frame);
   }
 
   // ------------------------------------------------------------------
   // Input. A tap does something where it lands; a drag sideways turns
-  // her head, following the finger at a head's pace, never flung.
+  // her head, with the sky under the finger. A flick glides only a
+  // little way, however hard it is, so the sky can't be sent spinning.
   // ------------------------------------------------------------------
-  var drag = null, downs = {}, A0goal = 0;
+  var drag = null, downs = {}, A0goal = 0, A0vel = 0, GLIDE_MAX = 90 * D2R;
 
   canvas.addEventListener('pointerdown', function (e) {
     initAudio();
@@ -2875,19 +3023,24 @@
     if (!d) { return; }
     if (!d.moved && Math.abs(e.clientX - d.x0) + Math.abs(e.clientY - d.y0) > 12) {
       d.moved = true;
-      if (!drag) { drag = { id: e.pointerId, lastX: d.x0 }; A0goal = A0; }
+      if (!drag) { drag = { id: e.pointerId, lastX: d.x0, lastT: performance.now(), vel: 0 }; A0goal = A0; A0vel = 0; }
     }
     if (drag && drag.id === e.pointerId) {
-      // The goal may run ahead of her head, but only so far: a wild
-      // swipe asks for a quarter turn at most.
-      A0goal = clamp(A0goal - (e.clientX - drag.lastX) / K, A0 - HALF_PI, A0 + HALF_PI);
+      var now = performance.now(), da = -(e.clientX - drag.lastX) / K;
+      // The sky may run behind a wild swipe, but never by more than
+      // half a turn.
+      A0goal = clamp(A0goal + da, A0 - Math.PI, A0 + Math.PI);
+      drag.vel = drag.vel * 0.5 + da / Math.max(0.008, (now - drag.lastT) / 1000) * 0.5;
       drag.lastX = e.clientX;
+      drag.lastT = now;
     }
   });
   function lift(e) {
     var d = downs[e.pointerId];
     delete downs[e.pointerId];
     if (drag && drag.id === e.pointerId) {
+      var fresh = performance.now() - drag.lastT < 100;
+      A0vel = fresh && !reduced ? clamp(drag.vel, -GLIDE_MAX, GLIDE_MAX) : 0;
       drag = null;
       A0goal = A0;
       return;
