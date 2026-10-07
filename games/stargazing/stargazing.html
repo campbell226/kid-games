@@ -1528,25 +1528,27 @@
       var bright = nf * (1 + c.flare * 0.9);
       // The straight blue tail of gas, and the broader, curving tail of
       // dust beside it.
-      for (i = 1; i <= 50; i++) {
-        f = i / 50; u = c.len * 1.25 * f;
+      // The puffs are packed closer near the head, where they are
+      // smallest, so the tail never looks like a string of beads.
+      for (i = 1; i <= 70; i++) {
+        f = Math.pow(i / 70, 1.5); u = c.len * 1.25 * f;
         var tn = Math.tan(u);
         var p = norm3([vx + t[0] * tn, vy + t[1] * tn, vz + t[2] * tn]);
         yu = projEq(p[0], p[1], p[2]);
         if (PD < 0.2 || yu < -0.02) { continue; }
-        r = (0.4 + 0.5 * f) * c.size * D2R * K2 / PD;
-        a = 0.075 * Math.pow(1 - f, 1.2) * bright * hfade(yu);
+        r = (0.45 + 0.5 * f) * c.size * D2R * K2 / PD;
+        a = 0.055 * Math.pow(1 - f, 1.2) * bright * hfade(yu);
         ctx.globalAlpha = Math.min(1, a);
         ctx.drawImage(ionSprite, PX - r, PY - r, 2 * r, 2 * r);
       }
-      for (i = 1; i <= 30; i++) {
-        f = i / 30; u = c.len * f;
+      for (i = 1; i <= 60; i++) {
+        f = Math.pow(i / 60, 1.5); u = c.len * f;
         var tn2 = Math.tan(u), cv = 0.22 * u * f;
         var q = norm3([vx + t[0] * tn2 + w[0] * cv, vy + t[1] * tn2 + w[1] * cv, vz + t[2] * tn2 + w[2] * cv]);
         yu = projEq(q[0], q[1], q[2]);
         if (PD < 0.2 || yu < -0.02) { continue; }
-        r = (0.3 + 1.9 * f) * c.size * D2R * K2 / PD;
-        a = 0.2 * Math.pow(1 - f, 1.4) * bright * hfade(yu);
+        r = (0.45 + 1.8 * f) * c.size * D2R * K2 / PD;
+        a = 0.12 * Math.pow(1 - f, 1.4) * bright * hfade(yu);
         ctx.globalAlpha = Math.min(1, a);
         ctx.drawImage(dustSprite, PX - r, PY - r, 2 * r, 2 * r);
       }
@@ -2093,42 +2095,6 @@
     ctx.globalCompositeOperation = 'source-over';
   }
 
-  // The knitted brim of her hat, out of focus across the top of the
-  // view, hanging a little lower in the middle over her forehead.
-  var HAT = hex('#1d0e16'), HAT_RIB = hex('#36192a');
-  function drawHat() {
-    var hb = Math.max(10, H * 0.032), e0 = hb * 0.45, mid = hb * 1.25;
-    for (var k = 2; k >= 0; k--) {
-      var off = k * Math.max(2, hb * 0.18);
-      ctx.beginPath();
-      ctx.moveTo(-4, -4);
-      ctx.lineTo(W + 4, -4);
-      ctx.lineTo(W + 4, e0 + off);
-      ctx.quadraticCurveTo(W / 2, 2 * (mid + off) - (e0 + off), -4, e0 + off);
-      ctx.closePath();
-      ctx.fillStyle = rgba(HAT, k ? 0.22 : 0.96);
-      ctx.fill();
-    }
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(-4, -4);
-    ctx.lineTo(W + 4, -4);
-    ctx.lineTo(W + 4, e0);
-    ctx.quadraticCurveTo(W / 2, 2 * mid - e0, -4, e0);
-    ctx.closePath();
-    ctx.clip();
-    ctx.strokeStyle = rgba(HAT_RIB, 0.45);
-    ctx.lineWidth = Math.max(1.5, hb * 0.14);
-    ctx.beginPath();
-    var step = Math.max(6, hb * 0.5);
-    for (var x = step / 2; x < W; x += step) {
-      ctx.moveTo(x, -2);
-      ctx.lineTo(x + (x - W / 2) * 0.02, mid + 2);
-    }
-    ctx.stroke();
-    ctx.restore();
-  }
-
   // A tap on empty sky while a shooting star is still flying just makes
   // the sky glint under the finger.
   function drawGlints() {
@@ -2260,7 +2226,6 @@
     drawArm(dadHand);
     drawArm(mitten);
     drawBreath();
-    drawHat();
   }
 
   // ------------------------------------------------------------------
