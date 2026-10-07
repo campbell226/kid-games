@@ -507,10 +507,77 @@
         var p = norm3([c[0] + e[0] * xi + n[0] * eta, c[1] + e[1] * xi + n[1] * eta, c[2] + e[2] * xi + n[2] * eta]);
         v.push(p[0], p[1], p[2]);
       }
+      // The flat-map numbers are kept too, for the pictures that move.
+      cm.loc = cm.v;
       cm.v = v;
     });
     return cmds;
   }
+
+  // ------------------------------------------------------------------
+  // Four of the pictures come alive for a few seconds once they have
+  // glowed in, then settle back onto their stars: the swan beats its
+  // wings, the dolphin swims, the bear ambles and the dragon swishes its
+  // tail. Each is a bending of the picture's own points on the flat
+  // map, with parts turning about a joint, weighted so the joint itself
+  // barely moves and the tips move most.
+  // ------------------------------------------------------------------
+  function turnAbout(x, y, px, py, ang) {
+    var c = Math.cos(ang), s = Math.sin(ang), dx = x - px, dy = y - py;
+    return [px + dx * c - dy * s, py + dx * s + dy * c];
+  }
+  function reach(x, y, px, py, r0, r1) {
+    var dx = x - px, dy = y - py;
+    return smooth((Math.sqrt(dx * dx + dy * dy) - r0) / r1);
+  }
+  // Into and out of the frame a picture was drawn in, so a swan's wings
+  // can be found as "far from its body" whichever way it lies.
+  function frameIn(x, y, f) {
+    var c = Math.cos(f[2] * D2R), s = Math.sin(f[2] * D2R), dx = x - f[0], dy = y - f[1];
+    return [dx * c + dy * s, -dx * s + dy * c];
+  }
+  function frameOut(x, y, f) {
+    var c = Math.cos(f[2] * D2R), s = Math.sin(f[2] * D2R);
+    return [f[0] + x * c - y * s, f[1] + x * s + y * c];
+  }
+  var ANIMS = {
+    'Swan': { len: 4.5, fn: function (x, y, t) {
+      var F = [-2.47, 0.43, 50.4], p = frameIn(x, y, F), env = Math.sin(Math.PI * t);
+      var beat = (1 - Math.cos(TAU * 3 * t)) / 2 * env, w = smooth((Math.abs(p[1]) - 2) / 3);
+      p[1] *= 1 - 0.5 * beat * w;
+      p[0] += -1.2 * beat * w + 0.8 * env;
+      return frameOut(p[0], p[1], F);
+    } },
+    'Dolphin': { len: 3.6, fn: function (x, y, t) {
+      var F = [0.61, 0.01, -144.9], p = frameIn(x, y, F), env = Math.sin(Math.PI * t);
+      if (p[0] < -1.2) {
+        p = turnAbout(p[0], p[1], -1.2, -0.7, 0.45 * Math.sin(TAU * 2 * t) * env * reach(p[0], p[1], -1.2, -0.7, 0.3, 2));
+      }
+      p = turnAbout(p[0], p[1], 0.5, 0, 0.35 * Math.sin(TAU * t));
+      p[0] += 1.4 * env;
+      return frameOut(p[0], p[1], F);
+    } },
+    'Great Bear': { len: 4.2, fn: function (x, y, t) {
+      var env = Math.sin(Math.PI * t), ph = TAU * 2 * t, p = [x, y];
+      if (x > 11 && y > -3.5) { p = turnAbout(x, y, 10.8, -2.8, 0.38 * Math.sin(ph) * env * reach(x, y, 10.8, -2.8, 1.5, 5)); }
+      else if (y > 5 && x > -2.6) { p = turnAbout(x, y, -0.6, 5.2, -0.35 * Math.sin(ph) * env * reach(x, y, -0.6, 5.2, 1, 4)); }
+      else if (y > 8.5 && x < -2.4) { p = turnAbout(x, y, -6.2, 7.2, -0.28 * Math.sin(ph) * env * reach(x, y, -6.2, 7.2, 1.5, 6)); }
+      else if (x < -11.5) { p = turnAbout(x, y, -11.5, -6.6, 0.09 * Math.sin(ph * 0.5) * env * reach(x, y, -11.5, -6.6, 1, 12)); }
+      else if (x > 9.5 && y < -6.5) { p = turnAbout(x, y, 8.8, -9.5, 0.14 * Math.sin(2 * ph) * env); }
+      p[0] += 1.5 * env;
+      p[1] -= 0.7 * Math.abs(Math.sin(ph)) * env;
+      return p;
+    } },
+    'Dragon': { len: 4.2, fn: function (x, y, t) {
+      var env = Math.sin(Math.PI * t), p = [x, y];
+      if (y > 6.5 && x < -4 && x > -14.5) { return turnAbout(x, y, -9.4, 7.5, 0.2 * Math.sin(TAU * 2 * t) * env * reach(x, y, -9.4, 7.5, 1, 4)); }
+      // A ripple running down the body to the tail, which swishes.
+      var w = smooth((x + 5) / 8);
+      p[1] += 0.9 * Math.sin(x * 0.45 - TAU * 2 * t) * env * w;
+      if (x > 11) { p = turnAbout(p[0], p[1], 11, 3, 0.2 * Math.sin(TAU * 1.5 * t) * env * reach(x, y, 11, 3, 1, 18)); }
+      return p;
+    } }
+  };
 
   var groups = GROUPS.map(function (g) {
     var idx = [], edges = [];
@@ -533,6 +600,7 @@
     var f = FIGURES[g.name];
     var grp = {
       name: g.name, stars: idx, edges: edges, cluster: !!g.cluster,
+      slug: g.name.toLowerCase().replace(/ /g, '-'), c: c, e: e, n: n, anim: ANIMS[g.name] || null,
       fig: f ? { d: parseFigure(f.d, c, e, n), l: parseFigure(f.l, c, e, n) } : null,
       brightest: idx.slice().sort(function (a, b) { return stars[a].mag - stars[b].mag; })[0]
     };
@@ -645,15 +713,44 @@
   var SKY_RATE = 360 / 86164.1 * 60;
 
   // Where the sun is today, for where the last of the sunset glows.
-  var SUN = (function () {
-    var L = (280.46 + 0.9856474 * DAYS) * D2R, g = (357.528 + 0.9856003 * DAYS) * D2R;
-    var lam = L + (1.915 * Math.sin(g) + 0.02 * Math.sin(2 * g)) * D2R, eps = 23.439 * D2R;
-    return [Math.cos(lam), Math.cos(eps) * Math.sin(lam), Math.sin(eps) * Math.sin(lam)];
-  })();
+  var EPS = 23.439 * D2R;
+  function sunAt(d) {
+    var L = (280.46 + 0.9856474 * d) * D2R, g = (357.528 + 0.9856003 * d) * D2R;
+    var lam = L + (1.915 * Math.sin(g) + 0.02 * Math.sin(2 * g)) * D2R;
+    return [Math.cos(lam), Math.cos(EPS) * Math.sin(lam), Math.sin(EPS) * Math.sin(lam)];
+  }
+  var SUN = sunAt(DAYS);
   var SUNSET_AZ = TAU - Math.acos(clamp(SUN[2] / COS_LAT, -1, 1));
 
+  // Tonight's Moon, from the short series in the Astronomical Almanac,
+  // good to about a third of a degree, which is far closer than it is
+  // drawn. It moves along among the stars at the same quickened pace as
+  // everything else, so over an evening it creeps a few degrees east.
+  var moon = { x: 1, y: 0, z: 0, sun: SUN, frac: 0, elong: 0, sx: 0, sy: 0, r: 0, front: false, shown: false, flare: 0 };
+  function updateMoon(d) {
+    var T = d / 36525, r = D2R;
+    var lam = 218.32 + 481267.881 * T
+      + 6.29 * Math.sin((135.0 + 477198.87 * T) * r) - 1.27 * Math.sin((259.3 - 413335.36 * T) * r)
+      + 0.66 * Math.sin((235.7 + 890534.22 * T) * r) + 0.21 * Math.sin((269.9 + 954397.74 * T) * r)
+      - 0.19 * Math.sin((357.5 + 35999.05 * T) * r) - 0.11 * Math.sin((186.5 + 966404.03 * T) * r);
+    var bet = 5.13 * Math.sin((93.3 + 483202.02 * T) * r) + 0.28 * Math.sin((228.2 + 960400.89 * T) * r)
+      - 0.28 * Math.sin((318.3 + 6003.15 * T) * r) - 0.17 * Math.sin((217.6 - 407332.21 * T) * r);
+    lam *= r; bet *= r;
+    var cb = Math.cos(bet);
+    moon.x = cb * Math.cos(lam);
+    moon.y = Math.cos(EPS) * cb * Math.sin(lam) - Math.sin(EPS) * Math.sin(bet);
+    moon.z = Math.sin(EPS) * cb * Math.sin(lam) + Math.cos(EPS) * Math.sin(bet);
+    var s = sunAt(d);
+    moon.sun = s;
+    moon.elong = Math.acos(clamp(moon.x * s[0] + moon.y * s[1] + moon.z * s[2], -1, 1));
+    moon.frac = (1 - Math.cos(moon.elong)) / 2;
+  }
+
   // The way you are facing, in radians from north towards east.
-  var A0 = 0, A0vel = 0;
+  var A0 = 0;
+
+  // Days of sky time since the page opened, at the same quickened pace.
+  var gameDays = 0;
 
   // Directions east, north and straight up, written in the stars' own
   // frame; and the view's right and forward, from the way you face.
@@ -823,14 +920,39 @@
     }
   })();
 
+  // Three smudges that are not stars: the Andromeda galaxy, the glow in
+  // Orion's sword, and the haze round the Seven Sisters. Each is a soft
+  // oval, its length laid along the sky at its real angle from north.
+  var nebulaPink = radialSprite(hex('#f2a8cc'), PUFF);
+  var hazeBlue = radialSprite(hex('#a9c3ff'), PUFF);
+  var SMUDGES = [
+    { ra: 0.712, dec: 41.27, len: 3.4, wid: 1.0, pa: 35, img: blobCool, a: 0.42 },
+    { ra: 5.588, dec: -5.39, len: 1.1, wid: 0.9, pa: 0, img: nebulaPink, a: 0.4 },
+    { ra: 3.785, dec: 24.12, len: 1.9, wid: 1.6, pa: 0, img: hazeBlue, a: 0.2 }
+  ].map(function (m) {
+    var v = radec(m.ra, m.dec), e = norm3(cross3([0, 0, 1], v)), n = cross3(v, e);
+    var pa = m.pa * D2R, h = m.len / 2 * D2R;
+    var tip = norm3([v[0] + (n[0] * Math.cos(pa) + e[0] * Math.sin(pa)) * h, v[1] + (n[1] * Math.cos(pa) + e[1] * Math.sin(pa)) * h, v[2] + (n[2] * Math.cos(pa) + e[2] * Math.sin(pa)) * h]);
+    m.v = v; m.tip = tip;
+    return m;
+  });
+
   // ------------------------------------------------------------------
-  // The two of them, lying on a blanket on the top of the hill.
+  // Everything is seen through her eyes. She is lying propped up on a
+  // blanket, looking north, in a bobble hat and mittens; Dad is lying on
+  // her right. Her mitten comes up from below the edge of the view to
+  // point at whatever you tap; his hand comes in from the bottom right
+  // when he has something to show her. Each arm turns towards its
+  // target no faster than an arm would, so a burst of taps makes a calm
+  // wave rather than a twitch, and goes back down when it is done.
   // ------------------------------------------------------------------
-  function makePerson() {
-    return { aim: -1.2, raise: 0, look: -HALF_PI, point: null, pointUntil: 0, gaze: null, gazeUntil: 0, kickT: -99 };
+  function makeHand(dad) {
+    return { dad: dad, raise: 0, ang: -HALF_PI - (dad ? 0.6 : 0), len: 0, target: null, until: 0, trace: null };
   }
-  var child = makePerson(), adult = makePerson();
-  var folk = { s: 100, ox: 0, oy: 0, cs: 62, cxo: 0, cyo: 0, crest: 0 };
+  var mitten = makeHand(false), dadHand = makeHand(true);
+
+  // Her breath, misting up into the cold now and then.
+  var breaths = [], nextBreath = 6;
 
   // ------------------------------------------------------------------
   // Layout
@@ -842,21 +964,12 @@
     canvas.height = Math.round(h * DPR);
     W = w; H = h; U = Math.min(W, H);
     cx = W / 2;
-    hy = H * 0.8;
-    K = Math.min(W * 0.56, H * 0.585);
+    hy = H * 0.82;
+    K = Math.min(W * 0.56, H * 0.6);
     K2 = 2 * K;
 
     mwC.width = Math.max(1, Math.ceil(W / MW_DIV));
     mwC.height = Math.max(1, Math.ceil((hy + 6) / MW_DIV));
-
-    var s = clamp(Math.min(W * 0.36, H * 0.36), 90, 380);
-    folk.s = s;
-    folk.crest = hy + Math.max(H * 0.045, s * 0.12);
-    folk.ox = (W > H ? W * 0.47 : W * 0.5) - 0.48 * s;
-    folk.oy = folk.crest - 0.012 * s;
-    folk.cs = s * 0.62;
-    folk.cxo = folk.ox + 0.15 * s;
-    folk.cyo = folk.oy + 0.04 * s;
     buildGrass();
   }
 
@@ -893,13 +1006,17 @@
   // the land, not the stars: a start, a direction, a speed.
   // ------------------------------------------------------------------
   var meteors = [], nextMeteor = 14, shower = null, nextShower = 210 + Math.random() * 120;
-  var tmp3 = [0, 0, 0];
+
+  // Only one shooting star from a tap at a time: tapping again while it
+  // is still flying just makes the sky glint where the finger lands.
+  var tapMeteor = null, glints = [];
 
   function addMeteor(p, t, bright, tapped) {
     var m = {
       p: p, t: t, w: (15 + Math.random() * 18) * D2R, path: (10 + Math.random() * 14) * D2R,
       streak: (5 + Math.random() * 4) * D2R, age: 0, bright: bright, sx: 0, sy: 0, front: false, dead: false
     };
+    if (tapped) { tapMeteor = m; }
     m.dur = reduced ? 1.8 : m.path / m.w;
     meteors.push(m);
     if (bright > 0.55 || tapped) {
@@ -933,8 +1050,8 @@
       if (nextMeteor <= 0) {
         var m = meteorAt(W * (0.08 + Math.random() * 0.84), hy * (0.06 + Math.random() * 0.62), false);
         nextMeteor = 7 + Math.random() * 14;
-        // A bright one makes the child turn to look.
-        if (m.bright > 0.8) { later(0.15, function () { gazeAt(child, { obj: m }, 1.2); }); }
+        // A bright one gets a word from Dad.
+        if (m.bright > 0.75) { shootingStarLine(); }
       }
       // Now and then a shower: a dozen or so, all flying out from one
       // spot in the sky.
@@ -962,15 +1079,34 @@
     }
     for (i = meteors.length - 1; i >= 0; i--) {
       meteors[i].age += dt;
-      if (meteors[i].age > meteors[i].dur) { meteors[i].dead = true; meteors.splice(i, 1); }
+      if (meteors[i].age > meteors[i].dur) {
+        meteors[i].dead = true;
+        if (meteors[i] === tapMeteor) { tapMeteor = null; }
+        meteors.splice(i, 1);
+      }
     }
+    for (i = glints.length - 1; i >= 0; i--) {
+      glints[i].age += dt;
+      if (glints[i].age > 0.7) { glints.splice(i, 1); }
+    }
+  }
+
+  // Dad on shooting stars: not every one, and never twice within the
+  // same half minute. After his second, he says what they are, once.
+  var shootLines = 0, lastShootLine = -99;
+  function shootingStarLine() {
+    if (clock - lastShootLine < 35) { return; }
+    lastShootLine = clock;
+    shootLines += 1;
+    say(['shoot-1', 'shoot-2', 'shoot-3'][(shootLines - 1) % 3], { wait: 1.2 });
+    if (shootLines === 2) { say('shoot-fact', { wait: 6, once: true }); }
   }
 
   // ------------------------------------------------------------------
   // Satellites: a steady point sliding across in a minute or two, never
   // twinkling. Some fade out halfway, into the earth's shadow.
   // ------------------------------------------------------------------
-  var sats = [], nextSat = 50 + Math.random() * 40;
+  var sats = [], nextSat = 50 + Math.random() * 40, satsShown = 0;
   function updateSats(dt) {
     if (dusk > 0.8) {
       nextSat -= dt;
@@ -983,8 +1119,16 @@
         var big = Math.random() < 0.22;
         var s = { p: p, t: t, w: (big ? 0.6 : 0.7 + Math.random() * 0.5) * D2R, mag: big ? -1.2 : 2.4 + Math.random() * 1.4, age: 0, shadow: Math.random() < 0.35 ? 40 + Math.random() * 50 : 999, sx: 0, sy: 0, front: false, dead: false };
         sats.push(s);
-        // The child spots it and points.
-        later(4 + Math.random() * 3, function () { if (!s.dead && !child.point) { pointAt(child, { obj: s }, 3.5); later(0.6, function () { gazeAt(adult, { obj: s }, 3); }); } });
+        // Dad spots it and points it out, the first time with a word
+        // or two, later just now and then.
+        later(4 + Math.random() * 3, function () {
+          if (s.dead || !s.front || dadBusy()) { return; }
+          satsShown += 1;
+          if (satsShown > 2 && Math.random() < 0.5) { return; }
+          dadPoint({ obj: s }, 4.5);
+          if (big) { say(said.iss ? 'sat-1' : 'iss', { wait: 2 }); }
+          else if (satsShown === 1) { say('sat-1', { wait: 2 }); say('sat-2', { wait: 7, once: true }); }
+        });
       }
     }
     for (var i = sats.length - 1; i >= 0; i--) {
@@ -1014,10 +1158,12 @@
     aur.ph += dt * (reduced ? 0.3 : 1);
     if (!aur.on && clock > aur.next && dusk > 0.95) {
       aur.on = true; aur.t0 = clock; aur.len = 70 + Math.random() * 40;
-      // Both of them look up when it starts, and the child points.
-      later(5, function () {
-        var t = { enu: altAz(14 * D2R, 0) };
-        if (resolve(t)) { pointAt(child, t, 4); later(0.7, function () { gazeAt(adult, t, 6); }); }
+      // Dad points it out as it gets going, and later says what it is.
+      later(6, function () {
+        var t = { enu: altAz(16 * D2R, 0) };
+        if (resolve(t) && !dadBusy()) { dadPoint(t, 5); }
+        say('aurora-1', { wait: 3 });
+        say('aurora-2', { wait: 12, once: true });
       });
     }
     if (aur.on) {
@@ -1033,7 +1179,7 @@
   // for each star as the line reaches it. Then the picture itself glows
   // in behind, and after a while it all fades back to stars.
   // ------------------------------------------------------------------
-  var lit = [], EDGE_T = 0.36, HOLD = 7, FADE = 2.6;
+  var lit = [], EDGE_T = 0.36, HOLD = 9, FADE = 2.6;
 
   function lightGroup(g, from) {
     var i, l;
@@ -1043,11 +1189,18 @@
         l.refresh = clock;
         ring(from, 0.8);
         stars[from].flare = 1;
+        // Tapped again once it has finished moving: it moves again.
+        if (l.done && g.anim && animAt(l) >= 1) { l.animFrom = clock; }
         return l;
       }
     }
-    // No more than four at once: the oldest starts fading now.
-    if (lit.length >= 4) { lit[0].refresh = clock - HOLD; lit[0].end = clock - HOLD - lit[0].start; }
+    say('name-' + g.slug, { wait: 2.5, gap: 25 });
+    // No more than three pictures being shown at once: the oldest starts
+    // fading now. And never more than five on the sky at all, counting
+    // the ones still fading, however fast the taps come.
+    var showing = lit.filter(function (o) { return o.alpha >= 1; });
+    if (showing.length >= 3) { showing[0].refresh = clock - HOLD; showing[0].end = clock - HOLD - showing[0].start; }
+    while (lit.length >= 5) { lit.shift(); }
     var seq = [], seen = {};
     seen[from] = true;
     if (g.cluster) {
@@ -1105,18 +1258,35 @@
     }
   }
 
-  // The picture is complete: a soft low chord, and the child kicks their
-  // feet.
+  // The picture is complete: a soft low chord, and once it has glowed
+  // in, Dad says something true about it, the first time each evening.
   function finished(l) {
     var s = stars[l.g.brightest];
     var pan = clamp((s.sx / W - 0.5) * 1.2, -0.8, 0.8);
     if (AC && AC.state === 'running') {
       var t = AC.currentTime + 0.05;
-      chime(53, pan, 0.55, t);
-      chime(60, pan, 0.45, t + 0.12);
-      chime(65, pan, 0.4, t + 0.24);
+      chime(53, pan, 0.55, t, true);
+      chime(60, pan, 0.45, t + 0.12, true);
+      chime(65, pan, 0.4, t + 0.24, true);
     }
-    child.kickT = clock;
+    var g = l.g;
+    later(1.2, function () { say('fact-' + g.slug, { wait: 8, once: true }); });
+    if (breaths.length < 2) { breathe(); }
+  }
+
+  // Where the pen is, along whichever line is being drawn: Dad's finger
+  // follows it when he is showing her a picture.
+  function penAt(l) {
+    var el = clock - l.start;
+    for (var i = l.seq.length - 1; i >= 0; i--) {
+      var q = l.seq[i];
+      if (q.a < 0 || el < q.t0) { continue; }
+      var A = stars[q.a], B = stars[q.b], p = clamp((el - q.t0) / EDGE_T, 0, 1);
+      if (!A.front || !B.front) { return null; }
+      return [A.sx + (B.sx - A.sx) * p, A.sy + (B.sy - A.sy) * p];
+    }
+    var s = stars[l.g.brightest];
+    return s.front ? [s.sx, s.sy] : null;
   }
 
   // ------------------------------------------------------------------
@@ -1136,59 +1306,75 @@
     }
     return null;
   }
-  function pointAt(p, t, secs) {
-    p.point = t; p.pointUntil = clock + secs;
-    p.gaze = t; p.gazeUntil = clock + secs;
-  }
-  function gazeAt(p, t, secs) { p.gaze = t; p.gazeUntil = clock + secs; }
+  function herPoint(t, secs) { mitten.target = t; mitten.until = clock + secs; mitten.trace = null; }
+  function dadPoint(t, secs, trace) { dadHand.target = t; dadHand.until = clock + secs; dadHand.trace = trace || null; }
+  function dadBusy() { return !!dadHand.target || dadHand.raise > 0.1; }
 
-  function shoulder(p) {
-    if (p === child) { return [folk.cxo + 0.16 * folk.cs, folk.cyo - 0.13 * folk.cs]; }
-    return [folk.ox + 0.14 * folk.s, folk.oy - 0.11 * folk.s];
+  // Where each shoulder is: hers just below the bottom of the view, a
+  // little left of the middle; his off the bottom right corner.
+  function shoulderOf(h) {
+    return h.dad ? [W + U * 0.1, H + U * 0.06] : [W * 0.4, H + U * 0.2];
   }
 
-  function updatePerson(p, dt, idle) {
-    if (p.point && clock > p.pointUntil) { p.point = null; }
-    if (p.gaze && clock > p.gazeUntil) { p.gaze = null; }
-    var sh = shoulder(p);
-    var pt = resolve(p.point), gz = resolve(p.gaze), k;
+  // An arm turns towards its target at no more than a set speed, and
+  // reaches until the hand is a little short of it, so it never covers
+  // what it is pointing at.
+  function updateHand(h, dt) {
+    if (h.target && clock > h.until) { h.target = null; h.trace = null; }
+    var pt = null;
+    if (h.trace) { pt = h.trace.alpha > 0 ? penAt(h.trace) : null; }
+    else if (h.target) { pt = resolve(h.target); }
+    // Nobody points at what they can't see.
+    if (pt && (pt[0] < -20 || pt[0] > W + 20 || pt[1] < 0 || pt[1] > hy)) { pt = null; }
+    var sh = shoulderOf(h);
     if (pt) {
-      var ang = clamp(Math.atan2(pt[1] - sh[1], pt[0] - sh[0]), -Math.PI + 0.35, -0.3);
-      if (p.raise < 0.05) { p.aim = ang; }
-      p.aim += (ang - p.aim) * Math.min(1, dt * 5);
+      var want = Math.atan2(pt[1] - sh[1], pt[0] - sh[0]);
+      want = h.dad ? clamp(want, -Math.PI + 0.15, -0.95) : clamp(want, -Math.PI + 0.25, -0.25);
+      if (h.raise < 0.05) { h.ang = want; }
+      var maxTurn = (reduced ? 1.1 : 2.2) * dt, d = want - h.ang;
+      h.ang += clamp(d, -maxTurn, maxTurn);
+      var dist = Math.sqrt((pt[0] - sh[0]) * (pt[0] - sh[0]) + (pt[1] - sh[1]) * (pt[1] - sh[1]));
+      // Arms reach about halfway: the direction says where, and the
+      // hand stays low enough never to hide what it points at.
+      var full = clamp(dist * 0.5, U * 0.28, U * (h.dad ? 0.55 : 0.5));
+      h.len += (full - h.len) * Math.min(1, dt * 3);
     }
-    k = Math.min(1, dt * (pt ? 3 : 1.4) * (reduced ? 0.6 : 1));
-    p.raise += ((pt ? 1 : 0) - p.raise) * k;
-    var look = idle;
-    if (gz) { look = clamp(Math.atan2(gz[1] - sh[1], gz[0] - sh[0]), -HALF_PI - 0.75, -HALF_PI + 0.75); }
-    p.look += (look - p.look) * Math.min(1, dt * 3);
+    var k = Math.min(1, dt * (pt ? 2.6 : 1.5) * (reduced ? 0.6 : 1));
+    h.raise += ((pt ? 1 : 0) - h.raise) * k;
+    if (h.raise < 0.01 && !pt) { h.raise = 0; }
   }
 
-  // Every couple of minutes the grown-up points out the comet, and the
-  // child turns to look where they are pointing.
-  var nextShowComet = 75 + Math.random() * 40;
-  function updateFolk(dt) {
+  // Every couple of minutes Dad points out the comet; the first two
+  // times he says what it is.
+  var nextShowComet = 75 + Math.random() * 40, cometsShown = 0, mwSpoken = false;
+  function updateHands(dt) {
     if (dusk > 0.9 && clock > nextShowComet) {
       nextShowComet = clock + 110 + Math.random() * 80;
       var c = comets[0];
-      if (c && c.front && !adult.point && !child.point) {
-        pointAt(adult, { obj: c }, 4.5);
-        later(0.8, function () { gazeAt(child, { obj: c }, 3.5); });
+      if (c && c.front && !dadBusy()) {
+        dadPoint({ obj: c }, 5);
+        cometsShown += 1;
+        if (cometsShown === 1) { say('comet-1', { wait: 2 }); }
+        if (cometsShown === 2) { say('comet-2', { wait: 2, once: true }); }
       }
     }
-    updatePerson(child, dt, -HALF_PI + 0.12 * Math.sin(clock * 0.21));
-    updatePerson(adult, dt, -HALF_PI + 0.1 * Math.sin(clock * 0.13 + 2));
+    if (!mwSpoken && dusk > 0.92 && clock > 40) {
+      mwSpoken = true;
+      later(3, function () { say('milky-way', { wait: 20, once: true }); });
+    }
+    updateHand(mitten, dt);
+    updateHand(dadHand, dt);
   }
 
-  // While it gets dark, the child points out the first few stars as
-  // they appear.
+  // While it gets dark, Dad points out the first few stars as they
+  // appear.
   var firstStars = 0, lastFirst = -9;
   function spotFirst(i) {
-    if (firstStars >= 3 || clock - lastFirst < 3) { return; }
+    if (firstStars >= 3 || clock - lastFirst < 4 || dadBusy()) { return; }
     firstStars += 1;
     lastFirst = clock;
-    pointAt(child, { star: i }, 2.8);
-    later(0.6, function () { gazeAt(adult, { star: i }, 2.6); });
+    dadPoint({ star: i }, 3);
+    say(['dusk-first', 'dusk-another', 'dusk-all'][firstStars - 1], { wait: 1.5 });
   }
 
   // ------------------------------------------------------------------
@@ -1483,11 +1669,22 @@
   // ------------------------------------------------------------------
   var FONT = 'ui-rounded, "Segoe UI", system-ui, -apple-system, sans-serif';
 
-  function figurePath(cmds) {
+  // A picture's outline on the screen. When it is moving, each point is
+  // bent on the flat map first and then turned back into a direction.
+  function figurePath(cmds, g, at) {
+    var mv = g && g.anim && at > 0 && at < 1, c = g ? g.c : null, e = g ? g.e : null, n = g ? g.n : null;
     for (var i = 0; i < cmds.length; i++) {
       var cm = cmds[i], v = cm.v, pts = [];
       for (var j = 0; j < v.length; j += 3) {
-        projEq(v[j], v[j + 1], v[j + 2]);
+        if (mv) {
+          var q = g.anim.fn(cm.loc[j / 3 * 2], cm.loc[j / 3 * 2 + 1], at);
+          var xi = -q[0] * D2R, eta = -q[1] * D2R;
+          var dx = c[0] + e[0] * xi + n[0] * eta, dy = c[1] + e[1] * xi + n[1] * eta, dz = c[2] + e[2] * xi + n[2] * eta;
+          var dm = Math.sqrt(dx * dx + dy * dy + dz * dz);
+          projEq(dx / dm, dy / dm, dz / dm);
+        } else {
+          projEq(v[j], v[j + 1], v[j + 2]);
+        }
         if (PD < 0.2) { return false; }
         pts.push(PX, PY);
       }
@@ -1500,11 +1697,11 @@
     return true;
   }
 
-  function drawFigure(fig, a) {
+  function drawFigure(fig, a, g, at) {
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
     ctx.beginPath();
-    if (!figurePath(fig.d)) { return; }
+    if (!figurePath(fig.d, g, at)) { return; }
     ctx.fillStyle = 'rgba(140,170,255,' + (0.08 * a).toFixed(3) + ')';
     ctx.fill();
     ctx.strokeStyle = 'rgba(150,180,255,' + (0.1 * a).toFixed(3) + ')';
@@ -1515,8 +1712,18 @@
     ctx.stroke();
     if (fig.l.length) {
       ctx.beginPath();
-      if (figurePath(fig.l)) { ctx.stroke(); }
+      if (figurePath(fig.l, g, at)) { ctx.stroke(); }
     }
+  }
+
+  // How far through its moment of life a picture is: it starts once the
+  // picture has fully glowed in, and again each time it is tapped after
+  // that. Never with reduced motion.
+  function animAt(l) {
+    var g = l.g;
+    if (!g.anim || !l.done || reduced) { return 0; }
+    var t0 = Math.max(l.doneAt + 2, l.animFrom || 0);
+    return (clock - t0) / g.anim.len;
   }
 
   function centroid(g) {
@@ -1534,7 +1741,7 @@
       var l = lit[k], a = clamp(l.alpha, 0, 1), el = clock - l.start, g = l.g;
       if (g.fig && l.done) {
         var fa = a * smooth((clock - l.doneAt) / 1.6);
-        if (fa > 0.01) { drawFigure(g.fig, fa); }
+        if (fa > 0.01) { drawFigure(g.fig, fa, g, animAt(l)); }
       }
       ctx.lineCap = 'round';
       for (i = 0; i < l.seq.length; i++) {
@@ -1618,7 +1825,7 @@
   // Drawing the land
   // ------------------------------------------------------------------
   var LAND_DUSK = hex('#1b2036'), LAND_NIGHT = hex('#0a1020'), AURORA_TINT = hex('#0e2a22');
-  var NEAR = hex('#03050b'), FOLK = hex('#010207');
+  var NEAR = hex('#03050b');
 
   function landColour() {
     return mix(mix(LAND_DUSK, LAND_NIGHT, dusk), AURORA_TINT, 0.3 * aur.s);
@@ -1693,185 +1900,342 @@
     }
   }
 
-  // The near hillside, with grass along its top that moves in the wind.
+  // The field in front of her, falling away into the dark, and the
+  // grass close to her eyes at the bottom corners, swaying in the wind.
+  // Thick at the edges and thin in the middle, so it frames the sky
+  // without hiding it.
   var grass = [];
   function buildGrass() {
     grass = [];
-    var rnd = seeded(13), x = 0;
-    var b0 = folk.ox - 0.16 * folk.s, b1 = folk.ox + 1.2 * folk.s;
-    while (x < W) {
-      x += 3 + rnd() * 9;
-      if (x > b0 && x < b1) { continue; }
-      grass.push({ x: x, h: 3 + rnd() * 8 * Math.max(1, U / 500), lean: (rnd() - 0.5) * 0.5, ph: rnd() * TAU });
+    var rnd = seeded(13), x = -12;
+    while (x < W + 12) {
+      var edge = Math.min(1, Math.pow(Math.abs(x - W / 2) / (W / 2), 1.6));
+      x += (2 + rnd() * 6) * (1.4 - edge);
+      if (rnd() > 0.2 + 0.8 * edge) { continue; }
+      grass.push({
+        x: x, h: U * (0.025 + 0.13 * edge * (0.45 + rnd() * 0.75)), w: 1 + 3 * edge * rnd(),
+        lean: (rnd() - 0.5) * 0.5 + (x < W / 2 ? -0.18 : 0.18), ph: rnd() * TAU
+      });
     }
-  }
-  // A rounded hilltop, level under the blanket.
-  function knollY(x) {
-    var mid = folk.ox + 0.5 * folk.s, flat = 0.72 * folk.s;
-    var d = Math.max(0, Math.abs(x - mid) - flat) / Math.max(60, W * 0.65 - flat);
-    return folk.crest + H * 0.075 * d * d;
   }
   var windAmt = 0;
-  function drawKnoll() {
-    ctx.fillStyle = rgba(NEAR);
-    ctx.beginPath();
-    ctx.moveTo(-4, H + 4);
-    for (var x = -4; x <= W + 8; x += 8) { ctx.lineTo(x, knollY(x)); }
-    ctx.lineTo(W + 4, H + 4);
-    ctx.closePath();
-    ctx.fill();
+  function drawNear() {
+    var g = ctx.createLinearGradient(0, hy + H * 0.02, 0, H);
+    g.addColorStop(0, rgba(NEAR, 0));
+    g.addColorStop(1, rgba(NEAR, 0.92));
+    ctx.fillStyle = g;
+    ctx.fillRect(0, hy, W, H - hy);
     ctx.strokeStyle = rgba(NEAR);
-    ctx.lineWidth = 1.2;
     ctx.lineCap = 'round';
-    ctx.beginPath();
     var sw = reduced ? 0.3 : 1;
     for (var i = 0; i < grass.length; i++) {
-      var g = grass[i], y = knollY(g.x) + 1;
-      var bend = g.lean + sw * (0.08 * Math.sin(clock * 1.3 + g.ph) + 0.35 * windAmt * (0.6 + 0.4 * Math.sin(clock * 2.1 + g.x * 0.02)));
-      ctx.moveTo(g.x, y);
-      ctx.quadraticCurveTo(g.x + Math.sin(bend) * g.h * 0.4, y - g.h * 0.6, g.x + Math.sin(bend) * g.h, y - Math.cos(bend) * g.h);
-    }
-    ctx.stroke();
-  }
-
-  // ------------------------------------------------------------------
-  // Drawing the two of them. Each is drawn twice: first a little larger
-  // in the faint colour the sky puts on their edges, then in black on
-  // top, which leaves a thin rim of light round each of them and keeps
-  // the child readable in front of the grown-up.
-  // ------------------------------------------------------------------
-  var ADULT_BODY = [[0.07, -0.04], [0.075, -0.1], [0.13, -0.135], [0.24, -0.155], [0.36, -0.142], [0.48, -0.126],
-    [0.6, -0.1], [0.75, -0.08], [0.9, -0.066], [0.935, -0.066], [0.95, -0.14], [0.99, -0.135], [1.0, -0.06], [1.0, 0], [0.06, 0]];
-  var CHILD_BODY = [[0.075, -0.045], [0.085, -0.1], [0.15, -0.15], [0.27, -0.165], [0.4, -0.15], [0.52, -0.13],
-    [0.66, -0.095], [0.8, -0.08], [0.9, -0.07], [0.93, -0.07], [0.95, -0.15], [0.99, -0.145], [1.0, -0.07], [1.0, 0], [0.06, 0]];
-
-  function smoothShape(pts) {
-    var n = pts.length, i;
-    ctx.moveTo((pts[n - 1][0] + pts[0][0]) / 2, (pts[n - 1][1] + pts[0][1]) / 2);
-    for (i = 0; i < n; i++) {
-      var a = pts[i], b = pts[(i + 1) % n];
-      ctx.quadraticCurveTo(a[0], a[1], (a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
-    }
-    ctx.closePath();
-  }
-
-  function limb(pts, w) {
-    ctx.lineWidth = w;
-    ctx.beginPath();
-    ctx.moveTo(pts[0][0], pts[0][1]);
-    for (var i = 1; i < pts.length; i++) { ctx.lineTo(pts[i][0], pts[i][1]); }
-    ctx.stroke();
-  }
-
-  function personShapes(isChild, rim, rimCol) {
-    var p = isChild ? child : adult;
-    var s = isChild ? folk.cs : folk.s, ox = isChild ? folk.cxo : folk.ox, oy = isChild ? folk.cyo : folk.oy;
-    var breathe = 0.006 * Math.sin(clock * TAU / (isChild ? 3.1 : 4.2));
-    var base = isChild ? CHILD_BODY : ADULT_BODY, pts = [], i;
-    for (i = 0; i < base.length; i++) {
-      var by = base[i][1] - (i >= 2 && i <= 4 ? breathe : 0);
-      pts.push([ox + base[i][0] * s, oy + by * s]);
-    }
-    var grow = rim ? 1.3 : 0;
-    ctx.beginPath();
-    smoothShape(pts);
-    // Head, and the nose showing which way it is turned.
-    var hr = (isChild ? 0.1 : 0.08) * s, hx = ox, hyy = oy - (isChild ? 0.105 : 0.085) * s, lk = p.look;
-    ctx.moveTo(hx + hr + grow, hyy);
-    ctx.arc(hx, hyy, hr + grow, 0, TAU);
-    ctx.moveTo(hx + Math.cos(lk - 0.32) * (hr * 0.85), hyy + Math.sin(lk - 0.32) * (hr * 0.85));
-    ctx.lineTo(hx + Math.cos(lk) * (hr * 1.22 + grow), hyy + Math.sin(lk) * (hr * 1.22 + grow));
-    ctx.lineTo(hx + Math.cos(lk + 0.32) * (hr * 0.85), hyy + Math.sin(lk + 0.32) * (hr * 0.85));
-    ctx.closePath();
-    if (isChild) {
-      // A bobble hat, on the crown of the head, turning with it.
-      var kk = lk - HALF_PI;
-      ctx.moveTo(hx + Math.cos(kk - 1.5) * (hr * 1.08 + grow), hyy + Math.sin(kk - 1.5) * (hr * 1.08 + grow));
-      ctx.arc(hx, hyy, hr * 1.08 + grow, kk - 1.5, kk + 1.5);
-      ctx.closePath();
-      var bx = hx + Math.cos(kk) * hr * 1.38, bby = hyy + Math.sin(kk) * hr * 1.38;
-      ctx.moveTo(bx + hr * 0.36 + grow, bby);
-      ctx.arc(bx, bby, hr * 0.36 + grow, 0, TAU);
-    }
-    ctx.fill();
-    if (rim) { ctx.lineWidth = 2.6; ctx.lineJoin = 'round'; ctx.stroke(); }
-    else if (isChild) {
-      // The edge of the hat, caught by the same faint light.
-      ctx.save();
-      ctx.strokeStyle = rimCol;
-      ctx.lineWidth = 1.2;
+      var b = grass[i], y = H + 4;
+      var bend = b.lean + sw * (0.06 * Math.sin(clock * 1.1 + b.ph) + 0.3 * windAmt * (0.6 + 0.4 * Math.sin(clock * 1.9 + b.x * 0.02)));
+      ctx.lineWidth = b.w;
       ctx.beginPath();
-      ctx.moveTo(hx + Math.cos(kk - 1.5) * hr * 1.06, hyy + Math.sin(kk - 1.5) * hr * 1.06);
-      ctx.quadraticCurveTo(hx - Math.cos(kk) * hr * 0.35, hyy - Math.sin(kk) * hr * 0.35,
-        hx + Math.cos(kk + 1.5) * hr * 1.06, hyy + Math.sin(kk + 1.5) * hr * 1.06);
+      ctx.moveTo(b.x, y);
+      ctx.quadraticCurveTo(b.x + Math.sin(bend) * b.h * 0.35, y - b.h * 0.6, b.x + Math.sin(bend) * b.h, y - Math.cos(bend) * b.h);
       ctx.stroke();
-      ctx.restore();
-    }
-
-    // Limbs.
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    var sh = [ox + (isChild ? 0.16 : 0.14) * s, oy - (isChild ? 0.13 : 0.11) * s];
-    var ua = isChild ? 0.22 : 0.21, fa = isChild ? 0.2 : 0.2, aw = (isChild ? 0.075 : 0.055) * s + grow * 2;
-    // At rest the arm lies along the body with the hand on the tummy, so
-    // only the hand shows; pointing, it straightens towards the target.
-    var restUp = isChild ? 0.25 : 0.3, restBend = isChild ? -0.7 : -0.62;
-    var r = smooth(p.raise), up = restUp + (p.aim - restUp) * r, bend = restBend + (-0.08 - restBend) * r;
-    var el = [sh[0] + Math.cos(up) * ua * s, sh[1] + Math.sin(up) * ua * s];
-    var hand = [el[0] + Math.cos(up + bend) * fa * s, el[1] + Math.sin(up + bend) * fa * s];
-    limb([sh, el, hand], aw);
-    if (r > 0.3) {
-      // A finger, pointing.
-      var fl = 0.05 * s * (r - 0.3) / 0.7;
-      limb([hand, [hand[0] + Math.cos(up + bend) * fl, hand[1] + Math.sin(up + bend) * fl]], aw * 0.38 + grow * 1.2);
-    }
-    if (!isChild) {
-      // One knee up.
-      limb([[ox + 0.5 * s, oy - 0.06 * s], [ox + 0.68 * s, oy - 0.24 * s], [ox + 0.86 * s, oy - 0.04 * s]], 0.075 * s + grow * 2);
-      limb([[ox + 0.85 * s, oy - 0.02 * s], [ox + 0.93 * s, oy - 0.02 * s]], 0.045 * s + grow * 2);
-    } else {
-      // The near leg, which kicks when a picture is finished.
-      var kt = clock - p.kickT, kick = 0;
-      if (kt < 1.3) { kick = reduced ? Math.sin(Math.PI * kt / 1.3) * 0.6 : Math.abs(Math.sin(Math.PI * kt / 0.45)) * (1 - kt / 1.3); }
-      var hip = [ox + 0.53 * s, oy - 0.06 * s];
-      var knee = [ox + (0.72 - 0.03 * kick) * s, oy - (0.065 + 0.2 * kick) * s];
-      var ank = [ox + (0.9 - 0.05 * kick) * s, oy - (0.05 + 0.08 * kick) * s];
-      limb([hip, knee, ank, [ank[0] + 0.02 * s, ank[1] - 0.075 * s]], 0.085 * s + grow * 2);
-    }
-  }
-
-  function drawPeople() {
-    var s = folk.s, ox = folk.ox, oy = folk.oy;
-    // The blanket, and a flask standing at its corner.
-    ctx.fillStyle = rgba(mix(NEAR, hex('#3a1a2a'), 0.35));
-    ctx.beginPath();
-    ctx.moveTo(ox - 0.14 * s, oy + 0.004 * s);
-    ctx.lineTo(ox + 1.12 * s, oy + 0.004 * s);
-    ctx.lineTo(ox + 1.16 * s, oy + 0.04 * s);
-    ctx.lineTo(ox - 0.18 * s, oy + 0.04 * s);
-    ctx.closePath();
-    ctx.fill();
-    var rimCol = rgba(mix(hex('#8ea2e0'), hex('#5fd9a0'), aur.s * 0.6), (0.4 + 0.2 * aur.s).toFixed(3));
-    var fx = ox + 1.2 * s, fw = 0.04 * s, fh = 0.12 * s;
-    ctx.fillStyle = rimCol;
-    ctx.fillRect(fx - 1.3, oy - fh - 1.3, fw + 2.6, fh + 2.6);
-    ctx.fillStyle = rgba(FOLK);
-    ctx.fillRect(fx, oy - fh, fw, fh);
-    ctx.fillRect(fx - fw * 0.15, oy - fh - fw * 0.5, fw * 1.3, fw * 0.6);
-
-    for (var who = 0; who < 2; who++) {
-      var isChild = who === 1;
-      ctx.fillStyle = rimCol;
-      ctx.strokeStyle = rimCol;
-      personShapes(isChild, true, rimCol);
-      ctx.fillStyle = rgba(FOLK);
-      ctx.strokeStyle = rgba(FOLK);
-      personShapes(isChild, false, rimCol);
     }
   }
 
   // ------------------------------------------------------------------
-  // Everything, in order from the back
+  // The arms. Each is a coat sleeve from the shoulder, below the edge of
+  // the view, out to the wrist, narrowing as it goes away from her eye;
+  // then her knitted mitten, or Dad's hand with one finger pointing.
+  // Both are dark against the sky, with a thin rim of the sky's light
+  // along their edges so they read as solid things in front of it.
+  // ------------------------------------------------------------------
+  var MITTEN = hex('#7e2b3e'), CUFF = hex('#a9465c'), COAT = hex('#141a2c'), DAD_COAT = hex('#181d19');
+  var DAD_CUFF = hex('#262e27'), SKIN = hex('#3a2f2a');
+
+  function rimColour(a) {
+    return rgba(mix(hex('#9aaee8'), hex('#5fd9a0'), aur.s * 0.6), ((0.3 + 0.15 * aur.s) * a).toFixed(3));
+  }
+
+  function drawArm(h) {
+    if (h.raise < 0.01) { return; }
+    var sh = shoulderOf(h), r = smooth(h.raise), L = h.len * r;
+    var c = Math.cos(h.ang), s = Math.sin(h.ang), px = -s, py = c;
+    var wx = sh[0] + c * L, wy = sh[1] + s * L;
+    var w0 = U * (h.dad ? 0.21 : 0.17), w1 = U * (h.dad ? 0.075 : 0.068);
+    var mx = sh[0] + c * L * 0.5, my = sh[1] + s * L * 0.5, wm = (w0 + w1) / 2 * 1.08;
+    ctx.beginPath();
+    ctx.moveTo(sh[0] + px * w0 / 2, sh[1] + py * w0 / 2);
+    ctx.quadraticCurveTo(mx + px * wm / 2, my + py * wm / 2, wx + px * w1 / 2, wy + py * w1 / 2);
+    ctx.lineTo(wx - px * w1 / 2, wy - py * w1 / 2);
+    ctx.quadraticCurveTo(mx - px * wm / 2, my - py * wm / 2, sh[0] - px * w0 / 2, sh[1] - py * w0 / 2);
+    ctx.closePath();
+    ctx.fillStyle = rgba(h.dad ? DAD_COAT : COAT);
+    ctx.fill();
+    ctx.strokeStyle = rimColour(1);
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    ctx.save();
+    ctx.translate(wx, wy);
+    ctx.rotate(h.ang);
+    if (h.dad) { dadHandShape(U * 0.085); } else { mittenShape(U * 0.078); }
+    ctx.restore();
+  }
+
+  // Her mitten, pointing the way her arm points: a knitted cuff, a
+  // rounded mitten and its thumb. The x axis runs along her arm.
+  function mittenShape(m) {
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.ellipse(0.72 * m, 0, 0.6 * m, 0.48 * m, 0, 0, TAU);
+    ctx.moveTo(0.7 * m, 0.42 * m);
+    ctx.ellipse(0.5 * m, 0.5 * m, 0.27 * m, 0.14 * m, 0.65, 0, TAU);
+    ctx.fillStyle = rgba(MITTEN);
+    ctx.fill();
+    ctx.strokeStyle = rimColour(1);
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    // The knit: faint rows across it.
+    ctx.strokeStyle = rgba(CUFF, 0.35);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (var k = 0; k < 4; k++) {
+      var x = (0.35 + k * 0.22) * m;
+      ctx.moveTo(x, -0.36 * m);
+      ctx.quadraticCurveTo(x + 0.08 * m, 0, x, 0.36 * m);
+    }
+    ctx.stroke();
+    // The cuff, ribbed.
+    ctx.beginPath();
+    ctx.moveTo(-0.2 * m, -0.5 * m);
+    ctx.lineTo(0.22 * m, -0.52 * m);
+    ctx.lineTo(0.22 * m, 0.52 * m);
+    ctx.lineTo(-0.2 * m, 0.5 * m);
+    ctx.closePath();
+    ctx.fillStyle = rgba(CUFF);
+    ctx.fill();
+    ctx.strokeStyle = rimColour(1);
+    ctx.stroke();
+    ctx.strokeStyle = rgba(MITTEN, 0.6);
+    ctx.beginPath();
+    for (var j = -3; j <= 3; j++) {
+      ctx.moveTo(-0.18 * m, j * 0.14 * m);
+      ctx.lineTo(0.2 * m, j * 0.14 * m);
+    }
+    ctx.stroke();
+  }
+
+  // Dad's hand, from the back: the cuff of his jacket, his hand with
+  // the fingers curled, and his first finger straight out, pointing.
+  function dadHandShape(m) {
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    // Back of the hand and the curled fingers.
+    ctx.moveTo(0.05 * m, -0.4 * m);
+    ctx.quadraticCurveTo(0.45 * m, -0.48 * m, 0.7 * m, -0.42 * m);
+    // The pointing finger.
+    ctx.lineTo(1.45 * m, -0.4 * m);
+    ctx.quadraticCurveTo(1.6 * m, -0.3 * m, 1.45 * m, -0.18 * m);
+    ctx.lineTo(0.82 * m, -0.16 * m);
+    // Knuckles of the curled fingers.
+    ctx.quadraticCurveTo(0.95 * m, -0.05 * m, 0.88 * m, 0.08 * m);
+    ctx.quadraticCurveTo(0.97 * m, 0.2 * m, 0.86 * m, 0.3 * m);
+    ctx.quadraticCurveTo(0.9 * m, 0.42 * m, 0.7 * m, 0.44 * m);
+    ctx.quadraticCurveTo(0.4 * m, 0.48 * m, 0.05 * m, 0.4 * m);
+    ctx.closePath();
+    // The thumb, tucked along the near side.
+    ctx.moveTo(0.3 * m, -0.38 * m);
+    ctx.quadraticCurveTo(0.55 * m, -0.62 * m, 0.78 * m, -0.5 * m);
+    ctx.quadraticCurveTo(0.7 * m, -0.38 * m, 0.45 * m, -0.34 * m);
+    ctx.closePath();
+    ctx.fillStyle = rgba(SKIN);
+    ctx.fill();
+    ctx.strokeStyle = rimColour(1);
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    // The cuff of his jacket.
+    ctx.beginPath();
+    ctx.moveTo(-0.16 * m, -0.6 * m);
+    ctx.lineTo(0.1 * m, -0.56 * m);
+    ctx.lineTo(0.1 * m, 0.56 * m);
+    ctx.lineTo(-0.16 * m, 0.6 * m);
+    ctx.closePath();
+    ctx.fillStyle = rgba(DAD_CUFF);
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  // Her breath: a soft white puff rising from below the view and
+  // fading, every so often, and once more when a picture is finished.
+  var mistSprite = radialSprite([236, 240, 250], PUFF);
+  function breathe() {
+    breaths.push({ x: W * (0.46 + Math.random() * 0.08), age: 0, life: 3.2, drift: (Math.random() - 0.5) * 0.08 });
+  }
+  function updateBreath(dt) {
+    nextBreath -= dt;
+    if (nextBreath <= 0) { breathe(); nextBreath = 9 + Math.random() * 8; }
+    for (var i = breaths.length - 1; i >= 0; i--) {
+      breaths[i].age += dt;
+      if (breaths[i].age > breaths[i].life) { breaths.splice(i, 1); }
+    }
+  }
+  function drawBreath() {
+    ctx.globalCompositeOperation = 'lighter';
+    for (var i = 0; i < breaths.length; i++) {
+      var b = breaths[i], t = b.age / b.life;
+      var a = 0.11 * Math.pow(Math.sin(Math.PI * t), 1.3);
+      var rise = reduced ? 0.04 : 0.32 * (1 - (1 - t) * (1 - t));
+      var y = H + U * 0.04 - U * rise, x = b.x + b.drift * W * t;
+      for (var k = 0; k < 3; k++) {
+        var r = U * (0.07 + 0.16 * t) * (1 - k * 0.22);
+        ctx.globalAlpha = a * (1 - k * 0.25);
+        ctx.drawImage(mistSprite, x + (k - 1) * r * 0.45 - r, y - k * r * 0.25 - r, 2 * r, 2 * r);
+      }
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // The knitted brim of her hat, out of focus across the top of the
+  // view, hanging a little lower in the middle over her forehead.
+  var HAT = hex('#1d0e16'), HAT_RIB = hex('#36192a');
+  function drawHat() {
+    var hb = Math.max(10, H * 0.032), e0 = hb * 0.45, mid = hb * 1.25;
+    for (var k = 2; k >= 0; k--) {
+      var off = k * Math.max(2, hb * 0.18);
+      ctx.beginPath();
+      ctx.moveTo(-4, -4);
+      ctx.lineTo(W + 4, -4);
+      ctx.lineTo(W + 4, e0 + off);
+      ctx.quadraticCurveTo(W / 2, 2 * (mid + off) - (e0 + off), -4, e0 + off);
+      ctx.closePath();
+      ctx.fillStyle = rgba(HAT, k ? 0.22 : 0.96);
+      ctx.fill();
+    }
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(-4, -4);
+    ctx.lineTo(W + 4, -4);
+    ctx.lineTo(W + 4, e0);
+    ctx.quadraticCurveTo(W / 2, 2 * mid - e0, -4, e0);
+    ctx.closePath();
+    ctx.clip();
+    ctx.strokeStyle = rgba(HAT_RIB, 0.45);
+    ctx.lineWidth = Math.max(1.5, hb * 0.14);
+    ctx.beginPath();
+    var step = Math.max(6, hb * 0.5);
+    for (var x = step / 2; x < W; x += step) {
+      ctx.moveTo(x, -2);
+      ctx.lineTo(x + (x - W / 2) * 0.02, mid + 2);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // A tap on empty sky while a shooting star is still flying just makes
+  // the sky glint under the finger.
+  function drawGlints() {
+    ctx.globalCompositeOperation = 'lighter';
+    for (var i = 0; i < glints.length; i++) {
+      var gl = glints[i], t = gl.age / 0.7, r = 12 * (1 - t) + 4;
+      ctx.globalAlpha = 0.8 * (1 - t);
+      ctx.drawImage(starSprites[1], gl.x - r, gl.y - r, 2 * r, 2 * r);
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // ------------------------------------------------------------------
+  // The Moon, drawn about six times its real size, which is about how
+  // big it looks. Its lit side faces the real sun, its shape is tonight's
+  // shape, and the dark seas on its face are turned the way they really
+  // are against the sky. The unlit part glows very faintly, the way it
+  // does from earthshine around a crescent.
+  // ------------------------------------------------------------------
+  var MARIA = [
+    [-0.38, -0.42, 0.28, 0.24, 0], [-0.62, 0.02, 0.24, 0.42, 0.2], [0.12, -0.38, 0.19, 0.17, 0],
+    [0.33, -0.08, 0.23, 0.19, 0.3], [0.68, -0.28, 0.12, 0.1, 0], [0.55, 0.22, 0.13, 0.18, 0],
+    [-0.18, 0.42, 0.2, 0.15, 0], [0, -0.72, 0.38, 0.08, 0]
+  ];
+  function drawMoon() {
+    moon.front = false;
+    var nf = smooth((dusk - 0.1) / 0.4);
+    if (moon.elong < 18 * D2R || nf <= 0) { return; }
+    var yu = projEq(moon.x, moon.y, moon.z);
+    moon.sx = PX; moon.sy = PY;
+    if (PD < 0.25 || yu < -0.03) { return; }
+    moon.front = yu > 0.005;
+    var mx = PX, my = PY, den = PD;
+    var r = Math.max(1.4 * D2R * K2 / den, U * 0.018) * (1 + 0.12 * moon.flare);
+    moon.r = r;
+    // Which way the sun is from the Moon, and which way north is.
+    var s = moon.sun, k = moon.x * s[0] + moon.y * s[1] + moon.z * s[2];
+    var t = norm3([s[0] - k * moon.x, s[1] - k * moon.y, s[2] - k * moon.z]);
+    projEq(moon.x + t[0] * 0.02, moon.y + t[1] * 0.02, moon.z + t[2] * 0.02);
+    var sunAng = Math.atan2(PY - my, PX - mx);
+    var nn = norm3([-moon.z * moon.x, -moon.z * moon.y, 1 - moon.z * moon.z]);
+    projEq(moon.x + nn[0] * 0.02, moon.y + nn[1] * 0.02, moon.z + nn[2] * 0.02);
+    var northAng = Math.atan2(PY - my, PX - mx);
+    var a = nf * hfade(yu);
+
+    ctx.globalCompositeOperation = 'lighter';
+    var hr = r * (4 + 3 * moon.frac) * (1 + 0.3 * moon.flare);
+    var g = ctx.createRadialGradient(mx, my, r * 0.8, mx, my, hr);
+    g.addColorStop(0, 'rgba(230,226,205,' + ((0.05 + 0.15 * moon.frac) * a * (1 + moon.flare)).toFixed(3) + ')');
+    g.addColorStop(1, 'rgba(230,226,205,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(mx, my, hr, 0, TAU);
+    ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+
+    ctx.fillStyle = 'rgba(52,62,90,' + (0.6 * a).toFixed(3) + ')';
+    ctx.beginPath();
+    ctx.arc(mx, my, r, 0, TAU);
+    ctx.fill();
+
+    ctx.save();
+    ctx.translate(mx, my);
+    ctx.rotate(sunAng);
+    var tr = r * Math.cos(moon.elong);
+    ctx.beginPath();
+    ctx.arc(0, 0, r, -HALF_PI, HALF_PI, false);
+    ctx.ellipse(0, 0, Math.abs(tr), r, 0, HALF_PI, -HALF_PI, tr > 0);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(244,240,226,' + a.toFixed(3) + ')';
+    ctx.fill();
+    ctx.clip();
+    ctx.rotate(northAng + HALF_PI - sunAng);
+    ctx.fillStyle = 'rgba(150,146,132,' + (0.45 * a).toFixed(3) + ')';
+    for (var i = 0; i < MARIA.length; i++) {
+      var q = MARIA[i];
+      ctx.beginPath();
+      ctx.ellipse(q[0] * r, q[1] * r, q[2] * r, q[3] * r, q[4], 0, TAU);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // The smudges: soft ovals laid along the sky at their real angles.
+  function drawSmudges() {
+    var nf = smooth((dusk - 0.5) / 0.5);
+    if (nf <= 0) { return; }
+    ctx.globalCompositeOperation = 'lighter';
+    for (var i = 0; i < SMUDGES.length; i++) {
+      var m = SMUDGES[i], yu = projEq(m.v[0], m.v[1], m.v[2]);
+      if (PD < 0.25 || yu < 0) { continue; }
+      var x0 = PX, y0 = PY;
+      projEq(m.tip[0], m.tip[1], m.tip[2]);
+      var dx = PX - x0, dy = PY - y0, half = Math.sqrt(dx * dx + dy * dy), wid = half * m.wid / m.len;
+      var c = dx / (half || 1), sn = dy / (half || 1);
+      ctx.setTransform(DPR * c, DPR * sn, -DPR * sn, DPR * c, DPR * x0, DPR * y0);
+      ctx.globalAlpha = Math.min(1, m.a * nf * hfade(yu));
+      ctx.drawImage(m.img, -half * 1.3, -wid * 1.3, half * 2.6, wid * 2.6);
+    }
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // ------------------------------------------------------------------
+  // Everything, in order from the back to her own eyes
   // ------------------------------------------------------------------
   function draw() {
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -1880,17 +2244,23 @@
     var lim = limitMag();
     drawSky();
     drawMilkyWay();
+    drawSmudges();
     drawComets();
     drawField(lim);
     drawStars(lim);
+    drawMoon();
     drawSats();
     drawMeteors();
+    drawGlints();
     drawAurora();
     drawLit();
     drawLand();
-    drawKnoll();
-    drawPeople();
+    drawNear();
     drawNames();
+    drawArm(dadHand);
+    drawArm(mitten);
+    drawBreath();
+    drawHat();
   }
 
   // ------------------------------------------------------------------
@@ -1904,19 +2274,36 @@
   }
 
   function tapAt(x, y) {
-    // The ground, the hills, the people: the child shows you something.
+    // The ground and the hills: Dad shows her something.
     if (y > hy - H * 0.02) { showSomething(); return; }
     var R = Math.max(30, U * 0.07), i, k;
+
+    // The Moon.
+    if (moon.front && Math.hypot(moon.sx - x, moon.sy - y) < Math.max(R, moon.r * 2.2)) {
+      moon.flare = 1;
+      herPoint({ obj: moon }, 3);
+      chime(76, clamp((moon.sx / W - 0.5) * 1.2, -0.8, 0.8), 0.6);
+      say('moon-name', { wait: 2, gap: 12 });
+      var phase = moon.frac < 0.35 ? 'moon-crescent' : moon.frac < 0.65 ? 'moon-half' : moon.frac < 0.94 ? 'moon-gibbous' : 'moon-full';
+      if (!said[phase]) { say(phase, { wait: 5, once: true }); }
+      else if (!said['moon-shine']) { say('moon-shine', { wait: 5, once: true }); }
+      else { say('moon-walk', { wait: 5, once: true }); }
+      return;
+    }
+
+    // A comet.
     for (k = 0; k < comets.length; k++) {
       var c = comets[k];
       if (c.front && Math.hypot(c.sx - x, c.sy - y) < R * 0.9) {
-        c.flare = 1;
-        cometSound(clamp((c.sx / W - 0.5) * 1.2, -0.8, 0.8));
-        pointAt(child, { obj: c }, 3);
-        later(0.5, function () { gazeAt(adult, { obj: c }, 2.5); });
+        if (c.flare < 0.5) { c.flare = 1; cometSound(clamp((c.sx / W - 0.5) * 1.2, -0.8, 0.8)); }
+        herPoint({ obj: c }, 3);
+        if (!said['comet-1']) { say('comet-1', { wait: 2 }); }
+        else { say('comet-2', { wait: 2, once: true }); }
         return;
       }
     }
+
+    // A star in one of the pictures, or near one of its lines.
     var best = null, bestStar = -1, bd = R;
     for (k = 0; k < groups.length; k++) {
       var g = groups[k];
@@ -1938,18 +2325,27 @@
     }
     if (best) {
       lightGroup(best, bestStar);
-      pointAt(child, { star: bestStar }, Math.max(3, best.stars.length * EDGE_T + 1));
-      later(0.5, function () { gazeAt(adult, { star: bestStar }, 4); });
+      herPoint({ star: bestStar }, Math.max(3, best.stars.length * EDGE_T + 1));
       return;
     }
-    // Empty sky: a shooting star from under the finger.
+
+    // Empty sky: a shooting star from under the finger, one at a time.
+    if (tapMeteor) {
+      if (glints.length < 4) { glints.push({ x: x, y: y, age: 0 }); }
+      return;
+    }
     var m = meteorAt(x, y, true);
-    pointAt(child, { obj: m }, 1.4);
+    herPoint({ obj: m }, 1.4);
+    if (Math.random() < 0.3) { shootingStarLine(); }
   }
 
-  // The child picks a picture that is well up in the sky and points it
-  // out, and a moment later it lights up.
+  // Dad picks a picture that is well up in the sky, points at it, says
+  // "look", and then traces it with his finger as it draws. He shows
+  // her one thing at a time: taps while he is showing her something
+  // are let go.
+  var lastShow = -99, showCount = 0;
   function showSomething() {
+    if (dadBusy() || clock - lastShow < 3) { return; }
     var choices = [], k, i;
     for (k = 0; k < groups.length; k++) {
       var g = groups[k], good = 0;
@@ -1960,15 +2356,16 @@
       }
       if (good / g.stars.length >= 0.7) { for (i = 0; i < (g.fig ? 3 : 1); i++) { choices.push(g); } }
     }
-    if (!choices.length) {
-      var m = meteorAt(W * (0.15 + Math.random() * 0.7), hy * (0.15 + Math.random() * 0.5), true);
-      pointAt(child, { obj: m }, 1.4);
-      return;
-    }
+    lastShow = clock;
+    if (!choices.length) { return; }
     var pick = choices[Math.floor(Math.random() * choices.length)], star = pick.brightest;
-    pointAt(child, { star: star }, Math.max(3.5, pick.stars.length * EDGE_T + 1.5));
-    later(0.4, function () { gazeAt(adult, { star: star }, 4); });
-    later(0.8, function () { lightGroup(pick, star); });
+    dadPoint({ star: star }, 2.5);
+    showCount += 1;
+    say(showCount % 2 ? 'look-1' : 'look-2', { wait: 1.2 });
+    later(1.1, function () {
+      var l = lightGroup(pick, star);
+      dadPoint({ star: star }, l.end + 2.5, l);
+    });
   }
 
   // ------------------------------------------------------------------
@@ -2158,8 +2555,15 @@
     });
   }
 
-  function chime(midi, pan, level, when) {
+  // No more than a handful of chimes in any second, however fast the
+  // taps come; the rest are simply not rung.
+  var chimeTimes = [];
+  function chime(midi, pan, level, when, force) {
     if (!AC || !bellBus || AC.state !== 'running') { return; }
+    var now = AC.currentTime;
+    while (chimeTimes.length && chimeTimes[0] < now - 1) { chimeTimes.shift(); }
+    if (!force && chimeTimes.length >= 6) { return; }
+    chimeTimes.push(now);
     var t = (when || AC.currentTime) + 0.01, f = mtof(midi), g = AC.createGain();
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(0.09 * level, t + 0.012);
@@ -2243,6 +2647,131 @@
     tone.stop(t + 0.9);
   }
 
+  // ------------------------------------------------------------------
+  // Dad's voice: 72 short recordings of her real dad, in sounds/ beside
+  // this file, played through plain <audio> the same way as Post a
+  // Letter's letters. On the first touch every clip is started and
+  // stopped again while muted, because a phone will not play a sound no
+  // finger asked for and most of his lines come a few seconds after the
+  // tap that prompted them, or with no tap at all.
+  //
+  // One line at a time, never over the top of himself. A line that has
+  // waited too long for its turn is dropped rather than said late, and
+  // some are said only once an evening, so tapping does not turn him
+  // into a talking toy. Any clip that will not load or play falls
+  // through to a soft low "mm-hm" from the synthesiser, so a moment he
+  // should have spoken is never silent.
+  // ------------------------------------------------------------------
+  var VOICE = ['dusk-first', 'dusk-another', 'dusk-all', 'milky-way',
+    'moon-name', 'moon-shine', 'moon-walk', 'moon-crescent', 'moon-half', 'moon-gibbous', 'moon-full',
+    'shoot-1', 'shoot-2', 'shoot-3', 'shoot-fact', 'sat-1', 'sat-2', 'iss', 'comet-1', 'comet-2',
+    'aurora-1', 'aurora-2', 'look-1', 'look-2'];
+  groups.forEach(function (g) { VOICE.push('name-' + g.slug, 'fact-' + g.slug); });
+
+  var clips = {}, clipsPrimed = false, speakingUntil = 0, speakingHardStop = 0, speaking = null;
+  var voiceQueue = [], said = {}, lastSaidAt = {};
+
+  function clipFor(id) {
+    var a = clips[id];
+    if (!a) {
+      a = new window.Audio('sounds/' + id + '.mp3');
+      a.preload = 'auto';
+      a.addEventListener('error', function () { a.broken = true; });
+      a.addEventListener('ended', function () { if (speaking === a) { speakingUntil = clock + 0.7; } });
+      clips[id] = a;
+    }
+    return a;
+  }
+
+  function primeClips() {
+    if (clipsPrimed) { return; }
+    clipsPrimed = true;
+    for (var i = 0; i < VOICE.length; i++) {
+      (function (a) {
+        a.muted = true;
+        var p;
+        try { p = a.play(); } catch (e) { a.muted = false; return; }
+        if (p && p.then) {
+          p.then(function () {
+            a.pause();
+            try { a.currentTime = 0; } catch (e1) { /* not loaded yet */ }
+            a.muted = false;
+          }, function () { a.muted = false; });
+        } else {
+          a.pause();
+          a.muted = false;
+        }
+      })(clipFor(VOICE[i]));
+    }
+  }
+
+  // Ask Dad to say something. wait: how many seconds the line may wait
+  // for its turn; once: only ever once an evening; gap: not again within
+  // this many seconds.
+  function say(id, opts) {
+    opts = opts || {};
+    if (opts.once && said[id]) { return; }
+    if (opts.gap && clock - (lastSaidAt[id] || -999) < opts.gap) { return; }
+    for (var i = 0; i < voiceQueue.length; i++) { if (voiceQueue[i].id === id) { return; } }
+    if (voiceQueue.length >= 3) { voiceQueue.shift(); }
+    voiceQueue.push({ id: id, by: clock + (opts.wait || 3), once: !!opts.once });
+  }
+
+  function updateVoice() {
+    // Still talking? Then wait, whatever the clock says, unless a clip
+    // has stalled for a long while.
+    if (speaking && !speaking.ended && !speaking.paused && clock < speakingHardStop) { return; }
+    if (clock < speakingUntil) { return; }
+    speaking = null;
+    // Before the first touch nothing can be heard, so lines wait their
+    // turn rather than being used up unheard.
+    var ready = AC && AC.state === 'running';
+    while (voiceQueue.length) {
+      if (!ready) {
+        if (clock > voiceQueue[0].by) { voiceQueue.shift(); continue; }
+        return;
+      }
+      var q = voiceQueue.shift();
+      if (clock > q.by || (q.once && said[q.id])) { continue; }
+      speak(q.id);
+      return;
+    }
+  }
+
+  function speak(id) {
+    said[id] = true;
+    lastSaidAt[id] = clock;
+    var a = VOICE.indexOf(id) >= 0 ? clipFor(id) : null;
+    if (!a || a.broken || !AC || AC.state !== 'running') { murmur(); speakingUntil = clock + 1.4; return; }
+    try { a.currentTime = 0; } catch (e) { /* it will start from wherever it is */ }
+    speaking = a;
+    speakingUntil = clock + (isFinite(a.duration) && a.duration > 0 ? a.duration + 0.7 : 12);
+    speakingHardStop = clock + 20;
+    var p;
+    try { p = a.play(); } catch (e2) { murmur(); speakingUntil = clock + 1.4; return; }
+    if (p && p['catch']) { p['catch'](function () { murmur(); speakingUntil = clock + 1.4; }); }
+  }
+
+  // Dad's stand-in when a clip will not play: two soft low notes, like
+  // a contented "mm-hm".
+  function murmur() {
+    if (!AC || !padBus || AC.state !== 'running') { return; }
+    var t = AC.currentTime + 0.02;
+    [[53, 0], [57, 0.28]].forEach(function (n) {
+      var o = AC.createOscillator(), g = AC.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(mtof(n[0]), t + n[1]);
+      g.gain.setValueAtTime(0.0001, t + n[1]);
+      g.gain.exponentialRampToValueAtTime(0.07, t + n[1] + 0.08);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + n[1] + 0.55);
+      o.connect(g);
+      g.connect(master);
+      g.connect(verb);
+      o.start(t + n[1]);
+      o.stop(t + n[1] + 0.6);
+    });
+  }
+
   function cometSound(pan) {
     if (!AC || AC.state !== 'running') { return; }
     var t = AC.currentTime + 0.02;
@@ -2288,6 +2817,8 @@
     windGain.gain.setTargetAtTime(0.004 + 0.035 * windAmt * windAmt, now, 0.4);
     windFilter.frequency.setTargetAtTime(700 + 700 * windAmt, now, 0.4);
     auroraGain.gain.setTargetAtTime(0.0001 + 0.035 * aur.s, now, 0.8);
+    // The music steps back a little while Dad is talking.
+    padBus.gain.setTargetAtTime(speaking ? 0.28 : 0.5, now, 0.3);
   }
 
   // ------------------------------------------------------------------
@@ -2296,14 +2827,18 @@
   function update(dt) {
     clock += dt;
     dusk = smooth(clock / DUSK_LEN);
-    lst = (lst + SKY_RATE * dt * (reduced ? 1 / 3 : 1)) % 360;
-    if (!drag && A0vel !== 0) {
-      if (reduced) { A0vel = 0; }
-      A0 += A0vel * dt;
-      A0vel *= Math.exp(-dt / 0.45);
-      if (Math.abs(A0vel) < 0.002) { A0vel = 0; }
-    }
-    A0 = ((A0 + Math.PI) % TAU + TAU) % TAU - Math.PI;
+    var rate = reduced ? 1 / 3 : 1;
+    lst = (lst + SKY_RATE * dt * rate) % 360;
+    gameDays += 60 * rate * dt / 86400;
+    updateMoon(DAYS + gameDays);
+
+    // Turning: her head follows the finger, but no faster than a head
+    // turns, and stops the moment the finger lifts.
+    var turn = A0goal - A0, maxTurn = (reduced ? 25 : 40) * D2R * dt;
+    A0 += clamp(turn, -maxTurn, maxTurn);
+    var wrap = ((A0 + Math.PI) % TAU + TAU) % TAU - Math.PI - A0;
+    A0 += wrap;
+    A0goal += wrap;
     updateBasis();
 
     for (var i = timers.length - 1; i >= 0; i--) {
@@ -2315,13 +2850,16 @@
     for (i = 0; i < comets.length; i++) {
       if (comets[i].flare > 0) { comets[i].flare = Math.max(0, comets[i].flare - dt * 0.35); }
     }
+    if (moon.flare > 0) { moon.flare = Math.max(0, moon.flare - dt * 0.5); }
     windAmt = (0.5 + 0.5 * Math.sin(clock * 0.045)) * (0.5 + 0.5 * Math.sin(clock * 0.11 + 1.7));
 
     updateMeteors(dt);
     updateSats(dt);
     updateAurora(dt);
     updateLit();
-    updateFolk(dt);
+    updateHands(dt);
+    updateBreath(dt);
+    updateVoice();
   }
 
   // ------------------------------------------------------------------
@@ -2357,13 +2895,14 @@
 
   // ------------------------------------------------------------------
   // Input. A tap does something where it lands; a drag sideways turns
-  // you round, and the sky moves under the finger.
+  // her head, following the finger at a head's pace, never flung.
   // ------------------------------------------------------------------
-  var drag = null, downs = {};
+  var drag = null, downs = {}, A0goal = 0;
 
   canvas.addEventListener('pointerdown', function (e) {
     initAudio();
-    downs[e.pointerId] = { x0: e.clientX, y0: e.clientY, x: e.clientX, t0: clock, moved: false };
+    primeClips();
+    downs[e.pointerId] = { x0: e.clientX, y0: e.clientY, moved: false };
     try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* not every browser */ }
   });
   canvas.addEventListener('pointermove', function (e) {
@@ -2371,22 +2910,21 @@
     if (!d) { return; }
     if (!d.moved && Math.abs(e.clientX - d.x0) + Math.abs(e.clientY - d.y0) > 12) {
       d.moved = true;
-      if (!drag) { drag = { id: e.pointerId, lastX: d.x0, lastT: performance.now() }; A0vel = 0; }
+      if (!drag) { drag = { id: e.pointerId, lastX: d.x0 }; A0goal = A0; }
     }
     if (drag && drag.id === e.pointerId) {
-      var nowT = performance.now(), dx = e.clientX - drag.lastX, dtt = Math.max(1, nowT - drag.lastT) / 1000;
-      A0 -= dx / K;
-      A0vel = A0vel * 0.6 + (-dx / K / dtt) * 0.4;
+      // The goal may run ahead of her head, but only so far: a wild
+      // swipe asks for a quarter turn at most.
+      A0goal = clamp(A0goal - (e.clientX - drag.lastX) / K, A0 - HALF_PI, A0 + HALF_PI);
       drag.lastX = e.clientX;
-      drag.lastT = nowT;
     }
   });
   function lift(e) {
     var d = downs[e.pointerId];
     delete downs[e.pointerId];
     if (drag && drag.id === e.pointerId) {
-      if (performance.now() - drag.lastT > 90) { A0vel = 0; }
       drag = null;
+      A0goal = A0;
       return;
     }
     if (d && !d.moved && e.type === 'pointerup') { tapAt(e.clientX, e.clientY); }
@@ -2398,7 +2936,7 @@
   // A phone will not make a sound until a finger has asked for one, and
   // on some it has to be the lifting of the finger that asks.
   ['touchend', 'pointerup', 'click'].forEach(function (name) {
-    document.addEventListener(name, initAudio, true);
+    document.addEventListener(name, function () { initAudio(); primeClips(); }, true);
   });
 
   document.addEventListener('visibilitychange', function () {
@@ -2419,6 +2957,7 @@
 
   layout();
   updateBasis();
+  updateMoon(DAYS);
   makeComets();
   requestAnimationFrame(frame);
 })();

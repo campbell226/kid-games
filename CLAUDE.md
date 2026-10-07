@@ -53,6 +53,10 @@ there is still nothing to run to open a game. If a clip ever needs
 redoing, the original recordings are recoverable from the repo's history
 (commit e57d1f1).
 
+Stargazing's 72 lines of Dad's voice, in `games/stargazing/sounds/`,
+work the same way. They were cut from eight long recordings, which are
+in commit 6f2b3ce.
+
 ## Hosting
 
 Live on GitHub Pages from `campbell226/kid-games`, served straight off
