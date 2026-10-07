@@ -746,25 +746,53 @@
     moon.frac = (1 - Math.cos(moon.elong)) / 2;
   }
 
-  // The way you are facing, in radians from north towards east.
-  var A0 = 0;
+  // Which way she is lying, as the direction her body faces in radians
+  // from north towards east, and how far her head is turned on her neck.
+  // She lies back propped up on the blanket, so her neck leans back: a
+  // turn of her head is a turn about that leaning axis, which is what
+  // tips the horizon and dips her gaze as she looks to the side, the way
+  // it does lying back on a hill. A neck only turns so far.
+  var A0 = 0, headYaw = 0, lookAt = 0;
+  var NECK_TILT = 25 * D2R, NECK_MAX = 75 * D2R;
 
   // Days of sky time since the page opened, at the same quickened pace.
   var gameDays = 0;
 
   // Directions east, north and straight up, written in the stars' own
-  // frame; and the view's right and forward, from the way you face.
+  // frame. Then the view's own three directions, both over the land
+  // (east, north, up parts) and among the stars: forward (the middle of
+  // the lens, on the horizon when her head is straight), right, and up.
   var Ex = 0, Ey = 1, Nx = 0, Ny = 0, Nz = 1, Zx = 0, Zy = 0, Zz = 1;
-  var Rx = 1, Ry = 0, Rz = 0, Fx = 0, Fy = 1, Fz = 0, ca = 1, sa = 0;
+  var cE = 0, cN = 1, cU = 0, rE = 1, rN = 0, rU = 0, vE = 0, vN = 0, vU = 1;
+  var Fx = 0, Fy = 1, Fz = 0, Rx = 1, Ry = 0, Rz = 0, Vx = 0, Vy = 0, Vz = 1;
+
+  // Turn v about the unit axis a by angle t (right-handed).
+  function turn3(a, v, t) {
+    var c = Math.cos(t), s = Math.sin(t), d = (a[0] * v[0] + a[1] * v[1] + a[2] * v[2]) * (1 - c);
+    return [
+      v[0] * c + (a[1] * v[2] - a[2] * v[1]) * s + a[0] * d,
+      v[1] * c + (a[2] * v[0] - a[0] * v[2]) * s + a[1] * d,
+      v[2] * c + (a[0] * v[1] - a[1] * v[0]) * s + a[2] * d
+    ];
+  }
 
   function updateBasis() {
     var th = lst * D2R, ct = Math.cos(th), st = Math.sin(th);
     Ex = -st; Ey = ct;
     Nx = -SIN_LAT * ct; Ny = -SIN_LAT * st; Nz = COS_LAT;
     Zx = COS_LAT * ct; Zy = COS_LAT * st; Zz = SIN_LAT;
-    ca = Math.cos(A0); sa = Math.sin(A0);
-    Fx = sa * Ex + ca * Nx; Fy = sa * Ey + ca * Ny; Fz = ca * Nz;
-    Rx = ca * Ex - sa * Nx; Ry = ca * Ey - sa * Ny; Rz = -sa * Nz;
+    var sA = Math.sin(A0), cA = Math.cos(A0);
+    var C = [sA, cA, 0], R = [cA, -sA, 0], V = [0, 0, 1];
+    if (headYaw !== 0) {
+      var axis = [-Math.sin(NECK_TILT) * sA, -Math.sin(NECK_TILT) * cA, Math.cos(NECK_TILT)];
+      C = turn3(axis, C, -headYaw); R = turn3(axis, R, -headYaw); V = turn3(axis, V, -headYaw);
+    }
+    cE = C[0]; cN = C[1]; cU = C[2];
+    rE = R[0]; rN = R[1]; rU = R[2];
+    vE = V[0]; vN = V[1]; vU = V[2];
+    Fx = cE * Ex + cN * Nx + cU * Zx; Fy = cE * Ey + cN * Ny + cU * Zy; Fz = cN * Nz + cU * Zz;
+    Rx = rE * Ex + rN * Nx + rU * Zx; Ry = rE * Ey + rN * Ny + rU * Zy; Rz = rN * Nz + rU * Zz;
+    Vx = vE * Ex + vN * Nx + vU * Zx; Vy = vE * Ey + vN * Ny + vU * Zy; Vz = vN * Nz + vU * Zz;
   }
 
   // ------------------------------------------------------------------
@@ -777,30 +805,55 @@
   var W = 1, H = 1, U = 1, DPR = 1, cx = 0, hy = 0, K = 1, K2 = 2;
   var PX = 0, PY = 0, PD = 0;
 
+  // A direction among the stars to the screen. Returns the sine of its
+  // height above the horizon, which much of the drawing wants as well.
   function projEq(x, y, z) {
     var zf = x * Fx + y * Fy + z * Fz, den = 1 + zf;
     PD = den;
     if (den < 0.05) { den = 0.05; }
-    var yu = x * Zx + y * Zy + z * Zz;
     PX = cx + K2 * (x * Rx + y * Ry + z * Rz) / den;
-    PY = hy - K2 * yu / den;
-    return yu;
+    PY = hy - K2 * (x * Vx + y * Vy + z * Vz) / den;
+    return x * Zx + y * Zy + z * Zz;
   }
+  // A direction over the land (east, north, up) to the screen.
   function projENU(e, n, u) {
-    var zf = e * sa + n * ca, den = 1 + zf;
+    var zf = e * cE + n * cN + u * cU, den = 1 + zf;
     PD = den;
     if (den < 0.05) { den = 0.05; }
-    PX = cx + K2 * (e * ca - n * sa) / den;
-    PY = hy - K2 * u / den;
+    PX = cx + K2 * (e * rE + n * rN + u * rU) / den;
+    PY = hy - K2 * (e * vE + n * vN + u * vU) / den;
   }
   // A point on the screen back to a direction: east, north, up.
   function unproject(X, Y, out) {
     var u = (X - cx) / K2, v = (hy - Y) / K2, r2 = u * u + v * v, q = 1 / (1 + r2);
-    var xr = 2 * u * q, yu = 2 * v * q, zf = (1 - r2) * q;
-    out[0] = xr * ca + zf * sa;
-    out[1] = -xr * sa + zf * ca;
-    out[2] = yu;
+    var xr = 2 * u * q, yv = 2 * v * q, zf = (1 - r2) * q;
+    out[0] = xr * rE + yv * vE + zf * cE;
+    out[1] = xr * rN + yv * vN + zf * cN;
+    out[2] = xr * rU + yv * vU + zf * cU;
     return out;
+  }
+  // Where the horizon crosses a given column of the screen. With her
+  // head turned the horizon tilts, so this is no longer one height.
+  var tmpDir = [0, 0, 0];
+  function horizonYAt(X) {
+    var lo = -2 * H, hi = 3 * H;
+    for (var i = 0; i < 20; i++) {
+      var mid = (lo + hi) / 2;
+      if (unproject(X, mid, tmpDir)[2] > 0) { lo = mid; } else { hi = mid; }
+    }
+    return (lo + hi) / 2;
+  }
+  // The way the middle of the view faces, over the land, and the screen
+  // direction of "up" from the horizon there: what the sky's colours and
+  // the near ground are laid along.
+  function viewUp() {
+    var af = Math.atan2(cE, cN), p = altAz(0, af);
+    projENU(p[0], p[1], p[2]);
+    var hx = PX, hyy = PY;
+    p = altAz(5 * D2R, af);
+    projENU(p[0], p[1], p[2]);
+    var dx = PX - hx, dy = PY - hyy, m = Math.sqrt(dx * dx + dy * dy) || 1;
+    return { x: hx, y: hyy, ux: dx / m, uy: dy / m, az: af };
   }
   function enuToEq(e, n, u) {
     return [e * Ex + n * Nx + u * Zx, e * Ey + n * Ny + u * Zy, n * Nz + u * Zz];
@@ -969,9 +1022,11 @@
     K2 = 2 * K;
 
     mwC.width = Math.max(1, Math.ceil(W / MW_DIV));
-    mwC.height = Math.max(1, Math.ceil((hy + 6) / MW_DIV));
+    // Full height: with her head turned the horizon tilts, and the sky
+    // can reach lower on one side.
+    mwC.height = Math.max(1, Math.ceil(H / MW_DIV));
     cloudC.width = Math.max(1, Math.ceil(W / CLOUD_DIV));
-    cloudC.height = Math.max(1, Math.ceil((hy + 6) / CLOUD_DIV));
+    cloudC.height = Math.max(1, Math.ceil(H / CLOUD_DIV));
     buildGrass();
   }
 
@@ -1050,16 +1105,22 @@
     if (dusk > 0.6) {
       nextMeteor -= dt;
       if (nextMeteor <= 0) {
-        var m = meteorAt(W * (0.08 + Math.random() * 0.84), hy * (0.06 + Math.random() * 0.62), false);
+        // Somewhere in view and well up in the sky, wherever the horizon
+        // happens to be lying.
+        var m = null;
+        for (var tries = 0; tries < 8 && !m; tries++) {
+          var mx = W * (0.08 + Math.random() * 0.84), my = H * (0.05 + Math.random() * 0.7);
+          if (unproject(mx, my, tmpDir)[2] > 0.12) { m = meteorAt(mx, my, false); }
+        }
         nextMeteor = 7 + Math.random() * 14;
         // A bright one gets a word from Dad.
-        if (m.bright > 0.75) { shootingStarLine(); }
+        if (m && m.bright > 0.75) { shootingStarLine(); }
       }
       // Now and then a shower: a dozen or so, all flying out from one
       // spot in the sky.
       nextShower -= dt;
       if (nextShower <= 0 && !shower) {
-        var rad = altAz((35 + Math.random() * 30) * D2R, A0 + (Math.random() - 0.5) * 1.2);
+        var rad = altAz((35 + Math.random() * 30) * D2R, lookAt + (Math.random() - 0.5) * 1.2);
         shower = { r: rad, left: 14 + Math.floor(Math.random() * 8), next: 0 };
         nextShower = 240 + Math.random() * 160;
       }
@@ -1114,7 +1175,7 @@
       nextSat -= dt;
       if (nextSat <= 0) {
         nextSat = 70 + Math.random() * 110;
-        var p = altAz((5 + Math.random() * 10) * D2R, A0 + (Math.random() - 0.5) * 1.6);
+        var p = altAz((5 + Math.random() * 10) * D2R, lookAt + (Math.random() - 0.5) * 1.6);
         var up = norm3([-p[2] * p[0], -p[2] * p[1], 1 - p[2] * p[2]]), side = cross3(p, up);
         var b = (Math.random() - 0.5) * 1.6;
         var t = [up[0] * Math.cos(b) + side[0] * Math.sin(b), up[1] * Math.cos(b) + side[1] * Math.sin(b), up[2] * Math.cos(b) + side[2] * Math.sin(b)];
@@ -1198,7 +1259,7 @@
       });
     }
     // It starts well off to the west of wherever she is looking.
-    clouds.push({ az: A0 - (80 + w / 2) * D2R, alt: 14 + rnd() * 36, speed: (0.45 + rnd() * 0.4) * D2R, blobs: blobs, travel: 0 });
+    clouds.push({ az: lookAt - (80 + w / 2) * D2R, alt: 14 + rnd() * 36, speed: (0.45 + rnd() * 0.4) * D2R, blobs: blobs, travel: 0 });
   }
 
   function updateClouds(dt) {
@@ -1353,8 +1414,16 @@
 
   // Where each shoulder is: hers just below the bottom of the view, a
   // little left of the middle; his off the bottom right corner.
+  // Each is a fixed direction from her eye, just below the view: hers a
+  // little left of straight ahead and low down, Dad's off to her right
+  // where he is lying. They belong to the bodies, not to her head, so
+  // when she turns her head they slide across the view the other way;
+  // turn far enough and Dad is out of sight altogether.
+  var SHOULDER_HER = [-8 * D2R, -40 * D2R], SHOULDER_DAD = [75 * D2R, -18 * D2R];
   function shoulderOf(h) {
-    return h.dad ? [W + U * 0.1, H + U * 0.06] : [W * 0.4, H + U * 0.2];
+    var s = h.dad ? SHOULDER_DAD : SHOULDER_HER, p = altAz(s[1], A0 + s[0]);
+    projENU(p[0], p[1], p[2]);
+    return PD > 0.3 ? [PX, PY] : null;
   }
 
   // An arm turns towards its target at no more than a set speed, and
@@ -1365,12 +1434,14 @@
     var pt = null;
     if (h.trace) { pt = h.trace.alpha > 0 ? penAt(h.trace) : null; }
     else if (h.target) { pt = resolve(h.target); }
-    // Nobody points at what they can't see.
-    if (pt && (pt[0] < -20 || pt[0] > W + 20 || pt[1] < 0 || pt[1] > hy)) { pt = null; }
+    // Nobody points at what they can't see, and a shoulder that has
+    // gone out of view behind her can't point at all.
+    if (pt && (pt[0] < -20 || pt[0] > W + 20 || pt[1] < 0 || pt[1] > horizonYAt(pt[0]))) { pt = null; }
     var sh = shoulderOf(h);
+    if (!sh) { pt = null; sh = h.lastSh || [W / 2, H * 1.5]; } else { h.lastSh = sh; }
     if (pt) {
       var want = Math.atan2(pt[1] - sh[1], pt[0] - sh[0]);
-      want = h.dad ? clamp(want, -Math.PI + 0.15, -0.95) : clamp(want, -Math.PI + 0.25, -0.25);
+      want = clamp(want, -Math.PI + 0.1, -0.1);
       if (h.raise < 0.05) { h.ang = want; }
       var maxTurn = (reduced ? 1.1 : 2.2) * dt, d = want - h.ang;
       h.ang += clamp(d, -maxTurn, maxTurn);
@@ -1381,7 +1452,7 @@
       // the dark ground can't be seen at all.
       var full = clamp(dist * 0.5, U * 0.28, U * (h.dad ? 0.55 : 0.5));
       var up = -Math.sin(h.ang);
-      if (up > 0.15) { full = Math.max(full, (sh[1] - (hy - U * 0.14)) / up); }
+      if (up > 0.15) { full = Math.max(full, (sh[1] - (horizonYAt((sh[0] + pt[0]) / 2) - U * 0.14)) / up); }
       full = Math.min(full, Math.max(U * 0.28, dist - U * 0.14));
       h.len += (full - h.len) * Math.min(1, dt * 3);
     }
@@ -1430,24 +1501,28 @@
   var DUSK_TOP = hex('#1b2b55'), DUSK_MID = hex('#3b4c7c'), DUSK_HOR = hex('#9a8796');
   var SUNSET = hex('#f0a070');
 
+  // The sky's colours run from the horizon upwards, laid along whichever
+  // way is up on the screen, so they tilt with the horizon when she
+  // turns her head. With her head straight this is exactly top to
+  // bottom of the screen.
   function drawSky() {
-    var f = dusk;
-    var g = ctx.createLinearGradient(0, 0, 0, hy);
+    var f = dusk, vu = viewUp();
+    var g = ctx.createLinearGradient(vu.x + vu.ux * hy, vu.y + vu.uy * hy, vu.x, vu.y);
     g.addColorStop(0, rgba(mix(DUSK_TOP, NIGHT_TOP, f)));
     g.addColorStop(0.6, rgba(mix(DUSK_MID, NIGHT_MID, f)));
     g.addColorStop(1, rgba(mix(DUSK_HOR, NIGHT_HOR, f)));
     ctx.fillStyle = g;
-    ctx.fillRect(0, 0, W, hy + 4);
+    ctx.fillRect(0, 0, W, H);
     if (f < 0.99) {
-      var p = altAz(-4 * D2R, SUNSET_AZ);
+      var p = altAz(0, SUNSET_AZ);
       projENU(p[0], p[1], p[2]);
       if (PD > 0.15) {
         var rad = Math.max(W, H) * 0.8;
-        var rg = ctx.createRadialGradient(PX, hy, 0, PX, hy, rad);
+        var rg = ctx.createRadialGradient(PX, PY, 0, PX, PY, rad);
         rg.addColorStop(0, rgba(SUNSET, 0.55 * Math.pow(1 - f, 1.6)));
         rg.addColorStop(1, rgba(SUNSET, 0));
         ctx.fillStyle = rg;
-        ctx.fillRect(0, 0, W, hy + 4);
+        ctx.fillRect(0, 0, W, H);
       }
     }
   }
@@ -1470,7 +1545,7 @@
         var den = 1 + x * Fx + y * Fy + z * Fz;
         if (den < 0.3) { continue; }
         var r = mwR[i] * K2 / den * sc;
-        var X = (cx + K2 * (x * Rx + y * Ry + z * Rz) / den) * sc, Y = (hy - K2 * yu / den) * sc;
+        var X = (cx + K2 * (x * Rx + y * Ry + z * Rz) / den) * sc, Y = (hy - K2 * (x * Vx + y * Vy + z * Vz) / den) * sc;
         if (X + r < 0 || X - r > cw || Y + r < 0 || Y - r > ch) { continue; }
         var a = mwA[i] * (pass ? 1 : nf * hfade(yu));
         if (a < 0.003) { continue; }
@@ -1496,8 +1571,8 @@
       if (den < 0.25) { continue; }
       var X = cx + K2 * (x * Rx + y * Ry + z * Rz) / den;
       if (X < -2 || X > W + 2) { continue; }
-      var Y = hy - K2 * yu / den;
-      if (Y < -2 || Y > hy + 2) { continue; }
+      var Y = hy - K2 * (x * Vx + y * Vy + z * Vz) / den;
+      if (Y < -2 || Y > H + 2) { continue; }
       var m = fM[i] + extinction(yu);
       var a = clamp((lim - m) / 0.9, 0, 1) * 0.5 * Math.pow(10, -0.22 * (m - 4.4));
       a *= 1 + tw * Math.sin(clock * fF[i] * ts + fP[i]);
@@ -1531,7 +1606,7 @@
       var yu = projEq(s.x, s.y, s.z);
       s.sx = PX; s.sy = PY; s.alt = yu;
       s.front = PD > 0.2 && yu > -0.3;
-      s.on = s.front && yu > 0.004 && PX > -30 && PX < W + 30 && PY > -30 && PY < hy + 10;
+      s.on = s.front && yu > 0.004 && PX > -30 && PX < W + 30 && PY > -30 && PY < H + 10;
       s.vis = 0;
       if (!s.on) { continue; }
       var me = s.mag + extinction(yu);
@@ -1670,11 +1745,16 @@
     if (aur.s < 0.01) { return; }
     var s = aur.s, ph = aur.ph, i;
     ctx.globalCompositeOperation = 'lighter';
+    // The glow lies along the horizon, whichever way that is tilted.
+    var g1 = altAz(5 * D2R, 0.1);
+    projENU(g1[0], g1[1], g1[2]);
+    var hx1 = PX, hy1 = PY;
     var g0 = altAz(5 * D2R, 0);
     projENU(g0[0], g0[1], g0[2]);
     if (PD > 0.15) {
       ctx.save();
       ctx.translate(PX, PY);
+      ctx.rotate(Math.atan2(hy1 - PY, hx1 - PX));
       ctx.scale(1, 0.32);
       var rad = K2 * 0.9;
       var gg = ctx.createRadialGradient(0, 0, 0, 0, 0, rad);
@@ -1747,7 +1827,8 @@
     var top = mix(mix(mix(DUSK_TOP, NIGHT_TOP, dusk), CLOUD_DIM, 0.75 * dusk), CLOUD_GREY, lit);
     var mid = mix(mix(mix(DUSK_MID, NIGHT_MID, dusk), CLOUD_DIM, 0.45 * dusk), CLOUD_GREY, lit);
     var hor = mix(mix(mix(DUSK_HOR, NIGHT_HOR, dusk), NEAR, 0.5), CLOUD_GREY, lit);
-    var g = m.createLinearGradient(0, 0, 0, hy * sc);
+    var vu = viewUp();
+    var g = m.createLinearGradient((vu.x + vu.ux * hy) * sc, (vu.y + vu.uy * hy) * sc, vu.x * sc, vu.y * sc);
     g.addColorStop(0, rgba(top));
     g.addColorStop(0.6, rgba(mid));
     g.addColorStop(1, rgba(hor));
@@ -1910,7 +1991,7 @@
         if (s.sy > lo) { lo = s.sy; }
       }
       if (!n) { continue; }
-      var nx = clamp(x / n, 70, W - 70), ny = Math.min(lo + fs * 1.8, hy - fs);
+      var nx = clamp(x / n, 70, W - 70), ny = Math.min(lo + fs * 1.8, horizonYAt(nx) - fs);
       ctx.fillStyle = 'rgba(196,210,250,' + (0.7 * a).toFixed(3) + ')';
       ctx.fillText(g.name, nx, ny);
     }
@@ -1926,18 +2007,24 @@
     return mix(mix(LAND_DUSK, LAND_NIGHT, dusk), AURORA_TINT, 0.3 * aur.s);
   }
 
+  // The land is the skyline of hills, traced round the way she is
+  // looking, closed off by a line far below the horizon, so it fills
+  // the bottom of the view however the horizon is tilted.
   function drawLand() {
-    var step = 4, X, col = landColour();
+    var col = landColour(), af = Math.atan2(cE, cN), a, p, k;
     ctx.fillStyle = rgba(col);
     ctx.beginPath();
-    ctx.moveTo(-4, H + 4);
-    for (X = -step; X <= W + step; X += step) {
-      var d = 2 * Math.atan((X - cx) / K2);
-      var h = profAt(A0 + d) * D2R, chh = Math.cos(h);
-      var den = 1 + chh * Math.cos(d);
-      ctx.lineTo(cx + K2 * chh * Math.sin(d) / den, hy - K2 * Math.sin(h) / den);
+    for (k = -240; k <= 240; k++) {
+      a = af + k * 0.5 * D2R;
+      p = altAz(profAt(a) * D2R, a);
+      projENU(p[0], p[1], p[2]);
+      if (k === -240) { ctx.moveTo(PX, PY); } else { ctx.lineTo(PX, PY); }
     }
-    ctx.lineTo(W + 4, H + 4);
+    for (k = 120; k >= -120; k -= 4) {
+      p = altAz(-80 * D2R, af + k * D2R);
+      projENU(p[0], p[1], p[2]);
+      ctx.lineTo(PX, PY);
+    }
     ctx.closePath();
     ctx.fill();
 
@@ -1996,40 +2083,56 @@
   }
 
   // The field in front of her, falling away into the dark, and the
-  // grass close to her eyes at the bottom corners, swaying in the wind.
-  // Thick at the edges and thin in the middle, so it frames the sky
-  // without hiding it.
+  // grass close to her eyes, swaying in the wind. The grass stands all
+  // round her in the world, so it sweeps past as she turns her head;
+  // in front of her, where her legs are on the blanket, there is hardly
+  // any, so at rest it frames the sky at the corners without hiding it.
+  // Each blade is a direction and a height in degrees, rooted just
+  // below the bottom of the view.
   var grass = [];
   function buildGrass() {
-    grass = [];
-    var rnd = seeded(13), x = -12;
-    while (x < W + 12) {
-      var edge = Math.min(1, Math.pow(Math.abs(x - W / 2) / (W / 2), 1.6));
-      x += (2 + rnd() * 6) * (1.4 - edge);
-      if (rnd() > 0.2 + 0.8 * edge) { continue; }
-      grass.push({
-        x: x, h: U * (0.025 + 0.13 * edge * (0.45 + rnd() * 0.75)), w: 1 + 3 * edge * rnd(),
-        lean: (rnd() - 0.5) * 0.5 + (x < W / 2 ? -0.18 : 0.18), ph: rnd() * TAU
-      });
+    if (grass.length) { return; }
+    var rnd = seeded(13), az = 0;
+    while (az < 360) {
+      az += 0.35 + rnd() * 1.1;
+      grass.push({ az: az * D2R, k: rnd(), w: rnd(), lean: (rnd() - 0.5) * 3, ph: rnd() * TAU });
     }
   }
   var windAmt = 0;
   function drawNear() {
-    var g = ctx.createLinearGradient(0, hy + H * 0.02, 0, H);
+    var vu = viewUp(), drop = H - hy;
+    var g = ctx.createLinearGradient(vu.x - vu.ux * H * 0.02, vu.y - vu.uy * H * 0.02, vu.x - vu.ux * drop, vu.y - vu.uy * drop);
     g.addColorStop(0, rgba(NEAR, 0));
     g.addColorStop(1, rgba(NEAR, 0.92));
     ctx.fillStyle = g;
-    ctx.fillRect(0, hy, W, H - hy);
+    ctx.fillRect(0, 0, W, H);
+
+    // The roots sit just below the lowest point of the bottom edge.
+    var root = Math.min(unproject(0, H, tmpDir)[2], unproject(cx, H, tmpDir)[2], unproject(W, H, tmpDir)[2]);
+    root = Math.asin(clamp(root, -1, 1)) - 2 * D2R;
     ctx.strokeStyle = rgba(NEAR);
     ctx.lineCap = 'round';
-    var sw = reduced ? 0.3 : 1;
+    var sw = reduced ? 0.3 : 1, p;
     for (var i = 0; i < grass.length; i++) {
-      var b = grass[i], y = H + 4;
-      var bend = b.lean + sw * (0.06 * Math.sin(clock * 1.1 + b.ph) + 0.3 * windAmt * (0.6 + 0.4 * Math.sin(clock * 1.9 + b.x * 0.02)));
-      ctx.lineWidth = b.w;
+      var b = grass[i];
+      // Short in front of her legs, taller round the sides.
+      var rel = Math.abs(((b.az - A0) % TAU + TAU + Math.PI) % TAU - Math.PI) / D2R;
+      var side = smooth((rel - 18) / 40);
+      var h = (1.5 + 14 * side * (0.45 + b.k * 0.75)) * D2R;
+      p = altAz(root, b.az);
+      projENU(p[0], p[1], p[2]);
+      if (PD < 0.3 || PX < -60 || PX > W + 60) { continue; }
+      var x0 = PX, y0 = PY;
+      var bend = (b.lean + sw * (1.2 * Math.sin(clock * 1.1 + b.ph) + 6 * windAmt * (0.6 + 0.4 * Math.sin(clock * 1.9 + b.az * 9)))) * D2R * (h / (12 * D2R));
+      p = altAz(root + h * 0.6, b.az + bend * 0.35);
+      projENU(p[0], p[1], p[2]);
+      var x1 = PX, y1 = PY;
+      p = altAz(root + h, b.az + bend);
+      projENU(p[0], p[1], p[2]);
+      ctx.lineWidth = 1 + 3 * side * b.w;
       ctx.beginPath();
-      ctx.moveTo(b.x, y);
-      ctx.quadraticCurveTo(b.x + Math.sin(bend) * b.h * 0.35, y - b.h * 0.6, b.x + Math.sin(bend) * b.h, y - Math.cos(bend) * b.h);
+      ctx.moveTo(x0, y0);
+      ctx.quadraticCurveTo(x1, y1, PX, PY);
       ctx.stroke();
     }
   }
@@ -2066,7 +2169,9 @@
 
   function drawArm(h) {
     if (h.raise < 0.01) { return; }
-    var sh = shoulderOf(h), r = smooth(h.raise), L = h.len * r;
+    var sh = shoulderOf(h);
+    if (!sh) { return; }
+    var r = smooth(h.raise), L = h.len * r;
     var sway = reduced ? 0 : 0.012 * Math.sin(clock * 1.3 + (h.dad ? 1.7 : 0)) + 0.005 * Math.sin(clock * 3.1 + (h.dad ? 0.4 : 2));
     var ang = h.ang + sway, c = Math.cos(ang), s = Math.sin(ang), side = h.dad ? 1 : -1;
     // The elbow sits a little out to the side; the wrist is on the line
@@ -2438,7 +2543,7 @@
 
   function tapAt(x, y) {
     // The ground and the hills: Dad shows her something.
-    if (y > hy - H * 0.02) { showSomething(); return; }
+    if (unproject(x, y, tmpDir)[2] < 0.035) { showSomething(); return; }
     var R = Math.max(30, U * 0.07), i, k;
 
     // The Moon.
@@ -3024,20 +3129,38 @@
     gameDays += 60 * rate * dt / 86400;
     updateMoon(DAYS + gameDays);
 
-    // Turning: the sky stays under the finger, up to half a turn a
-    // second, and after a flick it glides a little and settles.
+    // Looking round. Where she is looking (lookAt) follows the finger, up
+    // to half a turn a second, and after a flick glides a little and
+    // settles. Her head turns on her neck up to its limit; past that
+    // she shuffles round on the blanket, more slowly. And once she has
+    // been still for a few seconds her neck relaxes: her head comes back
+    // to the middle while her body turns to follow, so the view levels
+    // out still facing where she was looking.
+    var lookMax = (reduced ? 90 : 180) * D2R * dt, bodyMax = (reduced ? 25 : 45) * D2R * dt;
     if (drag) {
-      var turn = A0goal - A0, maxTurn = (reduced ? 90 : 180) * D2R * dt;
-      A0 += clamp(turn, -maxTurn, maxTurn);
-    } else if (A0vel !== 0) {
-      A0 += A0vel * dt;
-      A0vel *= Math.exp(-dt / 0.35);
-      if (Math.abs(A0vel) < 0.01) { A0vel = 0; }
-      A0goal = A0;
+      lookAt += clamp(lookGoal - lookAt, -lookMax, lookMax);
+      lastLook = clock;
+    } else if (lookVel !== 0) {
+      lookAt += lookVel * dt;
+      lookVel *= Math.exp(-dt / 0.35);
+      if (Math.abs(lookVel) < 0.01) { lookVel = 0; }
+      lookGoal = lookAt;
+      lastLook = clock;
     }
+    var over = lookAt - A0;
+    if (over > NECK_MAX) { A0 += Math.min(over - NECK_MAX, bodyMax); }
+    else if (over < -NECK_MAX) { A0 -= Math.min(-over - NECK_MAX, bodyMax); }
+    lookAt = clamp(lookAt, A0 - NECK_MAX, A0 + NECK_MAX);
+    if (!drag) { lookGoal = lookAt; }
+    if (!drag && lookVel === 0 && clock - lastLook > 5) {
+      A0 += (lookAt - A0) * (1 - Math.exp(-dt / (reduced ? 4 : 2.5)));
+    }
+    headYaw = lookAt - A0;
+    if (Math.abs(headYaw) < 1e-4) { headYaw = 0; }
     var wrap = ((A0 + Math.PI) % TAU + TAU) % TAU - Math.PI - A0;
     A0 += wrap;
-    A0goal += wrap;
+    lookAt += wrap;
+    lookGoal += wrap;
     updateBasis();
 
     for (var i = timers.length - 1; i >= 0; i--) {
@@ -3100,7 +3223,7 @@
   // her head, with the sky under the finger. A flick glides only a
   // little way, however hard it is, so the sky can't be sent spinning.
   // ------------------------------------------------------------------
-  var drag = null, downs = {}, A0goal = 0, A0vel = 0, GLIDE_MAX = 90 * D2R;
+  var drag = null, downs = {}, lookGoal = 0, lookVel = 0, lastLook = -99, GLIDE_MAX = 90 * D2R;
 
   canvas.addEventListener('pointerdown', function (e) {
     initAudio();
@@ -3113,13 +3236,13 @@
     if (!d) { return; }
     if (!d.moved && Math.abs(e.clientX - d.x0) + Math.abs(e.clientY - d.y0) > 12) {
       d.moved = true;
-      if (!drag) { drag = { id: e.pointerId, lastX: d.x0, lastT: performance.now(), vel: 0 }; A0goal = A0; A0vel = 0; }
+      if (!drag) { drag = { id: e.pointerId, lastX: d.x0, lastT: performance.now(), vel: 0 }; lookGoal = lookAt; lookVel = 0; }
     }
     if (drag && drag.id === e.pointerId) {
       var now = performance.now(), da = -(e.clientX - drag.lastX) / K;
-      // The sky may run behind a wild swipe, but never by more than
-      // half a turn.
-      A0goal = clamp(A0goal + da, A0 - Math.PI, A0 + Math.PI);
+      // The sky may run behind a wild swipe, but never by more than a
+      // quarter turn.
+      lookGoal = clamp(lookGoal + da, lookAt - HALF_PI, lookAt + HALF_PI);
       drag.vel = drag.vel * 0.5 + da / Math.max(0.008, (now - drag.lastT) / 1000) * 0.5;
       drag.lastX = e.clientX;
       drag.lastT = now;
@@ -3130,9 +3253,9 @@
     delete downs[e.pointerId];
     if (drag && drag.id === e.pointerId) {
       var fresh = performance.now() - drag.lastT < 100;
-      A0vel = fresh && !reduced ? clamp(drag.vel, -GLIDE_MAX, GLIDE_MAX) : 0;
+      lookVel = fresh && !reduced ? clamp(drag.vel, -GLIDE_MAX, GLIDE_MAX) : 0;
       drag = null;
-      A0goal = A0;
+      lookGoal = lookAt;
       return;
     }
     if (d && !d.moved && e.type === 'pointerup') { tapAt(e.clientX, e.clientY); }
