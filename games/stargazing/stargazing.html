@@ -752,8 +752,12 @@
   // turn of her head is a turn about that leaning axis, which is what
   // tips the horizon and dips her gaze as she looks to the side, the way
   // it does lying back on a hill. A neck only turns so far.
-  var A0 = 0, headYaw = 0, lookAt = 0;
+  var A0 = 0, headYaw = 0, lookAt = 0, headPitch = 0;
   var NECK_TILT = 25 * D2R, NECK_MAX = 75 * D2R;
+  // Altogether she can look 135 degrees round either side of north,
+  // with a little give at the end, and tip her head back up to 55
+  // degrees (nearly overhead) or forward a little.
+  var LOOK_MAX = 135 * D2R, LOOK_GIVE = 10 * D2R, PITCH_UP = 55 * D2R, PITCH_DOWN = -10 * D2R;
 
   // Days of sky time since the page opened, at the same quickened pace.
   var gameDays = 0;
@@ -786,6 +790,10 @@
     if (headYaw !== 0) {
       var axis = [-Math.sin(NECK_TILT) * sA, -Math.sin(NECK_TILT) * cA, Math.cos(NECK_TILT)];
       C = turn3(axis, C, -headYaw); R = turn3(axis, R, -headYaw); V = turn3(axis, V, -headYaw);
+    }
+    // Then her head tips back (or forward) about its own left-right line.
+    if (headPitch !== 0) {
+      C = turn3(R, C, headPitch); V = turn3(R, V, headPitch);
     }
     cE = C[0]; cN = C[1]; cU = C[2];
     rE = R[0]; rN = R[1]; rU = R[2];
@@ -2083,19 +2091,22 @@
   }
 
   // The field in front of her, falling away into the dark, and the
-  // grass close to her eyes, swaying in the wind. The grass stands all
-  // round her in the world, so it sweeps past as she turns her head;
-  // in front of her, where her legs are on the blanket, there is hardly
-  // any, so at rest it frames the sky at the corners without hiding it.
-  // Each blade is a direction and a height in degrees, rooted just
-  // below the bottom of the view.
-  var grass = [];
+  // grass close to her eyes, swaying in the wind. Each blade stands at
+  // a real place on the ground round her, a metre or two away, seen
+  // from her eyes half a metre up, so it sweeps past as she turns her
+  // head, drops out of sight as she looks up, and the nearest blades
+  // are the biggest. In front of her, where her legs are on the
+  // blanket, there is hardly any, so at rest it frames the sky at the
+  // corners without hiding it.
+  var grass = [], EYE = 0.5;
   function buildGrass() {
     if (grass.length) { return; }
-    var rnd = seeded(13), az = 0;
-    while (az < 360) {
-      az += 0.35 + rnd() * 1.1;
-      grass.push({ az: az * D2R, k: rnd(), w: rnd(), lean: (rnd() - 0.5) * 3, ph: rnd() * TAU });
+    var rnd = seeded(13);
+    for (var i = 0; i < 1100; i++) {
+      grass.push({
+        az: rnd() * TAU, d: 0.55 + 2.6 * rnd() * rnd(), h: 0.1 + 0.28 * rnd(),
+        lean: (rnd() - 0.5) * 0.08, ph: rnd() * TAU
+      });
     }
   }
   var windAmt = 0;
@@ -2107,29 +2118,29 @@
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, H);
 
-    // The roots sit just below the lowest point of the bottom edge.
-    var root = Math.min(unproject(0, H, tmpDir)[2], unproject(cx, H, tmpDir)[2], unproject(W, H, tmpDir)[2]);
-    root = Math.asin(clamp(root, -1, 1)) - 2 * D2R;
     ctx.strokeStyle = rgba(NEAR);
     ctx.lineCap = 'round';
-    var sw = reduced ? 0.3 : 1, p;
+    var sw = reduced ? 0.3 : 1, af = Math.atan2(cE, cN);
     for (var i = 0; i < grass.length; i++) {
       var b = grass[i];
-      // Short in front of her legs, taller round the sides.
+      if (Math.abs(((b.az - af) % TAU + TAU + Math.PI) % TAU - Math.PI) > 1.9) { continue; }
+      // Barely any in front of her legs, on the blanket.
       var rel = Math.abs(((b.az - A0) % TAU + TAU + Math.PI) % TAU - Math.PI) / D2R;
-      var side = smooth((rel - 18) / 40);
-      var h = (1.5 + 14 * side * (0.45 + b.k * 0.75)) * D2R;
-      p = altAz(root, b.az);
+      var h = b.h * (0.12 + 0.88 * smooth((rel - 16) / 34));
+      // Sway, in metres at the tip, more in the wind.
+      var bend = (b.lean + sw * (0.012 * Math.sin(clock * 1.1 + b.ph) + 0.05 * windAmt * (0.6 + 0.4 * Math.sin(clock * 1.9 + b.az * 9)))) * (h / 0.3);
+      var a0 = -Math.atan(EYE / b.d), a1 = Math.atan((h * 0.6 - EYE) / b.d), a2 = Math.atan((h - EYE) / b.d);
+      var p = altAz(a0, b.az);
       projENU(p[0], p[1], p[2]);
-      if (PD < 0.3 || PX < -60 || PX > W + 60) { continue; }
-      var x0 = PX, y0 = PY;
-      var bend = (b.lean + sw * (1.2 * Math.sin(clock * 1.1 + b.ph) + 6 * windAmt * (0.6 + 0.4 * Math.sin(clock * 1.9 + b.az * 9)))) * D2R * (h / (12 * D2R));
-      p = altAz(root + h * 0.6, b.az + bend * 0.35);
+      if (PD < 0.3) { continue; }
+      var x0 = PX, y0 = PY, den = PD;
+      p = altAz(a1, b.az + bend * 0.35 / b.d);
       projENU(p[0], p[1], p[2]);
       var x1 = PX, y1 = PY;
-      p = altAz(root + h, b.az + bend);
+      p = altAz(a2, b.az + bend / b.d);
       projENU(p[0], p[1], p[2]);
-      ctx.lineWidth = 1 + 3 * side * b.w;
+      if (Math.max(x0, PX) < -20 || Math.min(x0, PX) > W + 20 || Math.min(y0, PY) > H + 4) { continue; }
+      ctx.lineWidth = clamp(0.006 / b.d * K2 / den, 0.8, 5);
       ctx.beginPath();
       ctx.moveTo(x0, y0);
       ctx.quadraticCurveTo(x1, y1, PX, PY);
@@ -2302,11 +2313,11 @@
   }
 
   // ------------------------------------------------------------------
-  // Her breath. Each breath out is a little cloud of mist pushed up from
-  // just below the view: billowy puffs that rise fast and slow down,
-  // spread, turn and curl as they go, drift with the wind and thin
-  // away, faintly lit by the sky. With it comes a soft breath of sound.
-  // With reduced motion the mist rises slowly and gently fades.
+  // Her breath. Each breath out is a little cloud of mist from her
+  // mouth: billowy puffs that go out away from her, slow down, spread,
+  // turn and curl as they go, drift with the wind and thin away, faintly
+  // lit by the sky. With it comes a soft breath of sound. With reduced
+  // motion the mist moves slowly and gently fades.
   // ------------------------------------------------------------------
   // A puff of mist is not a smooth ball: each of these is a clump of
   // soft blobs, faded at the edges, so that overlapping them makes
@@ -2334,46 +2345,60 @@
     }
     return out;
   })();
-  var puffs = [], exhaling = 0, breathX = 0;
+  // Each puff is a real thing in the air in front of her face: where it
+  // is, in metres from her eyes (east, north, up), how fast it is going,
+  // and how big it has grown. It comes from her mouth, a few centimetres
+  // below her eyes and a little in front, and goes out along the way she
+  // is looking, rising a touch as warm breath does; so it appears big and
+  // soft at the bottom of the view and travels away into it, shrinking
+  // with distance as it spreads and thins. Once out, it stays in the air
+  // where she breathed it, even if she turns her head.
+  var puffs = [], exhaling = 0;
 
   function breathe() {
     if (exhaling > 0) { return; }
     exhaling = 0.6;
-    breathX = W * (0.47 + Math.random() * 0.06);
     breathSound();
   }
 
   function updateBreath(dt) {
     nextBreath -= dt;
     if (nextBreath <= 0) { breathe(); nextBreath = 7 + Math.random() * 5; }
-    var slow = reduced ? 0.35 : 1, i;
+    var slow = reduced ? 0.4 : 1, i, k;
     if (exhaling > 0) {
       exhaling -= dt;
-      // Strong at first and tailing off: fewer, slower puffs at the end
-      // of the breath, so they don't pile up at the bottom of the view.
+      // Out along her face, a little above where her eyes rest.
+      var up = [vE, vN, vU], side = [rE, rN, rU], ca = Math.cos(0.3), sa = Math.sin(0.3);
+      var g = [cE * ca + vE * sa, cN * ca + vN * sa, cU * ca + vU * sa];
+      // Strong at first and tailing off.
       var strength = clamp(exhaling / 0.6, 0.45, 1);
       var n = Math.floor(40 * dt * strength * strength + Math.random());
       for (i = 0; i < n; i++) {
+        var sp = (0.5 + Math.random() * 0.35) * strength * slow;
+        var jx = (Math.random() - 0.5) * 0.16, jy = 0.05 + (Math.random() - 0.5) * 0.12, jm = (Math.random() - 0.5) * 0.02;
+        var pos = [], vel = [];
+        for (k = 0; k < 3; k++) {
+          pos.push(g[k] * 0.05 - up[k] * 0.075 + side[k] * jm);
+          vel.push(g[k] * sp + side[k] * jx * slow + up[k] * jy * slow);
+        }
         puffs.push({
-          x: breathX + (Math.random() - 0.5) * U * 0.05, y: H + U * 0.13,
-          vx: (Math.random() - 0.5) * U * 0.26, vy: -U * (0.85 + Math.random() * 0.4) * strength * slow,
-          r0: U * (0.03 + Math.random() * 0.03), grow: U * (0.13 + Math.random() * 0.11),
-          age: 0, life: 2.2 + Math.random() * 1.1, img: Math.floor(Math.random() * 4),
+          p: pos, v: vel, r0: 0.025 + Math.random() * 0.015, grow: 0.1 + Math.random() * 0.07,
+          age: 0, life: 1.6 + Math.random() * 0.9, img: Math.floor(Math.random() * 4),
           rot: Math.random() * TAU, spin: (Math.random() - 0.5) * 1.6 * slow,
           ph: Math.random() * TAU, curl: (Math.random() - 0.5) * 2.4
         });
       }
     }
     for (i = puffs.length - 1; i >= 0; i--) {
-      var p = puffs[i];
-      p.age += dt;
-      if (p.age > p.life) { puffs.splice(i, 1); continue; }
-      p.vy *= Math.exp(-dt * 1.35);
-      p.vx *= Math.exp(-dt * 1.2);
-      p.vx += (windAmt * U * 0.08 + p.curl * Math.sin(p.age * 2.6 + p.ph) * U * 0.09) * dt * slow;
-      p.x += p.vx * dt;
-      p.y += p.vy * dt;
-      p.rot += p.spin * dt;
+      var q = puffs[i];
+      q.age += dt;
+      if (q.age > q.life) { puffs.splice(i, 1); continue; }
+      var damp = Math.exp(-dt * 1.1), curl = q.curl * Math.sin(q.age * 2.6 + q.ph) * 0.08 * dt * slow;
+      for (k = 0; k < 3; k++) { q.v[k] = q.v[k] * damp + [rE, rN, rU][k] * curl; }
+      q.v[2] += 0.05 * dt * slow;
+      q.v[0] += windAmt * 0.12 * dt * slow;
+      for (k = 0; k < 3; k++) { q.p[k] += q.v[k] * dt; }
+      q.rot += q.spin * dt;
     }
   }
 
@@ -2381,16 +2406,23 @@
     if (!puffs.length) { return; }
     ctx.globalCompositeOperation = 'lighter';
     for (var i = 0; i < puffs.length; i++) {
-      var p = puffs[i], t = p.age / p.life;
-      var r = p.r0 + p.grow * Math.pow(t, 0.6);
-      // Dim while still small and bunched together, so the mist is
-      // brightest where it has spread out, not where it starts.
-      var a = 0.3 * smooth(p.age / 0.6) * Math.pow(1 - t, 1.4) * Math.min(1, r / (U * 0.09));
+      var q = puffs[i], t = q.age / q.life;
+      var dist = Math.sqrt(q.p[0] * q.p[0] + q.p[1] * q.p[1] + q.p[2] * q.p[2]);
+      if (dist < 0.02) { continue; }
+      projENU(q.p[0] / dist, q.p[1] / dist, q.p[2] / dist);
+      if (PD < 0.15) { continue; }
+      var r = Math.min(U * 0.4, (q.r0 + q.grow * Math.pow(t, 0.6)) / dist * K2 / PD);
+      // It shows from the moment it leaves her lips, so the plume runs
+      // unbroken up from the bottom of the view; close up it is spread
+      // over so much of the view that it is only a faint haze, and it
+      // gathers into a small cloud as it goes, then thins away.
+      var a = 0.22 * smooth((dist - 0.04) / 0.06) * smooth(q.age / 0.1) * Math.pow(1 - t, 1.4) *
+        clamp(U * 0.12 / r, 0.3, 1);
       if (a < 0.01) { continue; }
-      var c = Math.cos(p.rot), s = Math.sin(p.rot);
-      ctx.setTransform(DPR * c, DPR * s, -DPR * s, DPR * c, DPR * p.x, DPR * p.y);
+      var c = Math.cos(q.rot), s = Math.sin(q.rot);
+      ctx.setTransform(DPR * c, DPR * s, -DPR * s, DPR * c, DPR * PX, DPR * PY);
       ctx.globalAlpha = a;
-      ctx.drawImage(mistSprites[p.img], -r, -r, 2 * r, 2 * r);
+      ctx.drawImage(mistSprites[q.img], -r, -r, 2 * r, 2 * r);
     }
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     ctx.globalAlpha = 1;
@@ -3129,38 +3161,66 @@
     gameDays += 60 * rate * dt / 86400;
     updateMoon(DAYS + gameDays);
 
-    // Looking round. Where she is looking (lookAt) follows the finger, up
-    // to half a turn a second, and after a flick glides a little and
-    // settles. Her head turns on her neck up to its limit; past that
-    // she shuffles round on the blanket, more slowly. And once she has
-    // been still for a few seconds her neck relaxes: her head comes back
-    // to the middle while her body turns to follow, so the view levels
-    // out still facing where she was looking.
+    // Looking round. Where she is looking follows the finger or the arrow
+    // keys, up to half a turn a second, and after a flick glides a little
+    // and settles.
+    // - Sideways, her head turns on her neck up to its limit, and past
+    //   that she shuffles round on the blanket, more slowly; but never
+    //   more than 135 degrees either side of north. At the end there is a
+    //   little give, and it eases back when let go.
+    // - Up and down, her head tips back to look higher, and stays there.
+    // - Once she has been still for a few seconds her neck relaxes
+    //   sideways: her head comes back to the middle while her body turns
+    //   to follow, so the view levels out still facing the same way.
     var lookMax = (reduced ? 90 : 180) * D2R * dt, bodyMax = (reduced ? 25 : 45) * D2R * dt;
-    if (drag) {
-      lookAt += clamp(lookGoal - lookAt, -lookMax, lookMax);
+    var kx = (keys.right ? 1 : 0) - (keys.left ? 1 : 0), ky = (keys.up ? 1 : 0) - (keys.down ? 1 : 0);
+    if (kx || ky) {
+      var keyRate = reduced ? 0.6 : 1;
+      lookGoal = clamp(lookAt + kx * 70 * D2R * keyRate * dt, -LOOK_MAX, LOOK_MAX);
+      pitchGoal = clamp(headPitch + ky * 45 * D2R * keyRate * dt, PITCH_DOWN, PITCH_UP);
+      lookVel = 0;
+      pitchVel = 0;
+    }
+    var steering = drag || kx || ky, ease = 1 - Math.exp(-dt / 0.25);
+    if (steering) {
+      var aim = drag ? softEnd(lookGoal, -LOOK_MAX, LOOK_MAX, LOOK_GIVE) : lookGoal;
+      var aimP = drag ? softEnd(pitchGoal, PITCH_DOWN, PITCH_UP, 6 * D2R) : pitchGoal;
+      lookAt += clamp(aim - lookAt, -lookMax, lookMax);
+      headPitch += clamp(aimP - headPitch, -lookMax, lookMax);
       lastLook = clock;
-    } else if (lookVel !== 0) {
-      lookAt += lookVel * dt;
-      lookVel *= Math.exp(-dt / 0.35);
-      if (Math.abs(lookVel) < 0.01) { lookVel = 0; }
+    } else {
+      if (lookVel !== 0) {
+        lookAt += lookVel * dt;
+        lookVel *= Math.exp(-dt / 0.35);
+        if (Math.abs(lookVel) < 0.01) { lookVel = 0; }
+        lastLook = clock;
+      }
+      if (pitchVel !== 0) {
+        headPitch += pitchVel * dt;
+        pitchVel *= Math.exp(-dt / 0.35);
+        if (Math.abs(pitchVel) < 0.01) { pitchVel = 0; }
+      }
+      if (lookAt > LOOK_MAX || lookAt < -LOOK_MAX) {
+        lookVel = 0;
+        lookAt += (clamp(lookAt, -LOOK_MAX, LOOK_MAX) - lookAt) * ease;
+      }
+      if (headPitch > PITCH_UP || headPitch < PITCH_DOWN) {
+        pitchVel = 0;
+        headPitch += (clamp(headPitch, PITCH_DOWN, PITCH_UP) - headPitch) * ease;
+      }
       lookGoal = lookAt;
-      lastLook = clock;
+      pitchGoal = headPitch;
     }
     var over = lookAt - A0;
     if (over > NECK_MAX) { A0 += Math.min(over - NECK_MAX, bodyMax); }
     else if (over < -NECK_MAX) { A0 -= Math.min(-over - NECK_MAX, bodyMax); }
     lookAt = clamp(lookAt, A0 - NECK_MAX, A0 + NECK_MAX);
-    if (!drag) { lookGoal = lookAt; }
-    if (!drag && lookVel === 0 && clock - lastLook > 5) {
+    if (!steering && lookVel === 0 && clock - lastLook > 5) {
       A0 += (lookAt - A0) * (1 - Math.exp(-dt / (reduced ? 4 : 2.5)));
     }
     headYaw = lookAt - A0;
     if (Math.abs(headYaw) < 1e-4) { headYaw = 0; }
-    var wrap = ((A0 + Math.PI) % TAU + TAU) % TAU - Math.PI - A0;
-    A0 += wrap;
-    lookAt += wrap;
-    lookGoal += wrap;
+    if (Math.abs(headPitch) < 1e-4) { headPitch = 0; }
     updateBasis();
 
     for (var i = timers.length - 1; i >= 0; i--) {
@@ -3219,11 +3279,38 @@
   }
 
   // ------------------------------------------------------------------
-  // Input. A tap does something where it lands; a drag sideways turns
-  // her head, with the sky under the finger. A flick glides only a
-  // little way, however hard it is, so the sky can't be sent spinning.
+  // Input. A tap does something where it lands; a drag turns her head,
+  // sideways or up and down, with the sky under the finger. A flick
+  // glides only a little way, however hard it is. The arrow keys (or W A
+  // S D) turn and tip her head at a steady pace.
   // ------------------------------------------------------------------
   var drag = null, downs = {}, lookGoal = 0, lookVel = 0, lastLook = -99, GLIDE_MAX = 90 * D2R;
+  var pitchGoal = 0, pitchVel = 0, keys = { left: false, right: false, up: false, down: false };
+
+  // Beyond an end, a pull only stretches a little further, less and less.
+  function softEnd(v, lo, hi, give) {
+    if (v > hi) { return hi + give * Math.tanh((v - hi) / (give * 2.5)); }
+    if (v < lo) { return lo - give * Math.tanh((lo - v) / (give * 2.5)); }
+    return v;
+  }
+
+  var KEYMAP = {
+    ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down',
+    a: 'left', d: 'right', w: 'up', s: 'down', A: 'left', D: 'right', W: 'up', S: 'down'
+  };
+  window.addEventListener('keydown', function (e) {
+    var k = KEYMAP[e.key];
+    if (!k) { return; }
+    e.preventDefault();
+    initAudio();
+    primeClips();
+    keys[k] = true;
+  });
+  window.addEventListener('keyup', function (e) {
+    var k = KEYMAP[e.key];
+    if (k) { keys[k] = false; }
+  });
+  window.addEventListener('blur', function () { keys.left = keys.right = keys.up = keys.down = false; });
 
   canvas.addEventListener('pointerdown', function (e) {
     initAudio();
@@ -3236,15 +3323,23 @@
     if (!d) { return; }
     if (!d.moved && Math.abs(e.clientX - d.x0) + Math.abs(e.clientY - d.y0) > 12) {
       d.moved = true;
-      if (!drag) { drag = { id: e.pointerId, lastX: d.x0, lastT: performance.now(), vel: 0 }; lookGoal = lookAt; lookVel = 0; }
+      if (!drag) {
+        drag = { id: e.pointerId, lastX: d.x0, lastY: d.y0, lastT: performance.now(), vel: 0, velY: 0 };
+        lookGoal = lookAt; lookVel = 0;
+        pitchGoal = headPitch; pitchVel = 0;
+      }
     }
     if (drag && drag.id === e.pointerId) {
-      var now = performance.now(), da = -(e.clientX - drag.lastX) / K;
-      // The sky may run behind a wild swipe, but never by more than a
-      // quarter turn.
-      lookGoal = clamp(lookGoal + da, lookAt - HALF_PI, lookAt + HALF_PI);
-      drag.vel = drag.vel * 0.5 + da / Math.max(0.008, (now - drag.lastT) / 1000) * 0.5;
+      var now = performance.now(), dts = Math.max(0.008, (now - drag.lastT) / 1000);
+      var da = -(e.clientX - drag.lastX) / K, dp = (e.clientY - drag.lastY) / K;
+      // The sky may run behind a wild swipe, but never by much, nor
+      // far past the ends.
+      lookGoal = clamp(lookGoal + da, Math.max(lookAt - HALF_PI, -LOOK_MAX - 0.5), Math.min(lookAt + HALF_PI, LOOK_MAX + 0.5));
+      pitchGoal = clamp(pitchGoal + dp, PITCH_DOWN - 0.5, PITCH_UP + 0.5);
+      drag.vel = drag.vel * 0.5 + da / dts * 0.5;
+      drag.velY = drag.velY * 0.5 + dp / dts * 0.5;
       drag.lastX = e.clientX;
+      drag.lastY = e.clientY;
       drag.lastT = now;
     }
   });
@@ -3252,10 +3347,12 @@
     var d = downs[e.pointerId];
     delete downs[e.pointerId];
     if (drag && drag.id === e.pointerId) {
-      var fresh = performance.now() - drag.lastT < 100;
-      lookVel = fresh && !reduced ? clamp(drag.vel, -GLIDE_MAX, GLIDE_MAX) : 0;
+      var fresh = performance.now() - drag.lastT < 100 && !reduced;
+      lookVel = fresh ? clamp(drag.vel, -GLIDE_MAX, GLIDE_MAX) : 0;
+      pitchVel = fresh ? clamp(drag.velY, -GLIDE_MAX, GLIDE_MAX) : 0;
       drag = null;
       lookGoal = lookAt;
+      pitchGoal = headPitch;
       return;
     }
     if (d && !d.moved && e.type === 'pointerup') { tapAt(e.clientX, e.clientY); }
