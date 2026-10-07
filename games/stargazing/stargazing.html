@@ -1,0 +1,2427 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#03050c">
+<title>Stargazing</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #03050c;
+    overflow: hidden;
+    touch-action: none;
+    overscroll-behavior: none;
+    -webkit-user-select: none; user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #sky {
+    display: block;
+    position: fixed; left: 0; top: 0;
+    width: 100%; height: 100%;
+    touch-action: none;
+  }
+</style>
+</head>
+<body>
+<script>
+// Full screen on the first touch, and a way back if it is off.
+//
+// A browser will not do this by itself: the request has to come out of a
+// gesture the browser counts as user activation, and that list is fussier
+// than it looks. pointerdown only counts when the pointer is a mouse - on
+// a touchscreen it grants nothing at all, which is why listening for it
+// worked on a laptop and did nothing whatever on a tablet. For a finger it
+// is pointerup and touchend that count.
+//
+// Once full screen is on, the automatic asking stops, so leaving it stays
+// left. But leaving it used to mean reloading to get it back, so there is
+// now a small button at the top of the screen that is only there while
+// full screen is off, and takes itself away the moment it is on.
+//
+// An iPhone ignores the lot, because Safari there gives full screen to
+// video and nothing else, so no button is offered. That is what the home
+// screen tags above are for.
+(function () {
+  var el = document.documentElement;
+  var go = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (!go) { return; }
+  var EVENTS = ['pointerup', 'touchend', 'click', 'mousedown'];
+  var asking = false, done = false, btn = null, i;
+
+  function isFull() {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement);
+  }
+
+  function request() {
+    if (asking || isFull()) { return; }
+    asking = true;
+    try {
+      var p = go.call(el);
+      if (p && p.then) { p.then(function () { asking = false; }, function () { asking = false; }); }
+      else { setTimeout(function () { asking = false; }, 500); }
+    } catch (e) { asking = false; }
+  }
+
+  function stopAuto() {
+    done = true;
+    for (var k = 0; k < EVENTS.length; k++) {
+      document.removeEventListener(EVENTS[k], autoTry, true);
+    }
+  }
+
+  function autoTry() {
+    if (done) { return; }
+    if (isFull()) { stopAuto(); sync(); return; }
+    request();
+  }
+
+  // A dim button: anything bright at the top of a night sky is the first
+  // thing the eye goes to.
+  function sync() {
+    var want = !isFull();
+    if (want && !btn && document.body) {
+      btn = document.createElement('button');
+      btn.setAttribute('aria-label', 'Full screen');
+      btn.style.cssText = 'position:fixed;top:5px;left:50%;transform:translateX(-50%);'
+        + 'z-index:30;width:46px;height:46px;padding:0;line-height:0;border:0;'
+        + 'border-radius:14px;background:rgba(190,205,255,0.16);cursor:pointer;'
+        + '-webkit-tap-highlight-color:transparent;';
+      btn.innerHTML = '<svg width="46" height="46" viewBox="0 0 46 46" aria-hidden="true">'
+        + '<g fill="none" stroke="#c9d4ff" stroke-opacity="0.8" stroke-width="3.4" stroke-linecap="round"'
+        + ' stroke-linejoin="round">'
+        + '<path d="M19 14 H14 V19 M27 14 H32 V19 M19 32 H14 V27 M27 32 H32 V27"/>'
+        + '</g></svg>';
+      btn.addEventListener('click', function (e) { e.stopPropagation(); request(); });
+      document.body.appendChild(btn);
+    }
+    if (btn) { btn.style.display = want ? 'block' : 'none'; }
+  }
+
+  document.addEventListener('fullscreenchange', function () {
+    if (isFull()) { stopAuto(); }
+    sync();
+  });
+  document.addEventListener('webkitfullscreenchange', function () {
+    if (isFull()) { stopAuto(); }
+    sync();
+  });
+  for (i = 0; i < EVENTS.length; i++) {
+    document.addEventListener(EVENTS[i], autoTry, true);
+  }
+  sync();
+})();
+</script>
+
+<canvas id="sky" aria-label="Stargazing"></canvas>
+
+<script>
+(function () {
+  'use strict';
+
+  var canvas = document.getElementById('sky');
+  var ctx = canvas.getContext('2d', { alpha: false });
+
+  var D2R = Math.PI / 180, TAU = Math.PI * 2, HALF_PI = Math.PI / 2;
+
+  function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+  function smooth(t) { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); }
+  function mtof(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+  function hex(h) {
+    return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  }
+  function mix(a, b, t) {
+    return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+  }
+  function rgba(c, a) {
+    return 'rgba(' + (c[0] | 0) + ',' + (c[1] | 0) + ',' + (c[2] | 0) + ',' + (a === undefined ? 1 : a) + ')';
+  }
+
+  // The same stars every visit, because the real sky is the same every
+  // night; only the comets are new each time.
+  function seeded(seed) {
+    return function () {
+      seed = (seed + 0x6D2B79F5) | 0;
+      var t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  var reduceQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+  var reduced = reduceQuery.matches;
+  if (reduceQuery.addEventListener) {
+    reduceQuery.addEventListener('change', function (e) { reduced = e.matches; });
+  }
+
+  // ------------------------------------------------------------------
+  // Every star bright enough to be part of a picture, plus the brightest
+  // of the rest, in their real places: name, right ascension in hours,
+  // declination in degrees, magnitude, and colour index (blue below
+  // nought, orange above one). The thousands of fainter stars are made up
+  // further down, but they thicken along the real Milky Way.
+  // ------------------------------------------------------------------
+  var STARS = [
+    // Great Bear
+    ['Dubhe', 11.062, 61.751, 1.79, 1.07], ['Merak', 11.031, 56.382, 2.37, 0.03],
+    ['Phecda', 11.897, 53.695, 2.44, 0.04], ['Megrez', 12.257, 57.033, 3.31, 0.08],
+    ['Alioth', 12.901, 55.960, 1.77, -0.02], ['Mizar', 13.399, 54.925, 2.27, 0.02],
+    ['Alcor', 13.420, 54.988, 4.01, 0.16], ['Alkaid', 13.792, 49.313, 1.86, -0.19],
+    ['Muscida', 8.504, 60.718, 3.36, 0.85], ['23UMa', 9.526, 63.062, 3.65, 0.33],
+    ['upsUMa', 9.850, 59.039, 3.80, 0.28], ['thUMa', 9.548, 51.678, 3.17, 0.46],
+    ['Talitha', 8.987, 48.042, 3.14, 0.19], ['kapUMa', 9.061, 47.157, 3.60, 0.0],
+    ['TaniaB', 10.285, 42.914, 3.45, 0.03], ['TaniaA', 10.372, 41.499, 3.06, 1.59],
+    ['psiUMa', 11.161, 44.498, 3.01, 1.14], ['AlulaB', 11.308, 33.094, 3.48, 1.40],
+    ['AlulaA', 11.303, 31.529, 3.79, 0.59], ['chiUMa', 11.768, 47.779, 3.71, 1.18],
+    // Little Bear
+    ['Polaris', 2.530, 89.264, 1.98, 0.60], ['Yildun', 17.537, 86.586, 4.35, 0.03],
+    ['epsUMi', 16.766, 82.037, 4.21, 0.89], ['zetUMi', 15.734, 77.794, 4.32, 0.04],
+    ['etaUMi', 16.292, 75.755, 4.95, 0.37], ['Kochab', 14.845, 74.156, 2.08, 1.47],
+    ['Pherkad', 15.346, 71.834, 3.05, 0.05],
+    // Dragon
+    ['Thuban', 14.073, 64.376, 3.65, -0.05], ['Rastaban', 17.507, 52.301, 2.79, 0.98],
+    ['Eltanin', 17.943, 51.489, 2.23, 1.52], ['Altais', 19.209, 67.661, 3.07, 1.00],
+    ['epsDra', 19.803, 70.268, 3.83, 0.89], ['zetDra', 17.146, 65.715, 3.17, -0.12],
+    ['etaDra', 16.400, 61.514, 2.73, 0.91], ['thDra', 16.031, 58.565, 4.01, 0.52],
+    ['iotDra', 15.416, 58.966, 3.29, 1.16], ['kapDra', 12.558, 69.788, 3.87, -0.13],
+    ['Giausar', 11.523, 69.331, 3.84, 1.62], ['Grumium', 17.892, 56.873, 3.75, 1.18],
+    ['Kuma', 17.538, 55.184, 4.88, 0.26], ['chiDra', 18.351, 72.733, 3.57, 0.49],
+    // Cassiopeia
+    ['Caph', 0.153, 59.150, 2.27, 0.34], ['Schedar', 0.675, 56.537, 2.24, 1.17],
+    ['Navi', 0.945, 60.717, 2.47, -0.15], ['Ruchbah', 1.430, 60.235, 2.68, 0.13],
+    ['Segin', 1.907, 63.670, 3.37, -0.15],
+    // Cepheus
+    ['Alderamin', 21.310, 62.585, 2.45, 0.26], ['Alfirk', 21.478, 70.561, 3.23, -0.20],
+    ['Errai', 23.656, 77.632, 3.21, 1.03], ['iotCep', 22.828, 66.201, 3.52, 1.05],
+    ['zetCep', 22.181, 58.201, 3.35, 1.57],
+    // Swan
+    ['Deneb', 20.691, 45.280, 1.25, 0.09], ['Sadr', 20.371, 40.257, 2.23, 0.67],
+    ['Gienah', 20.770, 33.970, 2.48, 1.03], ['Fawaris', 19.750, 45.131, 2.87, -0.03],
+    ['Albireo', 19.512, 27.960, 3.08, 1.13], ['etaCyg', 19.938, 35.083, 3.89, 1.02],
+    ['zetCyg', 21.216, 30.227, 3.21, 0.99], ['iotCyg', 19.495, 51.730, 3.79, 0.14],
+    ['kapCyg', 19.285, 53.368, 3.80, 0.96],
+    // Harp
+    ['Vega', 18.616, 38.784, 0.03, 0.00], ['epsLyr', 18.739, 39.670, 4.67, 0.18],
+    ['zetLyr', 18.746, 37.605, 4.34, 0.19], ['Sheliak', 18.835, 33.363, 3.52, 0.0],
+    ['Sulafat', 18.982, 32.690, 3.25, -0.05], ['delLyr', 18.908, 36.899, 4.30, 1.68],
+    // Eagle
+    ['Altair', 19.846, 8.868, 0.77, 0.22], ['Tarazed', 19.771, 10.613, 2.72, 1.52],
+    ['Alshain', 19.922, 6.407, 3.71, 0.86], ['delAql', 19.425, 3.115, 3.36, 0.32],
+    ['zetAql', 19.090, 13.863, 2.99, 0.01], ['lamAql', 19.104, -4.882, 3.43, -0.09],
+    ['thAql', 20.188, -0.821, 3.23, -0.07], ['etaAql', 19.875, 1.006, 3.87, 0.89],
+    // Dolphin
+    ['Sualocin', 20.661, 15.912, 3.77, -0.06], ['Rotanev', 20.626, 14.595, 3.63, 0.44],
+    ['gamDel', 20.778, 16.124, 4.27, 1.04], ['delDel', 20.724, 15.075, 4.43, 0.32],
+    ['Aldulfin', 20.554, 11.303, 4.03, -0.13],
+    // Northern Crown
+    ['Alphecca', 15.578, 26.715, 2.23, -0.02], ['Nusakan', 15.464, 29.106, 3.68, 0.28],
+    ['thCrB', 15.549, 31.359, 4.14, -0.13], ['gamCrB', 15.712, 26.296, 3.84, 0.0],
+    ['delCrB', 15.827, 26.068, 4.63, 0.80], ['epsCrB', 15.960, 26.878, 4.15, 1.23],
+    ['iotCrB', 16.024, 29.851, 4.98, -0.06],
+    // Herdsman
+    ['Arcturus', 14.261, 19.182, -0.05, 1.23], ['Izar', 14.750, 27.074, 2.37, 0.97],
+    ['Seginus', 14.535, 38.308, 3.03, 0.19], ['delBoo', 15.258, 33.315, 3.47, 0.95],
+    ['Nekkar', 15.032, 40.390, 3.50, 0.97], ['rhoBoo', 14.531, 30.371, 3.58, 1.30],
+    ['Muphrid', 13.911, 18.398, 2.68, 0.58], ['zetBoo', 14.686, 13.729, 3.78, 0.05],
+    // Lion
+    ['Regulus', 10.140, 11.967, 1.36, -0.11], ['Denebola', 11.818, 14.572, 2.14, 0.09],
+    ['Algieba', 10.333, 19.842, 2.08, 1.15], ['Zosma', 11.235, 20.524, 2.56, 0.12],
+    ['Chertan', 11.237, 15.430, 3.33, -0.01], ['etaLeo', 10.122, 16.763, 3.48, -0.03],
+    ['Adhafera', 10.278, 23.417, 3.44, 0.31], ['Rasalas', 9.879, 26.007, 3.88, 1.22],
+    ['epsLeo', 9.764, 23.774, 2.98, 0.80],
+    // Twins
+    ['Castor', 7.577, 31.888, 1.58, 0.03], ['Pollux', 7.755, 28.026, 1.14, 1.00],
+    ['Alhena', 6.629, 16.399, 1.93, 0.0], ['Mebsuta', 6.732, 25.131, 2.98, 1.40],
+    ['Tejat', 6.383, 22.514, 2.87, 1.64], ['Propus', 6.248, 22.507, 3.31, 1.60],
+    ['Wasat', 7.335, 21.982, 3.53, 0.34], ['Mekbuda', 7.069, 20.570, 3.90, 0.79],
+    ['tauGem', 7.186, 30.245, 4.41, 1.26], ['kapGem', 7.741, 24.398, 3.57, 0.93],
+    ['thGem', 6.880, 33.961, 3.60, 0.10], ['lamGem', 7.302, 16.540, 3.58, 0.11],
+    ['xiGem', 6.755, 12.896, 3.36, 0.43],
+    // Bull
+    ['Aldebaran', 4.599, 16.509, 0.85, 1.54], ['Elnath', 5.438, 28.608, 1.65, -0.13],
+    ['zetTau', 5.627, 21.143, 3.00, -0.19], ['th2Tau', 4.478, 15.871, 3.40, 0.18],
+    ['gamTau', 4.330, 15.628, 3.65, 0.99], ['delTau', 4.382, 17.543, 3.76, 0.98],
+    ['epsTau', 4.477, 19.180, 3.53, 1.01], ['lamTau', 4.011, 12.490, 3.40, -0.12],
+    ['omiTau', 3.414, 9.029, 3.60, 0.89],
+    // Seven Sisters
+    ['Alcyone', 3.791, 24.105, 2.87, -0.09], ['Atlas', 3.819, 24.053, 3.62, -0.08],
+    ['Electra', 3.748, 24.113, 3.70, -0.11], ['Maia', 3.764, 24.368, 3.87, -0.07],
+    ['Merope', 3.772, 23.948, 4.18, -0.06], ['Taygeta', 3.753, 24.467, 4.30, -0.11],
+    ['Pleione', 3.820, 24.137, 5.05, -0.08], ['Celaeno', 3.747, 24.289, 5.45, -0.04],
+    // Orion
+    ['Betelgeuse', 5.919, 7.407, 0.50, 1.85], ['Rigel', 5.242, -8.202, 0.13, -0.03],
+    ['Bellatrix', 5.419, 6.350, 1.64, -0.22], ['Mintaka', 5.533, -0.299, 2.23, -0.22],
+    ['Alnilam', 5.604, -1.202, 1.69, -0.18], ['Alnitak', 5.679, -1.943, 1.77, -0.21],
+    ['Saiph', 5.796, -9.670, 2.09, -0.17], ['Meissa', 5.586, 9.934, 3.39, -0.16],
+    ['pi1Ori', 4.916, 10.151, 4.65, 0.08], ['pi2Ori', 4.844, 8.900, 4.36, 0.01],
+    ['pi3Ori', 4.831, 6.961, 3.19, 0.45], ['pi4Ori', 4.853, 5.605, 3.69, -0.17],
+    ['pi5Ori', 4.904, 2.441, 3.72, -0.18], ['pi6Ori', 4.976, 1.714, 4.47, 1.40],
+    ['muOri', 6.040, 9.648, 4.12, 0.16], ['nuOri', 6.126, 14.768, 4.42, -0.17],
+    ['xiOri', 6.199, 14.209, 4.45, -0.18], ['chi1Ori', 5.906, 20.276, 4.41, 0.59],
+    ['chi2Ori', 6.065, 20.138, 4.63, 0.28], ['iotOri', 5.591, -5.910, 2.77, -0.24],
+    ['th1Ori', 5.588, -5.390, 4.00, 0.02],
+    // Great Dog
+    ['Sirius', 6.753, -16.716, -1.46, 0.0], ['Mirzam', 6.378, -17.956, 1.98, -0.23],
+    ['Adhara', 6.977, -28.972, 1.50, -0.21], ['Wezen', 7.140, -26.393, 1.83, 0.67],
+    ['Aludra', 7.402, -29.303, 2.45, -0.08], ['Furud', 6.339, -30.064, 3.02, -0.19],
+    ['Muliphein', 7.063, -15.633, 4.12, -0.12], ['iotCMa', 6.936, -17.054, 4.37, -0.07],
+    ['omi2CMa', 7.050, -23.833, 3.02, -0.08],
+    // Little Dog
+    ['Procyon', 7.655, 5.225, 0.34, 0.42], ['Gomeisa', 7.453, 8.289, 2.89, -0.10],
+    // Charioteer
+    ['Capella', 5.278, 45.998, 0.08, 0.80], ['Menkalinan', 5.992, 44.948, 1.90, 0.08],
+    ['thAur', 5.995, 37.213, 2.62, -0.08], ['Hassaleh', 4.950, 33.166, 2.69, 1.53],
+    ['Almaaz', 5.033, 43.823, 2.98, 0.54], ['Haedus', 5.041, 41.076, 3.75, 1.22],
+    ['Haedi', 5.109, 41.234, 3.17, -0.18],
+    // Perseus
+    ['Mirfak', 3.405, 49.861, 1.79, 0.48], ['Algol', 3.136, 40.956, 2.12, -0.05],
+    ['gamPer', 3.080, 53.506, 2.93, 0.70], ['delPer', 3.715, 47.788, 3.01, -0.13],
+    ['epsPer', 3.964, 40.010, 2.89, -0.18], ['zetPer', 3.902, 31.884, 2.85, 0.12],
+    ['etaPer', 2.845, 55.896, 3.76, 1.68], ['kapPer', 3.158, 44.857, 3.80, 0.98],
+    ['nuPer', 3.753, 42.579, 3.77, 0.42], ['Menkib', 3.983, 35.791, 4.04, 0.01],
+    ['Atik', 3.739, 32.288, 3.83, 0.05],
+    // Andromeda
+    ['Alpheratz', 0.140, 29.091, 2.06, -0.11], ['Mirach', 1.162, 35.621, 2.05, 1.58],
+    ['Almach', 2.065, 42.330, 2.10, 1.37], ['delAnd', 0.655, 30.861, 3.27, 1.28],
+    ['muAnd', 0.946, 38.499, 3.87, 0.13], ['nuAnd', 0.830, 41.079, 4.53, -0.15],
+    // Pegasus
+    ['Markab', 23.079, 15.205, 2.49, -0.04], ['Scheat', 23.063, 28.083, 2.42, 1.67],
+    ['Algenib', 0.221, 15.184, 2.83, -0.23], ['Enif', 21.736, 9.875, 2.39, 1.53],
+    ['Homam', 22.691, 10.831, 3.40, -0.09], ['Biham', 22.170, 6.198, 3.53, 0.08],
+    ['Matar', 22.717, 30.221, 2.94, 0.86], ['piPeg', 22.166, 33.178, 4.29, 0.46],
+    ['muPeg', 22.833, 24.601, 3.48, 0.93], ['lamPeg', 22.776, 23.566, 3.95, 1.07],
+    ['iotPeg', 22.117, 25.345, 3.76, 0.44], ['kapPeg', 21.744, 25.645, 4.13, 0.43],
+    // Triangle
+    ['Mothallah', 1.885, 29.579, 3.41, 0.49], ['betTri', 2.159, 34.987, 3.00, 0.14],
+    ['gamTri', 2.289, 33.847, 4.01, 0.02],
+    // Ram
+    ['Hamal', 2.119, 23.462, 2.00, 1.15], ['Sheratan', 1.911, 20.808, 2.64, 0.13],
+    ['Mesarthim', 1.892, 19.294, 3.88, -0.05], ['41Ari', 2.833, 27.261, 3.63, -0.10],
+    // Bright stars that belong to no picture here
+    ['Spica', 13.420, -11.161, 0.97, -0.23], ['Antares', 16.490, -26.432, 1.06, 1.83],
+    ['Fomalhaut', 22.961, -29.622, 1.16, 0.09], ['Rasalhague', 17.582, 12.560, 2.07, 0.15],
+    ['Alphard', 9.460, -8.659, 1.98, 1.44], ['Menkar', 3.038, 4.090, 2.54, 1.64],
+    ['Diphda', 0.727, -17.987, 2.04, 1.02], ['CorCaroli', 12.934, 38.318, 2.89, -0.12],
+    ['Kornephoros', 16.504, 21.490, 2.77, 0.94], ['zetHer', 16.688, 31.603, 2.81, 0.65],
+    ['piHer', 17.251, 36.809, 3.16, 1.44], ['etaHer', 16.715, 38.922, 3.48, 0.92],
+    ['epsHer', 17.005, 30.926, 3.92, -0.01], ['Rasalgethi', 17.244, 14.390, 3.10, 1.44],
+    ['delHer', 17.251, 24.839, 3.14, 0.08], ['Vindemiatrix', 13.036, 10.959, 2.83, 0.94],
+    ['Zubeneschamali', 15.283, -9.383, 2.61, -0.11], ['Zubenelgenubi', 14.848, -16.042, 2.75, 0.15],
+    ['Unukalhai', 15.738, 6.426, 2.63, 1.17], ['Sabik', 17.173, -15.725, 2.43, 0.06],
+    ['Sadalsuud', 21.526, -5.571, 2.90, 0.83], ['Sadalmelik', 22.096, -0.320, 2.95, 0.98],
+    ['DenebAlgedi', 21.784, -16.127, 2.85, 0.29]
+  ];
+
+  // The pictures. Each line is a run of stars joined one to the next. The
+  // Seven Sisters are too close together for lines; they are counted
+  // instead.
+  var GROUPS = [
+    { name: 'Great Bear', lines: [
+      ['Alkaid', 'Mizar', 'Alioth', 'Megrez', 'Phecda', 'Merak', 'Dubhe', 'Megrez'],
+      ['Dubhe', '23UMa', 'Muscida'],
+      ['23UMa', 'upsUMa', 'thUMa', 'kapUMa', 'Talitha'],
+      ['Phecda', 'chiUMa', 'AlulaB', 'AlulaA'],
+      ['chiUMa', 'psiUMa', 'TaniaA', 'TaniaB']] },
+    { name: 'Little Bear', lines: [
+      ['Polaris', 'Yildun', 'epsUMi', 'zetUMi', 'Kochab', 'Pherkad', 'etaUMi', 'zetUMi']] },
+    { name: 'Dragon', lines: [
+      ['Giausar', 'kapDra', 'Thuban', 'iotDra', 'thDra', 'etaDra', 'zetDra', 'chiDra', 'epsDra', 'Altais', 'Grumium'],
+      ['Grumium', 'Kuma', 'Rastaban', 'Eltanin', 'Grumium']] },
+    { name: 'Cassiopeia', lines: [['Caph', 'Schedar', 'Navi', 'Ruchbah', 'Segin']] },
+    { name: 'Cepheus', lines: [['Alderamin', 'Alfirk', 'Errai', 'iotCep', 'zetCep', 'Alderamin'], ['Alfirk', 'iotCep']] },
+    { name: 'Swan', lines: [
+      ['Deneb', 'Sadr', 'etaCyg', 'Albireo'],
+      ['kapCyg', 'iotCyg', 'Fawaris', 'Sadr', 'Gienah', 'zetCyg']] },
+    { name: 'Harp', lines: [['Vega', 'epsLyr', 'zetLyr', 'Vega'], ['zetLyr', 'Sheliak', 'Sulafat', 'delLyr', 'zetLyr']] },
+    { name: 'Eagle', lines: [
+      ['zetAql', 'Tarazed', 'Altair', 'Alshain'],
+      ['Altair', 'delAql', 'lamAql'],
+      ['delAql', 'etaAql', 'thAql']] },
+    { name: 'Dolphin', lines: [['Aldulfin', 'Rotanev', 'Sualocin', 'gamDel', 'delDel', 'Rotanev']] },
+    { name: 'Northern Crown', lines: [['thCrB', 'Nusakan', 'Alphecca', 'gamCrB', 'delCrB', 'epsCrB', 'iotCrB']] },
+    { name: 'Herdsman', lines: [
+      ['Arcturus', 'Izar', 'delBoo', 'Nekkar', 'Seginus', 'rhoBoo', 'Arcturus'],
+      ['Muphrid', 'Arcturus', 'zetBoo']] },
+    { name: 'Lion', lines: [
+      ['Regulus', 'etaLeo', 'Algieba', 'Adhafera', 'Rasalas', 'epsLeo'],
+      ['Algieba', 'Zosma', 'Denebola', 'Chertan', 'Regulus'],
+      ['Zosma', 'Chertan']] },
+    { name: 'Twins', lines: [
+      ['Castor', 'Pollux'],
+      ['Castor', 'tauGem', 'Mebsuta', 'Tejat', 'Propus'],
+      ['tauGem', 'thGem'],
+      ['Pollux', 'kapGem'],
+      ['Pollux', 'Wasat', 'Mekbuda', 'Alhena'],
+      ['Wasat', 'lamGem', 'xiGem']] },
+    { name: 'Bull', lines: [
+      ['zetTau', 'Aldebaran', 'th2Tau', 'gamTau', 'delTau', 'epsTau', 'Elnath'],
+      ['gamTau', 'lamTau', 'omiTau']] },
+    { name: 'Seven Sisters', cluster: true,
+      stars: ['Alcyone', 'Atlas', 'Electra', 'Maia', 'Merope', 'Taygeta', 'Pleione'] },
+    { name: 'Orion', lines: [
+      ['Bellatrix', 'Meissa', 'Betelgeuse'],
+      ['Bellatrix', 'Mintaka', 'Alnilam', 'Alnitak', 'Betelgeuse'],
+      ['Mintaka', 'Rigel'],
+      ['Alnitak', 'Saiph'],
+      ['Alnilam', 'th1Ori', 'iotOri'],
+      ['Betelgeuse', 'muOri', 'xiOri', 'nuOri', 'chi2Ori', 'chi1Ori'],
+      ['Bellatrix', 'pi3Ori'],
+      ['pi1Ori', 'pi2Ori', 'pi3Ori', 'pi4Ori', 'pi5Ori', 'pi6Ori']] },
+    { name: 'Great Dog', lines: [
+      ['Mirzam', 'Sirius', 'omi2CMa', 'Wezen', 'Aludra'],
+      ['Wezen', 'Adhara', 'Furud'],
+      ['Sirius', 'iotCMa', 'Muliphein']] },
+    { name: 'Little Dog', lines: [['Procyon', 'Gomeisa']] },
+    { name: 'Charioteer', lines: [
+      ['Capella', 'Menkalinan', 'thAur', 'Elnath', 'Hassaleh', 'Capella'],
+      ['Capella', 'Almaaz', 'Haedus', 'Haedi', 'Capella']] },
+    { name: 'Perseus', lines: [
+      ['etaPer', 'gamPer', 'Mirfak', 'delPer', 'nuPer', 'epsPer', 'Menkib', 'zetPer', 'Atik'],
+      ['Mirfak', 'kapPer', 'Algol']] },
+    { name: 'Andromeda', lines: [['Alpheratz', 'delAnd', 'Mirach', 'Almach'], ['Mirach', 'muAnd', 'nuAnd']] },
+    { name: 'Pegasus', lines: [
+      ['Markab', 'Scheat', 'Alpheratz', 'Algenib', 'Markab'],
+      ['Markab', 'Homam', 'Biham', 'Enif'],
+      ['Scheat', 'Matar', 'piPeg'],
+      ['Scheat', 'muPeg', 'lamPeg', 'iotPeg', 'kapPeg']] },
+    { name: 'Triangle', lines: [['Mothallah', 'betTri', 'gamTri', 'Mothallah']] },
+    { name: 'Ram', lines: [['41Ari', 'Hamal', 'Sheratan', 'Mesarthim']] }
+  ];
+
+  // What each picture looks like, drawn round its own stars. Coordinates
+  // are degrees on a flat map of that patch of sky, north up and east to
+  // the left, the way it looks overhead. d is the outline, filled and
+  // traced; l is detail, traced only.
+  var FIGURES = {
+    'Great Bear': {
+      d: 'M-29,-5.3Q-24,-9.8 -17,-8.4Q-13,-7.6 -11,-7.8C-6,-10.8 2,-12.2 6,-12.4Q8.5,-13.6 10.2,-14.6L10.8,-16.8Q12.3,-17.6 12.8,-15.6Q15.5,-15.6 18.6,-14.1Q19.6,-13.4 18.8,-12.7Q15.5,-11.4 12.6,-10.9Q10.4,-9.2 10.6,-6.4Q11.8,-3.6 14.5,-2.2L19.2,-0.6Q21.4,0 21.2,1.6Q20.4,2.8 18.6,2.2L12.6,0.4Q9.8,0.2 8.2,1.6Q4,3.8 0.5,4.6Q4.5,7.2 7,8.8Q9,10.2 7.8,11.6Q6.6,12.2 5.4,11.2Q2.6,9.6 -2,8Q-3.2,8.8 -3,11Q-2.6,16 -3.4,20.2Q-3.2,22.6 -5,22.8Q-6.6,22.6 -6.4,20.8Q-7.2,14 -10.6,8C-12.6,4.4 -13.2,-1 -12.2,-4.4Q-15,-5.6 -18,-6Q-24,-6.2 -29,-5.3Z',
+      l: 'M14.2,-13.6Q14.8,-13.6 14.8,-13.1Q14.8,-12.6 14.2,-12.6Q13.6,-12.6 13.6,-13.1Q13.6,-13.6 14.2,-13.6Z'
+    },
+    'Little Bear': {
+      d: 'M-0.2,-10.8Q-3.2,-4.6 0,0.8C1.8,1.8 3.5,3.5 4.3,4.7Q5.5,4.3 6,4.5L6.7,4.1Q7.2,4.4 6.8,5.1Q7.1,5.9 7,7.1Q7,7.7 6.4,7.6Q5.4,7.4 4.7,7Q3.9,6.9 3.3,7.6L1.6,9.9Q1.1,10.5 0.6,10L0.1,9.6L1.3,8.1Q-0.3,6.9 -1.5,5.6L-2.5,6.7Q-2.9,7.2 -3.4,6.7L-4,6.2Q-3.4,4.9 -2.8,3.6C-2.3,2.2 -1.5,1.3 -0.8,1.2Q-4.1,-4.9 -0.2,-10.8Z',
+      l: 'M6.7,5.9Q6.9,6.1 6.7,6.3Q6.5,6.6 6.3,6.4Q6.1,6.2 6.3,5.9Q6.5,5.7 6.7,5.9Z'
+    },
+    'Dragon': {
+      d: 'M23.3,-22.2L23.2,-22.1L23,-22L22.9,-21.8L22.7,-21.6L22.4,-21.2L22.1,-20.7L21.6,-20.1L21,-19.4L20.4,-18.5L19.7,-17.5L19.1,-16.4L18.5,-15L18,-13.5L17.6,-11.7L17.3,-9.7L16.9,-7.8L15.9,-7.4L16.4,-6L15.8,-4.3L14.9,-2.6L13.8,-2.5L13.9,-0.9L12.7,0.8L11.5,2.3L10.5,2.2L10.4,3.7L9.4,4.6L8.6,5.3L8.2,4.5L8,5.6L7.4,5.8L6.8,5.9L6.9,5L6.3,5.8L5.8,5.7L5.4,5.6L6.1,5L5.2,5.4L4.9,5.1L4.4,4.6L5.1,3.9L3.9,4L3.2,3.3L2.4,2.7L2.9,1.8L1.6,2.1L0.8,1.5L0,0.8L0.5,0L-0.8,0.1L-1.5,-0.8L-2.2,-1.9L-1.6,-2.7L-2.9,-3.3L-3.7,-4.9L-4.4,-6.5L-3.9,-7.3L-5.2,-8L-6.1,-9.2L-6.9,-10.1L-6.5,-10.9L-7.8,-10.8L-8.7,-11.3L-9.5,-11.6L-9.3,-12.5L-10.2,-11.8L-10.9,-11.9L-11.7,-12.1L-11.7,-13L-12.5,-12.1L-13.3,-12L-14,-11.8L-14.3,-12.7L-14.6,-11.6L-15.2,-11.2L-15.7,-10.8L-16.4,-11.4L-16.2,-10.3L-16.4,-9.7L-16.7,-9.1L-17.5,-9.2L-16.8,-8.4L-16.7,-7.7L-16.3,-6.9L-16.9,-6.2L-15.8,-6.5L-15.4,-6.3L-15.1,-6.1L-15.9,-5.6L-15,-5.9L-14.7,-5.5L-14.5,-4.7L-14.2,-3.7L-13.9,-2.5L-13.6,-1.1L-13.3,0.2L-12.9,1.4L-12.6,2.6L-12.2,3.8L-11.9,5.1L-11.5,6.2L-11.2,7.2L-11,7.9L-8.2,6.9L-8.4,6.3L-8.7,5.3L-9.1,4.2L-9.5,3L-9.9,1.8L-10.3,0.6L-10.6,-0.5L-11,-1.8L-11.3,-3.1L-11.7,-4.4L-12,-5.5L-12.4,-6.6L-13,-7.4L-13.6,-8L-14.2,-8.4L-14.5,-8.5L-14.6,-8.5L-14.5,-8.3L-14.5,-8.3L-14.5,-8.5L-14.4,-8.8L-14.3,-9L-14.1,-9.2L-14,-9.3L-13.7,-9.4L-13.3,-9.5L-12.9,-9.6L-12.4,-9.6L-12,-9.6L-11.5,-9.5L-10.9,-9.3L-10.3,-9.1L-9.8,-8.9L-9.3,-8.6L-8.7,-8.2L-8.2,-7.6L-7.5,-6.6L-6.8,-5.3L-6.1,-3.7L-5.3,-2.1L-4.5,-0.5L-3.6,0.8L-2.7,1.9L-1.7,2.8L-0.8,3.6L0.1,4.2L0.9,4.8L1.5,5.3L2.1,5.7L2.6,6.3L3.1,6.8L3.6,7.4L4.4,7.8L5.3,8.1L6.1,8.2L7,8.2L7.9,8L8.9,7.7L9.9,7.1L10.9,6.2L12,5L13.1,3.5L14.3,1.9L15.4,0.1L16.5,-1.8L17.4,-3.6L18,-5.5L18.4,-7.5L18.8,-9.5L19,-11.4L19.3,-13.2L19.7,-14.6L20.2,-15.9L20.7,-17L21.3,-18L21.8,-18.8L22.3,-19.6L22.7,-20.3L23,-20.9L23.2,-21.3L23.3,-21.6L23.4,-21.8L23.5,-22L23.5,-22.2ZM -11.8,8.2C-13.4,9.8 -13.6,12.6 -12.9,14.4C-12.3,16.2 -10.9,17.8 -9.4,18C-7.9,17.8 -6.5,16.2 -5.9,14.4C-5.2,12.6 -5.4,9.8 -7,8.2ZM -11.6,8.4L-13.6,5.4L-11,7.6ZM -7.2,8.4L-5.2,5.4L-7.8,7.6Z',
+      l: 'M-12.5,13.2Q-11.6,12.1 -10.7,13.2Q-11.6,14.1 -12.5,13.2ZM -8.2,13.2Q-7.3,12.1 -6.4,13.2Q-7.3,14.1 -8.2,13.2ZM -10.3,16.6Q-10,16.9 -10.3,17.2M-8.5,16.6Q-8.8,16.9 -8.5,17.2'
+    },
+    'Swan': {
+      d: 'M-6.5,-6.3Q-5.6,-5.3 -3.7,-4.8Q-2.8,-6.6 -1.4,-8.3Q0.4,-8.4 0.8,-10.6Q2.6,-10.7 3.2,-12.5Q5.3,-12.5 6.6,-12.8L8.7,-13.7C8.4,-7.8 5.5,-2.5 0.8,0.9Q1.7,3 2.3,4.6C3.6,7.1 6.3,8.5 8.1,10.7Q9.2,11.8 9.1,12.8L9.9,14.3L8.5,13.3Q7.9,12.9 7.4,11.7C5.5,9.4 2.7,7.9 0.6,6Q-0.9,5.1 -2.6,3.7C-5.7,7.5 -9.8,9.8 -14.6,9.7L-14,7.9Q-14.4,6.4 -13.7,4.8Q-12,4.6 -12,2.4Q-10.2,2.1 -9.7,0.2Q-8.1,0.2 -7.4,-1.7Q-7.6,-3.6 -8.4,-4.8Q-8.4,-5.8 -7.8,-6Q-7.5,-6.6 -6.5,-6.3Z',
+      l: 'M6.6,-11.5Q4.3,-6.5 -0.5,-1.9M-13.3,7.1Q-8.4,5.8 -4.7,2.5'
+    },
+    'Orion': {
+      d: 'M-1.3,-7C0,-7 0.4,-5.8 0.3,-5C0.2,-4 -0.4,-3.4 -1.3,-3.4C-2.2,-3.4 -2.8,-4 -2.9,-5C-3,-5.8 -2.6,-7 -1.3,-7ZM -0.7,-3.2L1.8,-2.2Q4,-2.8 6.4,-2.4L8.2,-1.8Q8.9,-1.2 8.4,-0.4L6.4,-0.6Q4.2,-0.6 2.6,0.4Q1.8,3 0.6,5L1.6,9L1.4,9.2Q3,11 4.2,13L5.4,14Q5.6,14.6 4.8,14.6L3.4,14.4Q2,12 0,9.8Q-2.2,12 -3.4,14.6L-3.8,15.6Q-4.4,16.2 -5.4,15.8L-5.2,15Q-4.8,12.4 -4.4,9.6L-4,9.4L-3.4,6.6Q-4.6,3 -5.6,-0.6L-9,-4.6L-10.6,-9Q-10.4,-10.4 -9.2,-10.2L-8.8,-8.8L-7.2,-5L-5.4,-3.4Q-3.6,-3.2 -1.9,-3.2ZM -10.2,-9.9L-9,-14.6Q-8.6,-16.6 -7,-16.8Q-5.6,-16.6 -6,-15.2L-9.4,-9.6ZM 8.2,-6Q11.6,-3.2 10.6,0.6Q10,3.2 7.6,4.2Q8.4,1 8.6,-1Q8.8,-3.6 8.2,-6ZM -1,7L-1.6,7L-1.6,11.8L-1.3,12.6L-1,11.8Z',
+      l: 'M-3.3,6.4Q-1.4,5.2 0.5,5'
+    },
+    'Lion': {
+      d: 'M-12,-1.4C-8,-3.2 -2,-2.6 2,-3.2Q1.6,-5.6 3.4,-6.6Q3.8,-8.8 6.2,-8.6Q7.6,-10.2 9.6,-9Q11.6,-9 11.6,-7.2L11.2,-6.6Q12.2,-5.6 12.4,-4.4L12.8,-3.4Q12.6,-2.6 11.8,-2.6Q11.6,-1.8 10.8,-1.8Q11,-0.4 9.6,0Q9.6,1.4 8,1.6Q7.6,3 6.4,3L6.8,5Q7,6.2 8,6.4L11.4,6.6Q12.6,6.8 12.4,7.8Q12.2,8.6 11.2,8.6L-12.4,8.6C-14.4,8 -14.6,3 -13.4,1.4Q-16,2.6 -18.2,4.4Q-18.8,5.6 -19.8,5Q-20.8,4.2 -19.8,3.2Q-19.2,2.6 -18.4,3Q-16,1.2 -13.6,0.2Q-12.8,-0.8 -12,-1.4Z',
+      l: 'M-6.2,8.6C-6.4,4.6 -9,2.6 -12,3.4M4.4,-0.6C3.6,-3 5,-6.2 8,-6.8M10.2,-5.2Q10.6,-5.6 11,-5.2Q10.6,-4.9 10.2,-5.2ZM 4.2,8.6L4.2,6.8'
+    },
+    'Great Dog': {
+      d: 'M3.6,-6.4Q2.4,-7.2 0.6,-7.6Q-0.6,-8.2 -1.4,-8L-2.4,-10.2Q-3.2,-10.4 -3.2,-9.6L-2.8,-7.2Q-3.4,-5.6 -3.6,-3.6Q-4.4,-0.4 -5.2,2.6Q-5.6,3.8 -5.4,4.6Q-6.2,5 -7.2,6.6L-7.4,7.2Q-6.4,6.4 -5,5.6Q-4,6.4 -2.6,6.9L4.6,7.6Q5.6,7.8 5.6,7.1Q5.4,6.6 4.4,6.6L0.2,5.8Q-0.6,4.6 -1,3.4Q-0.4,1.6 0.6,-0.6L6.6,-3.8Q8.2,-3.8 8.2,-4.6Q8,-5.4 6.8,-5.2L1.6,-4Q1,-4.8 1.4,-5.4Q2.4,-5.6 3.6,-6Q3.9,-6.2 3.6,-6.4Z',
+      l: 'M0.4,-7Q0.7,-7 0.7,-6.7Q0.7,-6.4 0.4,-6.4Q0.1,-6.4 0.1,-6.7Q0.1,-7 0.4,-7ZM -3.4,1.2Q-2.2,2.2 -1.6,4.4'
+    },
+    'Dolphin': {
+      d: 'M-2.9,-2.2Q-2.4,-1.2 -1.7,-0.5L-1.4,-0.2Q-1.5,0.9 -1.2,1.3Q-1,0.6 -0.6,0.2Q0.5,0.9 1.1,2.2Q1.3,2.7 1.3,3.2Q1,4 1.3,4.5Q1.5,3.9 1.7,3.6Q2.2,4 2.8,4Q2.5,3.4 2,2.8Q1.7,1.5 1.6,0.1Q2.2,-0.5 2.8,-0.7Q1.6,-1.1 0.8,-1Q-0.3,-1.8 -1.3,-2.1Q-1.9,-2.2 -2.2,-2.1L-2.9,-2.2Z',
+      l: ''
+    },
+    'Bull': {
+      d: 'M-3.8,0.6Q-3.2,-2.2 -1,-3.8L0.1,-4.3Q1.3,-5.9 2.3,-5.2Q2.2,-3.9 1,-3.2Q3.2,-1.8 3.8,-0.2Q5.9,1 4.8,3.1Q3.3,5 1.4,3.5Q-0.3,3.6 -2.5,2.2Q-2.6,3.5 -3.8,4.2Q-4.8,3.5 -3.9,1.7L-3.8,0.6ZM -3.8,0.1C-5.9,1.6 -8.5,1.8 -10.9,0C-13.1,-1.7 -14.7,-3.2 -16.3,-4.5C-14.1,-4.2 -12,-3.1 -9.9,-1.5C-8,0 -6,-0.1 -3.6,-0.9ZM -1.4,-3.6C-0.9,-6.1 -2,-8.5 -4.7,-9.8C-7.3,-11 -10.1,-11.4 -12.8,-12C-10.1,-11 -7.9,-9.7 -5.7,-8.3C-3.5,-6.9 -2.6,-5.3 -2.3,-2.9Z',
+      l: 'M3,3Q3.2,2.6 3.5,2.9Q3.8,3.1 3.6,3.4Q3.4,3.7 3.1,3.5Q2.7,3.3 3,3ZM 3.9,1.5Q4.2,1.1 4.5,1.4Q4.8,1.6 4.6,1.9Q4.4,2.2 4.1,2Q3.7,1.8 3.9,1.5Z'
+    },
+    'Northern Crown': {
+      d: 'M-4.6,-0.9L-3.8,-2.6L-2.7,-0.3L-1.6,-4.4L-0.6,0.4L0.4,-5L1.4,0.2L2.3,-4L3,-0.4L3.6,-2L4.5,-1Q4.6,2.4 0,2.9Q-4.6,2.6 -4.6,-0.9Z',
+      l: 'M-4.5,0.3Q0,3 4.5,0.2M-1.6,-4.8Q-1.2,-4.8 -1.2,-4.4Q-1.2,-4.1 -1.6,-4.1Q-1.9,-4.1 -1.9,-4.4Q-1.9,-4.8 -1.6,-4.8ZM 0.4,-5.4Q0.8,-5.4 0.8,-5Q0.8,-4.7 0.4,-4.7Q0.1,-4.7 0.1,-5Q0.1,-5.4 0.4,-5.4Z'
+    }
+  };
+
+  // ------------------------------------------------------------------
+  // Turning the lists into stars. Each star is a direction: x towards
+  // the spring equinox, z towards the Pole Star.
+  // ------------------------------------------------------------------
+  function radec(ra, dec) {
+    var a = ra * 15 * D2R, d = dec * D2R;
+    return [Math.cos(d) * Math.cos(a), Math.cos(d) * Math.sin(a), Math.sin(d)];
+  }
+  function norm3(v) {
+    var m = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]) || 1;
+    return [v[0] / m, v[1] / m, v[2] / m];
+  }
+  function cross3(a, b) {
+    return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  }
+
+  // Colour from colour index, a little richer than the eye would see it,
+  // so that Betelgeuse is plainly orange and Rigel plainly blue.
+  var BV_STOPS = [
+    [-0.3, [150, 180, 255]], [0.0, [200, 216, 255]], [0.3, [240, 242, 255]],
+    [0.6, [255, 240, 220]], [1.0, [255, 212, 160]], [1.5, [255, 176, 108]], [2.0, [255, 140, 80]]
+  ];
+  function bvColour(bv) {
+    if (bv <= BV_STOPS[0][0]) { return BV_STOPS[0][1].slice(); }
+    for (var i = 1; i < BV_STOPS.length; i++) {
+      if (bv <= BV_STOPS[i][0]) {
+        var a = BV_STOPS[i - 1], b = BV_STOPS[i];
+        return mix(a[1], b[1], (bv - a[0]) / (b[0] - a[0]));
+      }
+    }
+    return BV_STOPS[BV_STOPS.length - 1][1].slice();
+  }
+  var CLASSES = [-0.25, 0.0, 0.35, 0.7, 1.1, 1.5, 1.85];
+
+  var stars = [], byName = {};
+  (function () {
+    var rnd = seeded(5);
+    for (var i = 0; i < STARS.length; i++) {
+      var s = STARS[i], v = radec(s[1], s[2]), cls = 0, best = 9;
+      for (var k = 0; k < CLASSES.length; k++) {
+        var d = Math.abs(CLASSES[k] - s[4]);
+        if (d < best) { best = d; cls = k; }
+      }
+      stars.push({
+        x: v[0], y: v[1], z: v[2], mag: s[3], cls: cls,
+        p1: rnd() * TAU, p2: rnd() * TAU, f1: 3 + rnd() * 4, f2: 5 + rnd() * 6,
+        sx: 0, sy: 0, front: false, on: false, alt: 0, vis: 0, seen: false, flare: 0, groups: []
+      });
+      byName[s[0]] = i;
+    }
+  })();
+
+  // A figure's points are worked out once as directions in the sky, so
+  // each frame only has to say where those directions are on the screen.
+  function parseFigure(d, c, e, n) {
+    var toks = d.match(/[MLQCZ]|-?\d*\.?\d+/g) || [], cmds = [], cur = null, i;
+    for (i = 0; i < toks.length; i++) {
+      if (/[MLQCZ]/.test(toks[i])) { cur = { c: toks[i], v: [] }; cmds.push(cur); }
+      else if (cur) { cur.v.push(parseFloat(toks[i])); }
+    }
+    cmds.forEach(function (cm) {
+      var v = [];
+      for (var j = 0; j + 1 < cm.v.length; j += 2) {
+        var xi = -cm.v[j] * D2R, eta = -cm.v[j + 1] * D2R;
+        var p = norm3([c[0] + e[0] * xi + n[0] * eta, c[1] + e[1] * xi + n[1] * eta, c[2] + e[2] * xi + n[2] * eta]);
+        v.push(p[0], p[1], p[2]);
+      }
+      cm.v = v;
+    });
+    return cmds;
+  }
+
+  var groups = GROUPS.map(function (g) {
+    var idx = [], edges = [];
+    function add(name) {
+      var i = byName[name];
+      if (idx.indexOf(i) < 0) { idx.push(i); }
+      return i;
+    }
+    if (g.stars) { g.stars.forEach(add); }
+    (g.lines || []).forEach(function (line) {
+      for (var j = 0; j < line.length; j++) {
+        var b = add(line[j]);
+        if (j) { edges.push([byName[line[j - 1]], b]); }
+      }
+    });
+    var c = [0, 0, 0];
+    idx.forEach(function (i) { c[0] += stars[i].x; c[1] += stars[i].y; c[2] += stars[i].z; });
+    c = norm3(c);
+    var e = norm3(cross3([0, 0, 1], c)), n = cross3(c, e);
+    var f = FIGURES[g.name];
+    var grp = {
+      name: g.name, stars: idx, edges: edges, cluster: !!g.cluster,
+      fig: f ? { d: parseFigure(f.d, c, e, n), l: parseFigure(f.l, c, e, n) } : null,
+      brightest: idx.slice().sort(function (a, b) { return stars[a].mag - stars[b].mag; })[0]
+    };
+    idx.forEach(function (i) { stars[i].groups.push(grp); });
+    return grp;
+  });
+
+  // ------------------------------------------------------------------
+  // The faint stars and the Milky Way. Both follow the real band of the
+  // galaxy: bright through the Swan and the Eagle, fainter towards the
+  // Charioteer, and split down its length by the dark lane of dust that
+  // runs from the Swan southwards.
+  // ------------------------------------------------------------------
+  function galToEq(l, b) {
+    var cl = Math.cos(l * D2R), sl = Math.sin(l * D2R), cb = Math.cos(b * D2R), sb = Math.sin(b * D2R);
+    var g0 = cb * cl, g1 = cb * sl, g2 = sb;
+    return [
+      -0.0548755604 * g0 + 0.4941094279 * g1 - 0.8676661490 * g2,
+      -0.8734370902 * g0 - 0.4448296300 * g1 - 0.1980763734 * g2,
+      -0.4838350155 * g0 + 0.7469822445 * g1 + 0.4559837762 * g2
+    ];
+  }
+  function dl(a, b) { var d = Math.abs(((a - b) % 360 + 540) % 360 - 180); return d; }
+  function mwBright(l) {
+    var d1 = dl(l, 30) / 24, d2 = dl(l, 76) / 14, d3 = dl(l, 125) / 26, d4 = dl(l, 4) / 14;
+    return 0.32 + 0.9 * Math.exp(-d1 * d1) + 0.85 * Math.exp(-d2 * d2) + 0.35 * Math.exp(-d3 * d3) + 0.6 * Math.exp(-d4 * d4);
+  }
+  function mwWidth(l) { var d = dl(l, 10) / 34; return 4 + 3.5 * Math.exp(-d * d); }
+  function inRift(l, b) {
+    if (l < 16 || l > 88) { return false; }
+    var mid = 1.2 + 1.2 * Math.sin(l * 0.09);
+    return Math.abs(b - mid) < 1.6;
+  }
+
+  var FMAX = 5400, NF = 0, fDraw = 0;
+  var fX = new Float32Array(FMAX), fY = new Float32Array(FMAX), fZ = new Float32Array(FMAX);
+  var fM = new Float32Array(FMAX), fP = new Float32Array(FMAX), fF = new Float32Array(FMAX);
+  var fS = new Float32Array(FMAX), fT = new Uint8Array(FMAX);
+
+  var MWMAX = 1000, MWN = 0;
+  var mwX = new Float32Array(MWMAX), mwY = new Float32Array(MWMAX), mwZ = new Float32Array(MWMAX);
+  var mwR = new Float32Array(MWMAX), mwA = new Float32Array(MWMAX), mwK = new Uint8Array(MWMAX);
+
+  (function () {
+    var rnd = seeded(2026), i, v, l, b;
+    function gauss() { var u = rnd() || 1e-9; return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * rnd()); }
+    function sampleL() {
+      for (;;) { var c = rnd() * 360; if (rnd() * 2.4 < mwBright(c)) { return c; } }
+    }
+    function addStar(v, m, size) {
+      if (NF >= FMAX) { return; }
+      fX[NF] = v[0]; fY[NF] = v[1]; fZ[NF] = v[2]; fM[NF] = m;
+      fP[NF] = rnd() * TAU; fF[NF] = 2 + rnd() * 6; fS[NF] = size;
+      var t = rnd();
+      fT[NF] = t < 0.25 ? 0 : (t < 0.72 ? 1 : 2);
+      NF++;
+    }
+    // Ordinary stars, everywhere.
+    for (i = 0; i < 1500; i++) {
+      var z = rnd() * 2 - 1, ph = rnd() * TAU, r = Math.sqrt(1 - z * z);
+      var m = 4.4 + 2.3 * Math.pow(rnd(), 0.6);
+      addStar([r * Math.cos(ph), r * Math.sin(ph), z], m, m < 5 ? 1.5 : 1.15);
+    }
+    // Stars crowding into the Milky Way.
+    for (i = 0; i < 1400; i++) {
+      l = sampleL(); b = gauss() * mwWidth(l) * 1.1;
+      if (inRift(l, b) && rnd() < 0.5) { continue; }
+      var mm = 4.8 + 2 * Math.pow(rnd(), 0.5);
+      addStar(galToEq(l, b), mm, mm < 5.3 ? 1.4 : 1.1);
+    }
+    // And a grain of the very faintest, which is what makes it look like
+    // a cloud of stars rather than a smear. Drawn last, so these are the
+    // first to go if the device is struggling.
+    for (i = 0; i < 2500; i++) {
+      l = sampleL(); b = gauss() * mwWidth(l) * 0.8;
+      if (inRift(l, b) && rnd() < 0.75) { continue; }
+      addStar(galToEq(l, b), 6.6 + rnd() * 0.8, 1);
+    }
+    fDraw = NF;
+
+    function addBlob(l, b, size, a, kind) {
+      if (MWN >= MWMAX) { return; }
+      v = galToEq(l, b);
+      mwX[MWN] = v[0]; mwY[MWN] = v[1]; mwZ[MWN] = v[2];
+      mwR[MWN] = size * D2R; mwA[MWN] = a; mwK[MWN] = kind;
+      MWN++;
+    }
+    for (l = 0; l < 360; l += 1.5) {
+      var I = mwBright(l), sg = mwWidth(l), warm = dl(l, 8) < 45 ? 1 : 0;
+      for (var k = 0; k < 2; k++) {
+        addBlob(l + rnd() * 1.5, gauss() * sg * 0.6, 2.4 + 3.4 * rnd(), I * (0.045 + 0.04 * rnd()), warm);
+      }
+      if (Math.round(l / 1.5) % 4 === 0) { addBlob(l, gauss() * sg * 0.25, 8 + 5 * rnd(), I * 0.04, warm); }
+    }
+    for (l = 16; l < 88; l += 1.4) {
+      addBlob(l, 1.2 + 1.2 * Math.sin(l * 0.09) + gauss() * 0.5, 1.3 + 1.6 * rnd(), 0.45 + 0.3 * rnd(), 2);
+    }
+  })();
+
+  // ------------------------------------------------------------------
+  // Where we are and when: a hillside in the middle of Britain, tonight.
+  // The sky starts where it really is at this moment, then turns about
+  // sixty times faster than it really does, so the Plough goes all the
+  // way round the Pole Star in a little under half an hour.
+  // ------------------------------------------------------------------
+  var LAT = 54 * D2R, LON = -2;
+  var SIN_LAT = Math.sin(LAT), COS_LAT = Math.cos(LAT);
+  var DAYS = Date.now() / 86400000 + 2440587.5 - 2451545.0;
+  var lst = (((280.46061837 + 360.98564736629 * DAYS + LON) % 360) + 360) % 360;
+  var SKY_RATE = 360 / 86164.1 * 60;
+
+  // Where the sun is today, for where the last of the sunset glows.
+  var SUN = (function () {
+    var L = (280.46 + 0.9856474 * DAYS) * D2R, g = (357.528 + 0.9856003 * DAYS) * D2R;
+    var lam = L + (1.915 * Math.sin(g) + 0.02 * Math.sin(2 * g)) * D2R, eps = 23.439 * D2R;
+    return [Math.cos(lam), Math.cos(eps) * Math.sin(lam), Math.sin(eps) * Math.sin(lam)];
+  })();
+  var SUNSET_AZ = TAU - Math.acos(clamp(SUN[2] / COS_LAT, -1, 1));
+
+  // The way you are facing, in radians from north towards east.
+  var A0 = 0, A0vel = 0;
+
+  // Directions east, north and straight up, written in the stars' own
+  // frame; and the view's right and forward, from the way you face.
+  var Ex = 0, Ey = 1, Nx = 0, Ny = 0, Nz = 1, Zx = 0, Zy = 0, Zz = 1;
+  var Rx = 1, Ry = 0, Rz = 0, Fx = 0, Fy = 1, Fz = 0, ca = 1, sa = 0;
+
+  function updateBasis() {
+    var th = lst * D2R, ct = Math.cos(th), st = Math.sin(th);
+    Ex = -st; Ey = ct;
+    Nx = -SIN_LAT * ct; Ny = -SIN_LAT * st; Nz = COS_LAT;
+    Zx = COS_LAT * ct; Zy = COS_LAT * st; Zz = SIN_LAT;
+    ca = Math.cos(A0); sa = Math.sin(A0);
+    Fx = sa * Ex + ca * Nx; Fy = sa * Ey + ca * Ny; Fz = ca * Nz;
+    Rx = ca * Ex - sa * Nx; Ry = ca * Ey - sa * Ny; Rz = -sa * Nz;
+  }
+
+  // ------------------------------------------------------------------
+  // The view. The sky is drawn as a wide lens would see it, centred on
+  // the horizon in front of you and lifted so the horizon sits low on
+  // the screen. That keeps the horizon a straight line, keeps every
+  // constellation its true shape, and lets the Pole Star sit well up the
+  // screen with the Plough wheeling round it.
+  // ------------------------------------------------------------------
+  var W = 1, H = 1, U = 1, DPR = 1, cx = 0, hy = 0, K = 1, K2 = 2;
+  var PX = 0, PY = 0, PD = 0;
+
+  function projEq(x, y, z) {
+    var zf = x * Fx + y * Fy + z * Fz, den = 1 + zf;
+    PD = den;
+    if (den < 0.05) { den = 0.05; }
+    var yu = x * Zx + y * Zy + z * Zz;
+    PX = cx + K2 * (x * Rx + y * Ry + z * Rz) / den;
+    PY = hy - K2 * yu / den;
+    return yu;
+  }
+  function projENU(e, n, u) {
+    var zf = e * sa + n * ca, den = 1 + zf;
+    PD = den;
+    if (den < 0.05) { den = 0.05; }
+    PX = cx + K2 * (e * ca - n * sa) / den;
+    PY = hy - K2 * u / den;
+  }
+  // A point on the screen back to a direction: east, north, up.
+  function unproject(X, Y, out) {
+    var u = (X - cx) / K2, v = (hy - Y) / K2, r2 = u * u + v * v, q = 1 / (1 + r2);
+    var xr = 2 * u * q, yu = 2 * v * q, zf = (1 - r2) * q;
+    out[0] = xr * ca + zf * sa;
+    out[1] = -xr * sa + zf * ca;
+    out[2] = yu;
+    return out;
+  }
+  function enuToEq(e, n, u) {
+    return [e * Ex + n * Nx + u * Zx, e * Ey + n * Ny + u * Zy, n * Nz + u * Zz];
+  }
+  function altAz(alt, az) {
+    var c = Math.cos(alt);
+    return [c * Math.sin(az), c * Math.cos(az), Math.sin(alt)];
+  }
+
+  // Air near the horizon dims stars and makes them twinkle harder.
+  function extinction(sinAlt) {
+    if (sinAlt <= 0.002) { return 6; }
+    var X = 1 / (sinAlt + 0.025 * Math.exp(-11 * sinAlt));
+    return Math.min(6, 0.22 * (X - 1));
+  }
+  function hfade(sinAlt) { return smooth(sinAlt / 0.22); }
+
+  // ------------------------------------------------------------------
+  // The land: low hills all the way round, hedgerows and a few trees,
+  // and one cottage with a light on. It all turns with you.
+  // ------------------------------------------------------------------
+  var PROF_N = 1440, prof = new Float32Array(PROF_N), trees = [];
+  var COTTAGE_AZ = 33 * D2R;
+  (function () {
+    var rnd = seeded(31), i, k, j, waves = [];
+    for (k = 0; k < 6; k++) { waves.push([0.15 + rnd() * 0.45, 1 + Math.floor(rnd() * 9), rnd() * TAU]); }
+    for (i = 0; i < PROF_N; i++) {
+      var a = i / PROF_N * TAU, h = 0.9;
+      for (k = 0; k < waves.length; k++) { h += waves[k][0] * Math.sin(waves[k][1] * a + waves[k][2]); }
+      prof[i] = Math.max(0.3, h);
+    }
+    for (k = 0; k < 46; k++) {
+      var c = Math.floor(rnd() * PROF_N), w = 3 + rnd() * 12, ht = 0.3 + 0.7 * rnd();
+      for (j = -Math.ceil(w); j <= Math.ceil(w); j++) {
+        var f = j / w;
+        if (f <= -1 || f >= 1) { continue; }
+        var idx = ((c + j) % PROF_N + PROF_N) % PROF_N;
+        var add = ht * Math.sqrt(1 - f * f) * (0.85 + 0.3 * rnd());
+        prof[idx] = Math.max(prof[idx], prof[idx] * 0.6 + add + 0.4);
+      }
+    }
+    for (k = 0; k < 10; k++) {
+      var az = rnd() * TAU;
+      if (Math.abs(((az - COTTAGE_AZ + Math.PI) % TAU + TAU) % TAU - Math.PI) < 4 * D2R) { continue; }
+      trees.push({ az: az, r: (0.7 + 0.7 * rnd()) * D2R, h: (1.6 + 1.4 * rnd()) * D2R, lean: (rnd() - 0.5) * 0.3 });
+    }
+    // Flatten the ground under the cottage.
+    var ci = Math.round(COTTAGE_AZ / TAU * PROF_N);
+    for (j = -10; j <= 10; j++) { prof[(ci + j) % PROF_N] = Math.min(prof[(ci + j) % PROF_N], 0.7); }
+  })();
+
+  function profAt(az) {
+    var f = ((az / TAU) % 1 + 1) % 1 * PROF_N, i = Math.floor(f), t = f - i;
+    return prof[i % PROF_N] * (1 - t) + prof[(i + 1) % PROF_N] * t;
+  }
+
+  // ------------------------------------------------------------------
+  // Pictures drawn once: the glow of a star in each colour, a soft puff
+  // for the Milky Way and the comets' tails, and one ray of aurora.
+  // ------------------------------------------------------------------
+  function makeCanvas(w, h) { var c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+  function radialSprite(col, stops) {
+    var c = makeCanvas(64, 64), g = c.getContext('2d');
+    var gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    for (var i = 0; i < stops.length; i++) { gr.addColorStop(stops[i][0], rgba(stops[i][1] || col, stops[i][2])); }
+    g.fillStyle = gr;
+    g.fillRect(0, 0, 64, 64);
+    return c;
+  }
+  var WHITE = [255, 255, 255];
+  var starSprites = CLASSES.map(function (bv) {
+    var col = bvColour(bv);
+    return radialSprite(col, [[0, WHITE, 1], [0.09, mix(WHITE, col, 0.35), 0.95], [0.2, col, 0.5], [0.42, col, 0.12], [1, col, 0]]);
+  });
+  var PUFF = [[0, null, 1], [0.3, null, 0.62], [0.6, null, 0.2], [1, null, 0]];
+  var blobCool = radialSprite(hex('#b9c6f0'), PUFF);
+  var blobWarm = radialSprite(hex('#efe0c6'), PUFF);
+  var blobDark = radialSprite([0, 0, 0], PUFF);
+  var dustSprite = radialSprite(hex('#f4ecd8'), PUFF);
+  var ionSprite = radialSprite(hex('#8fc4ff'), PUFF);
+  var comaSprite = radialSprite(hex('#c6f5e2'), [[0, WHITE, 1], [0.15, hex('#d8fff0'), 0.8], [0.45, null, 0.22], [1, null, 0]]);
+
+  var raySprite = (function () {
+    var c = makeCanvas(32, 256), g = c.getContext('2d');
+    var gr = g.createLinearGradient(0, 256, 0, 0);
+    gr.addColorStop(0, 'rgba(90,255,160,0)');
+    gr.addColorStop(0.05, 'rgba(120,255,175,0.95)');
+    gr.addColorStop(0.3, 'rgba(80,235,150,0.55)');
+    gr.addColorStop(0.58, 'rgba(110,200,185,0.2)');
+    gr.addColorStop(0.8, 'rgba(195,105,235,0.24)');
+    gr.addColorStop(1, 'rgba(200,100,240,0)');
+    g.fillStyle = gr;
+    g.fillRect(0, 0, 32, 256);
+    g.globalCompositeOperation = 'destination-in';
+    var side = g.createLinearGradient(0, 0, 32, 0);
+    side.addColorStop(0, 'rgba(0,0,0,0)');
+    side.addColorStop(0.5, 'rgba(0,0,0,1)');
+    side.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = side;
+    g.fillRect(0, 0, 32, 256);
+    return c;
+  })();
+
+  var MW_DIV = 3, mwC = makeCanvas(1, 1), mwCtx = mwC.getContext('2d');
+
+  // Faint stars are drawn as tiny squares, sorted into a few levels of
+  // brightness in each of three tints so each level is one fill.
+  var FT = 3, FB = 8;
+  var TINTS = [hex('#c4d2ff'), hex('#f2f4ff'), hex('#ffeedd')];
+  var fStyles = [], bX = [], bY = [], bS = [], bN = new Int32Array(FT * FB);
+  (function () {
+    for (var t = 0; t < FT; t++) {
+      for (var b = 0; b < FB; b++) {
+        fStyles.push(rgba(TINTS[t], ((b + 0.5) / FB).toFixed(3)));
+        bX.push(new Float32Array(FMAX)); bY.push(new Float32Array(FMAX)); bS.push(new Float32Array(FMAX));
+      }
+    }
+  })();
+
+  // ------------------------------------------------------------------
+  // The two of them, lying on a blanket on the top of the hill.
+  // ------------------------------------------------------------------
+  function makePerson() {
+    return { aim: -1.2, raise: 0, look: -HALF_PI, point: null, pointUntil: 0, gaze: null, gazeUntil: 0, kickT: -99 };
+  }
+  var child = makePerson(), adult = makePerson();
+  var folk = { s: 100, ox: 0, oy: 0, cs: 62, cxo: 0, cyo: 0, crest: 0 };
+
+  // ------------------------------------------------------------------
+  // Layout
+  // ------------------------------------------------------------------
+  function layout() {
+    var w = Math.max(1, window.innerWidth), h = Math.max(1, window.innerHeight);
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    canvas.width = Math.round(w * DPR);
+    canvas.height = Math.round(h * DPR);
+    W = w; H = h; U = Math.min(W, H);
+    cx = W / 2;
+    hy = H * 0.8;
+    K = Math.min(W * 0.56, H * 0.585);
+    K2 = 2 * K;
+
+    mwC.width = Math.max(1, Math.ceil(W / MW_DIV));
+    mwC.height = Math.max(1, Math.ceil((hy + 6) / MW_DIV));
+
+    var s = clamp(Math.min(W * 0.36, H * 0.36), 90, 380);
+    folk.s = s;
+    folk.crest = hy + Math.max(H * 0.045, s * 0.12);
+    folk.ox = (W > H ? W * 0.47 : W * 0.5) - 0.48 * s;
+    folk.oy = folk.crest - 0.012 * s;
+    folk.cs = s * 0.62;
+    folk.cxo = folk.ox + 0.15 * s;
+    folk.cyo = folk.oy + 0.04 * s;
+    buildGrass();
+  }
+
+  // ------------------------------------------------------------------
+  // The time of night. It opens at the end of dusk and the stars come
+  // out one by one, brightest first, as it gets dark.
+  // ------------------------------------------------------------------
+  var clock = 0, DUSK_LEN = 45, dusk = 0;
+  function limitMag() { return -1.6 + 8.6 * Math.pow(dusk, 1.25); }
+
+  var timers = [];
+  function later(secs, fn) { timers.push({ t: clock + secs, fn: fn }); }
+
+  // ------------------------------------------------------------------
+  // Comets: one big one low in the north-west and a smaller one
+  // elsewhere, new places every visit. Their tails point away from the
+  // sun, which is under the horizon, so they mostly stream upwards.
+  // ------------------------------------------------------------------
+  var comets = [];
+  function makeComets() {
+    var rnd = Math.random;
+    var specs = [
+      { alt: (22 + rnd() * 10) * D2R, az: (305 + rnd() * 22) * D2R, len: 20 + rnd() * 6, size: 1 },
+      { alt: (14 + rnd() * 12) * D2R, az: (rnd() < 0.5 ? 40 + rnd() * 40 : 255 + rnd() * 25) * D2R, len: 8 + rnd() * 4, size: 0.6 }
+    ];
+    specs.forEach(function (c) {
+      var p = altAz(c.alt, c.az), v = enuToEq(p[0], p[1], p[2]);
+      comets.push({ x: v[0], y: v[1], z: v[2], len: c.len * D2R, size: c.size, flare: 0, sx: 0, sy: 0, front: false });
+    });
+  }
+
+  // ------------------------------------------------------------------
+  // Shooting stars. They burn in the air, so they live in the frame of
+  // the land, not the stars: a start, a direction, a speed.
+  // ------------------------------------------------------------------
+  var meteors = [], nextMeteor = 14, shower = null, nextShower = 210 + Math.random() * 120;
+  var tmp3 = [0, 0, 0];
+
+  function addMeteor(p, t, bright, tapped) {
+    var m = {
+      p: p, t: t, w: (15 + Math.random() * 18) * D2R, path: (10 + Math.random() * 14) * D2R,
+      streak: (5 + Math.random() * 4) * D2R, age: 0, bright: bright, sx: 0, sy: 0, front: false, dead: false
+    };
+    m.dur = reduced ? 1.8 : m.path / m.w;
+    meteors.push(m);
+    if (bright > 0.55 || tapped) {
+      var a = Math.min(m.path, 0.3);
+      projENU(p[0] * Math.cos(a) + t[0] * Math.sin(a), p[1] * Math.cos(a) + t[1] * Math.sin(a), p[2] * Math.cos(a) + t[2] * Math.sin(a));
+      swish(clamp((PX / W - 0.5) * 1.2, -0.8, 0.8), tapped ? 1 : bright);
+    }
+    return m;
+  }
+
+  // A direction across the sky from p: mostly downwards, but not always.
+  function downish(p, spread) {
+    var up = p[2];
+    var dx = up * p[0], dy = up * p[1], dz = up * up - 1;
+    var dm = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
+    dx /= dm; dy /= dm; dz /= dm;
+    var s = cross3(p, [dx, dy, dz]), b = (Math.random() - 0.5) * spread;
+    return [dx * Math.cos(b) + s[0] * Math.sin(b), dy * Math.cos(b) + s[1] * Math.sin(b), dz * Math.cos(b) + s[2] * Math.sin(b)];
+  }
+
+  function meteorAt(X, Y, tapped) {
+    var q = unproject(X, Y, [0, 0, 0]);
+    var p = norm3(q);
+    return addMeteor(p, downish(p, tapped ? 1.6 : 2.4), tapped ? 1 : 0.25 + Math.random() * 0.75, tapped);
+  }
+
+  function updateMeteors(dt) {
+    var i;
+    if (dusk > 0.6) {
+      nextMeteor -= dt;
+      if (nextMeteor <= 0) {
+        var m = meteorAt(W * (0.08 + Math.random() * 0.84), hy * (0.06 + Math.random() * 0.62), false);
+        nextMeteor = 7 + Math.random() * 14;
+        // A bright one makes the child turn to look.
+        if (m.bright > 0.8) { later(0.15, function () { gazeAt(child, { obj: m }, 1.2); }); }
+      }
+      // Now and then a shower: a dozen or so, all flying out from one
+      // spot in the sky.
+      nextShower -= dt;
+      if (nextShower <= 0 && !shower) {
+        var rad = altAz((35 + Math.random() * 30) * D2R, A0 + (Math.random() - 0.5) * 1.2);
+        shower = { r: rad, left: 14 + Math.floor(Math.random() * 8), next: 0 };
+        nextShower = 240 + Math.random() * 160;
+      }
+    }
+    if (shower) {
+      shower.next -= dt;
+      if (shower.next <= 0) {
+        var R = shower.r, ang = (8 + Math.random() * 34) * D2R, dir = Math.random() * TAU;
+        var s1 = norm3(cross3(R, [0, 0, 1])), s2 = cross3(R, s1);
+        var off = [s1[0] * Math.cos(dir) + s2[0] * Math.sin(dir), s1[1] * Math.cos(dir) + s2[1] * Math.sin(dir), s1[2] * Math.cos(dir) + s2[2] * Math.sin(dir)];
+        var p = norm3([R[0] * Math.cos(ang) + off[0] * Math.sin(ang), R[1] * Math.cos(ang) + off[1] * Math.sin(ang), R[2] * Math.cos(ang) + off[2] * Math.sin(ang)]);
+        var k = R[0] * p[0] + R[1] * p[1] + R[2] * p[2];
+        var t = norm3([p[0] * k - R[0], p[1] * k - R[1], p[2] * k - R[2]]);
+        if (p[2] > 0.05) { addMeteor(p, t, 0.3 + Math.random() * 0.7, false); }
+        shower.left -= 1;
+        shower.next = 0.6 + Math.random() * 1.8;
+        if (shower.left <= 0) { shower = null; }
+      }
+    }
+    for (i = meteors.length - 1; i >= 0; i--) {
+      meteors[i].age += dt;
+      if (meteors[i].age > meteors[i].dur) { meteors[i].dead = true; meteors.splice(i, 1); }
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Satellites: a steady point sliding across in a minute or two, never
+  // twinkling. Some fade out halfway, into the earth's shadow.
+  // ------------------------------------------------------------------
+  var sats = [], nextSat = 50 + Math.random() * 40;
+  function updateSats(dt) {
+    if (dusk > 0.8) {
+      nextSat -= dt;
+      if (nextSat <= 0) {
+        nextSat = 70 + Math.random() * 110;
+        var p = altAz((5 + Math.random() * 10) * D2R, A0 + (Math.random() - 0.5) * 1.6);
+        var up = norm3([-p[2] * p[0], -p[2] * p[1], 1 - p[2] * p[2]]), side = cross3(p, up);
+        var b = (Math.random() - 0.5) * 1.6;
+        var t = [up[0] * Math.cos(b) + side[0] * Math.sin(b), up[1] * Math.cos(b) + side[1] * Math.sin(b), up[2] * Math.cos(b) + side[2] * Math.sin(b)];
+        var big = Math.random() < 0.22;
+        var s = { p: p, t: t, w: (big ? 0.6 : 0.7 + Math.random() * 0.5) * D2R, mag: big ? -1.2 : 2.4 + Math.random() * 1.4, age: 0, shadow: Math.random() < 0.35 ? 40 + Math.random() * 50 : 999, sx: 0, sy: 0, front: false, dead: false };
+        sats.push(s);
+        // The child spots it and points.
+        later(4 + Math.random() * 3, function () { if (!s.dead && !child.point) { pointAt(child, { obj: s }, 3.5); later(0.6, function () { gazeAt(adult, { obj: s }, 3); }); } });
+      }
+    }
+    for (var i = sats.length - 1; i >= 0; i--) {
+      var o = sats[i];
+      o.age += dt;
+      var a = o.w * o.age;
+      var z = o.p[2] * Math.cos(a) + o.t[2] * Math.sin(a);
+      if ((a > 0.3 && z < 0) || o.age > o.shadow + 4) { o.dead = true; sats.splice(i, 1); }
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Now and then the northern lights: curtains of green with pink tops,
+  // folding slowly along the northern horizon for a minute or so.
+  // ------------------------------------------------------------------
+  var AUR_N = 120, aurAz = new Float32Array(AUR_N), aurH = new Float32Array(AUR_N), aurP = new Float32Array(AUR_N);
+  var aur = { s: 0, on: false, t0: 0, len: 0, next: 150 + Math.random() * 70, ph: Math.random() * 100 };
+  (function () {
+    var rnd = seeded(91);
+    for (var i = 0; i < AUR_N; i++) {
+      aurAz[i] = (-85 + 170 * i / (AUR_N - 1) + (rnd() - 0.5) * 1.2) * D2R;
+      aurH[i] = 0.55 + 0.7 * rnd();
+      aurP[i] = rnd() * TAU;
+    }
+  })();
+  function updateAurora(dt) {
+    aur.ph += dt * (reduced ? 0.3 : 1);
+    if (!aur.on && clock > aur.next && dusk > 0.95) {
+      aur.on = true; aur.t0 = clock; aur.len = 70 + Math.random() * 40;
+      // Both of them look up when it starts, and the child points.
+      later(5, function () {
+        var t = { enu: altAz(14 * D2R, 0) };
+        if (resolve(t)) { pointAt(child, t, 4); later(0.7, function () { gazeAt(adult, t, 6); }); }
+      });
+    }
+    if (aur.on) {
+      var el = clock - aur.t0;
+      aur.s = smooth(el / 16) * smooth((aur.len - el) / 16);
+      if (el > aur.len) { aur.on = false; aur.s = 0; aur.next = clock + 300 + Math.random() * 200; }
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Constellations being shown. Tapping a star draws its picture from
+  // that star outwards, one line at a time, with a chime and a number
+  // for each star as the line reaches it. Then the picture itself glows
+  // in behind, and after a while it all fades back to stars.
+  // ------------------------------------------------------------------
+  var lit = [], EDGE_T = 0.36, HOLD = 7, FADE = 2.6;
+
+  function lightGroup(g, from) {
+    var i, l;
+    for (i = 0; i < lit.length; i++) {
+      if (lit[i].g === g) {
+        l = lit[i];
+        l.refresh = clock;
+        ring(from, 0.8);
+        stars[from].flare = 1;
+        return l;
+      }
+    }
+    // No more than four at once: the oldest starts fading now.
+    if (lit.length >= 4) { lit[0].refresh = clock - HOLD; lit[0].end = clock - HOLD - lit[0].start; }
+    var seq = [], seen = {};
+    seen[from] = true;
+    if (g.cluster) {
+      var rest = g.stars.filter(function (s) { return s !== from; });
+      rest.sort(function (a, b) {
+        var A = stars[a], B = stars[b], F = stars[from];
+        return Math.hypot(A.sx - F.sx, A.sy - F.sy) - Math.hypot(B.sx - F.sx, B.sy - F.sy);
+      });
+      for (i = 0; i < rest.length; i++) { seq.push({ a: -1, b: rest[i], t0: 0.3 + i * 0.5 }); }
+    } else {
+      var used = {}, q = [from];
+      while (q.length) {
+        var s = q.shift();
+        for (i = 0; i < g.edges.length; i++) {
+          if (used[i]) { continue; }
+          var e = g.edges[i], o = e[0] === s ? e[1] : (e[1] === s ? e[0] : -1);
+          if (o < 0) { continue; }
+          used[i] = true;
+          seq.push({ a: s, b: o, t0: 0.25 + seq.length * EDGE_T });
+          if (!seen[o]) { seen[o] = true; q.push(o); }
+        }
+      }
+    }
+    var last = seq.length ? seq[seq.length - 1].t0 + EDGE_T : 0.4;
+    l = { g: g, start: clock, seq: seq, next: 0, nums: {}, count: 1, end: last, refresh: clock, done: false, doneAt: 0, alpha: 1 };
+    l.nums[from] = { n: 1, t: clock };
+    ring(from, 1);
+    stars[from].flare = 1;
+    lit.push(l);
+    return l;
+  }
+
+  function updateLit() {
+    for (var k = lit.length - 1; k >= 0; k--) {
+      var l = lit[k], el = clock - l.start;
+      for (var i = l.next; i < l.seq.length; i++) {
+        var q = l.seq[i];
+        if (el < q.t0 + (q.a < 0 ? 0 : EDGE_T)) { break; }
+        l.next = i + 1;
+        if (!l.nums[q.b]) {
+          l.count += 1;
+          l.nums[q.b] = { n: l.count, t: clock };
+          ring(q.b, 1);
+          stars[q.b].flare = 1;
+        }
+      }
+      if (!l.done && el >= l.end) {
+        l.done = true;
+        l.doneAt = clock;
+        finished(l);
+      }
+      var holdEnd = Math.max(l.start + l.end, l.refresh) + HOLD;
+      l.alpha = clock < holdEnd ? 1 : 1 - (clock - holdEnd) / FADE;
+      if (l.alpha <= 0) { lit.splice(k, 1); }
+    }
+  }
+
+  // The picture is complete: a soft low chord, and the child kicks their
+  // feet.
+  function finished(l) {
+    var s = stars[l.g.brightest];
+    var pan = clamp((s.sx / W - 0.5) * 1.2, -0.8, 0.8);
+    if (AC && AC.state === 'running') {
+      var t = AC.currentTime + 0.05;
+      chime(53, pan, 0.55, t);
+      chime(60, pan, 0.45, t + 0.12);
+      chime(65, pan, 0.4, t + 0.24);
+    }
+    child.kickT = clock;
+  }
+
+  // ------------------------------------------------------------------
+  // Who is looking at what. A target is a star, a moving thing (comet,
+  // shooting star, satellite) or a fixed place over the land.
+  // ------------------------------------------------------------------
+  function resolve(t) {
+    if (!t) { return null; }
+    if (t.star !== undefined) {
+      var s = stars[t.star];
+      return s.front && s.alt > 0 ? [s.sx, s.sy] : null;
+    }
+    if (t.obj) { return !t.obj.dead && t.obj.front ? [t.obj.sx, t.obj.sy] : null; }
+    if (t.enu) {
+      projENU(t.enu[0], t.enu[1], t.enu[2]);
+      return PD > 0.3 && PX > -20 && PX < W + 20 ? [PX, PY] : null;
+    }
+    return null;
+  }
+  function pointAt(p, t, secs) {
+    p.point = t; p.pointUntil = clock + secs;
+    p.gaze = t; p.gazeUntil = clock + secs;
+  }
+  function gazeAt(p, t, secs) { p.gaze = t; p.gazeUntil = clock + secs; }
+
+  function shoulder(p) {
+    if (p === child) { return [folk.cxo + 0.16 * folk.cs, folk.cyo - 0.13 * folk.cs]; }
+    return [folk.ox + 0.14 * folk.s, folk.oy - 0.11 * folk.s];
+  }
+
+  function updatePerson(p, dt, idle) {
+    if (p.point && clock > p.pointUntil) { p.point = null; }
+    if (p.gaze && clock > p.gazeUntil) { p.gaze = null; }
+    var sh = shoulder(p);
+    var pt = resolve(p.point), gz = resolve(p.gaze), k;
+    if (pt) {
+      var ang = clamp(Math.atan2(pt[1] - sh[1], pt[0] - sh[0]), -Math.PI + 0.35, -0.3);
+      if (p.raise < 0.05) { p.aim = ang; }
+      p.aim += (ang - p.aim) * Math.min(1, dt * 5);
+    }
+    k = Math.min(1, dt * (pt ? 3 : 1.4) * (reduced ? 0.6 : 1));
+    p.raise += ((pt ? 1 : 0) - p.raise) * k;
+    var look = idle;
+    if (gz) { look = clamp(Math.atan2(gz[1] - sh[1], gz[0] - sh[0]), -HALF_PI - 0.75, -HALF_PI + 0.75); }
+    p.look += (look - p.look) * Math.min(1, dt * 3);
+  }
+
+  // Every couple of minutes the grown-up points out the comet, and the
+  // child turns to look where they are pointing.
+  var nextShowComet = 75 + Math.random() * 40;
+  function updateFolk(dt) {
+    if (dusk > 0.9 && clock > nextShowComet) {
+      nextShowComet = clock + 110 + Math.random() * 80;
+      var c = comets[0];
+      if (c && c.front && !adult.point && !child.point) {
+        pointAt(adult, { obj: c }, 4.5);
+        later(0.8, function () { gazeAt(child, { obj: c }, 3.5); });
+      }
+    }
+    updatePerson(child, dt, -HALF_PI + 0.12 * Math.sin(clock * 0.21));
+    updatePerson(adult, dt, -HALF_PI + 0.1 * Math.sin(clock * 0.13 + 2));
+  }
+
+  // While it gets dark, the child points out the first few stars as
+  // they appear.
+  var firstStars = 0, lastFirst = -9;
+  function spotFirst(i) {
+    if (firstStars >= 3 || clock - lastFirst < 3) { return; }
+    firstStars += 1;
+    lastFirst = clock;
+    pointAt(child, { star: i }, 2.8);
+    later(0.6, function () { gazeAt(adult, { star: i }, 2.6); });
+  }
+
+  // ------------------------------------------------------------------
+  // Drawing the sky
+  // ------------------------------------------------------------------
+  var NIGHT_TOP = hex('#02040a'), NIGHT_MID = hex('#050a17'), NIGHT_HOR = hex('#0d162e');
+  var DUSK_TOP = hex('#1b2b55'), DUSK_MID = hex('#3b4c7c'), DUSK_HOR = hex('#9a8796');
+  var SUNSET = hex('#f0a070');
+
+  function drawSky() {
+    var f = dusk;
+    var g = ctx.createLinearGradient(0, 0, 0, hy);
+    g.addColorStop(0, rgba(mix(DUSK_TOP, NIGHT_TOP, f)));
+    g.addColorStop(0.6, rgba(mix(DUSK_MID, NIGHT_MID, f)));
+    g.addColorStop(1, rgba(mix(DUSK_HOR, NIGHT_HOR, f)));
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, hy + 4);
+    if (f < 0.99) {
+      var p = altAz(-4 * D2R, SUNSET_AZ);
+      projENU(p[0], p[1], p[2]);
+      if (PD > 0.15) {
+        var rad = Math.max(W, H) * 0.8;
+        var rg = ctx.createRadialGradient(PX, hy, 0, PX, hy, rad);
+        rg.addColorStop(0, rgba(SUNSET, 0.55 * Math.pow(1 - f, 1.6)));
+        rg.addColorStop(1, rgba(SUNSET, 0));
+        ctx.fillStyle = rg;
+        ctx.fillRect(0, 0, W, hy + 4);
+      }
+    }
+  }
+
+  function drawMilkyWay() {
+    var nf = smooth((dusk - 0.45) / 0.55);
+    if (nf <= 0) { return; }
+    var m = mwCtx, sc = 1 / MW_DIV, cw = mwC.width, ch = mwC.height, i;
+    m.setTransform(1, 0, 0, 1, 0, 0);
+    m.globalCompositeOperation = 'source-over';
+    m.globalAlpha = 1;
+    m.clearRect(0, 0, cw, ch);
+    for (var pass = 0; pass < 2; pass++) {
+      m.globalCompositeOperation = pass ? 'destination-out' : 'lighter';
+      for (i = 0; i < MWN; i++) {
+        if ((mwK[i] === 2) !== (pass === 1)) { continue; }
+        var x = mwX[i], y = mwY[i], z = mwZ[i];
+        var yu = x * Zx + y * Zy + z * Zz;
+        if (yu < -0.06) { continue; }
+        var den = 1 + x * Fx + y * Fy + z * Fz;
+        if (den < 0.3) { continue; }
+        var r = mwR[i] * K2 / den * sc;
+        var X = (cx + K2 * (x * Rx + y * Ry + z * Rz) / den) * sc, Y = (hy - K2 * yu / den) * sc;
+        if (X + r < 0 || X - r > cw || Y + r < 0 || Y - r > ch) { continue; }
+        var a = mwA[i] * (pass ? 1 : nf * hfade(yu));
+        if (a < 0.003) { continue; }
+        m.globalAlpha = Math.min(1, a);
+        m.drawImage(pass ? blobDark : (mwK[i] ? blobWarm : blobCool), X - r, Y - r, 2 * r, 2 * r);
+      }
+    }
+    m.globalAlpha = 1;
+    m.globalCompositeOperation = 'source-over';
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.drawImage(mwC, 0, 0, cw * MW_DIV, ch * MW_DIV);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  function drawField(lim) {
+    var i, b, tw = (reduced ? 0.06 : 0.16), ts = reduced ? 0.35 : 1;
+    for (b = 0; b < FT * FB; b++) { bN[b] = 0; }
+    for (i = 0; i < fDraw; i++) {
+      var x = fX[i], y = fY[i], z = fZ[i];
+      var yu = x * Zx + y * Zy + z * Zz;
+      if (yu < 0.005) { continue; }
+      var den = 1 + x * Fx + y * Fy + z * Fz;
+      if (den < 0.25) { continue; }
+      var X = cx + K2 * (x * Rx + y * Ry + z * Rz) / den;
+      if (X < -2 || X > W + 2) { continue; }
+      var Y = hy - K2 * yu / den;
+      if (Y < -2 || Y > hy + 2) { continue; }
+      var m = fM[i] + extinction(yu);
+      var a = clamp((lim - m) / 0.9, 0, 1) * 0.5 * Math.pow(10, -0.22 * (m - 4.4));
+      a *= 1 + tw * Math.sin(clock * fF[i] * ts + fP[i]);
+      var lev = (a * FB) | 0;
+      if (lev <= 0) { continue; }
+      if (lev >= FB) { lev = FB - 1; }
+      var bk = fT[i] * FB + lev, n = bN[bk]++;
+      bX[bk][n] = X; bY[bk][n] = Y; bS[bk][n] = fS[i];
+    }
+    ctx.globalCompositeOperation = 'lighter';
+    for (b = 0; b < FT * FB; b++) {
+      var cnt = bN[b];
+      if (!cnt) { continue; }
+      var xs = bX[b], ys = bY[b], ss = bS[b];
+      ctx.fillStyle = fStyles[b];
+      ctx.beginPath();
+      for (i = 0; i < cnt; i++) {
+        var sz = ss[i];
+        ctx.rect(xs[i] - sz / 2, ys[i] - sz / 2, sz, sz);
+      }
+      ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  function drawStars(lim) {
+    var amp = reduced ? 0.4 : 1, fr = reduced ? 0.35 : 1;
+    ctx.globalCompositeOperation = 'lighter';
+    for (var i = 0; i < stars.length; i++) {
+      var s = stars[i];
+      var yu = projEq(s.x, s.y, s.z);
+      s.sx = PX; s.sy = PY; s.alt = yu;
+      s.front = PD > 0.2 && yu > -0.3;
+      s.on = s.front && yu > 0.004 && PX > -30 && PX < W + 30 && PY > -30 && PY < hy + 10;
+      s.vis = 0;
+      if (!s.on) { continue; }
+      var me = s.mag + extinction(yu);
+      var vis = clamp((lim - me) / 0.9, 0, 1);
+      s.vis = vis;
+      if (dusk < 1 && !s.seen && vis > 0.5) {
+        s.seen = true;
+        if (clock < DUSK_LEN && s.mag < 1.6 && yu > 0.1) { spotFirst(i); }
+      }
+      if (vis <= 0.01) { continue; }
+      var low = 1 - clamp(yu / 0.5, 0, 1);
+      var tw = amp * (0.07 + 0.38 * low * low);
+      var a = vis * clamp(Math.pow(10, -0.2 * (me - 1)), 0.18, 1);
+      a *= 1 + tw * (0.6 * Math.sin(clock * s.f1 * fr + s.p1) + 0.4 * Math.sin(clock * s.f2 * fr + s.p2));
+      a *= 1 + s.flare;
+      var r = clamp(3 - 0.48 * me, 0.5, 3.9) * (1 + 0.9 * s.flare) * 6.2;
+      var cls = Math.min(CLASSES.length - 1, s.cls + Math.round(low * low * 2));
+      ctx.globalAlpha = Math.min(1, a);
+      ctx.drawImage(starSprites[cls], PX - r, PY - r, 2 * r, 2 * r);
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  function drawComets() {
+    var nf = smooth((dusk - 0.3) / 0.5);
+    for (var k = 0; k < comets.length; k++) { comets[k].front = false; }
+    if (nf <= 0) { return; }
+    // The tails point away from the sun. Played at teatime in June the
+    // real sun would be up and the tails would hang down, so the sun is
+    // kept where it is at midnight in a British summer: just under the
+    // northern horizon, which sends the tails streaming upwards.
+    var sd = altAz(-22 * D2R, 0), SV = enuToEq(sd[0], sd[1], sd[2]);
+    ctx.globalCompositeOperation = 'lighter';
+    for (k = 0; k < comets.length; k++) {
+      var c = comets[k], vx = c.x, vy = c.y, vz = c.z, i, u, f, r, a, yu;
+      var sv = SV[0] * vx + SV[1] * vy + SV[2] * vz;
+      var t = norm3([sv * vx - SV[0], sv * vy - SV[1], sv * vz - SV[2]]);
+      var w = cross3([vx, vy, vz], t);
+      var bright = nf * (1 + c.flare * 0.9);
+      // The straight blue tail of gas, and the broader, curving tail of
+      // dust beside it.
+      for (i = 1; i <= 50; i++) {
+        f = i / 50; u = c.len * 1.25 * f;
+        var tn = Math.tan(u);
+        var p = norm3([vx + t[0] * tn, vy + t[1] * tn, vz + t[2] * tn]);
+        yu = projEq(p[0], p[1], p[2]);
+        if (PD < 0.2 || yu < -0.02) { continue; }
+        r = (0.4 + 0.5 * f) * c.size * D2R * K2 / PD;
+        a = 0.075 * Math.pow(1 - f, 1.2) * bright * hfade(yu);
+        ctx.globalAlpha = Math.min(1, a);
+        ctx.drawImage(ionSprite, PX - r, PY - r, 2 * r, 2 * r);
+      }
+      for (i = 1; i <= 30; i++) {
+        f = i / 30; u = c.len * f;
+        var tn2 = Math.tan(u), cv = 0.22 * u * f;
+        var q = norm3([vx + t[0] * tn2 + w[0] * cv, vy + t[1] * tn2 + w[1] * cv, vz + t[2] * tn2 + w[2] * cv]);
+        yu = projEq(q[0], q[1], q[2]);
+        if (PD < 0.2 || yu < -0.02) { continue; }
+        r = (0.3 + 1.9 * f) * c.size * D2R * K2 / PD;
+        a = 0.2 * Math.pow(1 - f, 1.4) * bright * hfade(yu);
+        ctx.globalAlpha = Math.min(1, a);
+        ctx.drawImage(dustSprite, PX - r, PY - r, 2 * r, 2 * r);
+      }
+      yu = projEq(vx, vy, vz);
+      c.sx = PX; c.sy = PY;
+      c.front = PD > 0.2 && yu > 0.01;
+      if (PD < 0.2 || yu < -0.02) { continue; }
+      r = 1.4 * c.size * D2R * K2 / PD * (1 + 0.4 * c.flare);
+      ctx.globalAlpha = Math.min(1, 0.9 * bright * hfade(yu));
+      ctx.drawImage(comaSprite, PX - r, PY - r, 2 * r, 2 * r);
+      r = 9 * c.size;
+      ctx.globalAlpha = Math.min(1, bright * hfade(yu));
+      ctx.drawImage(starSprites[2], PX - r, PY - r, 2 * r, 2 * r);
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  function drawMeteors() {
+    ctx.lineCap = 'round';
+    for (var i = 0; i < meteors.length; i++) {
+      var m = meteors[i], p = m.p, t = m.t;
+      var env = Math.pow(Math.sin(Math.PI * clamp(m.age / m.dur, 0, 1)), 0.6);
+      var head = reduced ? m.path : m.age * m.w;
+      var tail = reduced ? 0 : Math.max(0, head - m.streak);
+      var ch = Math.cos(head), sh = Math.sin(head), ct = Math.cos(tail), st = Math.sin(tail);
+      projENU(p[0] * ch + t[0] * sh, p[1] * ch + t[1] * sh, p[2] * ch + t[2] * sh);
+      var hx = PX, hyy = PY, hd = PD;
+      projENU(p[0] * ct + t[0] * st, p[1] * ct + t[1] * st, p[2] * ct + t[2] * st);
+      var tx = PX, ty = PY;
+      m.sx = hx; m.sy = hyy; m.front = hd > 0.2;
+      if (hd < 0.2 || PD < 0.2) { continue; }
+      var a = env * (0.45 + 0.55 * m.bright);
+      var g = ctx.createLinearGradient(tx, ty, hx, hyy);
+      g.addColorStop(0, 'rgba(220,240,255,0)');
+      g.addColorStop(0.7, 'rgba(225,245,240,' + (0.35 * a).toFixed(3) + ')');
+      g.addColorStop(1, 'rgba(255,255,250,' + a.toFixed(3) + ')');
+      ctx.strokeStyle = g;
+      ctx.lineWidth = 1.1 + 1.3 * m.bright;
+      ctx.beginPath();
+      ctx.moveTo(tx, ty);
+      ctx.lineTo(hx, hyy);
+      ctx.stroke();
+      if (!reduced) {
+        var r = 5 + 6 * m.bright;
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = Math.min(1, a);
+        ctx.drawImage(starSprites[2], hx - r, hyy - r, 2 * r, 2 * r);
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+      }
+    }
+  }
+
+  function drawSats() {
+    ctx.globalCompositeOperation = 'lighter';
+    for (var i = 0; i < sats.length; i++) {
+      var o = sats[i], a = o.w * o.age, c = Math.cos(a), s = Math.sin(a);
+      var e = o.p[0] * c + o.t[0] * s, n = o.p[1] * c + o.t[1] * s, u = o.p[2] * c + o.t[2] * s;
+      projENU(e, n, u);
+      o.sx = PX; o.sy = PY; o.front = PD > 0.2 && u > 0.02;
+      if (!o.front) { continue; }
+      var al = smooth(o.age / 3) * hfade(u) * (1 - smooth((o.age - o.shadow) / 4));
+      var r = clamp(2.4 - 0.35 * o.mag, 0.8, 2.9) * 6;
+      ctx.globalAlpha = clamp(al * clamp(Math.pow(10, -0.16 * (o.mag - 1)), 0.3, 1), 0, 1);
+      ctx.drawImage(starSprites[2], PX - r, PY - r, 2 * r, 2 * r);
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  function drawAurora() {
+    if (aur.s < 0.01) { return; }
+    var s = aur.s, ph = aur.ph, i;
+    ctx.globalCompositeOperation = 'lighter';
+    var g0 = altAz(5 * D2R, 0);
+    projENU(g0[0], g0[1], g0[2]);
+    if (PD > 0.15) {
+      ctx.save();
+      ctx.translate(PX, PY);
+      ctx.scale(1, 0.32);
+      var rad = K2 * 0.9;
+      var gg = ctx.createRadialGradient(0, 0, 0, 0, 0, rad);
+      gg.addColorStop(0, 'rgba(60,220,140,' + (0.28 * s).toFixed(3) + ')');
+      gg.addColorStop(1, 'rgba(60,220,140,0)');
+      ctx.fillStyle = gg;
+      ctx.fillRect(-rad, -rad, 2 * rad, 2 * rad);
+      ctx.restore();
+    }
+    for (i = 0; i < AUR_N; i++) {
+      var az = aurAz[i], azd = Math.abs(az / D2R);
+      var edge = smooth((85 - azd) / 30);
+      var fold = 0.25 + 0.75 * Math.pow(Math.max(0, Math.sin(az * 4.2 + ph * 0.21 + 1.3 * Math.sin(az * 2.1 - ph * 0.13))), 1.5);
+      var inten = s * edge * fold;
+      if (inten < 0.02) { continue; }
+      var base = (6 + 3 * Math.sin(az * 3 + ph * 0.13) + 1.5 * Math.sin(az * 8 - ph * 0.09)) * D2R;
+      var top = base + (15 + 11 * Math.sin(az * 2.3 + ph * 0.06 + aurP[i])) * aurH[i] * D2R;
+      var saz = Math.sin(az), caz = Math.cos(az);
+      projENU(Math.cos(base) * saz, Math.cos(base) * caz, Math.sin(base));
+      if (PD < 0.25) { continue; }
+      var bx = PX, by = PY, bd = PD;
+      projENU(Math.cos(top) * saz, Math.cos(top) * caz, Math.sin(top));
+      var tx = PX, ty = PY;
+      if (Math.max(bx, tx) < -60 || Math.min(bx, tx) > W + 60) { continue; }
+      var len = Math.sqrt((tx - bx) * (tx - bx) + (ty - by) * (ty - by));
+      if (len < 2) { continue; }
+      var w = Math.max(5, 3.4 * D2R * K2 / bd);
+      var ang = Math.atan2(ty - by, tx - bx) + HALF_PI, c = Math.cos(ang), sn = Math.sin(ang);
+      ctx.setTransform(DPR * c, DPR * sn, -DPR * sn, DPR * c, DPR * bx, DPR * by);
+      ctx.globalAlpha = Math.min(1, inten * 0.5);
+      ctx.drawImage(raySprite, -w / 2, -len, w, len);
+    }
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // ------------------------------------------------------------------
+  // Drawing a constellation that has been tapped
+  // ------------------------------------------------------------------
+  var FONT = 'ui-rounded, "Segoe UI", system-ui, -apple-system, sans-serif';
+
+  function figurePath(cmds) {
+    for (var i = 0; i < cmds.length; i++) {
+      var cm = cmds[i], v = cm.v, pts = [];
+      for (var j = 0; j < v.length; j += 3) {
+        projEq(v[j], v[j + 1], v[j + 2]);
+        if (PD < 0.2) { return false; }
+        pts.push(PX, PY);
+      }
+      if (cm.c === 'M') { ctx.moveTo(pts[0], pts[1]); }
+      else if (cm.c === 'L') { ctx.lineTo(pts[0], pts[1]); }
+      else if (cm.c === 'Q') { ctx.quadraticCurveTo(pts[0], pts[1], pts[2], pts[3]); }
+      else if (cm.c === 'C') { ctx.bezierCurveTo(pts[0], pts[1], pts[2], pts[3], pts[4], pts[5]); }
+      else if (cm.c === 'Z') { ctx.closePath(); }
+    }
+    return true;
+  }
+
+  function drawFigure(fig, a) {
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    if (!figurePath(fig.d)) { return; }
+    ctx.fillStyle = 'rgba(140,170,255,' + (0.08 * a).toFixed(3) + ')';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(150,180,255,' + (0.1 * a).toFixed(3) + ')';
+    ctx.lineWidth = 6;
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(190,208,255,' + (0.5 * a).toFixed(3) + ')';
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+    if (fig.l.length) {
+      ctx.beginPath();
+      if (figurePath(fig.l)) { ctx.stroke(); }
+    }
+  }
+
+  function centroid(g) {
+    var x = 0, y = 0, n = 0;
+    for (var i = 0; i < g.stars.length; i++) {
+      var s = stars[g.stars[i]];
+      if (s.front) { x += s.sx; y += s.sy; n++; }
+    }
+    return n ? [x / n, y / n] : null;
+  }
+
+  function drawLit() {
+    var fs = clamp(Math.round(U * 0.032), 13, 22), k, i;
+    for (k = 0; k < lit.length; k++) {
+      var l = lit[k], a = clamp(l.alpha, 0, 1), el = clock - l.start, g = l.g;
+      if (g.fig && l.done) {
+        var fa = a * smooth((clock - l.doneAt) / 1.6);
+        if (fa > 0.01) { drawFigure(g.fig, fa); }
+      }
+      ctx.lineCap = 'round';
+      for (i = 0; i < l.seq.length; i++) {
+        var q = l.seq[i];
+        if (q.a < 0) { continue; }
+        var p = (el - q.t0) / EDGE_T;
+        if (p <= 0) { break; }
+        p = Math.min(1, p);
+        var A = stars[q.a], B = stars[q.b];
+        if (!A.front || !B.front) { continue; }
+        var f = reduced ? 1 : p, la = a * (reduced ? p : 1);
+        var ex = A.sx + (B.sx - A.sx) * f, ey = A.sy + (B.sy - A.sy) * f;
+        ctx.beginPath();
+        ctx.moveTo(A.sx, A.sy);
+        ctx.lineTo(ex, ey);
+        ctx.strokeStyle = 'rgba(160,190,255,' + (0.16 * la).toFixed(3) + ')';
+        ctx.lineWidth = 6;
+        ctx.stroke();
+        ctx.strokeStyle = 'rgba(210,224,255,' + (0.78 * la).toFixed(3) + ')';
+        ctx.lineWidth = 1.6;
+        ctx.stroke();
+        if (p < 1 && !reduced) {
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.drawImage(starSprites[1], ex - 9, ey - 9, 18, 18);
+          ctx.globalCompositeOperation = 'source-over';
+        }
+      }
+      // Numbers, counting the stars as they are reached. They sit just
+      // outside the picture, away from its middle, so they never cover a
+      // line.
+      var cen = centroid(g);
+      if (!cen) { continue; }
+      ctx.font = '600 ' + fs + 'px ' + FONT;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.lineJoin = 'round';
+      for (var key in l.nums) {
+        if (!l.nums.hasOwnProperty(key)) { continue; }
+        var s = stars[key], nm = l.nums[key];
+        if (!s.front || s.alt < 0) { continue; }
+        var dx = s.sx - cen[0], dy = s.sy - cen[1], dm = Math.sqrt(dx * dx + dy * dy);
+        if (dm < 1) { dx = 0; dy = -1; dm = 1; }
+        var off = g.cluster ? fs * 1.6 + 8 : fs * 0.95;
+        var nx = s.sx + dx / dm * off, ny = s.sy + dy / dm * off;
+        var na = a * smooth((clock - nm.t) / 0.35);
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(2,4,10,' + (0.7 * na).toFixed(3) + ')';
+        ctx.strokeText(String(nm.n), nx, ny);
+        ctx.fillStyle = 'rgba(232,238,255,' + (0.92 * na).toFixed(3) + ')';
+        ctx.fillText(String(nm.n), nx, ny);
+      }
+    }
+  }
+
+  // The name, small, for whoever is reading it out.
+  function drawNames() {
+    var fs = clamp(Math.round(U * 0.03), 12, 20);
+    ctx.font = '500 ' + fs + 'px ' + FONT;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (var k = 0; k < lit.length; k++) {
+      var l = lit[k];
+      if (!l.done) { continue; }
+      var a = clamp(l.alpha, 0, 1) * smooth((clock - l.doneAt - 0.6) / 1.2);
+      if (a < 0.01) { continue; }
+      var g = l.g, x = 0, n = 0, lo = -1e9;
+      for (var i = 0; i < g.stars.length; i++) {
+        var s = stars[g.stars[i]];
+        if (!s.front) { continue; }
+        x += s.sx; n++;
+        if (s.sy > lo) { lo = s.sy; }
+      }
+      if (!n) { continue; }
+      var nx = clamp(x / n, 70, W - 70), ny = Math.min(lo + fs * 1.8, hy - fs);
+      ctx.fillStyle = 'rgba(196,210,250,' + (0.7 * a).toFixed(3) + ')';
+      ctx.fillText(g.name, nx, ny);
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Drawing the land
+  // ------------------------------------------------------------------
+  var LAND_DUSK = hex('#1b2036'), LAND_NIGHT = hex('#0a1020'), AURORA_TINT = hex('#0e2a22');
+  var NEAR = hex('#03050b'), FOLK = hex('#010207');
+
+  function landColour() {
+    return mix(mix(LAND_DUSK, LAND_NIGHT, dusk), AURORA_TINT, 0.3 * aur.s);
+  }
+
+  function drawLand() {
+    var step = 4, X, col = landColour();
+    ctx.fillStyle = rgba(col);
+    ctx.beginPath();
+    ctx.moveTo(-4, H + 4);
+    for (X = -step; X <= W + step; X += step) {
+      var d = 2 * Math.atan((X - cx) / K2);
+      var h = profAt(A0 + d) * D2R, chh = Math.cos(h);
+      var den = 1 + chh * Math.cos(d);
+      ctx.lineTo(cx + K2 * chh * Math.sin(d) / den, hy - K2 * Math.sin(h) / den);
+    }
+    ctx.lineTo(W + 4, H + 4);
+    ctx.closePath();
+    ctx.fill();
+
+    // Lone trees on the skyline.
+    for (var i = 0; i < trees.length; i++) {
+      var t = trees[i];
+      var ground = profAt(t.az) * D2R, crown = ground + t.h;
+      var p = altAz(crown, t.az);
+      projENU(p[0], p[1], p[2]);
+      if (PD < 0.3 || PX < -60 || PX > W + 60) { continue; }
+      var r = t.r * K2 / PD, tx = PX, ty = PY;
+      var gp = altAz(ground - 0.3 * D2R, t.az);
+      projENU(gp[0], gp[1], gp[2]);
+      ctx.beginPath();
+      ctx.moveTo(PX - r * 0.09, PY);
+      ctx.lineTo(tx - r * 0.06 + t.lean * r, ty + r * 0.4);
+      ctx.lineTo(tx + r * 0.06 + t.lean * r, ty + r * 0.4);
+      ctx.lineTo(PX + r * 0.09, PY);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(tx + t.lean * r, ty, r, 0, TAU);
+      ctx.arc(tx + t.lean * r - r * 0.55, ty + r * 0.25, r * 0.72, 0, TAU);
+      ctx.arc(tx + t.lean * r + r * 0.55, ty + r * 0.2, r * 0.75, 0, TAU);
+      ctx.arc(tx + t.lean * r, ty - r * 0.45, r * 0.68, 0, TAU);
+      ctx.fill();
+    }
+
+    // The cottage, with its one lit window.
+    var base = profAt(COTTAGE_AZ) * D2R - 0.15 * D2R;
+    var c0 = altAz(base, COTTAGE_AZ);
+    projENU(c0[0], c0[1], c0[2]);
+    if (PD > 0.3 && PX > -60 && PX < W + 60) {
+      var u = 1.0 * D2R * K2 / PD, bx = PX, by = PY;
+      ctx.beginPath();
+      ctx.moveTo(bx - u * 0.9, by);
+      ctx.lineTo(bx - u * 0.9, by - u * 0.65);
+      ctx.lineTo(bx - u * 0.55, by - u * 1.0);
+      ctx.lineTo(bx - u * 0.55, by - u * 1.2);
+      ctx.lineTo(bx - u * 0.38, by - u * 1.2);
+      ctx.lineTo(bx - u * 0.38, by - u * 1.12);
+      ctx.lineTo(bx - u * 0.1, by - u * 1.25);
+      ctx.lineTo(bx + u * 0.75, by - u * 0.7);
+      ctx.lineTo(bx + u * 0.75, by);
+      ctx.closePath();
+      ctx.fill();
+      var wx = bx - u * 0.42, wy = by - u * 0.38, ws = Math.max(1.6, u * 0.17);
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.5;
+      ctx.drawImage(starSprites[5], wx - ws * 5, wy - ws * 5, ws * 10, ws * 10);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = 'rgba(255,206,130,0.95)';
+      ctx.fillRect(wx - ws / 2, wy - ws / 2, ws, ws);
+    }
+  }
+
+  // The near hillside, with grass along its top that moves in the wind.
+  var grass = [];
+  function buildGrass() {
+    grass = [];
+    var rnd = seeded(13), x = 0;
+    var b0 = folk.ox - 0.16 * folk.s, b1 = folk.ox + 1.2 * folk.s;
+    while (x < W) {
+      x += 3 + rnd() * 9;
+      if (x > b0 && x < b1) { continue; }
+      grass.push({ x: x, h: 3 + rnd() * 8 * Math.max(1, U / 500), lean: (rnd() - 0.5) * 0.5, ph: rnd() * TAU });
+    }
+  }
+  // A rounded hilltop, level under the blanket.
+  function knollY(x) {
+    var mid = folk.ox + 0.5 * folk.s, flat = 0.72 * folk.s;
+    var d = Math.max(0, Math.abs(x - mid) - flat) / Math.max(60, W * 0.65 - flat);
+    return folk.crest + H * 0.075 * d * d;
+  }
+  var windAmt = 0;
+  function drawKnoll() {
+    ctx.fillStyle = rgba(NEAR);
+    ctx.beginPath();
+    ctx.moveTo(-4, H + 4);
+    for (var x = -4; x <= W + 8; x += 8) { ctx.lineTo(x, knollY(x)); }
+    ctx.lineTo(W + 4, H + 4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = rgba(NEAR);
+    ctx.lineWidth = 1.2;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    var sw = reduced ? 0.3 : 1;
+    for (var i = 0; i < grass.length; i++) {
+      var g = grass[i], y = knollY(g.x) + 1;
+      var bend = g.lean + sw * (0.08 * Math.sin(clock * 1.3 + g.ph) + 0.35 * windAmt * (0.6 + 0.4 * Math.sin(clock * 2.1 + g.x * 0.02)));
+      ctx.moveTo(g.x, y);
+      ctx.quadraticCurveTo(g.x + Math.sin(bend) * g.h * 0.4, y - g.h * 0.6, g.x + Math.sin(bend) * g.h, y - Math.cos(bend) * g.h);
+    }
+    ctx.stroke();
+  }
+
+  // ------------------------------------------------------------------
+  // Drawing the two of them. Each is drawn twice: first a little larger
+  // in the faint colour the sky puts on their edges, then in black on
+  // top, which leaves a thin rim of light round each of them and keeps
+  // the child readable in front of the grown-up.
+  // ------------------------------------------------------------------
+  var ADULT_BODY = [[0.07, -0.04], [0.075, -0.1], [0.13, -0.135], [0.24, -0.155], [0.36, -0.142], [0.48, -0.126],
+    [0.6, -0.1], [0.75, -0.08], [0.9, -0.066], [0.935, -0.066], [0.95, -0.14], [0.99, -0.135], [1.0, -0.06], [1.0, 0], [0.06, 0]];
+  var CHILD_BODY = [[0.075, -0.045], [0.085, -0.1], [0.15, -0.15], [0.27, -0.165], [0.4, -0.15], [0.52, -0.13],
+    [0.66, -0.095], [0.8, -0.08], [0.9, -0.07], [0.93, -0.07], [0.95, -0.15], [0.99, -0.145], [1.0, -0.07], [1.0, 0], [0.06, 0]];
+
+  function smoothShape(pts) {
+    var n = pts.length, i;
+    ctx.moveTo((pts[n - 1][0] + pts[0][0]) / 2, (pts[n - 1][1] + pts[0][1]) / 2);
+    for (i = 0; i < n; i++) {
+      var a = pts[i], b = pts[(i + 1) % n];
+      ctx.quadraticCurveTo(a[0], a[1], (a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
+    }
+    ctx.closePath();
+  }
+
+  function limb(pts, w) {
+    ctx.lineWidth = w;
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (var i = 1; i < pts.length; i++) { ctx.lineTo(pts[i][0], pts[i][1]); }
+    ctx.stroke();
+  }
+
+  function personShapes(isChild, rim, rimCol) {
+    var p = isChild ? child : adult;
+    var s = isChild ? folk.cs : folk.s, ox = isChild ? folk.cxo : folk.ox, oy = isChild ? folk.cyo : folk.oy;
+    var breathe = 0.006 * Math.sin(clock * TAU / (isChild ? 3.1 : 4.2));
+    var base = isChild ? CHILD_BODY : ADULT_BODY, pts = [], i;
+    for (i = 0; i < base.length; i++) {
+      var by = base[i][1] - (i >= 2 && i <= 4 ? breathe : 0);
+      pts.push([ox + base[i][0] * s, oy + by * s]);
+    }
+    var grow = rim ? 1.3 : 0;
+    ctx.beginPath();
+    smoothShape(pts);
+    // Head, and the nose showing which way it is turned.
+    var hr = (isChild ? 0.1 : 0.08) * s, hx = ox, hyy = oy - (isChild ? 0.105 : 0.085) * s, lk = p.look;
+    ctx.moveTo(hx + hr + grow, hyy);
+    ctx.arc(hx, hyy, hr + grow, 0, TAU);
+    ctx.moveTo(hx + Math.cos(lk - 0.32) * (hr * 0.85), hyy + Math.sin(lk - 0.32) * (hr * 0.85));
+    ctx.lineTo(hx + Math.cos(lk) * (hr * 1.22 + grow), hyy + Math.sin(lk) * (hr * 1.22 + grow));
+    ctx.lineTo(hx + Math.cos(lk + 0.32) * (hr * 0.85), hyy + Math.sin(lk + 0.32) * (hr * 0.85));
+    ctx.closePath();
+    if (isChild) {
+      // A bobble hat, on the crown of the head, turning with it.
+      var kk = lk - HALF_PI;
+      ctx.moveTo(hx + Math.cos(kk - 1.5) * (hr * 1.08 + grow), hyy + Math.sin(kk - 1.5) * (hr * 1.08 + grow));
+      ctx.arc(hx, hyy, hr * 1.08 + grow, kk - 1.5, kk + 1.5);
+      ctx.closePath();
+      var bx = hx + Math.cos(kk) * hr * 1.38, bby = hyy + Math.sin(kk) * hr * 1.38;
+      ctx.moveTo(bx + hr * 0.36 + grow, bby);
+      ctx.arc(bx, bby, hr * 0.36 + grow, 0, TAU);
+    }
+    ctx.fill();
+    if (rim) { ctx.lineWidth = 2.6; ctx.lineJoin = 'round'; ctx.stroke(); }
+    else if (isChild) {
+      // The edge of the hat, caught by the same faint light.
+      ctx.save();
+      ctx.strokeStyle = rimCol;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(hx + Math.cos(kk - 1.5) * hr * 1.06, hyy + Math.sin(kk - 1.5) * hr * 1.06);
+      ctx.quadraticCurveTo(hx - Math.cos(kk) * hr * 0.35, hyy - Math.sin(kk) * hr * 0.35,
+        hx + Math.cos(kk + 1.5) * hr * 1.06, hyy + Math.sin(kk + 1.5) * hr * 1.06);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Limbs.
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    var sh = [ox + (isChild ? 0.16 : 0.14) * s, oy - (isChild ? 0.13 : 0.11) * s];
+    var ua = isChild ? 0.22 : 0.21, fa = isChild ? 0.2 : 0.2, aw = (isChild ? 0.075 : 0.055) * s + grow * 2;
+    // At rest the arm lies along the body with the hand on the tummy, so
+    // only the hand shows; pointing, it straightens towards the target.
+    var restUp = isChild ? 0.25 : 0.3, restBend = isChild ? -0.7 : -0.62;
+    var r = smooth(p.raise), up = restUp + (p.aim - restUp) * r, bend = restBend + (-0.08 - restBend) * r;
+    var el = [sh[0] + Math.cos(up) * ua * s, sh[1] + Math.sin(up) * ua * s];
+    var hand = [el[0] + Math.cos(up + bend) * fa * s, el[1] + Math.sin(up + bend) * fa * s];
+    limb([sh, el, hand], aw);
+    if (r > 0.3) {
+      // A finger, pointing.
+      var fl = 0.05 * s * (r - 0.3) / 0.7;
+      limb([hand, [hand[0] + Math.cos(up + bend) * fl, hand[1] + Math.sin(up + bend) * fl]], aw * 0.38 + grow * 1.2);
+    }
+    if (!isChild) {
+      // One knee up.
+      limb([[ox + 0.5 * s, oy - 0.06 * s], [ox + 0.68 * s, oy - 0.24 * s], [ox + 0.86 * s, oy - 0.04 * s]], 0.075 * s + grow * 2);
+      limb([[ox + 0.85 * s, oy - 0.02 * s], [ox + 0.93 * s, oy - 0.02 * s]], 0.045 * s + grow * 2);
+    } else {
+      // The near leg, which kicks when a picture is finished.
+      var kt = clock - p.kickT, kick = 0;
+      if (kt < 1.3) { kick = reduced ? Math.sin(Math.PI * kt / 1.3) * 0.6 : Math.abs(Math.sin(Math.PI * kt / 0.45)) * (1 - kt / 1.3); }
+      var hip = [ox + 0.53 * s, oy - 0.06 * s];
+      var knee = [ox + (0.72 - 0.03 * kick) * s, oy - (0.065 + 0.2 * kick) * s];
+      var ank = [ox + (0.9 - 0.05 * kick) * s, oy - (0.05 + 0.08 * kick) * s];
+      limb([hip, knee, ank, [ank[0] + 0.02 * s, ank[1] - 0.075 * s]], 0.085 * s + grow * 2);
+    }
+  }
+
+  function drawPeople() {
+    var s = folk.s, ox = folk.ox, oy = folk.oy;
+    // The blanket, and a flask standing at its corner.
+    ctx.fillStyle = rgba(mix(NEAR, hex('#3a1a2a'), 0.35));
+    ctx.beginPath();
+    ctx.moveTo(ox - 0.14 * s, oy + 0.004 * s);
+    ctx.lineTo(ox + 1.12 * s, oy + 0.004 * s);
+    ctx.lineTo(ox + 1.16 * s, oy + 0.04 * s);
+    ctx.lineTo(ox - 0.18 * s, oy + 0.04 * s);
+    ctx.closePath();
+    ctx.fill();
+    var rimCol = rgba(mix(hex('#8ea2e0'), hex('#5fd9a0'), aur.s * 0.6), (0.4 + 0.2 * aur.s).toFixed(3));
+    var fx = ox + 1.2 * s, fw = 0.04 * s, fh = 0.12 * s;
+    ctx.fillStyle = rimCol;
+    ctx.fillRect(fx - 1.3, oy - fh - 1.3, fw + 2.6, fh + 2.6);
+    ctx.fillStyle = rgba(FOLK);
+    ctx.fillRect(fx, oy - fh, fw, fh);
+    ctx.fillRect(fx - fw * 0.15, oy - fh - fw * 0.5, fw * 1.3, fw * 0.6);
+
+    for (var who = 0; who < 2; who++) {
+      var isChild = who === 1;
+      ctx.fillStyle = rimCol;
+      ctx.strokeStyle = rimCol;
+      personShapes(isChild, true, rimCol);
+      ctx.fillStyle = rgba(FOLK);
+      ctx.strokeStyle = rgba(FOLK);
+      personShapes(isChild, false, rimCol);
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Everything, in order from the back
+  // ------------------------------------------------------------------
+  function draw() {
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+    var lim = limitMag();
+    drawSky();
+    drawMilkyWay();
+    drawComets();
+    drawField(lim);
+    drawStars(lim);
+    drawSats();
+    drawMeteors();
+    drawAurora();
+    drawLit();
+    drawLand();
+    drawKnoll();
+    drawPeople();
+    drawNames();
+  }
+
+  // ------------------------------------------------------------------
+  // Tapping
+  // ------------------------------------------------------------------
+  function segDist(px, py, ax, ay, bx, by) {
+    var dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
+    var t = l2 > 0 ? clamp(((px - ax) * dx + (py - ay) * dy) / l2, 0, 1) : 0;
+    var ex = ax + dx * t - px, ey = ay + dy * t - py;
+    return Math.sqrt(ex * ex + ey * ey);
+  }
+
+  function tapAt(x, y) {
+    // The ground, the hills, the people: the child shows you something.
+    if (y > hy - H * 0.02) { showSomething(); return; }
+    var R = Math.max(30, U * 0.07), i, k;
+    for (k = 0; k < comets.length; k++) {
+      var c = comets[k];
+      if (c.front && Math.hypot(c.sx - x, c.sy - y) < R * 0.9) {
+        c.flare = 1;
+        cometSound(clamp((c.sx / W - 0.5) * 1.2, -0.8, 0.8));
+        pointAt(child, { obj: c }, 3);
+        later(0.5, function () { gazeAt(adult, { obj: c }, 2.5); });
+        return;
+      }
+    }
+    var best = null, bestStar = -1, bd = R;
+    for (k = 0; k < groups.length; k++) {
+      var g = groups[k];
+      for (i = 0; i < g.stars.length; i++) {
+        var s = stars[g.stars[i]];
+        if (!s.on || s.vis < 0.2) { continue; }
+        var d = Math.hypot(s.sx - x, s.sy - y);
+        if (d < bd) { bd = d; best = g; bestStar = g.stars[i]; }
+      }
+      for (i = 0; i < g.edges.length; i++) {
+        var A = stars[g.edges[i][0]], B = stars[g.edges[i][1]];
+        if (!A.on || !B.on || A.vis < 0.2 || B.vis < 0.2) { continue; }
+        var de = segDist(x, y, A.sx, A.sy, B.sx, B.sy) * 1.25;
+        if (de < bd) {
+          bd = de; best = g;
+          bestStar = Math.hypot(A.sx - x, A.sy - y) < Math.hypot(B.sx - x, B.sy - y) ? g.edges[i][0] : g.edges[i][1];
+        }
+      }
+    }
+    if (best) {
+      lightGroup(best, bestStar);
+      pointAt(child, { star: bestStar }, Math.max(3, best.stars.length * EDGE_T + 1));
+      later(0.5, function () { gazeAt(adult, { star: bestStar }, 4); });
+      return;
+    }
+    // Empty sky: a shooting star from under the finger.
+    var m = meteorAt(x, y, true);
+    pointAt(child, { obj: m }, 1.4);
+  }
+
+  // The child picks a picture that is well up in the sky and points it
+  // out, and a moment later it lights up.
+  function showSomething() {
+    var choices = [], k, i;
+    for (k = 0; k < groups.length; k++) {
+      var g = groups[k], good = 0;
+      if (lit.some(function (l) { return l.g === g; })) { continue; }
+      for (i = 0; i < g.stars.length; i++) {
+        var s = stars[g.stars[i]];
+        if (s.on && s.alt > 0.14 && s.vis > 0.5) { good++; }
+      }
+      if (good / g.stars.length >= 0.7) { for (i = 0; i < (g.fig ? 3 : 1); i++) { choices.push(g); } }
+    }
+    if (!choices.length) {
+      var m = meteorAt(W * (0.15 + Math.random() * 0.7), hy * (0.15 + Math.random() * 0.5), true);
+      pointAt(child, { obj: m }, 1.4);
+      return;
+    }
+    var pick = choices[Math.floor(Math.random() * choices.length)], star = pick.brightest;
+    pointAt(child, { star: star }, Math.max(3.5, pick.stars.length * EDGE_T + 1.5));
+    later(0.4, function () { gazeAt(adult, { star: star }, 4); });
+    later(0.8, function () { lightGroup(pick, star); });
+  }
+
+  // ------------------------------------------------------------------
+  // Sound, synthesised from nothing so the game is never silent and
+  // never waits on a download: a slow night pad, a far-off chime now and
+  // then (and a star brightens as it sounds), a breath of wind in the
+  // grass, a note for each star of a picture as it is drawn, a soft
+  // swish for a shooting star, and a high shimmer under the aurora.
+  // ------------------------------------------------------------------
+  var AC = null, master = null, verb = null, padBus = null, bellBus = null, noise = null;
+  var windGain = null, windFilter = null, auroraGain = null;
+  var nextChord = 0, chordIdx = 0, nextBell = 0, soundClock = 0, lastSwish = 0;
+
+  var CHORDS = [
+    [53, 57, 60, 64],   // F, with the major seventh
+    [50, 57, 60, 64],   // D minor ninth
+    [46, 53, 57, 62],   // B flat, major seventh
+    [48, 55, 62, 67],   // C, suspended
+    [45, 52, 60, 64]    // A minor, with the sixth
+  ];
+  var PROG = [0, 1, 2, 3, 0, 4, 2, 3];
+  var CHORD_LEN = 22, CHORD_GAP = 15;
+  var BELLS = [77, 79, 81, 84, 86, 89];
+  // A star's note comes from how high it is on the screen, so each
+  // picture plays its own little tune, in the same key as the music.
+  var SCALE = [72, 74, 77, 79, 81, 84, 86, 89, 91, 93];
+
+  function pinkBuffer(secs) {
+    var len = Math.floor(AC.sampleRate * secs), fade = Math.floor(AC.sampleRate * 0.25);
+    var raw = new Float32Array(len + fade), i;
+    var b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+    for (i = 0; i < raw.length; i++) {
+      var w = Math.random() * 2 - 1;
+      b0 = 0.99886 * b0 + w * 0.0555179;
+      b1 = 0.99332 * b1 + w * 0.0750759;
+      b2 = 0.969 * b2 + w * 0.153852;
+      b3 = 0.8665 * b3 + w * 0.3104856;
+      b4 = 0.55 * b4 + w * 0.5329522;
+      b5 = -0.7616 * b5 - w * 0.016898;
+      raw[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11;
+      b6 = w * 0.115926;
+    }
+    var buf = AC.createBuffer(1, len, AC.sampleRate), d = buf.getChannelData(0);
+    for (i = 0; i < len; i++) {
+      d[i] = i < fade ? raw[i] * (i / fade) + raw[len + i] * (1 - i / fade) : raw[i];
+    }
+    return buf;
+  }
+
+  function impulse(secs, decay) {
+    var len = Math.floor(AC.sampleRate * secs);
+    var buf = AC.createBuffer(2, len, AC.sampleRate);
+    for (var c = 0; c < 2; c++) {
+      var d = buf.getChannelData(c);
+      for (var i = 0; i < len; i++) {
+        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+      }
+    }
+    return buf;
+  }
+
+  function initAudio() {
+    if (AC) {
+      if (AC.state === 'suspended' && !document.hidden) { AC.resume(); }
+      return;
+    }
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) { return; }
+    try { AC = new Ctx(); } catch (e) { AC = null; return; }
+    var t = AC.currentTime;
+
+    // Some older Safaris only unlock once a buffer has actually played.
+    var blip = AC.createBufferSource();
+    blip.buffer = AC.createBuffer(1, 1, AC.sampleRate);
+    blip.connect(AC.destination);
+    blip.start(0);
+
+    var comp = AC.createDynamicsCompressor();
+    comp.threshold.setValueAtTime(-18, t);
+    comp.ratio.setValueAtTime(4, t);
+    comp.connect(AC.destination);
+
+    master = AC.createGain();
+    master.gain.setValueAtTime(0.0001, t);
+    master.gain.exponentialRampToValueAtTime(0.55, t + 5);
+    master.connect(comp);
+
+    verb = AC.createConvolver();
+    verb.buffer = impulse(4.5, 2.6);
+    var verbOut = AC.createGain();
+    verbOut.gain.setValueAtTime(0.55, t);
+    verb.connect(verbOut);
+    verbOut.connect(master);
+
+    padBus = AC.createGain();
+    padBus.gain.setValueAtTime(0.5, t);
+    var padLp = AC.createBiquadFilter();
+    padLp.type = 'lowpass';
+    padLp.frequency.setValueAtTime(800, t);
+    padLp.Q.setValueAtTime(0.5, t);
+    var lfo = AC.createOscillator(), lfoAmt = AC.createGain();
+    lfo.frequency.setValueAtTime(0.035, t);
+    lfoAmt.gain.setValueAtTime(260, t);
+    lfo.connect(lfoAmt);
+    lfoAmt.connect(padLp.frequency);
+    lfo.start(t);
+    padBus.connect(padLp);
+    padLp.connect(master);
+    padLp.connect(verb);
+
+    bellBus = AC.createGain();
+    bellBus.gain.setValueAtTime(1, t);
+    var bellDry = AC.createGain();
+    bellDry.gain.setValueAtTime(0.35, t);
+    bellBus.connect(bellDry);
+    bellDry.connect(master);
+    bellBus.connect(verb);
+
+    // Wind in the grass: only the airy middle of the noise, very quiet.
+    noise = pinkBuffer(6);
+    var air = AC.createBufferSource();
+    air.buffer = noise;
+    air.loop = true;
+    var hp = AC.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.setValueAtTime(350, t);
+    windFilter = AC.createBiquadFilter();
+    windFilter.type = 'bandpass';
+    windFilter.frequency.setValueAtTime(900, t);
+    windFilter.Q.setValueAtTime(0.6, t);
+    windGain = AC.createGain();
+    windGain.gain.setValueAtTime(0.0001, t);
+    air.connect(hp);
+    hp.connect(windFilter);
+    windFilter.connect(windGain);
+    windGain.connect(master);
+    air.start(t);
+
+    // The aurora: four high tones, each trembling at its own slow rate,
+    // almost all of it heard through the reverb.
+    auroraGain = AC.createGain();
+    auroraGain.gain.setValueAtTime(0.0001, t);
+    auroraGain.connect(verb);
+    var aDry = AC.createGain();
+    aDry.gain.setValueAtTime(0.25, t);
+    auroraGain.connect(aDry);
+    aDry.connect(master);
+    [89, 91, 96, 98].forEach(function (m, i) {
+      var o = AC.createOscillator(), g = AC.createGain(), tr = AC.createOscillator(), ta = AC.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(mtof(m), t);
+      g.gain.setValueAtTime(0.5, t);
+      tr.frequency.setValueAtTime(0.11 + i * 0.07, t);
+      ta.gain.setValueAtTime(0.45, t);
+      tr.connect(ta);
+      ta.connect(g.gain);
+      o.connect(g);
+      g.connect(auroraGain);
+      o.start(t);
+      tr.start(t);
+    });
+
+    nextChord = t + 0.1;
+    nextBell = t + 8 + Math.random() * 6;
+    if (AC.state === 'suspended') { AC.resume(); }
+  }
+
+  // Pure tones only, for the same reason as the starlings' pad: detuned
+  // or brighter waves beat against each other on the low notes.
+  function padNote(t, midi, len) {
+    var f = mtof(midi), g = AC.createGain();
+    var level = midi < 50 ? 0.15 : 0.12;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(level, t + len * 0.35);
+    g.gain.setValueAtTime(level, t + len * 0.55);
+    g.gain.linearRampToValueAtTime(0.0001, t + len);
+    g.connect(padBus);
+    [[1, 1], [2, 0.2]].forEach(function (v) {
+      var o = AC.createOscillator(), og = AC.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(f * v[0], t);
+      og.gain.setValueAtTime(v[1], t);
+      o.connect(og);
+      og.connect(g);
+      o.start(t);
+      o.stop(t + len + 0.1);
+    });
+  }
+
+  function chime(midi, pan, level, when) {
+    if (!AC || !bellBus || AC.state !== 'running') { return; }
+    var t = (when || AC.currentTime) + 0.01, f = mtof(midi), g = AC.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.09 * level, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 3.4);
+    var out = g;
+    if (AC.createStereoPanner) {
+      var p = AC.createStereoPanner();
+      p.pan.setValueAtTime(clamp(pan, -0.8, 0.8), t);
+      g.connect(p);
+      out = p;
+    }
+    out.connect(bellBus);
+    [[1, 1], [2, 0.2], [2.76, 0.06]].forEach(function (v) {
+      var o = AC.createOscillator(), og = AC.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(f * v[0], t);
+      og.gain.setValueAtTime(v[1], t);
+      o.connect(og);
+      og.connect(g);
+      o.start(t);
+      o.stop(t + 3.5);
+    });
+  }
+
+  function ring(i, level) {
+    var s = stars[i];
+    var k = Math.round((1 - clamp(s.sy / Math.max(1, hy), 0, 1)) * (SCALE.length - 1));
+    var bright = 0.65 + 0.35 * clamp((3.5 - s.mag) / 4, 0, 1);
+    chime(SCALE[clamp(k, 0, SCALE.length - 1)], (s.sx / W - 0.5) * 1.2, level * bright);
+  }
+
+  // A shooting star: a short breath of air falling in pitch, and a faint
+  // glassy note falling with it.
+  function swish(pan, level) {
+    if (!AC || !noise || AC.state !== 'running') { return; }
+    var t = AC.currentTime + 0.01;
+    if (t - lastSwish < 0.15) { return; }
+    lastSwish = t;
+    var src = AC.createBufferSource();
+    src.buffer = noise;
+    var hp = AC.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.setValueAtTime(900, t);
+    var band = AC.createBiquadFilter();
+    band.type = 'bandpass';
+    band.Q.setValueAtTime(0.9, t);
+    band.frequency.setValueAtTime(4200, t);
+    band.frequency.exponentialRampToValueAtTime(1500, t + 0.7);
+    var g = AC.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.06 + 0.08 * level, t + 0.06);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.8);
+    src.connect(hp);
+    hp.connect(band);
+    band.connect(g);
+    var tone = AC.createOscillator(), tg = AC.createGain();
+    tone.type = 'sine';
+    tone.frequency.setValueAtTime(2400, t);
+    tone.frequency.exponentialRampToValueAtTime(1450, t + 0.7);
+    tg.gain.setValueAtTime(0.0001, t);
+    tg.gain.exponentialRampToValueAtTime(0.012 * level + 0.004, t + 0.05);
+    tg.gain.exponentialRampToValueAtTime(0.0001, t + 0.8);
+    tone.connect(tg);
+    var out = AC.createGain();
+    out.gain.setValueAtTime(1, t);
+    g.connect(out);
+    tg.connect(out);
+    if (AC.createStereoPanner) {
+      var p = AC.createStereoPanner();
+      p.pan.setValueAtTime(clamp(pan, -0.8, 0.8), t);
+      out.connect(p);
+      p.connect(master);
+      p.connect(verb);
+    } else {
+      out.connect(master);
+      out.connect(verb);
+    }
+    src.start(t, Math.random() * 5);
+    src.stop(t + 0.9);
+    tone.start(t);
+    tone.stop(t + 0.9);
+  }
+
+  function cometSound(pan) {
+    if (!AC || AC.state !== 'running') { return; }
+    var t = AC.currentTime + 0.02;
+    chime(53, pan, 0.9, t);
+    chime(65, pan, 0.6, t + 0.16);
+    chime(72, pan, 0.45, t + 0.32);
+    chime(81, pan, 0.3, t + 0.48);
+  }
+
+  function scheduleMusic() {
+    if (!AC || !padBus || AC.state !== 'running') { return; }
+    var now = AC.currentTime;
+    if (nextChord < now) { nextChord = now + 0.1; }
+    if (nextBell < now) { nextBell = now + 3 + Math.random() * 5; }
+    while (nextChord < now + 0.5) {
+      var ch = CHORDS[PROG[chordIdx % PROG.length]];
+      for (var k = 0; k < ch.length; k++) { padNote(nextChord, ch[k], CHORD_LEN); }
+      chordIdx += 1;
+      nextChord += CHORD_GAP;
+    }
+    if (nextBell < now + 0.5) {
+      chime(BELLS[Math.floor(Math.random() * BELLS.length)], (Math.random() - 0.5) * 1.2, 0.4, nextBell);
+      // A star somewhere brightens for a moment as the chime sounds.
+      var pick = -1, tries = 0;
+      while (tries++ < 30) {
+        var i = Math.floor(Math.random() * stars.length);
+        if (stars[i].on && stars[i].vis > 0.6 && stars[i].mag < 3) { pick = i; break; }
+      }
+      if (pick >= 0) {
+        var delay = Math.max(0, nextBell - now);
+        later(delay, function () { stars[pick].flare = Math.max(stars[pick].flare, 0.7); });
+      }
+      nextBell += 9 + Math.random() * 9;
+    }
+  }
+  setInterval(scheduleMusic, 250);
+
+  function updateSound(dt) {
+    soundClock += dt;
+    if (soundClock < 0.05 || !AC || !windGain) { return; }
+    soundClock = 0;
+    var now = AC.currentTime;
+    windGain.gain.setTargetAtTime(0.004 + 0.035 * windAmt * windAmt, now, 0.4);
+    windFilter.frequency.setTargetAtTime(700 + 700 * windAmt, now, 0.4);
+    auroraGain.gain.setTargetAtTime(0.0001 + 0.035 * aur.s, now, 0.8);
+  }
+
+  // ------------------------------------------------------------------
+  // The state of everything, once a frame
+  // ------------------------------------------------------------------
+  function update(dt) {
+    clock += dt;
+    dusk = smooth(clock / DUSK_LEN);
+    lst = (lst + SKY_RATE * dt * (reduced ? 1 / 3 : 1)) % 360;
+    if (!drag && A0vel !== 0) {
+      if (reduced) { A0vel = 0; }
+      A0 += A0vel * dt;
+      A0vel *= Math.exp(-dt / 0.45);
+      if (Math.abs(A0vel) < 0.002) { A0vel = 0; }
+    }
+    A0 = ((A0 + Math.PI) % TAU + TAU) % TAU - Math.PI;
+    updateBasis();
+
+    for (var i = timers.length - 1; i >= 0; i--) {
+      if (clock >= timers[i].t) { var fn = timers[i].fn; timers.splice(i, 1); fn(); }
+    }
+    for (i = 0; i < stars.length; i++) {
+      if (stars[i].flare > 0) { stars[i].flare = Math.max(0, stars[i].flare - dt * 0.8); }
+    }
+    for (i = 0; i < comets.length; i++) {
+      if (comets[i].flare > 0) { comets[i].flare = Math.max(0, comets[i].flare - dt * 0.35); }
+    }
+    windAmt = (0.5 + 0.5 * Math.sin(clock * 0.045)) * (0.5 + 0.5 * Math.sin(clock * 0.11 + 1.7));
+
+    updateMeteors(dt);
+    updateSats(dt);
+    updateAurora(dt);
+    updateLit();
+    updateFolk(dt);
+  }
+
+  // ------------------------------------------------------------------
+  // Frame loop. If the device is struggling, the faintest grain of the
+  // Milky Way thins a little rather than the whole sky stuttering.
+  // ------------------------------------------------------------------
+  var last = 0, workSum = 0, workFrames = 0, workClock = 0, slowWindows = 0;
+
+  function frame(now) {
+    var dt = last ? (now - last) / 1000 : 0.016;
+    last = now;
+    dt = clamp(dt, 0.001, 0.05);
+    var t0 = window.performance ? performance.now() : 0;
+    update(dt);
+    draw();
+    updateSound(dt);
+    var work = window.performance ? performance.now() - t0 : 0;
+    if (window.performance && !document.hidden && work < 60) {
+      workSum += work;
+      workFrames += 1;
+      workClock += dt;
+      if (workClock > 2) {
+        slowWindows = workSum / workFrames > 12 ? slowWindows + 1 : 0;
+        if (slowWindows >= 2 && fDraw > 2000) {
+          fDraw = Math.max(2000, Math.round(fDraw * 0.8));
+          slowWindows = 0;
+        }
+        workSum = 0; workFrames = 0; workClock = 0;
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // ------------------------------------------------------------------
+  // Input. A tap does something where it lands; a drag sideways turns
+  // you round, and the sky moves under the finger.
+  // ------------------------------------------------------------------
+  var drag = null, downs = {};
+
+  canvas.addEventListener('pointerdown', function (e) {
+    initAudio();
+    downs[e.pointerId] = { x0: e.clientX, y0: e.clientY, x: e.clientX, t0: clock, moved: false };
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* not every browser */ }
+  });
+  canvas.addEventListener('pointermove', function (e) {
+    var d = downs[e.pointerId];
+    if (!d) { return; }
+    if (!d.moved && Math.abs(e.clientX - d.x0) + Math.abs(e.clientY - d.y0) > 12) {
+      d.moved = true;
+      if (!drag) { drag = { id: e.pointerId, lastX: d.x0, lastT: performance.now() }; A0vel = 0; }
+    }
+    if (drag && drag.id === e.pointerId) {
+      var nowT = performance.now(), dx = e.clientX - drag.lastX, dtt = Math.max(1, nowT - drag.lastT) / 1000;
+      A0 -= dx / K;
+      A0vel = A0vel * 0.6 + (-dx / K / dtt) * 0.4;
+      drag.lastX = e.clientX;
+      drag.lastT = nowT;
+    }
+  });
+  function lift(e) {
+    var d = downs[e.pointerId];
+    delete downs[e.pointerId];
+    if (drag && drag.id === e.pointerId) {
+      if (performance.now() - drag.lastT > 90) { A0vel = 0; }
+      drag = null;
+      return;
+    }
+    if (d && !d.moved && e.type === 'pointerup') { tapAt(e.clientX, e.clientY); }
+  }
+  canvas.addEventListener('pointerup', lift);
+  canvas.addEventListener('pointercancel', lift);
+  canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
+  // A phone will not make a sound until a finger has asked for one, and
+  // on some it has to be the lifting of the finger that asks.
+  ['touchend', 'pointerup', 'click'].forEach(function (name) {
+    document.addEventListener(name, initAudio, true);
+  });
+
+  document.addEventListener('visibilitychange', function () {
+    if (!AC) { return; }
+    if (document.hidden) { AC.suspend(); }
+    else { AC.resume(); }
+  });
+
+  var resizeTimer = 0;
+  window.addEventListener('resize', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(layout, 120);
+  });
+  window.addEventListener('orientationchange', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(layout, 220);
+  });
+
+  layout();
+  updateBasis();
+  makeComets();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
