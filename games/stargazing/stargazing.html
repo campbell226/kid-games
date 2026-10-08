@@ -1524,20 +1524,25 @@
     return [x * cA + y * sA, y * cA - x * sA, z];
   }
 
-  // Dad lies on her right, propped up as she is, his near shoulder just
-  // off the bottom right of the view, and points with the arm nearer
-  // her; at rest it lies along his front, lost in the dark of him. She
-  // points with the arm on the side of whatever she is pointing at, up
-  // from her shoulder, which is below and to the side of her eye and out
-  // of the view; at rest her arms are down by her sides, out of sight.
-  // sh, rest and pole are for a right arm: her left is mirrored.
+  // Dad is not part of her: he lies where he lies on the blanket, which
+  // faces north, like the grass round them, whichever way she turns.
+  function blanketENU(x, y, z) { return [x, y, z]; }
+
+  // Dad lies on her right, propped up as she is, and points with his
+  // right arm, the one further from her: it lifts out of the dark of
+  // him at his right shoulder, a grown man's arm in a coat sleeve, and
+  // at rest lies along his side. She points with the arm on the side of
+  // whatever she is pointing at, up from her shoulder, which is below and
+  // to the side of her eye and out of the view; at rest her arms are
+  // down by her sides, out of sight. sh, rest and pole are for a right
+  // arm: her left is mirrored.
   var ARMS = {
-    dad: { sh: [0.42, 0.24, -0.13], rest: [0.45, 0.55, -0.25], pole: [1, 0, -1],
-      upper: 0.33, fore: 0.31, reach: 0.6, hand: 0.165, r0: 0.068, r1: 0.058, r2: 0.047 },
+    dad: { sh: [0.8, 0.22, -0.13], rest: [0.78, 0.55, -0.3], pole: [1, -0.3, -1], eye: [0.62, 0.06, 0.03],
+      upper: 0.31, fore: 0.27, reach: 0.6, hand: 0.19, r0: 0.056, r1: 0.047, r2: 0.04 },
     her: { sh: [0.15, 0.02, -0.2], rest: [0.15, 0.3, -0.36], pole: [1, -0.2, -1],
       upper: 0.24, fore: 0.22, reach: 0.36, hand: 0.09, r0: 0.048, r1: 0.04, r2: 0.033 }
   };
-  function armPt(h, v) { return bodyENU(v[0] * (h.dad ? 1 : h.side), v[1], v[2]); }
+  function armPt(h, v) { return h.dad ? blanketENU(v[0], v[1], v[2]) : bodyENU(v[0] * h.side, v[1], v[2]); }
 
   // An arm turns towards its target at no more than a set speed.
   function updateHand(h, dt) {
@@ -2354,22 +2359,23 @@
     ctx.fill();
   }
 
-  // Dad lying beside her: his legs and his body under his coat running
-  // away down the blanket, his shoulders, and his head propped up, which
-  // she only sees if she turns to him. And the front of her own coat,
-  // just showing at the bottom of the view.
+  // Dad lying beside her, just a black shape against the night: his legs
+  // and his body under his coat running away down the blanket, his
+  // shoulders, and his head propped up, which she only sees if she turns
+  // to him. And the front of her own coat, just showing at the bottom of
+  // the view.
   var COAT = hex('#0a0912');
   function drawBodies() {
-    var b = [];
-    grounded(b, bodyENU(0.6, 1.0, -0.38), bodyENU(0.58, 1.85, -0.42), 0.13, 0.1);
-    grounded(b, bodyENU(0.6, 0.25, -0.17), bodyENU(0.62, 0.98, -0.36), 0.19, 0.18);
-    grounded(b, bodyENU(0.42, 0.24, -0.13), bodyENU(0.8, 0.22, -0.13), 0.12, 0.12);
-    grounded(b, bodyENU(0.62, 0.1, -0.2), bodyENU(0.62, 0.0, -0.2), 0.12, 0.12);
-    tube(b, bodyENU(0.62, 0.17, -0.11), bodyENU(0.62, 0.05, -0.03), 0.07, 0.065);
-    tube(b, bodyENU(0.63, -0.04, 0.01), bodyENU(0.62, 0.03, 0.0), 0.085, 0.092);
-    tube(b, bodyENU(0.62, 0.03, 0.0), bodyENU(0.61, 0.08, 0.035), 0.092, 0.068);
+    var b = [], P = blanketENU;
+    grounded(b, P(0.6, 1.0, -0.38), P(0.58, 1.85, -0.42), 0.13, 0.1);
+    grounded(b, P(0.6, 0.25, -0.17), P(0.62, 0.98, -0.36), 0.19, 0.18);
+    grounded(b, P(0.42, 0.24, -0.13), P(0.8, 0.22, -0.13), 0.12, 0.12);
+    grounded(b, P(0.62, 0.1, -0.2), P(0.62, 0.0, -0.2), 0.12, 0.12);
+    tube(b, P(0.62, 0.17, -0.11), P(0.62, 0.05, -0.03), 0.07, 0.065);
+    tube(b, P(0.63, -0.04, 0.01), P(0.62, 0.03, 0.0), 0.085, 0.092);
+    tube(b, P(0.62, 0.03, 0.0), P(0.61, 0.08, 0.035), 0.092, 0.068);
     var dadArm = armBlobs(dadHand, b);
-    paintBlobs(b, SIL, 1);
+    paintBlobs(b, SIL, 0.55);
     drawHand(dadHand, dadArm);
     b = [];
     grounded(b, bodyENU(0, 0.12, -0.24), bodyENU(0, 0.58, -0.3), 0.17, 0.17);
@@ -2378,10 +2384,12 @@
     drawHand(mitten, herArm);
   }
 
-  // Where the arm is: the hand comes up between her eye and what is being
+  // Where the arm is: her hand comes up between her eye and what is being
   // pointed at, a little short of it so it never hides it, and always
-  // against the sky, where a dark hand can be seen. The elbow bends out
-  // and down, the way elbows do.
+  // against the sky, where a dark hand can be seen. Dad's goes partly out
+  // along his own line to it and partly towards hers, as you would lean
+  // in to show a child, as far as his arm will really reach from his
+  // shoulder. The elbow bends out and down, the way elbows do.
   function armPose(h) {
     var A = h.dad ? ARMS.dad : ARMS.her, S = armPt(h, A.sh), r = smooth(h.raise), wr = armPt(h, A.rest), k;
     if (h.aim) {
@@ -2393,7 +2401,12 @@
         var hz = Math.sqrt(n[0] * n[0] + n[1] * n[1]) || 1, c4 = Math.cos(4 * D2R);
         n = [n[0] / hz * c4, n[1] / hz * c4, lo];
       }
-      for (k = 0; k < 3; k++) { wr[k] += (n[k] * A.reach - wr[k]) * r; }
+      var to = [n[0] * A.reach, n[1] * A.reach, n[2] * A.reach];
+      if (A.eye) {
+        var ey = armPt(h, A.eye);
+        for (k = 0; k < 3; k++) { to[k] = to[k] * 0.6 + (ey[k] + a[k] * 0.5) * 0.4; }
+      }
+      for (k = 0; k < 3; k++) { wr[k] += (to[k] - wr[k]) * r; }
     }
     if (!reduced) {
       var sw = bodyENU(0.005 * Math.sin(clock * 1.3 + (h.dad ? 1.7 : 0)), 0, 0.004 * Math.sin(clock * 1.9 + (h.dad ? 0.4 : 2)));
@@ -2414,7 +2427,7 @@
   // The arm goes into the same list as the body it belongs to, so the
   // two are one dark shape, as they would be at night.
   function armBlobs(h, b) {
-    if (!h.dad && h.raise < 0.01) { return null; }
+    if (h.raise < 0.01) { return null; }
     var P = armPose(h), A = P.A;
     tube(b, P.S, P.E, A.r0, A.r1);
     tube(b, P.E, P.W, A.r1, A.r2);
@@ -2442,7 +2455,10 @@
     ctx.translate(wx, wy);
     ctx.rotate(Math.atan2(ty, tx));
     ctx.globalAlpha = smooth((P.r - 0.15) / 0.3);
-    if (h.dad) { drawDadHand(A.hand / 1.49 * sc); } else { drawMitten(A.hand / 1.25 * sc); }
+    // His hand is drawn a touch stubby, so it is drawn longer to come out
+    // a man's hand: about nine centimetres across and nineteen from wrist
+    // to fingertip.
+    if (h.dad) { ctx.scale(1.4, 1); drawDadHand(A.hand / (1.49 * 1.4) * sc); } else { drawMitten(A.hand / 1.25 * sc); }
     ctx.restore();
   }
 
