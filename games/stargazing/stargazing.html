@@ -1536,8 +1536,13 @@
   // to the side of her eye and out of the view; at rest her arms are
   // down by her sides, out of sight. sh, rest and pole are for a right
   // arm: her left is mirrored.
+  // To point, Dad rolls a little onto his side towards her, as you would
+  // to show a child something: his right shoulder comes up and over
+  // towards her and his head tips her way, and he settles back after.
+  var DAD_ROLL = [-0.18, 0.05, 0.15], DAD_TIP = [-0.08, 0.02, 0.03];
   var ARMS = {
     dad: { sh: [0.8, 0.22, -0.13], rest: [0.78, 0.55, -0.3], pole: [1, -0.3, -1], eye: [0.62, 0.06, 0.03],
+      roll: DAD_ROLL, tip: DAD_TIP,
       upper: 0.31, fore: 0.27, reach: 0.6, hand: 0.19, r0: 0.056, r1: 0.047, r2: 0.04 },
     her: { sh: [0.15, 0.02, -0.2], rest: [0.15, 0.3, -0.36], pole: [1, -0.2, -1],
       upper: 0.24, fore: 0.22, reach: 0.36, hand: 0.09, r0: 0.048, r1: 0.04, r2: 0.033 }
@@ -2366,14 +2371,17 @@
   // the view.
   var COAT = hex('#0a0912');
   function drawBodies() {
-    var b = [], P = blanketENU;
-    grounded(b, P(0.6, 1.0, -0.38), P(0.58, 1.85, -0.42), 0.13, 0.1);
-    grounded(b, P(0.6, 0.25, -0.17), P(0.62, 0.98, -0.36), 0.19, 0.18);
-    grounded(b, P(0.42, 0.24, -0.13), P(0.8, 0.22, -0.13), 0.12, 0.12);
-    grounded(b, P(0.62, 0.1, -0.2), P(0.62, 0.0, -0.2), 0.12, 0.12);
-    tube(b, P(0.62, 0.17, -0.11), P(0.62, 0.05, -0.03), 0.07, 0.065);
-    tube(b, P(0.63, -0.04, 0.01), P(0.62, 0.03, 0.0), 0.085, 0.092);
-    tube(b, P(0.62, 0.03, 0.0), P(0.61, 0.08, 0.035), 0.092, 0.068);
+    var b = [], L = smooth(dadHand.raise), R = DAD_ROLL, T = DAD_TIP;
+    // His upper body as he rolls towards her: x, y, z plus how far along
+    // the roll (R) or the tip of his head (T) that point moves.
+    var P = function (x, y, z, m, v) { return blanketENU(x + v[0] * m * L, y + v[1] * m * L, z + v[2] * m * L); };
+    grounded(b, P(0.6, 1.0, -0.38, 0, R), P(0.58, 1.85, -0.42, 0, R), 0.13, 0.1);
+    grounded(b, P(0.6, 0.25, -0.17, 0.2, R), P(0.62, 0.98, -0.36, 0, R), 0.19, 0.18);
+    grounded(b, P(0.42, 0.24, -0.13, 0.1, R), P(0.8, 0.22, -0.13, 1, R), 0.12, 0.12);
+    grounded(b, P(0.62, 0.1, -0.2, 0.4, R), P(0.62, 0.0, -0.2, 0.4, R), 0.12, 0.12);
+    tube(b, P(0.62, 0.17, -0.11, 0.5, R), P(0.62, 0.05, -0.03, 1, T), 0.07, 0.065);
+    tube(b, P(0.63, -0.04, 0.01, 1, T), P(0.62, 0.03, 0.0, 1, T), 0.085, 0.092);
+    tube(b, P(0.62, 0.03, 0.0, 1, T), P(0.61, 0.08, 0.035, 1, T), 0.092, 0.068);
     var dadArm = armBlobs(dadHand, b);
     paintBlobs(b, SIL, 0.55);
     drawHand(dadHand, dadArm);
@@ -2392,6 +2400,7 @@
   // shoulder. The elbow bends out and down, the way elbows do.
   function armPose(h) {
     var A = h.dad ? ARMS.dad : ARMS.her, S = armPt(h, A.sh), r = smooth(h.raise), wr = armPt(h, A.rest), k;
+    if (A.roll) { for (k = 0; k < 3; k++) { S[k] += A.roll[k] * r; } }
     if (h.aim) {
       var a = h.aim, s = norm3(S), sd = s[0] * a[0] + s[1] * a[1] + s[2] * a[2];
       var q = norm3([s[0] - a[0] * sd, s[1] - a[1] * sd, s[2] - a[2] * sd]);
@@ -2404,7 +2413,7 @@
       var to = [n[0] * A.reach, n[1] * A.reach, n[2] * A.reach];
       if (A.eye) {
         var ey = armPt(h, A.eye);
-        for (k = 0; k < 3; k++) { to[k] = to[k] * 0.6 + (ey[k] + a[k] * 0.5) * 0.4; }
+        for (k = 0; k < 3; k++) { to[k] = to[k] * 0.6 + (ey[k] + A.tip[k] * r + a[k] * 0.5) * 0.4; }
       }
       for (k = 0; k < 3; k++) { wr[k] += (to[k] - wr[k]) * r; }
     }
