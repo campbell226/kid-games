@@ -1001,14 +1001,14 @@
   // ------------------------------------------------------------------
   // Everything is seen through her eyes. She is lying propped up on a
   // blanket, looking north, in a bobble hat and mittens; Dad is lying on
-  // her right. Her mitten comes up from below the edge of the view to
-  // point at whatever you tap; his hand comes in from the bottom right
-  // when he has something to show her. Each arm turns towards its
+  // her right. Her arm comes up from her front, at the bottom of the
+  // view, to point at whatever you tap; his lifts off his body at the
+  // bottom right when he has something to show her. Each arm turns towards its
   // target no faster than an arm would, so a burst of taps makes a calm
   // wave rather than a twitch, and goes back down when it is done.
   // ------------------------------------------------------------------
   function makeHand(dad) {
-    return { dad: dad, raise: 0, ang: -HALF_PI - (dad ? 0.6 : 0), len: 0, target: null, until: 0, trace: null };
+    return { dad: dad, raise: 0, aim: null, side: 1, target: null, until: 0, trace: null };
   }
   var mitten = makeHand(false), dadHand = makeHand(true);
 
@@ -1512,49 +1512,54 @@
   function dadPoint(t, secs, trace) { dadHand.target = t; dadHand.until = clock + secs; dadHand.trace = trace || null; }
   function dadBusy() { return !!dadHand.target || dadHand.raise > 0.1; }
 
-  // Where each shoulder is: hers just below the bottom of the view, a
-  // little left of the middle; his off the bottom right corner.
-  // Each is a fixed direction from her eye, just below the view: hers a
-  // little left of straight ahead and low down, Dad's off to her right
-  // where he is lying. They belong to the bodies, not to her head, so
-  // when she turns her head they slide across the view the other way;
-  // turn far enough and Dad is out of sight altogether.
-  var SHOULDER_HER = [-8 * D2R, -40 * D2R], SHOULDER_DAD = [75 * D2R, -18 * D2R];
-  function shoulderOf(h) {
-    var s = h.dad ? SHOULDER_DAD : SHOULDER_HER, p = altAz(s[1], A0 + s[0]);
-    projENU(p[0], p[1], p[2]);
-    return PD > 0.3 ? [PX, PY] : null;
+  // The two of them are real bodies beside her eye, measured in metres
+  // as her body lies: x to her right, y ahead along the blanket, z up.
+  // They belong to the bodies, not to her head, so when she turns her
+  // head they slide across the view the other way, and when she looks
+  // up they drop out of the bottom of it.
+  function bodyENU(x, y, z) {
+    var sA = Math.sin(A0), cA = Math.cos(A0);
+    return [x * cA + y * sA, y * cA - x * sA, z];
   }
 
-  // An arm turns towards its target at no more than a set speed, and
-  // reaches until the hand is a little short of it, so it never covers
-  // what it is pointing at.
+  // Dad lies on her right, propped up as she is, his near shoulder just
+  // off the bottom right of the view, and points with the arm nearer
+  // her; at rest it lies along his front, lost in the dark of him. Her
+  // arm is seen as she sees her own: coming up out of the front of her
+  // coat, just off the bottom of the view, on the side of whatever she
+  // is pointing at, and at rest tucked down on her front out of sight.
+  // sh, rest and pole are for a right arm: her left is mirrored.
+  var ARMS = {
+    dad: { sh: [0.42, 0.24, -0.13], rest: [0.45, 0.55, -0.25], pole: [1, 0, -1],
+      upper: 0.33, fore: 0.31, reach: 0.6, hand: 0.165, r0: 0.068, r1: 0.058, r2: 0.047 },
+    her: { sh: [0.04, 0.3, -0.14], rest: [0.05, 0.42, -0.2], pole: [1, -0.2, -1], free: true,
+      upper: 0.24, fore: 0.22, reach: 0.36, hand: 0.09, r0: 0.05, r1: 0.042, r2: 0.034 }
+  };
+  function armPt(h, v) { return bodyENU(v[0] * (h.dad ? 1 : h.side), v[1], v[2]); }
+
+  // An arm turns towards its target at no more than a set speed.
   function updateHand(h, dt) {
     if (h.target && clock > h.until) { h.target = null; h.trace = null; }
     var pt = null;
     if (h.trace) { pt = h.trace.alpha > 0 ? penAt(h.trace) : null; }
     else if (h.target) { pt = resolve(h.target); }
-    // Nobody points at what they can't see, and a shoulder that has
-    // gone out of view behind her can't point at all.
+    // Nobody points at what they can't see, and Dad can't point while
+    // she has turned so far that he is behind her.
     if (pt && (pt[0] < -20 || pt[0] > W + 20 || pt[1] < 0 || pt[1] > horizonYAt(pt[0]))) { pt = null; }
-    var sh = shoulderOf(h);
-    if (!sh) { pt = null; sh = h.lastSh || [W / 2, H * 1.5]; } else { h.lastSh = sh; }
+    if (pt && h.dad) {
+      var ds = norm3(armPt(h, ARMS.dad.sh));
+      if (ds[0] * cE + ds[1] * cN + ds[2] * cU < -0.3) { pt = null; }
+    }
     if (pt) {
-      var want = Math.atan2(pt[1] - sh[1], pt[0] - sh[0]);
-      want = clamp(want, -Math.PI + 0.1, -0.1);
-      if (h.raise < 0.05) { h.ang = want; }
-      var maxTurn = (reduced ? 1.1 : 2.2) * dt, d = want - h.ang;
-      h.ang += clamp(d, -maxTurn, maxTurn);
-      var dist = Math.sqrt((pt[0] - sh[0]) * (pt[0] - sh[0]) + (pt[1] - sh[1]) * (pt[1] - sh[1]));
-      // Arms reach about halfway: the direction says where, and the
-      // hand stays low enough never to hide what it points at. But the
-      // hand always comes up into the sky, because a dark hand against
-      // the dark ground can't be seen at all.
-      var full = clamp(dist * 0.5, U * 0.28, U * (h.dad ? 0.55 : 0.5));
-      var up = -Math.sin(h.ang);
-      if (up > 0.15) { full = Math.max(full, (sh[1] - (horizonYAt((sh[0] + pt[0]) / 2) - U * 0.14)) / up); }
-      full = Math.min(full, Math.max(U * 0.28, dist - U * 0.14));
-      h.len += (full - h.len) * Math.min(1, dt * 3);
+      var want = norm3(unproject(pt[0], pt[1], [0, 0, 0]));
+      if (h.raise < 0.05 || !h.aim) {
+        h.aim = want;
+        if (!h.dad) { h.side = want[0] * Math.cos(A0) - want[1] * Math.sin(A0) < 0 ? -1 : 1; }
+      } else {
+        var dt3 = clamp(h.aim[0] * want[0] + h.aim[1] * want[1] + h.aim[2] * want[2], -1, 1), gap = Math.acos(dt3);
+        var f = gap > 1e-4 ? Math.min(1, (reduced ? 1.1 : 2.2) * dt / gap) : 1;
+        h.aim = norm3([h.aim[0] + (want[0] - h.aim[0]) * f, h.aim[1] + (want[1] - h.aim[1]) * f, h.aim[2] + (want[2] - h.aim[2]) * f]);
+      }
     }
     var k = Math.min(1, dt * (pt ? 2.6 : 1.5) * (reduced ? 0.6 : 1));
     h.raise += ((pt ? 1 : 0) - h.raise) * k;
@@ -2285,51 +2290,149 @@
     ctx.stroke();
   }
 
-  function drawArm(h) {
-    if (h.raise < 0.01) { return; }
-    var sh = shoulderOf(h);
-    if (!sh) { return; }
-    var r = smooth(h.raise), L = h.len * r;
-    var sway = reduced ? 0 : 0.012 * Math.sin(clock * 1.3 + (h.dad ? 1.7 : 0)) + 0.005 * Math.sin(clock * 3.1 + (h.dad ? 0.4 : 2));
-    var ang = h.ang + sway, c = Math.cos(ang), s = Math.sin(ang), side = h.dad ? 1 : -1;
-    // The elbow sits a little out to the side; the wrist is on the line
-    // to whatever is being pointed at.
-    var ex = sh[0] + c * L * 0.45 - s * side * L * 0.07, ey = sh[1] + s * L * 0.45 + c * side * L * 0.07;
-    var wx = sh[0] + c * L, wy = sh[1] + s * L;
-    var w0 = U * (h.dad ? 0.22 : 0.18), we = U * (h.dad ? 0.13 : 0.11), ww = U * (h.dad ? 0.07 : 0.062);
-    var ux = ex - sh[0], uy = ey - sh[1], ul = Math.sqrt(ux * ux + uy * uy) || 1;
-    ux /= ul; uy /= ul;
-    var fx = wx - ex, fy = wy - ey, fl = Math.sqrt(fx * fx + fy * fy) || 1;
-    fx /= fl; fy /= fl;
-    var nx = -(uy + fy) / 2, ny = (ux + fx) / 2, nm = Math.sqrt(nx * nx + ny * ny) || 1;
-    nx /= nm; ny /= nm;
+  // A point near her eye (east, north, up, in metres) to the screen.
+  // Returns how many pixels a metre spans there, or 0 if it is so far
+  // round to the side or behind that it can't be in view.
+  function projNear(p) {
+    var d = Math.sqrt(p[0] * p[0] + p[1] * p[1] + p[2] * p[2]) || 1e-6;
+    projENU(p[0] / d, p[1] / d, p[2] / d);
+    return PD < 0.6 ? 0 : K2 / (PD * d);
+  }
 
-    // The sleeve.
-    ctx.beginPath();
-    ctx.moveTo(sh[0] - uy * w0 / 2, sh[1] + ux * w0 / 2);
-    ctx.quadraticCurveTo(ex + nx * we / 2, ey + ny * we / 2, wx - fy * ww / 2, wy + fx * ww / 2);
-    ctx.lineTo(wx + fy * ww / 2, wy - fx * ww / 2);
-    ctx.quadraticCurveTo(ex - nx * we / 2, ey - ny * we / 2, sh[0] + uy * w0 / 2, sh[1] - ux * w0 / 2);
-    ctx.closePath();
-    silhouette(SIL, 1);
-
-    // Creases where the sleeve gathers on the inside of the elbow.
-    ctx.strokeStyle = rimColour(0.4);
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    var ix = ex - side * nx * we * 0.42, iy = ey - side * ny * we * 0.42;
-    for (var k = -1; k <= 1; k++) {
-      var px = ix + fx * we * 0.55 * k, py = iy + fy * we * 0.55 * k;
-      ctx.moveTo(px, py);
-      ctx.quadraticCurveTo(px + side * nx * we * 0.2 + fx * we * 0.12, py + side * ny * we * 0.2 + fy * we * 0.12,
-        px + side * nx * we * 0.34 + fx * we * 0.3, py + side * ny * we * 0.34 + fy * we * 0.3);
+  // Bodies and limbs are rounded things, so each is laid down as a row
+  // of discs along it, close enough together that their edges run
+  // smooth, as many as its size on the screen needs. They are kept as
+  // x, y, radius in one list, to be filled together as one shape.
+  function tube(out, a, b, ra, rb) {
+    var sa = projNear(a), ax = PX, ay = PY, sb = projNear(b), n = 40;
+    if (sa && sb) {
+      var rpx = Math.max(2, Math.min(ra * sa, rb * sb));
+      n = clamp(Math.ceil(Math.sqrt((PX - ax) * (PX - ax) + (PY - ay) * (PY - ay)) / (0.3 * rpx)), 1, 80);
     }
-    ctx.stroke();
+    for (var i = 0; i <= n; i++) {
+      var t = i / n, s = projNear([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]);
+      if (!s) { continue; }
+      var r = (ra + (rb - ra) * t) * s;
+      if (PX + r < 0 || PX - r > W || PY + r < 0 || PY - r > H) { continue; }
+      out.push(PX, PY, r);
+    }
+  }
+  function blobPath(list, grow) {
+    ctx.beginPath();
+    for (var i = 0; i < list.length; i += 3) {
+      var r = list[i + 2] + grow;
+      ctx.moveTo(list[i] + r, list[i + 1]);
+      ctx.arc(list[i], list[i + 1], r, 0, TAU);
+    }
+  }
+  // One dark shape with a soft edge and a thin rim of light all round
+  // its outside, and none where its pieces overlap.
+  function paintBlobs(list, fill, rim) {
+    if (!list.length) { return; }
+    blobPath(list, 1.6);
+    ctx.fillStyle = rgba(fill, 0.35);
+    ctx.fill();
+    blobPath(list, 0.8);
+    ctx.fillStyle = rimColour(rim);
+    ctx.fill();
+    blobPath(list, 0);
+    ctx.fillStyle = rgba(fill);
+    ctx.fill();
+  }
 
+  // Dad lying beside her: his legs and his body under his coat running
+  // away down the blanket, his shoulders, and his head propped up, which
+  // she only sees if she turns to him. And the front of her own coat,
+  // just showing at the bottom of the view.
+  var COAT = hex('#0a0912');
+  function drawBodies() {
+    var b = [];
+    tube(b, bodyENU(0.6, 1.0, -0.38), bodyENU(0.58, 1.85, -0.42), 0.13, 0.1);
+    tube(b, bodyENU(0.6, 0.25, -0.17), bodyENU(0.62, 0.98, -0.36), 0.19, 0.18);
+    tube(b, bodyENU(0.42, 0.24, -0.13), bodyENU(0.8, 0.22, -0.13), 0.12, 0.12);
+    tube(b, bodyENU(0.62, 0.17, -0.11), bodyENU(0.62, 0.05, -0.03), 0.07, 0.065);
+    tube(b, bodyENU(0.63, -0.04, 0.01), bodyENU(0.62, 0.03, 0.0), 0.085, 0.092);
+    tube(b, bodyENU(0.62, 0.03, 0.0), bodyENU(0.61, 0.08, 0.035), 0.092, 0.068);
+    var dadArm = armBlobs(dadHand, b);
+    paintBlobs(b, SIL, 1);
+    drawHand(dadHand, dadArm);
+    b = [];
+    tube(b, bodyENU(0, 0.12, -0.24), bodyENU(0, 0.58, -0.3), 0.17, 0.17);
+    var herArm = armBlobs(mitten, b);
+    paintBlobs(b, COAT, 0.8);
+    drawHand(mitten, herArm);
+  }
+
+  // Where the arm is: the hand comes up between her eye and what is being
+  // pointed at, a little short of it so it never hides it, and always
+  // against the sky, where a dark hand can be seen. The elbow bends out
+  // and down, the way elbows do.
+  function armPose(h) {
+    var A = h.dad ? ARMS.dad : ARMS.her, S = armPt(h, A.sh), r = smooth(h.raise), wr = armPt(h, A.rest), k;
+    if (h.aim) {
+      var a = h.aim, s = norm3(S), sd = s[0] * a[0] + s[1] * a[1] + s[2] * a[2];
+      var q = norm3([s[0] - a[0] * sd, s[1] - a[1] * sd, s[2] - a[2] * sd]);
+      var nud = A.hand / A.reach + 4 * D2R, cn = Math.cos(nud), sn = Math.sin(nud);
+      var n = [a[0] * cn + q[0] * sn, a[1] * cn + q[1] * sn, a[2] * cn + q[2] * sn], lo = Math.sin(4 * D2R);
+      if (n[2] < lo) {
+        var hz = Math.sqrt(n[0] * n[0] + n[1] * n[1]) || 1, c4 = Math.cos(4 * D2R);
+        n = [n[0] / hz * c4, n[1] / hz * c4, lo];
+      }
+      for (k = 0; k < 3; k++) { wr[k] += (n[k] * A.reach - wr[k]) * r; }
+    }
+    if (!reduced) {
+      var sw = bodyENU(0.005 * Math.sin(clock * 1.3 + (h.dad ? 1.7 : 0)), 0, 0.004 * Math.sin(clock * 1.9 + (h.dad ? 0.4 : 2)));
+      for (k = 0; k < 3; k++) { wr[k] += sw[k] * r; }
+    }
+    var L = A.upper + A.fore, d = [wr[0] - S[0], wr[1] - S[1], wr[2] - S[2]];
+    var dl = Math.sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]) || 1e-6;
+    var dc = clamp(dl, Math.abs(A.upper - A.fore) + 0.02, L * 0.995);
+    var u = [d[0] / dl, d[1] / dl, d[2] / dl];
+    wr = [S[0] + u[0] * dc, S[1] + u[1] * dc, S[2] + u[2] * dc];
+    var p = armPt(h, A.pole), pu = p[0] * u[0] + p[1] * u[1] + p[2] * u[2];
+    var pn = norm3([p[0] - u[0] * pu, p[1] - u[1] * pu, p[2] - u[2] * pu]);
+    // Hers runs out of her coat to her hand with just a little bend.
+    var x = dc / 2, ht = 0.02;
+    if (!A.free) {
+      x = (A.upper * A.upper - A.fore * A.fore + dc * dc) / (2 * dc);
+      ht = Math.sqrt(Math.max(0, A.upper * A.upper - x * x));
+    }
+    var E = [S[0] + u[0] * x + pn[0] * ht, S[1] + u[1] * x + pn[1] * ht, S[2] + u[2] * x + pn[2] * ht];
+    return { A: A, S: S, E: E, W: wr, r: r };
+  }
+
+  // The arm goes into the same list as the body it belongs to, so the
+  // two are one dark shape, as they would be at night.
+  function armBlobs(h, b) {
+    if (!h.dad && h.raise < 0.01) { return null; }
+    var P = armPose(h), A = P.A;
+    tube(b, P.S, P.E, A.r0, A.r1);
+    tube(b, P.E, P.W, A.r1, A.r2);
+    return P;
+  }
+
+  function drawHand(h, P) {
+    if (!P || P.r < 0.15) { return; }
+    var A = P.A;
+    var sc = projNear(P.E);
+    var ex = PX, ey = PY;
+    sc = projNear(P.W);
+    if (!sc) { return; }
+    var wx = PX, wy = PY, fx = wx - ex, fy = wy - ey, fl = Math.sqrt(fx * fx + fy * fy) || 1;
+    var tx = fx / fl, ty = fy / fl;
+    // The hand turns from the line of the forearm to point at the target
+    // as the arm comes up.
+    if (h.aim) {
+      projENU(h.aim[0], h.aim[1], h.aim[2]);
+      var gx = PX - wx, gy = PY - wy, gl = Math.sqrt(gx * gx + gy * gy) || 1;
+      tx = tx * (1 - P.r) + gx / gl * P.r;
+      ty = ty * (1 - P.r) + gy / gl * P.r;
+    }
     ctx.save();
     ctx.translate(wx, wy);
-    ctx.rotate(ang);
-    if (h.dad) { drawDadHand(U * 0.085); } else { drawMitten(U * 0.08); }
+    ctx.rotate(Math.atan2(ty, tx));
+    ctx.globalAlpha = smooth((P.r - 0.15) / 0.3);
+    if (h.dad) { drawDadHand(A.hand / 1.49 * sc); } else { drawMitten(A.hand / 1.25 * sc); }
     ctx.restore();
   }
 
@@ -2664,8 +2767,7 @@
     drawLand();
     drawNear();
     drawNames();
-    drawArm(dadHand);
-    drawArm(mitten);
+    drawBodies();
     drawBreath();
   }
 
