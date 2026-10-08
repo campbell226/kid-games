@@ -1383,7 +1383,9 @@
   // ------------------------------------------------------------------
   var lit = [], EDGE_T = 0.36, HOLD = 9, FADE = 2.6;
 
-  function lightGroup(g, from) {
+  // heard: when she has picked it out herself, how long Dad takes to see
+  // what she is pointing at before he names it.
+  function lightGroup(g, from, heard) {
     var i, l;
     for (i = 0; i < lit.length; i++) {
       if (lit[i].g === g) {
@@ -1396,7 +1398,7 @@
         return l;
       }
     }
-    say('name-' + g.slug, { wait: 2.5, gap: 25 });
+    say('name-' + g.slug, { wait: 2.5, gap: 25, after: heard || 0 });
     // No more than three pictures being shown at once: the oldest starts
     // fading now. And never more than five on the sky at all, counting
     // the ones still fading, however fast the taps come.
@@ -1524,16 +1526,16 @@
 
   // Dad lies on her right, propped up as she is, his near shoulder just
   // off the bottom right of the view, and points with the arm nearer
-  // her; at rest it lies along his front, lost in the dark of him. Her
-  // arm is seen as she sees her own: coming up out of the front of her
-  // coat, just off the bottom of the view, on the side of whatever she
-  // is pointing at, and at rest tucked down on her front out of sight.
+  // her; at rest it lies along his front, lost in the dark of him. She
+  // points with the arm on the side of whatever she is pointing at, up
+  // from her shoulder, which is below and to the side of her eye and out
+  // of the view; at rest her arms are down by her sides, out of sight.
   // sh, rest and pole are for a right arm: her left is mirrored.
   var ARMS = {
     dad: { sh: [0.42, 0.24, -0.13], rest: [0.45, 0.55, -0.25], pole: [1, 0, -1],
       upper: 0.33, fore: 0.31, reach: 0.6, hand: 0.165, r0: 0.068, r1: 0.058, r2: 0.047 },
-    her: { sh: [0.04, 0.3, -0.14], rest: [0.05, 0.42, -0.2], pole: [1, -0.2, -1], free: true,
-      upper: 0.24, fore: 0.22, reach: 0.36, hand: 0.09, r0: 0.05, r1: 0.042, r2: 0.034 }
+    her: { sh: [0.15, 0.02, -0.2], rest: [0.15, 0.3, -0.36], pole: [1, -0.2, -1],
+      upper: 0.24, fore: 0.22, reach: 0.36, hand: 0.09, r0: 0.048, r1: 0.04, r2: 0.033 }
   };
   function armPt(h, v) { return bodyENU(v[0] * (h.dad ? 1 : h.side), v[1], v[2]); }
 
@@ -2317,6 +2319,18 @@
       out.push(PX, PY, r);
     }
   }
+  // A part of a body lying on the blanket: whatever it is propped on
+  // fills it down to the ground, so there is never a gap to see through
+  // underneath.
+  function grounded(out, a, b, ra, rb) {
+    tube(out, a, b, ra, rb);
+    var dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2];
+    var m = clamp(Math.ceil(Math.sqrt(dx * dx + dy * dy + dz * dz) / (0.8 * Math.min(ra, rb))), 1, 40);
+    for (var j = 0; j <= m; j++) {
+      var t = j / m, r = ra + (rb - ra) * t, p = [a[0] + dx * t, a[1] + dy * t, a[2] + dz * t];
+      if (p[2] > r - EYE) { tube(out, p, [p[0], p[1], r - EYE], r, r); }
+    }
+  }
   function blobPath(list, grow) {
     ctx.beginPath();
     for (var i = 0; i < list.length; i += 3) {
@@ -2347,9 +2361,10 @@
   var COAT = hex('#0a0912');
   function drawBodies() {
     var b = [];
-    tube(b, bodyENU(0.6, 1.0, -0.38), bodyENU(0.58, 1.85, -0.42), 0.13, 0.1);
-    tube(b, bodyENU(0.6, 0.25, -0.17), bodyENU(0.62, 0.98, -0.36), 0.19, 0.18);
-    tube(b, bodyENU(0.42, 0.24, -0.13), bodyENU(0.8, 0.22, -0.13), 0.12, 0.12);
+    grounded(b, bodyENU(0.6, 1.0, -0.38), bodyENU(0.58, 1.85, -0.42), 0.13, 0.1);
+    grounded(b, bodyENU(0.6, 0.25, -0.17), bodyENU(0.62, 0.98, -0.36), 0.19, 0.18);
+    grounded(b, bodyENU(0.42, 0.24, -0.13), bodyENU(0.8, 0.22, -0.13), 0.12, 0.12);
+    grounded(b, bodyENU(0.62, 0.1, -0.2), bodyENU(0.62, 0.0, -0.2), 0.12, 0.12);
     tube(b, bodyENU(0.62, 0.17, -0.11), bodyENU(0.62, 0.05, -0.03), 0.07, 0.065);
     tube(b, bodyENU(0.63, -0.04, 0.01), bodyENU(0.62, 0.03, 0.0), 0.085, 0.092);
     tube(b, bodyENU(0.62, 0.03, 0.0), bodyENU(0.61, 0.08, 0.035), 0.092, 0.068);
@@ -2357,7 +2372,7 @@
     paintBlobs(b, SIL, 1);
     drawHand(dadHand, dadArm);
     b = [];
-    tube(b, bodyENU(0, 0.12, -0.24), bodyENU(0, 0.58, -0.3), 0.17, 0.17);
+    grounded(b, bodyENU(0, 0.12, -0.24), bodyENU(0, 0.58, -0.3), 0.17, 0.17);
     var herArm = armBlobs(mitten, b);
     paintBlobs(b, COAT, 0.8);
     drawHand(mitten, herArm);
@@ -2391,12 +2406,7 @@
     wr = [S[0] + u[0] * dc, S[1] + u[1] * dc, S[2] + u[2] * dc];
     var p = armPt(h, A.pole), pu = p[0] * u[0] + p[1] * u[1] + p[2] * u[2];
     var pn = norm3([p[0] - u[0] * pu, p[1] - u[1] * pu, p[2] - u[2] * pu]);
-    // Hers runs out of her coat to her hand with just a little bend.
-    var x = dc / 2, ht = 0.02;
-    if (!A.free) {
-      x = (A.upper * A.upper - A.fore * A.fore + dc * dc) / (2 * dc);
-      ht = Math.sqrt(Math.max(0, A.upper * A.upper - x * x));
-    }
+    var x = (A.upper * A.upper - A.fore * A.fore + dc * dc) / (2 * dc), ht = Math.sqrt(Math.max(0, A.upper * A.upper - x * x));
     var E = [S[0] + u[0] * x + pn[0] * ht, S[1] + u[1] * x + pn[1] * ht, S[2] + u[2] * x + pn[2] * ht];
     return { A: A, S: S, E: E, W: wr, r: r };
   }
@@ -2791,11 +2801,12 @@
       moon.flare = 1;
       herPoint({ obj: moon }, 3);
       chime(76, clamp((moon.sx / W - 0.5) * 1.2, -0.8, 0.8), 0.6);
-      say('moon-name', { wait: 2, gap: 12 });
+      var heard = noticing();
+      say('moon-name', { wait: 2, gap: 12, after: heard });
       var phase = moon.frac < 0.35 ? 'moon-crescent' : moon.frac < 0.65 ? 'moon-half' : moon.frac < 0.94 ? 'moon-gibbous' : 'moon-full';
-      if (!said[phase]) { say(phase, { wait: 5, once: true }); }
-      else if (!said['moon-shine']) { say('moon-shine', { wait: 5, once: true }); }
-      else { say('moon-walk', { wait: 5, once: true }); }
+      if (!said[phase]) { say(phase, { wait: 5, once: true, after: heard }); }
+      else if (!said['moon-shine']) { say('moon-shine', { wait: 5, once: true, after: heard }); }
+      else { say('moon-walk', { wait: 5, once: true, after: heard }); }
       return;
     }
 
@@ -2805,8 +2816,8 @@
       if (c.front && Math.hypot(c.sx - x, c.sy - y) < R * 0.9) {
         if (c.flare < 0.5) { c.flare = 1; cometSound(clamp((c.sx / W - 0.5) * 1.2, -0.8, 0.8)); }
         herPoint({ obj: c }, 3);
-        if (!said['comet-1']) { say('comet-1', { wait: 2 }); }
-        else { say('comet-2', { wait: 2, once: true }); }
+        if (!said['comet-1']) { say('comet-1', { wait: 2, after: noticing() }); }
+        else { say('comet-2', { wait: 2, once: true, after: noticing() }); }
         return;
       }
     }
@@ -2832,7 +2843,7 @@
       }
     }
     if (best) {
-      lightGroup(best, bestStar);
+      lightGroup(best, bestStar, noticing());
       herPoint({ star: bestStar }, Math.max(3, best.stars.length * EDGE_T + 1));
       return;
     }
@@ -3209,15 +3220,20 @@
 
   // Ask Dad to say something. wait: how many seconds the line may wait
   // for its turn; once: only ever once an evening; gap: not again within
-  // this many seconds.
+  // this many seconds; after: not before this many seconds from now.
   function say(id, opts) {
     opts = opts || {};
     if (opts.once && said[id]) { return; }
     if (opts.gap && clock - (lastSaidAt[id] || -999) < opts.gap) { return; }
     for (var i = 0; i < voiceQueue.length; i++) { if (voiceQueue[i].id === id) { return; } }
     if (voiceQueue.length >= 3) { voiceQueue.shift(); }
-    voiceQueue.push({ id: id, by: clock + (opts.wait || 3), once: !!opts.once });
+    var after = opts.after || 0;
+    voiceQueue.push({ id: id, at: clock + after, by: clock + after + (opts.wait || 3), once: !!opts.once });
   }
+
+  // When she points at something, Dad takes a moment to see what she is
+  // pointing at before he says what it is.
+  function noticing() { return 1.5 + Math.random() * 0.6; }
 
   function updateVoice() {
     // Still talking? Then wait, whatever the clock says, unless a clip
@@ -3229,6 +3245,7 @@
     // turn rather than being used up unheard.
     var ready = AC && AC.state === 'running';
     while (voiceQueue.length) {
+      if (clock < voiceQueue[0].at) { return; }
       if (!ready) {
         if (clock > voiceQueue[0].by) { voiceQueue.shift(); continue; }
         return;
