@@ -913,7 +913,32 @@
     for (k = 0; k < 10; k++) {
       var az = rnd() * TAU;
       if (Math.abs(((az - COTTAGE_AZ + Math.PI) % TAU + TAU) % TAU - Math.PI) < 4 * D2R) { continue; }
-      trees.push({ az: az, r: (0.7 + 0.7 * rnd()) * D2R, h: (1.6 + 1.4 * rnd()) * D2R, lean: (rnd() - 0.5) * 0.3 });
+      // Each tree its own: a round broadleaf, a tall narrow one, a
+      // flat-topped pine high on a bare trunk, or a pointed fir. Their
+      // crowns are clumps of foliage, x and y across and down from the
+      // middle of the crown, in crown radii.
+      var pick = rnd(), kind = pick < 0.45 ? 'round' : pick < 0.6 ? 'tall' : pick < 0.8 ? 'pine' : 'fir';
+      var tr = { az: az, r: (0.7 + 0.7 * rnd()) * D2R, h: (1.6 + 1.4 * rnd()) * D2R, lean: (rnd() - 0.5) * 0.3, kind: kind, lobes: [] };
+      var n, q;
+      if (kind === 'round') {
+        tr.lobes.push([0, 0, 1]);
+        for (n = 3 + Math.floor(rnd() * 3), q = 0; q < n; q++) {
+          var la = Math.PI + rnd() * Math.PI, lr = 0.5 + 0.3 * rnd();
+          tr.lobes.push([Math.cos(la) * (0.45 + 0.25 * rnd()), Math.sin(la) * (0.35 + 0.25 * rnd()) + 0.15, lr]);
+        }
+        tr.lobes.push([(rnd() - 0.5) * 0.9, 0.3, 0.6 + 0.2 * rnd()]);
+      } else if (kind === 'tall') {
+        for (q = 0; q < 4; q++) { tr.lobes.push([(rnd() - 0.5) * 0.25, 0.35 - q * 0.45, 0.5 - q * 0.06]); }
+        tr.h *= 1.15;
+      } else if (kind === 'pine') {
+        for (n = 3 + Math.floor(rnd() * 2), q = 0; q < n; q++) {
+          tr.lobes.push([-0.75 + 1.5 * q / (n - 1) + (rnd() - 0.5) * 0.2, (rnd() - 0.5) * 0.25, 0.32 + 0.18 * rnd()]);
+        }
+        tr.h *= 1.35; tr.r *= 0.9;
+      } else {
+        tr.r *= 0.8;
+      }
+      trees.push(tr);
     }
     // Flatten the ground under the cottage.
     var ci = Math.round(COTTAGE_AZ / TAU * PROF_N);
@@ -1058,9 +1083,9 @@
   function later(secs, fn) { timers.push({ t: clock + secs, fn: fn }); }
 
   // ------------------------------------------------------------------
-  // Comets: one big one low in the north-west and a smaller one
-  // elsewhere, new places every visit. Their tails point away from the
-  // sun, which is under the horizon, so they mostly stream upwards.
+  // A comet: just the one, low in the north-west, in a new place every
+  // visit. Its tail points away from the
+  // sun, which is under the horizon, so it mostly streams upwards.
   // ------------------------------------------------------------------
   var comets = [];
 
@@ -1124,8 +1149,8 @@
     }
   }
 
-  // One big comet low in the north-west and a smaller one elsewhere, at
-  // the first place found where neither ever crosses those stars, going
+  // The comet low in the north-west, at the first place found where it
+  // never crosses those stars, going
   // further afield if the usual places are no good, and at worst the
   // place that crosses them least.
   function makeComets() {
@@ -1134,11 +1159,6 @@
       { len: 20 + rnd() * 6, size: 1, place: function (wide) {
         return wide > 1 ? [15 + rnd() * 35, 240 + rnd() * 180] :
           wide ? [18 + rnd() * 24, 280 + rnd() * 80] : [22 + rnd() * 10, 305 + rnd() * 22];
-      } },
-      { len: 8 + rnd() * 4, size: 0.6, place: function (wide) {
-        var east = rnd() < 0.5;
-        return wide ? [12 + rnd() * 26, east ? 30 + rnd() * 80 : 230 + rnd() * 70]
-          : [14 + rnd() * 12, east ? 40 + rnd() * 40 : 255 + rnd() * 25];
       } }
     ];
     specs.forEach(function (c) {
@@ -1227,9 +1247,10 @@
   }
 
   function updateMeteors(dt) {
-    var i, hush = talkingPictures();
-    // None until it is properly dark and the Milky Way is out.
-    if (dusk > 0.98) {
+    var i, hush = talkingPictures() || aur.on;
+    // None until it is properly dark and the Milky Way is out, and none
+    // while the northern lights are showing.
+    if (dusk > 0.98 && !aur.on) {
       nextMeteor -= dt;
       if (hush) { nextMeteor = Math.max(nextMeteor, 3); }
       if (nextMeteor <= 0) {
@@ -1338,6 +1359,10 @@
   // ------------------------------------------------------------------
   var AUR_N = 120, aurAz = new Float32Array(AUR_N), aurH = new Float32Array(AUR_N), aurP = new Float32Array(AUR_N);
   var aur = { s: 0, on: false, t0: 0, len: 0, next: 150 + Math.random() * 70, ph: Math.random() * 100 };
+  // When a finger or a key last did anything. The lights only begin in
+  // a quiet spell, when nobody has touched anything for a while: they
+  // are a reward for lying still and watching.
+  var lastActive = 0, AUR_QUIET = 25;
   (function () {
     var rnd = seeded(91);
     for (var i = 0; i < AUR_N; i++) {
@@ -1348,7 +1373,7 @@
   })();
   function updateAurora(dt) {
     aur.ph += dt * (reduced ? 0.3 : 1);
-    if (!aur.on && clock > aur.next && dusk > 0.95) {
+    if (!aur.on && clock > aur.next && dusk > 0.95 && clock - lastActive > AUR_QUIET) {
       aur.on = true; aur.t0 = clock; aur.len = 70 + Math.random() * 40;
       // Dad points it out as it gets going, and later says what it is.
       later(6, function () {
@@ -2207,18 +2232,36 @@
       var ux = tx - PX, uy = ty - PY, ul = Math.sqrt(ux * ux + uy * uy) || 1, d = ul;
       ux /= ul; uy /= ul;
       ctx.setTransform(-DPR * uy, DPR * ux, -DPR * ux, -DPR * uy, DPR * tx, DPR * ty);
+      var top = t.kind === 'pine' ? 0.1 : t.kind === 'fir' ? 0.6 : 0.4, cx0 = t.lean * r, j;
       ctx.beginPath();
       ctx.moveTo(-r * 0.09, d);
-      ctx.lineTo(-r * 0.06 + t.lean * r, r * 0.4);
-      ctx.lineTo(r * 0.06 + t.lean * r, r * 0.4);
+      ctx.lineTo(-r * 0.06 + cx0, r * top);
+      ctx.lineTo(r * 0.06 + cx0, r * top);
       ctx.lineTo(r * 0.09, d);
       ctx.closePath();
       ctx.fill();
       ctx.beginPath();
-      ctx.arc(t.lean * r, 0, r, 0, TAU);
-      ctx.arc(t.lean * r - r * 0.55, r * 0.25, r * 0.72, 0, TAU);
-      ctx.arc(t.lean * r + r * 0.55, r * 0.2, r * 0.75, 0, TAU);
-      ctx.arc(t.lean * r, -r * 0.45, r * 0.68, 0, TAU);
+      if (t.kind === 'fir') {
+        // Tiers of branches drooping from a point.
+        var right = [], tiers = 4;
+        for (j = 0; j < tiers; j++) {
+          var yb = (-1.5 + (j + 1) * 0.55) * r, w = (0.28 + 0.17 * j) * r;
+          right.push([w, yb]);
+          if (j < tiers - 1) { right.push([w * 0.55, yb - 0.08 * r]); }
+        }
+        ctx.moveTo(cx0, -1.5 * r);
+        for (j = 0; j < right.length; j++) { ctx.lineTo(cx0 + right[j][0], right[j][1]); }
+        for (j = right.length - 1; j >= 0; j--) { ctx.lineTo(cx0 - right[j][0], right[j][1]); }
+        ctx.closePath();
+      } else {
+        // Each clump its own circle, started afresh, so none of them
+        // cuts a hole in the rest.
+        for (j = 0; j < t.lobes.length; j++) {
+          var lb = t.lobes[j], lx = cx0 + lb[0] * r, ly = lb[1] * r, lr = lb[2] * r;
+          ctx.moveTo(lx + lr, ly);
+          ctx.arc(lx, ly, lr, 0, TAU);
+        }
+      }
       ctx.fill();
     }
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -2682,11 +2725,15 @@
   // soft at the bottom of the view and travels away into it, shrinking
   // with distance as it spreads and thins. Once out, it stays in the air
   // where she breathed it, even if she turns her head.
-  var puffs = [], exhaling = 0;
+  var puffs = [], exhaling = 0, herLastBreath = -99;
 
+  // The two of them breathe in their own time, never together: if Dad
+  // has only just breathed out, hers waits a couple of seconds.
   function breathe() {
     if (exhaling > 0) { return; }
+    if (dadExhaling > 0 || clock - dadLastBreath < 2.5) { nextBreath = Math.min(nextBreath, 2.5); return; }
     exhaling = 0.6;
+    herLastBreath = clock;
     breathSound(false);
   }
 
@@ -2713,7 +2760,7 @@
   // slow breath out now and then, but never while he is talking, nor in
   // the moment after, when he would be breathing in. While he talks only
   // a little mist comes with his words, in short wisps.
-  var dadExhaling = 0, dadNextBreath = 9, lastTalk = -99;
+  var dadExhaling = 0, dadNextBreath = 9, lastTalk = -99, dadLastBreath = -99;
   function dadTalking() {
     return speaking ? !speaking.ended && !speaking.paused : clock < speakingUntil;
   }
@@ -2729,7 +2776,9 @@
     dadNextBreath -= dt;
     if (dadNextBreath <= 0) {
       if (talking || clock - lastTalk < 1.5) { dadNextBreath = 1; }
-      else { dadExhaling = 0.8; dadNextBreath = 6 + Math.random() * 5; breathSound(true); }
+      // Not on top of hers, just gone or just coming.
+      else if (exhaling > 0 || clock - herLastBreath < 2.5 || nextBreath < 2.5) { dadNextBreath = 1.5; }
+      else { dadExhaling = 0.8; dadLastBreath = clock; dadNextBreath = 6 + Math.random() * 5; breathSound(true); }
     }
     if (dadExhaling <= 0 && !talking) { return; }
     // Out from his mouth along his face, a little down towards his
@@ -2752,7 +2801,7 @@
 
   function updateBreath(dt) {
     nextBreath -= dt;
-    if (nextBreath <= 0) { breathe(); nextBreath = 7 + Math.random() * 5; }
+    if (nextBreath <= 0) { nextBreath = 7 + Math.random() * 5; breathe(); }
     var slow = reduced ? 0.4 : 1, i, k;
     if (exhaling > 0) {
       exhaling -= dt;
@@ -2965,6 +3014,20 @@
       else if (!said['moon-shine']) { say('moon-shine', { wait: 5, once: true, after: heard }); }
       else { say('moon-walk', { wait: 5, once: true, after: heard }); }
       return;
+    }
+
+    // A satellite sliding across: easy to miss with a finger, so the
+    // reach is generous.
+    for (k = 0; k < sats.length; k++) {
+      var st = sats[k];
+      if (st.front && !st.dead && Math.hypot(st.sx - x, st.sy - y) < R * 1.4) {
+        herPoint({ obj: st }, 3);
+        chime(79, clamp((st.sx / W - 0.5) * 1.2, -0.8, 0.8), 0.5);
+        if (st.mag < 0) { say(said.iss ? 'sat-1' : 'iss', { wait: 2, gap: 15, after: noticing() }); }
+        else if (!said['sat-1']) { say('sat-1', { wait: 2, after: noticing() }); say('sat-2', { wait: 7, once: true, after: noticing() }); }
+        else { say('sat-2', { wait: 2, once: true, after: noticing() }); }
+        return;
+      }
     }
 
     // A comet.
@@ -3680,6 +3743,7 @@
     initAudio();
     primeClips();
     keys[k] = true;
+    lastActive = clock;
   });
   window.addEventListener('keyup', function (e) {
     var k = KEYMAP[e.key];
@@ -3690,6 +3754,7 @@
   canvas.addEventListener('pointerdown', function (e) {
     initAudio();
     primeClips();
+    lastActive = clock;
     downs[e.pointerId] = { x0: e.clientX, y0: e.clientY, moved: false };
     try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* not every browser */ }
   });
@@ -3705,6 +3770,7 @@
       }
     }
     if (drag && drag.id === e.pointerId) {
+      lastActive = clock;
       var now = performance.now(), dts = Math.max(0.008, (now - drag.lastT) / 1000);
       var da = -(e.clientX - drag.lastX) / K, dp = (e.clientY - drag.lastY) / K;
       // The sky may run behind a wild swipe, but never by much, nor
