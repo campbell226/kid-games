@@ -1540,9 +1540,9 @@
   // him at his right shoulder, a grown man's arm in a coat sleeve, and
   // at rest lies along his side. She points with the arm on the side of
   // whatever she is pointing at, up from her shoulder, which is below and
-  // to the side of her eye and out of the view; at rest her arms are
-  // down by her sides, out of sight. sh, rest and pole are for a right
-  // arm: her left is mirrored.
+  // to the side of her eye and out of the view; at rest both her hands
+  // lie on her front, her mittens just in view at the bottom. sh, rest
+  // and pole are for a right arm: her left is mirrored.
   // To point, Dad rolls a little onto his side towards her, as you would
   // to show a child something: his right shoulder comes up and over
   // towards her and his head tips her way, and he settles back after.
@@ -1551,10 +1551,10 @@
     dad: { sh: [0.8, -0.08, -0.25], rest: [0.8, 0.3, -0.38], pole: [1, -0.3, -1], eye: [0.6, -0.24, -0.07],
       roll: DAD_ROLL, tip: DAD_TIP,
       upper: 0.31, fore: 0.27, reach: 0.6, hand: 0.19, r0: 0.056, r1: 0.047, r2: 0.04 },
-    her: { sh: [0.15, 0.02, -0.2], rest: [0.15, 0.3, -0.36], pole: [1, -0.2, -1],
+    her: { sh: [0.15, 0.02, -0.2], rest: [0.09, 0.38, -0.1], pole: [1, -0.2, -1],
       upper: 0.24, fore: 0.22, reach: 0.36, hand: 0.09, r0: 0.048, r1: 0.04, r2: 0.033 }
   };
-  function armPt(h, v) { return h.dad ? blanketENU(v[0], v[1], v[2]) : bodyENU(v[0] * h.side, v[1], v[2]); }
+  function armPt(h, v, side) { return h.dad ? blanketENU(v[0], v[1], v[2]) : bodyENU(v[0] * (side || h.side), v[1], v[2]); }
 
   // An arm turns towards its target at no more than a set speed.
   function updateHand(h, dt) {
@@ -2407,14 +2407,14 @@
     tube(b, Hd(0.03, -0.08), Hd(0.075, -0.088), 0.036, 0.03);
     tube(b, Hd(0.075, 0.035), Hd(0.075, 0.035), 0.034, 0.034);
     tube(b, Hd(0.085, 0.0), Hd(0.118, -0.012), 0.022, 0.011);
-    var dadArm = armBlobs(dadHand, b);
+    var arms = armBlobs(dadHand, b), i;
     paintBlobs(b, SIL, 0.55);
-    drawHand(dadHand, dadArm);
+    for (i = 0; i < arms.length; i++) { drawHand(dadHand, arms[i]); }
     b = [];
     grounded(b, bodyENU(0, 0.12, -0.24), bodyENU(0, 0.58, -0.3), 0.17, 0.17);
-    var herArm = armBlobs(mitten, b);
+    arms = armBlobs(mitten, b);
     paintBlobs(b, COAT, 0.8);
-    drawHand(mitten, herArm);
+    for (i = 0; i < arms.length; i++) { drawHand(mitten, arms[i]); }
   }
 
   // Where the arm is: her hand comes up between her eye and what is being
@@ -2423,8 +2423,9 @@
   // along his own line to it and partly towards hers, as you would lean
   // in to show a child, as far as his arm will really reach from his
   // shoulder. The elbow bends out and down, the way elbows do.
-  function armPose(h) {
-    var A = h.dad ? ARMS.dad : ARMS.her, S = armPt(h, A.sh), r = smooth(h.raise), wr = armPt(h, A.rest), k;
+  // side picks which of her arms; raise is how far up it is.
+  function armPose(h, side, raise) {
+    var A = h.dad ? ARMS.dad : ARMS.her, S = armPt(h, A.sh, side), r = smooth(raise), wr = armPt(h, A.rest, side), k;
     if (A.roll) { for (k = 0; k < 3; k++) { S[k] += A.roll[k] * r; } }
     if (h.aim) {
       var a = h.aim, s = norm3(S), sd = s[0] * a[0] + s[1] * a[1] + s[2] * a[2];
@@ -2445,54 +2446,73 @@
     if (!reduced) {
       var sw = bodyENU(0.005 * Math.sin(clock * 1.3 + (h.dad ? 1.7 : 0)), 0, 0.004 * Math.sin(clock * 1.9 + (h.dad ? 0.4 : 2)));
       for (k = 0; k < 3; k++) { wr[k] += sw[k] * r; }
+      // Her hands rise and fall a little on her front as she breathes.
+      if (!h.dad) { wr[2] += 0.003 * Math.sin(clock * 1.1 + side) * (1 - r); }
     }
     var L = A.upper + A.fore, d = [wr[0] - S[0], wr[1] - S[1], wr[2] - S[2]];
     var dl = Math.sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]) || 1e-6;
     var dc = clamp(dl, Math.abs(A.upper - A.fore) + 0.02, L * 0.995);
     var u = [d[0] / dl, d[1] / dl, d[2] / dl];
     wr = [S[0] + u[0] * dc, S[1] + u[1] * dc, S[2] + u[2] * dc];
-    var p = armPt(h, A.pole), pu = p[0] * u[0] + p[1] * u[1] + p[2] * u[2];
+    var p = armPt(h, A.pole, side), pu = p[0] * u[0] + p[1] * u[1] + p[2] * u[2];
     var pn = norm3([p[0] - u[0] * pu, p[1] - u[1] * pu, p[2] - u[2] * pu]);
     var x = (A.upper * A.upper - A.fore * A.fore + dc * dc) / (2 * dc), ht = Math.sqrt(Math.max(0, A.upper * A.upper - x * x));
     var E = [S[0] + u[0] * x + pn[0] * ht, S[1] + u[1] * x + pn[1] * ht, S[2] + u[2] * x + pn[2] * ht];
-    return { A: A, S: S, E: E, W: wr, r: r };
+    return { A: A, S: S, E: E, W: wr, r: r, side: side };
   }
 
-  // The arm goes into the same list as the body it belongs to, so the
-  // two are one dark shape, as they would be at night.
+  // The arms go into the same list as the body they belong to, so the
+  // two are one dark shape, as they would be at night. Dad's only shows
+  // when it is raised; both of hers always show, the one on the side of
+  // whatever she is pointing at raised, the other resting.
   function armBlobs(h, b) {
-    if (h.raise < 0.01) { return null; }
-    var P = armPose(h), A = P.A;
-    tube(b, P.S, P.E, A.r0, A.r1);
-    tube(b, P.E, P.W, A.r1, A.r2);
-    return P;
+    var poses = [], i;
+    if (h.dad) {
+      if (h.raise >= 0.01) { poses.push(armPose(h, 1, h.raise)); }
+    } else {
+      poses.push(armPose(h, -h.side, 0), armPose(h, h.side, h.raise));
+    }
+    for (i = 0; i < poses.length; i++) {
+      var P = poses[i], A = P.A;
+      tube(b, P.S, P.E, A.r0, A.r1);
+      tube(b, P.E, P.W, A.r1, A.r2);
+    }
+    return poses;
   }
 
+  // The hand runs on from the forearm and, as the arm comes up, turns to
+  // point at the target; it is drawn shortened as much as it is turned
+  // away from her, so a hand lying on her front or pointing off into the
+  // distance looks it.
   function drawHand(h, P) {
-    if (!P || P.r < 0.15) { return; }
-    var A = P.A;
-    var sc = projNear(P.E);
-    var ex = PX, ey = PY;
-    sc = projNear(P.W);
+    if (h.dad && P.r < 0.15) { return; }
+    var A = P.A, k;
+    var sc = projNear(P.W);
     if (!sc) { return; }
-    var wx = PX, wy = PY, fx = wx - ex, fy = wy - ey, fl = Math.sqrt(fx * fx + fy * fy) || 1;
-    var tx = fx / fl, ty = fy / fl;
-    // The hand turns from the line of the forearm to point at the target
-    // as the arm comes up.
-    if (h.aim) {
-      projENU(h.aim[0], h.aim[1], h.aim[2]);
-      var gx = PX - wx, gy = PY - wy, gl = Math.sqrt(gx * gx + gy * gy) || 1;
-      tx = tx * (1 - P.r) + gx / gl * P.r;
-      ty = ty * (1 - P.r) + gy / gl * P.r;
+    var wx = PX, wy = PY, fd = norm3([P.W[0] - P.E[0], P.W[1] - P.E[1], P.W[2] - P.E[2]]), hd = fd;
+    if (h.aim && P.r > 0) {
+      hd = norm3([fd[0] * (1 - P.r) + h.aim[0] * P.r, fd[1] * (1 - P.r) + h.aim[1] * P.r, fd[2] * (1 - P.r) + h.aim[2] * P.r]);
+    }
+    var tip = [], ang, ls = 1;
+    for (k = 0; k < 3; k++) { tip.push(P.W[k] + hd[k] * A.hand); }
+    if (projNear(tip)) {
+      var gx = PX - wx, gy = PY - wy, gl = Math.sqrt(gx * gx + gy * gy);
+      ang = Math.atan2(gy, gx);
+      ls = clamp(gl / (A.hand * sc), 0.45, 1);
+    } else {
+      projNear(P.E);
+      ang = Math.atan2(wy - PY, wx - PX);
     }
     ctx.save();
     ctx.translate(wx, wy);
-    ctx.rotate(Math.atan2(ty, tx));
-    ctx.globalAlpha = smooth((P.r - 0.15) / 0.3);
+    ctx.rotate(ang);
+    ctx.globalAlpha = h.dad ? smooth((P.r - 0.15) / 0.3) : 1;
     // His hand is drawn a touch stubby, so it is drawn longer to come out
     // a man's hand: about nine centimetres across and nineteen from wrist
-    // to fingertip.
-    if (h.dad) { ctx.scale(1.4, 1); drawDadHand(A.hand / (1.49 * 1.4) * sc); } else { drawMitten(A.hand / 1.25 * sc); }
+    // to fingertip. Her left mitten is her right one turned over, so its
+    // thumb is on the inside too.
+    if (h.dad) { ctx.scale(1.4 * ls, 1); drawDadHand(A.hand / (1.49 * 1.4) * sc); }
+    else { ctx.scale(ls, P.side); drawMitten(A.hand / 1.25 * sc); }
     ctx.restore();
   }
 
@@ -2628,7 +2648,67 @@
   function breathe() {
     if (exhaling > 0) { return; }
     exhaling = 0.6;
-    breathSound();
+    breathSound(false);
+  }
+
+  // One puff from a mouth at `at`, going out along `dir` at speed sp,
+  // scattered a little sideways (`side`) and up (`up`). size scales how
+  // big it grows and how long it lasts; dim, how bright it is (Dad's
+  // breath is further off, so it bunches up smaller and would glow).
+  function puffOut(at, dir, side, up, sp, size, slow, dim) {
+    var jx = (Math.random() - 0.5) * 0.16, jy = 0.05 + (Math.random() - 0.5) * 0.12, jm = (Math.random() - 0.5) * 0.02;
+    var pos = [], vel = [];
+    for (var k = 0; k < 3; k++) {
+      pos.push(at[k] + side[k] * jm);
+      vel.push(dir[k] * sp + side[k] * jx * slow + up[k] * jy * slow);
+    }
+    puffs.push({
+      p: pos, v: vel, r0: (0.025 + Math.random() * 0.015) * size, grow: (0.1 + Math.random() * 0.07) * size,
+      age: 0, life: (1.6 + Math.random() * 0.9) * (0.5 + 0.5 * size), img: Math.floor(Math.random() * 4),
+      rot: Math.random() * TAU, spin: (Math.random() - 0.5) * 1.6 * slow,
+      ph: Math.random() * TAU, curl: (Math.random() - 0.5) * 2.4, dim: dim || 1
+    });
+  }
+
+  // Dad breathes too, from his own mouth and in his own time: a long,
+  // slow breath out now and then, but never while he is talking, nor in
+  // the moment after, when he would be breathing in. While he talks only
+  // a little mist comes with his words, in short wisps.
+  var dadExhaling = 0, dadNextBreath = 9, lastTalk = -99;
+  function dadTalking() {
+    return speaking ? !speaking.ended && !speaking.paused : clock < speakingUntil;
+  }
+  function dadMouth() {
+    var L = smooth(dadHand.raise), f = 0.11, c = -0.045;
+    return blanketENU(DAD_HEAD[0] + DAD_FACE[0] * f + DAD_CROWN[0] * c + DAD_TIP[0] * L,
+      DAD_HEAD[1] + DAD_FACE[1] * f + DAD_CROWN[1] * c + DAD_TIP[1] * L,
+      DAD_HEAD[2] + DAD_FACE[2] * f + DAD_CROWN[2] * c + DAD_TIP[2] * L);
+  }
+  function updateDadBreath(dt, slow) {
+    var talking = dadTalking(), i;
+    if (talking) { lastTalk = clock; }
+    dadNextBreath -= dt;
+    if (dadNextBreath <= 0) {
+      if (talking || clock - lastTalk < 1.5) { dadNextBreath = 1; }
+      else { dadExhaling = 0.8; dadNextBreath = 6 + Math.random() * 5; breathSound(true); }
+    }
+    if (dadExhaling <= 0 && !talking) { return; }
+    // Out from his mouth along his face, a little down towards his
+    // chest, and turned her way as he rolls towards her.
+    var L = smooth(dadHand.raise), at = dadMouth();
+    var dir = norm3([DAD_FACE[0] - 0.3 * L, DAD_FACE[1] + 0.25, DAD_FACE[2] - 0.1]), side = [1, 0, 0], up = [0, 0, 1];
+    var n;
+    if (dadExhaling > 0) {
+      dadExhaling -= dt;
+      var strength = clamp(dadExhaling / 0.8, 0.45, 1);
+      n = Math.floor(46 * dt * strength * strength + Math.random());
+      for (i = 0; i < n; i++) { puffOut(at, dir, side, up, (0.6 + Math.random() * 0.4) * strength * slow, 1.25, slow, 0.45); }
+    } else {
+      // The rise and fall of his words.
+      var words = Math.max(0, Math.sin(clock * 9 + Math.sin(clock * 2.3) * 2));
+      n = Math.floor(10 * dt * (0.2 + 0.8 * words) + Math.random());
+      for (i = 0; i < n; i++) { puffOut(at, dir, side, up, (0.15 + Math.random() * 0.15) * slow, 0.55, slow, 0.5); }
+    }
   }
 
   function updateBreath(dt) {
@@ -2640,25 +2720,13 @@
       // Out along her face, a little above where her eyes rest.
       var up = [vE, vN, vU], side = [rE, rN, rU], ca = Math.cos(0.3), sa = Math.sin(0.3);
       var g = [cE * ca + vE * sa, cN * ca + vN * sa, cU * ca + vU * sa];
+      var mouth = [g[0] * 0.05 - up[0] * 0.075, g[1] * 0.05 - up[1] * 0.075, g[2] * 0.05 - up[2] * 0.075];
       // Strong at first and tailing off.
       var strength = clamp(exhaling / 0.6, 0.45, 1);
       var n = Math.floor(40 * dt * strength * strength + Math.random());
-      for (i = 0; i < n; i++) {
-        var sp = (0.5 + Math.random() * 0.35) * strength * slow;
-        var jx = (Math.random() - 0.5) * 0.16, jy = 0.05 + (Math.random() - 0.5) * 0.12, jm = (Math.random() - 0.5) * 0.02;
-        var pos = [], vel = [];
-        for (k = 0; k < 3; k++) {
-          pos.push(g[k] * 0.05 - up[k] * 0.075 + side[k] * jm);
-          vel.push(g[k] * sp + side[k] * jx * slow + up[k] * jy * slow);
-        }
-        puffs.push({
-          p: pos, v: vel, r0: 0.025 + Math.random() * 0.015, grow: 0.1 + Math.random() * 0.07,
-          age: 0, life: 1.6 + Math.random() * 0.9, img: Math.floor(Math.random() * 4),
-          rot: Math.random() * TAU, spin: (Math.random() - 0.5) * 1.6 * slow,
-          ph: Math.random() * TAU, curl: (Math.random() - 0.5) * 2.4
-        });
-      }
+      for (i = 0; i < n; i++) { puffOut(mouth, g, side, up, (0.5 + Math.random() * 0.35) * strength * slow, 1, slow); }
     }
+    updateDadBreath(dt, slow);
     for (i = puffs.length - 1; i >= 0; i--) {
       var q = puffs[i];
       q.age += dt;
@@ -2686,7 +2754,7 @@
       // unbroken up from the bottom of the view; close up it is spread
       // over so much of the view that it is only a faint haze, and it
       // gathers into a small cloud as it goes, then thins away.
-      var a = 0.22 * smooth((dist - 0.04) / 0.06) * smooth(q.age / 0.1) * Math.pow(1 - t, 1.4) *
+      var a = 0.22 * q.dim * smooth((dist - 0.04) / 0.06) * smooth(q.age / 0.1) * Math.pow(1 - t, 1.4) *
         clamp(U * 0.12 / r, 0.3, 1);
       if (a < 0.01) { continue; }
       var c = Math.cos(q.rot), s = Math.sin(q.rot);
@@ -3343,32 +3411,40 @@
   }
 
   // Her breath out: a soft, close "haaa" of air that starts bright and
-  // falls away, quiet enough to sit under the music. Not while Dad is
-  // talking.
-  function breathSound() {
+  // falls away, quiet enough to sit under the music. Dad's is deeper,
+  // longer and quieter, and comes from wherever he is beside her. Not
+  // while Dad is talking.
+  function breathSound(dad) {
     if (!AC || !noise || AC.state !== 'running' || speaking) { return; }
-    var t = AC.currentTime + 0.02;
+    var t = AC.currentTime + 0.02, len = dad ? 1.5 : 1.2;
     var src = AC.createBufferSource();
     src.buffer = noise;
     var hp = AC.createBiquadFilter();
     hp.type = 'highpass';
-    hp.frequency.setValueAtTime(280, t);
+    hp.frequency.setValueAtTime(dad ? 180 : 280, t);
     var band = AC.createBiquadFilter();
     band.type = 'bandpass';
     band.Q.setValueAtTime(0.7, t);
-    band.frequency.setValueAtTime(1350, t);
-    band.frequency.exponentialRampToValueAtTime(650, t + 1.1);
-    var g = AC.createGain();
+    band.frequency.setValueAtTime(dad ? 850 : 1350, t);
+    band.frequency.exponentialRampToValueAtTime(dad ? 400 : 650, t + len - 0.1);
+    var g = AC.createGain(), peak = dad ? 0.045 : 0.075;
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.075, t + 0.14);
-    g.gain.setValueAtTime(0.075, t + 0.3);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.2);
+    g.gain.exponentialRampToValueAtTime(peak, t + 0.16);
+    g.gain.setValueAtTime(peak, t + 0.35);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + len);
     src.connect(hp);
     hp.connect(band);
     band.connect(g);
-    g.connect(master);
+    var out = g;
+    if (dad && AC.createStereoPanner) {
+      var m = norm3(dadMouth()), p = AC.createStereoPanner();
+      p.pan.setValueAtTime(clamp((m[0] * rE + m[1] * rN + m[2] * rU) * 0.8, -0.8, 0.8), t);
+      g.connect(p);
+      out = p;
+    }
+    out.connect(master);
     src.start(t, Math.random() * 4.5);
-    src.stop(t + 1.3);
+    src.stop(t + len + 0.1);
   }
 
   function cometSound(pan) {
