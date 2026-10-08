@@ -748,12 +748,13 @@
 
   // Which way she is lying, as the direction her body faces in radians
   // from north towards east, and how far her head is turned on her neck.
-  // She lies back propped up on the blanket, so her neck leans back: a
-  // turn of her head is a turn about that leaning axis, which is what
-  // tips the horizon and dips her gaze as she looks to the side, the way
-  // it does lying back on a hill. A neck only turns so far.
+  // She lies back propped up on the blanket facing north, and stays that
+  // way: only her head turns. Her neck leans back, so a turn of her head
+  // is a turn about that leaning axis, which is what tips the horizon and
+  // dips her gaze as she looks to the side, the way it does lying back
+  // on a hill.
   var A0 = 0, headYaw = 0, lookAt = 0, headPitch = 0;
-  var NECK_TILT = 25 * D2R, NECK_MAX = 75 * D2R;
+  var NECK_TILT = 25 * D2R;
   // Altogether she can look 135 degrees round either side of north,
   // with a little give at the end, and tip her head back up to 55
   // degrees (nearly overhead) or forward a little.
@@ -792,8 +793,14 @@
       C = turn3(axis, C, -headYaw); R = turn3(axis, R, -headYaw); V = turn3(axis, V, -headYaw);
     }
     // Then her head tips back (or forward) about its own left-right line.
-    if (headPitch !== 0) {
-      C = turn3(R, C, headPitch); V = turn3(R, V, headPitch);
+    // Turned far round on a neck that leans back, her eyes would end up
+    // on the ground beside and behind her, so past three-quarters of the
+    // way to the side she tips her head back as she turns, and her gaze
+    // never drops lower than it is there.
+    var tilt = headPitch, lowest = Math.asin(-Math.sin(NECK_TILT) * Math.cos(NECK_TILT) * (1 - Math.cos(75 * D2R)));
+    if (C[2] < Math.sin(lowest)) { tilt = Math.min(tilt + lowest - Math.asin(C[2]), PITCH_UP + 10 * D2R); }
+    if (tilt !== 0) {
+      C = turn3(R, C, tilt); V = turn3(R, V, tilt);
     }
     cE = C[0]; cN = C[1]; cU = C[2];
     rE = R[0]; rN = R[1]; rU = R[2];
@@ -3427,15 +3434,11 @@
     // Looking round. Where she is looking follows the finger or the arrow
     // keys, up to half a turn a second, and after a flick glides a little
     // and settles.
-    // - Sideways, her head turns on her neck up to its limit, and past
-    //   that she shuffles round on the blanket, more slowly; but never
-    //   more than 135 degrees either side of north. At the end there is a
-    //   little give, and it eases back when let go.
+    // - Sideways, her head turns on her neck, up to 135 degrees either
+    //   side of north; her body stays where it is on the blanket. At the
+    //   end there is a little give, and it eases back when let go.
     // - Up and down, her head tips back to look higher, and stays there.
-    // - Once she has been still for a few seconds her neck relaxes
-    //   sideways: her head comes back to the middle while her body turns
-    //   to follow, so the view levels out still facing the same way.
-    var lookMax = (reduced ? 90 : 180) * D2R * dt, bodyMax = (reduced ? 25 : 45) * D2R * dt;
+    var lookMax = (reduced ? 90 : 180) * D2R * dt;
     var kx = (keys.right ? 1 : 0) - (keys.left ? 1 : 0), ky = (keys.up ? 1 : 0) - (keys.down ? 1 : 0);
     if (kx || ky) {
       var keyRate = reduced ? 0.6 : 1;
@@ -3450,13 +3453,11 @@
       var aimP = drag ? softEnd(pitchGoal, PITCH_DOWN, PITCH_UP, 6 * D2R) : pitchGoal;
       lookAt += clamp(aim - lookAt, -lookMax, lookMax);
       headPitch += clamp(aimP - headPitch, -lookMax, lookMax);
-      lastLook = clock;
     } else {
       if (lookVel !== 0) {
         lookAt += lookVel * dt;
         lookVel *= Math.exp(-dt / 0.35);
         if (Math.abs(lookVel) < 0.01) { lookVel = 0; }
-        lastLook = clock;
       }
       if (pitchVel !== 0) {
         headPitch += pitchVel * dt;
@@ -3473,13 +3474,6 @@
       }
       lookGoal = lookAt;
       pitchGoal = headPitch;
-    }
-    var over = lookAt - A0;
-    if (over > NECK_MAX) { A0 += Math.min(over - NECK_MAX, bodyMax); }
-    else if (over < -NECK_MAX) { A0 -= Math.min(-over - NECK_MAX, bodyMax); }
-    lookAt = clamp(lookAt, A0 - NECK_MAX, A0 + NECK_MAX);
-    if (!steering && lookVel === 0 && clock - lastLook > 5) {
-      A0 += (lookAt - A0) * (1 - Math.exp(-dt / (reduced ? 4 : 2.5)));
     }
     headYaw = lookAt - A0;
     if (Math.abs(headYaw) < 1e-4) { headYaw = 0; }
@@ -3548,7 +3542,7 @@
   // glides only a little way, however hard it is. The arrow keys (or W A
   // S D) turn and tip her head at a steady pace.
   // ------------------------------------------------------------------
-  var drag = null, downs = {}, lookGoal = 0, lookVel = 0, lastLook = -99, GLIDE_MAX = 90 * D2R;
+  var drag = null, downs = {}, lookGoal = 0, lookVel = 0, GLIDE_MAX = 90 * D2R;
   var pitchGoal = 0, pitchVel = 0, keys = { left: false, right: false, up: false, down: false };
 
   // Beyond an end, a pull only stretches a little further, less and less.
