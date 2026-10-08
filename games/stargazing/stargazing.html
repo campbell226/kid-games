@@ -1049,7 +1049,9 @@
   // The time of night. It opens at the end of dusk and the stars come
   // out one by one, brightest first, as it gets dark.
   // ------------------------------------------------------------------
-  var clock = 0, DUSK_LEN = 45, dusk = 0;
+  // duskT is how far into the dusk it is, which runs with the clock
+  // except while Dad is pointing out the first stars.
+  var clock = 0, DUSK_LEN = 45, dusk = 0, duskT = 0;
   function limitMag() { return -1.6 + 8.6 * Math.pow(dusk, 1.25); }
 
   var timers = [];
@@ -1159,9 +1161,28 @@
   // A tap on empty sky just makes it glint where the finger lands.
   var glints = [];
 
+  // Whether a shooting star from p heading along t would stay in view, on
+  // the screen and above the hills, for the whole of its flight. Only
+  // those are ever let go: one she would have to turn to catch, after
+  // Dad has said "Look!", is no fun at all.
+  function wholeInView(p, t, path) {
+    var mg = Math.max(20, U * 0.05);
+    for (var f = 0; f <= 1; f += 0.25) {
+      var a = path * f, c = Math.cos(a), s = Math.sin(a);
+      var d = [p[0] * c + t[0] * s, p[1] * c + t[1] * s, p[2] * c + t[2] * s];
+      projENU(d[0], d[1], d[2]);
+      if (PD < 0.3 || d[2] < 0.05 || PX < mg || PX > W - mg || PY < mg) { return false; }
+      var x = PX, y = PY;
+      if (y > horizonYAt(x) - mg) { return false; }
+    }
+    return true;
+  }
+
   function addMeteor(p, t, bright) {
+    var path = (10 + Math.random() * 14) * D2R;
+    if (!wholeInView(p, t, path)) { return null; }
     var m = {
-      p: p, t: t, w: (15 + Math.random() * 18) * D2R, path: (10 + Math.random() * 14) * D2R,
+      p: p, t: t, w: (15 + Math.random() * 18) * D2R, path: path,
       streak: (5 + Math.random() * 4) * D2R, age: 0, bright: bright, sx: 0, sy: 0, front: false, dead: false
     };
     m.dur = reduced ? 1.8 : m.path / m.w;
@@ -1213,9 +1234,9 @@
       if (hush) { nextMeteor = Math.max(nextMeteor, 3); }
       if (nextMeteor <= 0) {
         // Somewhere in view and well up in the sky, wherever the horizon
-        // happens to be lying.
+        // happens to be lying, and only where it will stay in view.
         var m = null;
-        for (var tries = 0; tries < 8 && !m; tries++) {
+        for (var tries = 0; tries < 20 && !m; tries++) {
           var mx = W * (0.08 + Math.random() * 0.84), my = H * (0.05 + Math.random() * 0.7);
           if (unproject(mx, my, tmpDir)[2] > 0.12) { m = meteorAt(mx, my); }
         }
@@ -1242,7 +1263,8 @@
         var p = norm3([R[0] * Math.cos(ang) + off[0] * Math.sin(ang), R[1] * Math.cos(ang) + off[1] * Math.sin(ang), R[2] * Math.cos(ang) + off[2] * Math.sin(ang)]);
         var k = R[0] * p[0] + R[1] * p[1] + R[2] * p[2];
         var t = norm3([p[0] * k - R[0], p[1] * k - R[1], p[2] * k - R[2]]);
-        if (p[2] > 0.05) { addMeteor(p, t, 0.3 + Math.random() * 0.7); }
+        // The ones that would fly out of view are simply not seen.
+        addMeteor(p, t, 0.3 + Math.random() * 0.7);
         shower.left -= 1;
         shower.next = 0.6 + Math.random() * 1.8;
         if (shower.left <= 0) { shower = null; }
@@ -1608,14 +1630,31 @@
   }
 
   // While it gets dark, Dad points out the first few stars as they
-  // appear.
-  var firstStars = 0, lastFirst = -9;
+  // appear. A star that comes out while he is still busy with the last
+  // one waits for him. After "There's the first star" and "And another
+  // one" the dusk holds still until he has finished saying it, so the
+  // sky shows just what he is talking about; it never holds for more
+  // than nine seconds, in case nothing can be heard yet. Returns whether
+  // he took it.
+  var firstStars = 0, lastFirst = -9, duskHold = null;
   function spotFirst(i) {
-    if (firstStars >= 3 || clock - lastFirst < 4 || dadBusy()) { return; }
+    if (firstStars >= 3 || clock - lastFirst < 4 || dadBusy()) { return false; }
     firstStars += 1;
     lastFirst = clock;
     dadPoint({ star: i }, 3);
-    say(['dusk-first', 'dusk-another', 'dusk-all'][firstStars - 1], { wait: 1.5 });
+    var line = ['dusk-first', 'dusk-another', 'dusk-all'][firstStars - 1];
+    say(line, { wait: 1.5 });
+    if (firstStars < 3) { duskHold = { id: line, until: clock + 9, done: false }; }
+    return true;
+  }
+  function updateDuskHold() {
+    if (!duskHold) { return; }
+    var queued = voiceQueue.some(function (q) { return q.id === duskHold.id; });
+    if (!duskHold.done && !queued && !(sayingId === duskHold.id && dadTalking())) {
+      duskHold.done = true;
+      duskHold.until = Math.min(duskHold.until, clock + 1.2);
+    }
+    if (clock >= duskHold.until) { duskHold = null; }
   }
 
   // ------------------------------------------------------------------
@@ -1737,8 +1776,8 @@
       var vis = clamp((lim - me) / 0.9, 0, 1);
       s.vis = vis;
       if (dusk < 1 && !s.seen && vis > 0.5) {
-        s.seen = true;
-        if (clock < DUSK_LEN && s.mag < 1.6 && yu > 0.1) { spotFirst(i); }
+        var first = duskT < DUSK_LEN && s.mag < 1.6 && yu > 0.1 && firstStars < 3;
+        if (!first || spotFirst(i)) { s.seen = true; }
       }
       if (vis <= 0.01) { continue; }
       var low = 1 - clamp(yu / 0.5, 0, 1);
@@ -3501,7 +3540,9 @@
   // ------------------------------------------------------------------
   function update(dt) {
     clock += dt;
-    dusk = smooth(clock / DUSK_LEN);
+    updateDuskHold();
+    if (!duskHold) { duskT += dt; }
+    dusk = smooth(duskT / DUSK_LEN);
     var rate = reduced ? 1 / 3 : 1;
     lst = (lst + SKY_RATE * dt * rate) % 360;
     gameDays += 60 * rate * dt / 86400;
