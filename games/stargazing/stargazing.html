@@ -1539,9 +1539,9 @@
   // To point, Dad rolls a little onto his side towards her, as you would
   // to show a child something: his right shoulder comes up and over
   // towards her and his head tips her way, and he settles back after.
-  var DAD_ROLL = [-0.18, 0.05, 0.15], DAD_TIP = [-0.08, 0.02, 0.03];
+  var DAD_ROLL = [-0.2, 0.12, 0.2], DAD_TIP = [-0.07, 0.06, 0.07];
   var ARMS = {
-    dad: { sh: [0.8, 0.22, -0.13], rest: [0.78, 0.55, -0.3], pole: [1, -0.3, -1], eye: [0.62, 0.06, 0.03],
+    dad: { sh: [0.8, -0.08, -0.25], rest: [0.8, 0.3, -0.38], pole: [1, -0.3, -1], eye: [0.6, -0.24, -0.07],
       roll: DAD_ROLL, tip: DAD_TIP,
       upper: 0.31, fore: 0.27, reach: 0.6, hand: 0.19, r0: 0.056, r1: 0.047, r2: 0.04 },
     her: { sh: [0.15, 0.02, -0.2], rest: [0.15, 0.3, -0.36], pole: [1, -0.2, -1],
@@ -2364,24 +2364,42 @@
     ctx.fill();
   }
 
-  // Dad lying beside her, just a black shape against the night: his legs
-  // and his body under his coat running away down the blanket, his
-  // shoulders, and his head propped up, which she only sees if she turns
-  // to him. And the front of her own coat, just showing at the bottom of
-  // the view.
+  // Dad lying beside her, just a black shape against the night. He is
+  // bigger than her, so her head is level with his chest and his head is
+  // back behind her shoulder, on a rolled-up coat, half propped up and
+  // looking up at the sky ahead; she sees it in profile only if she turns
+  // right round to him. His body under his coat runs away down the
+  // blanket, and his two legs end in his boots, toes up. And the front
+  // of her own coat, just showing at the bottom of the view.
   var COAT = hex('#0a0912');
+  // His head: the way his face looks (up and ahead) and the way the
+  // crown of his head points (back and up).
+  var DAD_HEAD = [0.6, -0.3, -0.15], DAD_FACE = [0, 0.5, 0.866], DAD_CROWN = [0, -0.866, 0.5];
   function drawBodies() {
     var b = [], L = smooth(dadHand.raise), R = DAD_ROLL, T = DAD_TIP;
     // His upper body as he rolls towards her: x, y, z plus how far along
     // the roll (R) or the tip of his head (T) that point moves.
     var P = function (x, y, z, m, v) { return blanketENU(x + v[0] * m * L, y + v[1] * m * L, z + v[2] * m * L); };
-    grounded(b, P(0.6, 1.0, -0.38, 0, R), P(0.58, 1.85, -0.42, 0, R), 0.13, 0.1);
-    grounded(b, P(0.6, 0.25, -0.17, 0.2, R), P(0.62, 0.98, -0.36, 0, R), 0.19, 0.18);
-    grounded(b, P(0.42, 0.24, -0.13, 0.1, R), P(0.8, 0.22, -0.13, 1, R), 0.12, 0.12);
-    grounded(b, P(0.62, 0.1, -0.2, 0.4, R), P(0.62, 0.0, -0.2, 0.4, R), 0.12, 0.12);
-    tube(b, P(0.62, 0.17, -0.11, 0.5, R), P(0.62, 0.05, -0.03, 1, T), 0.07, 0.065);
-    tube(b, P(0.63, -0.04, 0.01, 1, T), P(0.62, 0.03, 0.0, 1, T), 0.085, 0.092);
-    tube(b, P(0.62, 0.03, 0.0, 1, T), P(0.61, 0.08, 0.035, 1, T), 0.092, 0.068);
+    // A point on his head, so far along his face and his crown.
+    var Hd = function (f, c) {
+      return P(DAD_HEAD[0] + DAD_FACE[0] * f + DAD_CROWN[0] * c, DAD_HEAD[1] + DAD_FACE[1] * f + DAD_CROWN[1] * c,
+        DAD_HEAD[2] + DAD_FACE[2] * f + DAD_CROWN[2] * c, 1, T);
+    };
+    var side, x;
+    for (side = -1; side <= 1; side += 2) {
+      x = 0.6 + side * 0.09;
+      grounded(b, P(x, 0.6, -0.42, 0, R), P(x, 1.36, -0.44, 0, R), 0.085, 0.06);
+      tube(b, P(x, 1.36, -0.44, 0, R), P(x + side * 0.025, 1.42, -0.34, 0, R), 0.065, 0.06);
+    }
+    grounded(b, P(0.6, 0.0, -0.28, 0.3, R), P(0.6, 0.55, -0.38, 0, R), 0.18, 0.17);
+    grounded(b, P(0.4, -0.08, -0.26, 0.15, R), P(0.8, -0.08, -0.25, 1, R), 0.11, 0.11);
+    grounded(b, P(0.6, -0.36, -0.36, 0, R), P(0.6, -0.12, -0.32, 0.4, R), 0.12, 0.12);
+    tube(b, P(0.6, -0.08, -0.25, 0.5, R), Hd(-0.03, -0.05), 0.065, 0.055);
+    tube(b, Hd(0, 0.01), Hd(-0.02, 0.02), 0.095, 0.09);
+    tube(b, Hd(0.035, -0.035), Hd(0.03, -0.08), 0.072, 0.04);
+    tube(b, Hd(0.03, -0.08), Hd(0.075, -0.088), 0.036, 0.03);
+    tube(b, Hd(0.075, 0.035), Hd(0.075, 0.035), 0.034, 0.034);
+    tube(b, Hd(0.085, 0.0), Hd(0.118, -0.012), 0.022, 0.011);
     var dadArm = armBlobs(dadHand, b);
     paintBlobs(b, SIL, 0.55);
     drawHand(dadHand, dadArm);
@@ -2413,7 +2431,7 @@
       var to = [n[0] * A.reach, n[1] * A.reach, n[2] * A.reach];
       if (A.eye) {
         var ey = armPt(h, A.eye);
-        for (k = 0; k < 3; k++) { to[k] = to[k] * 0.6 + (ey[k] + A.tip[k] * r + a[k] * 0.5) * 0.4; }
+        for (k = 0; k < 3; k++) { to[k] = to[k] * 0.75 + (ey[k] + A.tip[k] * r + a[k] * 0.5) * 0.25; }
       }
       for (k = 0; k < 3; k++) { wr[k] += (to[k] - wr[k]) * r; }
     }
