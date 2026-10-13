@@ -308,6 +308,11 @@ Dictionary's worker predates this and is still deployed by pasting into the
 dashboard, which is why it has no `wrangler.jsonc`. That works from a tablet,
 which the CLI does not, so it has not been changed for the sake of matching.
 
+Vibe With Me has a third, `clock`, which only says what time it is so that
+every device playing keeps the same beat. It has no store and no secret, so for
+it only steps 1 and 3 apply. If it is down, the game goes back to each device's
+own clock and the ring on the tuning screen, and nothing else breaks.
+
 ---
 
 ## If Claude is ever unavailable

@@ -829,13 +829,44 @@
   // are already playing the same beat of the same loop, with nothing to
   // count in and nothing to press together.
   //
-  // The clock is never shown and never set. It is here for one job: it
-  // does not run fast or slow, so a grid pinned to it does not drift,
-  // and an afternoon-long session ends as together as it started. What
-  // it cannot do is tell one device where the other one is, because it
-  // is only ever read to the second and a second is a beat and a half at
-  // ninety. So where in the loop to be is set by hand, by pointing at
-  // it, and the clock's job is only to hold it there.
+  // The time comes from one place: a small worker of ours on Cloudflare
+  // (worker.js, beside this file) that answers with the time to the
+  // millisecond. Every device asks the same worker, so every device has
+  // the same answer, and the same leader at the same tempo is the same
+  // beat of the same loop on all of them. That is the shared clock.
+  //
+  // It used to be each device's own clock, which two devices can
+  // disagree about by a second - a beat and a half at ninety - so where
+  // in the loop to be had to be set by hand, by pointing at it on the
+  // ring and sliding with the arrows. Getting that right was more than a
+  // child could be asked to do, or than a grown-up much enjoyed. It is
+  // all still here, untouched, for when the worker cannot be reached:
+  // off the disk, with no signal, or on a day its free allowance has run
+  // out. A device that never hears from it plays exactly as it always
+  // did.
+  //
+  // With the shared clock:
+  //
+  //   lag          the only control. How much later than the others
+  //                this device should sound, for a speaker that takes
+  //                longer than it admits to - a Bluetooth one, mostly.
+  //                Kept apart from offset because it means something
+  //                different, and clamped rather than wrapped, because
+  //                with nothing to rotate there is nowhere for a wrap to
+  //                go.
+  //   skew         where the audio clock sits against the shared one,
+  //                measured from what is coming out of the speaker
+  //                rather than what is being worked on, so how long each
+  //                device takes to get a sound out is already allowed
+  //                for, as far as the browser will say. Slewed as below,
+  //                except that an error that stays over twenty
+  //                milliseconds for most of a second is taken in one go:
+  //                that is the speaker delay being reported for the
+  //                first time, or a Bluetooth speaker arriving, and
+  //                easing that in at a millisecond a second would take
+  //                minutes.
+  //
+  // Without it:
   //
   //   beatShift    which beat of the sixteen this device calls the
   //                first. Whole beats, so it rotates the pattern and
@@ -855,12 +886,14 @@
   //                in one go instead, because being a second out is
   //                worse than one flinch.
   //
-  // Tapping the ring sets both of the first two at once, from wherever
-  // you point to wherever the playhead is.
+  // Tapping the ring sets both of those at once, from wherever you point
+  // to wherever the playhead is. With the shared clock the ring only
+  // shows: a tap there could only take a device out of time.
   // ------------------------------------------------------------------
   var STEPS_PER_BEAT = 4, BEATS_PER_LOOP = 16;
   var STEPS_PER_LOOP = STEPS_PER_BEAT * BEATS_PER_LOOP;
   var LOOK = 0.14, MAX_SLEW = 0.001, JUMP = 0.25, NUDGE_STEP = 0.003;
+  var MAX_LAG = 0.3, SETTLE = 0.02, SETTLE_FOR = 0.75;
 
   var SIDEMEN = 3;
   // How long a character keeps dancing after it stops playing, and how
@@ -878,29 +911,166 @@
   var bpm = clamp(load('bpm', 90), 60, 160);
   var offset = load('offset', 0);
   var beatShift = ((Math.round(load('shift', 0)) % BEATS_PER_LOOP) + BEATS_PER_LOOP) % BEATS_PER_LOOP;
-  var skew = 0, skewSet = false, stepN = 0, visQ = [], mode = 'tune';
+  var lag = clamp(load('lag', 0), -MAX_LAG, MAX_LAG);
+  var skew = 0, skewSet = false, offFor = 0, stepN = 0, visQ = [], mode = 'tune';
 
-  function wallNow() { return Date.now() / 1000; }
+  // ------------------------------------------------------------------
+  // Asking the shared clock.
+  //
+  // The way any network clock is read. Note the local time, ask, note it
+  // again when the answer comes: the worker's time belongs halfway
+  // between the two. How far wrong that can be is half the round trip,
+  // so it asks several times and keeps the quickest - over home wifi
+  // that is a few milliseconds, which is closer than two drummers ever
+  // stand.
+  //
+  // The local half is performance.now() rather than the date, because
+  // the date is the very clock that cannot be trusted and can be set
+  // backwards under us; performance.now() only ever counts up. It does
+  // not count while a tablet is asleep, though, so a gap that opens
+  // between it and the date is taken as a nap and the clock asked again.
+  //
+  // It asks on opening, once a minute while on screen, on coming back to
+  // the screen and on getting a signal back. A minute's crystal drift is
+  // a millisecond or two, which the slew takes in without a sound. A
+  // device that has heard once keeps the answer for as long as the page
+  // is open, even with no signal: a clock that was right a minute ago is
+  // far better than one that was never right at all.
+  // ------------------------------------------------------------------
+  var CLOCK_URL = 'https://clock.campbell226.workers.dev/';
+  var clk = { have: false, off: 0, rtt: 0, at: 0, dp: 0, busy: false };
+
+  function askClock(times) {
+    if (clk.busy || !window.fetch || !window.performance) { return; }
+    clk.busy = true;
+    var best = null, done = 0;
+    function one() {
+      var ctl = window.AbortController ? new AbortController() : null;
+      var stop = ctl ? setTimeout(function () { ctl.abort(); }, 2500) : 0;
+      var p0 = performance.now();
+      window.fetch(CLOCK_URL, {
+        cache: 'no-store', credentials: 'omit', signal: ctl ? ctl.signal : undefined
+      }).then(function (r) {
+        return r.ok ? r.text() : null;
+      }).then(function (txt) {
+        var p1 = performance.now(), s = txt ? parseFloat(txt) : NaN;
+        if (isFinite(s) && s > 1e12 && (!best || p1 - p0 < best.rtt)) {
+          best = { rtt: p1 - p0, off: s - (p0 + p1) / 2 };
+        }
+      }, function () { /* no answer this time; the others may get one */ })
+        .then(function () {
+          clearTimeout(stop);
+          done += 1;
+          if (done < times) { setTimeout(one, 90); } else { finish(); }
+        });
+    }
+    function finish() {
+      clk.busy = false;
+      if (!best) { return; }
+      var nowMs = performance.now();
+      // A slow answer is still better than none, but once there is a good
+      // one it is not swapped for a much worse one just because it is
+      // newer - unless the good one is old enough to have drifted.
+      if (clk.have && best.rtt > clk.rtt * 2 + 20 && nowMs - clk.at < 600000) { return; }
+      if (!clk.have && best.rtt > 600) { return; }
+      var first = !clk.have;
+      clk.off = best.off;
+      clk.rtt = best.rtt;
+      clk.at = nowMs;
+      clk.dp = Date.now() - nowMs;
+      clk.have = true;
+      if (first) {
+        // Straight onto it, and onto the shared grid with it: the ring's
+        // rotation and the old offset belonged to the guesswork.
+        skewSet = false;
+        resyncGrid();
+        paintShared();
+      }
+    }
+    one();
+  }
+
+  // The tablet napped if the date has moved on further than the steady
+  // clock has. The steady clock is put forward by the gap at once, which
+  // is right to within the date's own accuracy, and then asked properly.
+  function checkNap() {
+    if (!clk.have) { return; }
+    var dp = Date.now() - performance.now();
+    if (Math.abs(dp - clk.dp) > 1000) {
+      clk.off += dp - clk.dp;
+      clk.dp = dp;
+      askClock(6);
+    }
+  }
+
+  askClock(8);
+  setInterval(function () { if (!document.hidden) { askClock(4); } }, 60000);
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) { askClock(6); }
+  });
+  window.addEventListener('online', function () { askClock(8); });
+
+  function wallNow() {
+    return clk.have ? (performance.now() + clk.off) / 1000 : Date.now() / 1000;
+  }
   function stepDur() { return 60 / bpm / STEPS_PER_BEAT; }
   function beatDur() { return 60 / bpm; }
 
+  // The rotation only exists for lining devices up by hand. On the
+  // shared clock there is nothing to line up, so it is none.
+  function rot() { return clk.have ? 0 : beatShift; }
+
   // Audio time of the grid's zero, which is where the layers meet.
-  function gridZero() { return offset + skew; }
+  function gridZero() { return (clk.have ? lag : offset) + skew; }
   function stepTime(n) { return n * stepDur() + gridZero(); }
+
+  // The audio time of whatever is coming out of the speaker right now.
+  // Without the shared clock it is just the audio clock, as it always
+  // was, and the ear and the arrows take up the speaker's delay.
+  //
+  // With it, the delay is taken off, so that a sound is placed by when
+  // it is heard rather than when it was worked out - which is the thing
+  // two devices actually have to agree on. Two ways to know the delay
+  // and neither is everywhere: the browser's timestamp of what is in the
+  // speaker, which is also smooth where the audio clock moves in jumps,
+  // and the delay it says it adds. The larger is believed, because a
+  // browser that leaves something out of its sums never leaves it out
+  // by having too much.
+  function heardNow() {
+    var c = AC.currentTime;
+    if (!clk.have) { return c; }
+    var said = clamp((AC.baseLatency || 0) + (AC.outputLatency || 0), 0, 0.5);
+    var ts = AC.getOutputTimestamp ? AC.getOutputTimestamp() : null;
+    if (ts && ts.contextTime > 0 && ts.performanceTime > 0) {
+      var h = ts.contextTime + (performance.now() - ts.performanceTime) / 1000;
+      var l = c - h;
+      if (l > -0.05 && l < 0.5) { return h - Math.max(0, said - Math.max(0, l)); }
+    }
+    return c - said;
+  }
 
   function trackWallClock(dt) {
     if (!AC) { return; }
-    var measured = AC.currentTime - wallNow();
-    if (!skewSet) { skew = measured; skewSet = true; return; }
+    checkNap();
+    var measured = heardNow() - wallNow();
+    if (!skewSet) { skew = measured; skewSet = true; offFor = 0; return; }
     var err = measured - skew;
     if (err > JUMP || err < -JUMP) { skew = measured; return; }
+    if (clk.have) {
+      offFor = (err > SETTLE || err < -SETTLE) ? offFor + dt : 0;
+      if (offFor > SETTLE_FOR) { skew = measured; offFor = 0; return; }
+    }
     var step = MAX_SLEW * dt;
     skew += clamp(err, -step, step);
   }
 
+  // Where the beat is as heard, for anything drawn. Drawing it as worked
+  // out would put each device's dots ahead of its own sound by however
+  // long its speaker takes - and the dots are how anyone checks that two
+  // devices are together.
   function curStep() {
     if (!AC || !skewSet) { return 0; }
-    return (AC.currentTime - gridZero()) / stepDur();
+    return (heardNow() - gridZero()) / stepDur();
   }
 
   // The beat jumps when the tempo changes, and that is right: the grid
@@ -950,6 +1120,13 @@
   }
 
   function nudge(seconds) {
+    // On the shared clock the arrows are only for a slow speaker, and
+    // they stop at the ends rather than going round.
+    if (clk.have) {
+      lag = clamp(Math.round((lag + seconds) / NUDGE_STEP) * NUDGE_STEP, -MAX_LAG, MAX_LAG);
+      save('lag', lag);
+      return;
+    }
     offset += seconds;
     wrapOffset(true);
     save('offset', offset);
@@ -1006,7 +1183,7 @@
   // thing two devices have to agree on, and the ring both shows it and
   // sets it.
   function loopPosNow() {
-    var s = curStep() + beatShift * STEPS_PER_BEAT;
+    var s = curStep() + rot() * STEPS_PER_BEAT;
     return (((s % STEPS_PER_LOOP) + STEPS_PER_LOOP) % STEPS_PER_LOOP) / STEPS_PER_LOOP;
   }
 
@@ -1047,7 +1224,7 @@
       // The rotation goes in here and nowhere else: it is a whole number
       // of beats, so it moves which part of the pattern is playing
       // without moving when anything sounds.
-      var inLoop = ((n + beatShift * STEPS_PER_BEAT) % STEPS_PER_LOOP + STEPS_PER_LOOP) % STEPS_PER_LOOP;
+      var inLoop = ((n + rot() * STEPS_PER_BEAT) % STEPS_PER_LOOP + STEPS_PER_LOOP) % STEPS_PER_LOOP;
       var onBeat = (inLoop % STEPS_PER_BEAT) === 0;
 
       // Coming in, going out and changing sound all happen on a beat, so
@@ -1391,6 +1568,19 @@
     g.appendChild(T.offText);
     g.appendChild(T.play);
     paintBpm();
+    paintShared();
+  }
+
+  // Once the shared clock answers, the second line stops asking anyone
+  // to point at the ring, and the ring turns green: every device showing
+  // a green ring with its dot in the same place is in time, and that is
+  // something a child can check by looking.
+  function paintShared() {
+    if (!T.hintB) { return; }
+    T.hintB.textContent = clk.have
+      ? 'On the shared clock. Arrows for a slow speaker.'
+      : 'Tap the ring where the others are, then nudge.';
+    T.ringLine.setAttribute('stroke', clk.have ? 'rgba(120,214,140,0.42)' : 'rgba(255,255,255,0.16)');
   }
 
   function paintBpm() {
@@ -1958,6 +2148,7 @@
   }
 
   function tapRing(ev) {
+    if (clk.have) { return; }
     var p = svgPoint(ev);
     if (!p) { return; }
     var dx = p.x - T.ringX, dy = p.y - T.ringY;
@@ -2134,7 +2325,8 @@
     }
 
     // The readouts only have to change when they change.
-    var ms = (offset >= 0 ? '+' : '−') + Math.round(Math.abs(offset) * 1000) + ' ms';
+    var shown = clk.have ? lag : offset;
+    var ms = (shown >= 0 ? '+' : '−') + Math.round(Math.abs(shown) * 1000) + ' ms';
     if (ms !== T.offShown) { T.offShown = ms; T.offText.textContent = ms; }
 
     // Down on the beat and up between: sin is zero at both ends of the
@@ -2260,10 +2452,10 @@
     lastFrame = now;
 
     runHeld(now, dt);
-    if (AC) { drainVis(AC.currentTime); }
+    if (AC) { drainVis(heardNow()); }
     beatFlash = Math.max(0, beatFlash - dt * 3.4);
 
-    var s = curStep() + beatShift * STEPS_PER_BEAT;
+    var s = curStep() + rot() * STEPS_PER_BEAT;
     var loopPos = (((s % STEPS_PER_LOOP) + STEPS_PER_LOOP) % STEPS_PER_LOOP) / STEPS_PER_LOOP;
     var beatPhase = (((s % STEPS_PER_BEAT) + STEPS_PER_BEAT) % STEPS_PER_BEAT) / STEPS_PER_BEAT;
     var beats = s / STEPS_PER_BEAT;

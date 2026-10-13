@@ -1,0 +1,16 @@
+// How Vibe With Me's clock worker gets deployed from a clone of this repo.
+//
+// Like the Academy's, this is not a build step and the game does not need
+// it to open: off the disk, or with the worker down, the game keeps time
+// by the device's own clock as it always did. It is only a note of where
+// worker.js goes, so that `npx wrangler deploy` in this folder is the
+// whole of a release.
+//
+// There is nothing bound to it and nothing secret to set. The one thing
+// it needs is a signed-in wrangler (`npx wrangler login`, once per
+// machine), and it ends up at https://clock.campbell226.workers.dev/.
+{
+  "name": "clock",
+  "main": "worker.js",
+  "compatibility_date": "2026-10-12"
+}
