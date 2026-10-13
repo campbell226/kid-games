@@ -7,7 +7,7 @@ and pushes, and the live site follows about a minute later.
 |---|---|
 | **Live site** | https://kidgames.jamesinthe.uk/ |
 | **Repo (the real project)** | https://github.com/campbell226/kid-games |
-| **Copy on the laptop** | `C:\Users\campb\Projects\kid-games` |
+| **Copy on Rascal (the desktop)** | `C:\Users\James\Claude code\kid games` |
 
 The repo is the project. Any local folder is a disposable working copy. Never
 keep one in Google Drive — Drive sync and git fight over the hidden `.git`
@@ -17,7 +17,7 @@ folder.
 
 ## Starting a session
 
-**On this laptop.** Open Claude Code in `C:\Users\campb\Projects\kid-games`.
+**On Rascal.** Open Claude Code in `C:\Users\James\Claude code\kid games`.
 Everything is already set up: the GitHub sign-in is saved, so pushes just work.
 
 **Anywhere else** — a different computer, or Claude Code on the web. Say:
@@ -169,8 +169,8 @@ If it offers to add a domain, skip it; none is needed.
 icon). Select everything in the editor, delete it, and paste the whole of
 `games/dictionary/worker.js` from this repo. Then **Deploy**, top right.
 
-The editor works on an iPad but select-all and paste in it are fiddly. If a
-laptop is to hand, this is the one step worth doing there.
+The editor works on an iPad but select-all and paste in it are fiddly. If
+Rascal is to hand, this is the one step worth doing there.
 
 **Step 4 — the counter's storage.** The worker keeps its daily tally in KV, so
 that has to exist before it can be bound.
