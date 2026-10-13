@@ -924,6 +924,16 @@
   // that is a few milliseconds, which is closer than two drummers ever
   // stand.
   //
+  // Keeping the quickest matters more than it sounds. Measured against
+  // Cloudflare's own time service, the quickest answer was two
+  // milliseconds out, but every millisecond a trip took beyond that was
+  // spent on the way there, so a trip twenty-five milliseconds slower
+  // came back fourteen milliseconds wrong. So the quickest trip of the
+  // whole session is remembered as the floor, and a later answer is only
+  // taken if it came close to that. A worse one is taken after five
+  // minutes all the same, because by then the old answer has drifted
+  // further than a slow trip is wrong.
+  //
   // The local half is performance.now() rather than the date, because
   // the date is the very clock that cannot be trusted and can be set
   // backwards under us; performance.now() only ever counts up. It does
@@ -938,7 +948,7 @@
   // far better than one that was never right at all.
   // ------------------------------------------------------------------
   var CLOCK_URL = 'https://clock.campbell226.workers.dev/';
-  var clk = { have: false, off: 0, rtt: 0, at: 0, dp: 0, busy: false };
+  var clk = { have: false, off: 0, floor: Infinity, at: 0, dp: 0, busy: false };
 
   function askClock(times) {
     if (clk.busy || !window.fetch || !window.performance) { return; }
@@ -968,14 +978,11 @@
       clk.busy = false;
       if (!best) { return; }
       var nowMs = performance.now();
-      // A slow answer is still better than none, but once there is a good
-      // one it is not swapped for a much worse one just because it is
-      // newer - unless the good one is old enough to have drifted.
-      if (clk.have && best.rtt > clk.rtt * 2 + 20 && nowMs - clk.at < 600000) { return; }
       if (!clk.have && best.rtt > 600) { return; }
+      clk.floor = Math.min(clk.floor, best.rtt);
+      if (clk.have && best.rtt > clk.floor + 12 && nowMs - clk.at < 300000) { return; }
       var first = !clk.have;
       clk.off = best.off;
-      clk.rtt = best.rtt;
       clk.at = nowMs;
       clk.dp = Date.now() - nowMs;
       clk.have = true;
@@ -1003,8 +1010,8 @@
     }
   }
 
-  askClock(8);
-  setInterval(function () { if (!document.hidden) { askClock(4); } }, 60000);
+  askClock(10);
+  setInterval(function () { if (!document.hidden) { askClock(6); } }, 60000);
   document.addEventListener('visibilitychange', function () {
     if (!document.hidden) { askClock(6); }
   });
