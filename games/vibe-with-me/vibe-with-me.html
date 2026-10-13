@@ -948,15 +948,26 @@
   // far better than one that was never right at all.
   // ------------------------------------------------------------------
   var CLOCK_URL = 'https://clock.campbell226.workers.dev/';
-  var clk = { have: false, off: 0, floor: Infinity, at: 0, dp: 0, busy: false };
+  // tried is whether a first round of asking has finished at all. Until
+  // it has, nobody knows yet whether the clock is there, and the tuning
+  // screen shows its simple face rather than flashing up the by-hand one
+  // for the second it takes to find out.
+  var clk = { have: false, tried: false, off: 0, floor: Infinity, at: 0, dp: 0, busy: false };
+
+  // Asking by hand only makes sense once asking has been tried and has
+  // not worked.
+  function byHand() { return clk.tried && !clk.have; }
 
   function askClock(times) {
-    if (clk.busy || !window.fetch || !window.performance) { return; }
+    if (clk.busy || !window.fetch || !window.performance) {
+      if (!clk.tried && !clk.busy) { clk.tried = true; paintClock(); }
+      return;
+    }
     clk.busy = true;
     var best = null, done = 0;
     function one() {
       var ctl = window.AbortController ? new AbortController() : null;
-      var stop = ctl ? setTimeout(function () { ctl.abort(); }, 2500) : 0;
+      var stop = ctl ? setTimeout(function () { ctl.abort(); }, 2000) : 0;
       var p0 = performance.now();
       window.fetch(CLOCK_URL, {
         cache: 'no-store', credentials: 'omit', signal: ctl ? ctl.signal : undefined
@@ -971,11 +982,19 @@
         .then(function () {
           clearTimeout(stop);
           done += 1;
-          if (done < times) { setTimeout(one, 90); } else { finish(); }
+          // Three in a row with nothing back and it is not there: a
+          // grown-up waiting to be told to line up by hand should not have
+          // to sit through the other seven failing as well.
+          if (done < times && (best || done < 3)) { setTimeout(one, 90); } else { finish(); }
         });
     }
     function finish() {
       clk.busy = false;
+      clk.tried = true;
+      take();
+      paintClock();
+    }
+    function take() {
       if (!best) { return; }
       var nowMs = performance.now();
       if (!clk.have && best.rtt > 600) { return; }
@@ -991,7 +1010,6 @@
         // rotation and the old offset belonged to the guesswork.
         skewSet = false;
         resyncGrid();
-        paintShared();
       }
     }
     one();
@@ -1457,26 +1475,76 @@
   }
 
   // ------------------------------------------------------------------
-  // Tuning up. One number to match and two arrows to slide with, and
-  // one click a beat - no bar, no strong and weak, nothing to work out
-  // about which click is which.
+  // Tuning up. One click a beat - no bar, no strong and weak, nothing to
+  // work out about which click is which - and two faces.
+  //
+  // With the shared clock, which is nearly always, there is nothing to
+  // line up, so there is nothing to do but pick a leader and a tempo.
+  // One line says so, the ring turns green and only shows, and the
+  // arrows go away behind a speaker button in the corner, because the
+  // one thing left for them to do is make up for a slow speaker.
+  //
+  // Without it, the grown-up setting up is told plainly that the clock
+  // is missing and what to do instead, in three steps, with the ring to
+  // tap and the arrows out. The corner holds a button to ask the clock
+  // again, which spins while it asks. The screen goes back to its simple
+  // face by itself the moment the clock answers.
   // ------------------------------------------------------------------
   var T = {};
   var MINUS = '<rect x="-34" y="-8" width="68" height="16" rx="8" fill="#ffffff"/>';
   var PLUS = MINUS + '<rect x="-8" y="-34" width="16" height="68" rx="8" fill="#ffffff"/>';
 
+  // A speaker and two waves.
+  function speakerGlyph() {
+    return '<path d="M -36 -12 H -20 L 0 -30 V 30 L -20 12 H -36 Z" fill="#ffffff"/>'
+      + '<g fill="none" stroke="#ffffff" stroke-width="7" stroke-linecap="round">'
+      + '<path d="M 12 -14 Q 21 0 12 14"/><path d="M 23 -27 Q 39 0 23 27"/></g>';
+  }
+
+  // Round and back again, with a head on it: ask again. Drawn in a group
+  // of its own so it can turn on the spot while it asks.
+  function retryGlyph() {
+    return '<g class="spin"><path d="M 19.9 16.7 A 26 26 0 1 1 22.5 -13" fill="none"'
+      + ' stroke="#ffffff" stroke-width="9" stroke-linecap="round"/>'
+      + '<path d="M 30.5 0.9 L 31.2 -26 L 7.8 -12.6 Z" fill="#ffffff"/></g>';
+  }
+
+  // The only words in the game, and they are for whoever sets it up.
+  function tuneLines() {
+    if (byHand()) {
+      return [
+        { t: 'No shared clock. Line them up by hand:', b: true },
+        { t: '1. Same leader and tempo on every device.' },
+        { t: '2. Tap this ring where another device’s dot is.' },
+        { t: '3. Nudge with the arrows until the clicks match.' }
+      ];
+    }
+    return [{ t: 'Pick the same leader and tempo on every device.' }];
+  }
+
   function buildTune() {
     var g = document.getElementById('tune');
     clear(g);
 
-    // The only words in the game, and they are for whoever sets it up.
-    T.hint = el('g');
-    T.hintA = el('text', { 'text-anchor': 'middle', fill: '#aab6e0' });
-    T.hintB = el('text', { 'text-anchor': 'middle', fill: '#aab6e0' });
-    T.hintA.textContent = 'Same leader and tempo on every device.';
-    T.hintB.textContent = 'Tap the ring where the others are, then nudge.';
-    T.hint.appendChild(T.hintA);
-    T.hint.appendChild(T.hintB);
+    T.text = el('g');
+    T.lines = [];
+    for (var n = 0; n < 4; n++) {
+      var line = el('text', { fill: '#aab6e0' });
+      T.text.appendChild(line);
+      T.lines.push(line);
+    }
+
+    T.speaker = bigButton('#3f4a7d', speakerGlyph());
+    T.speaker.setAttribute('data-act', 'speaker');
+    T.retry = bigButton('#3f4a7d', retryGlyph());
+    T.retry.setAttribute('data-act', 'retry');
+    T.retrySpin = T.retry.querySelector('.spin');
+    T.spinA = 0;
+    T.speakerOpen = false;
+    // A speaker correction left in place is shown beside the button even
+    // with the arrows put away. Hidden state is what made a stale offset
+    // so hard to find, and this is the same kind of thing.
+    T.lagText = el('text', { 'text-anchor': 'start', fill: '#ffe9a0' });
 
     T.minus = bigButton('#3f4a7d', MINUS);
     T.plus = bigButton('#3f4a7d', PLUS);
@@ -1558,7 +1626,7 @@
     T.play = bigButton('#3fa564', playGlyph());
     T.play.setAttribute('data-act', 'play');
 
-    g.appendChild(T.hint);
+    g.appendChild(T.text);
     g.appendChild(T.minus);
     g.appendChild(T.plus);
     g.appendChild(T.bpmText);
@@ -1574,20 +1642,48 @@
     g.appendChild(T.right);
     g.appendChild(T.offText);
     g.appendChild(T.play);
+    g.appendChild(T.speaker);
+    g.appendChild(T.retry);
+    g.appendChild(T.lagText);
     paintBpm();
-    paintShared();
+    paintClock();
   }
 
-  // Once the shared clock answers, the second line stops asking anyone
-  // to point at the ring, and the ring turns green: every device showing
-  // a green ring with its dot in the same place is in time, and that is
+  function msText(s) {
+    return (s >= 0 ? '+' : '−') + Math.round(Math.abs(s) * 1000) + ' ms';
+  }
+
+  // Which face the tuning screen shows, and everything that hangs off
+  // it. Asked for whenever the clock might have changed its mind, so it
+  // only does any work when the answer is different.
+  //
+  // The ring turns green on the shared clock: every device showing a
+  // green ring with its dot in the same place is in time, and that is
   // something a child can check by looking.
-  function paintShared() {
-    if (!T.hintB) { return; }
-    T.hintB.textContent = clk.have
-      ? 'On the shared clock. Arrows for a slow speaker.'
-      : 'Tap the ring where the others are, then nudge.';
-    T.ringLine.setAttribute('stroke', clk.have ? 'rgba(120,214,140,0.42)' : 'rgba(255,255,255,0.16)');
+  function paintClock(force) {
+    if (!T || !T.lines) { return; }
+    var shared = clk.have, hand = byHand();
+    var arrows = hand || (shared && T.speakerOpen);
+    var lagShown = shared && !T.speakerOpen && lag !== 0;
+    var key = [shared, hand, arrows, lagShown, lagShown ? lag : 0].join();
+    if (key === T.clockKey && !force) { return; }
+    T.clockKey = key;
+
+    T.ringLine.setAttribute('stroke', shared ? 'rgba(120,214,140,0.42)' : 'rgba(255,255,255,0.16)');
+    T.ringHit.setAttribute('display', shared ? 'none' : 'inline');
+    T.speaker.setAttribute('display', shared ? 'inline' : 'none');
+    T.retry.setAttribute('display', hand ? 'inline' : 'none');
+    T.left.setAttribute('display', arrows ? 'inline' : 'none');
+    T.right.setAttribute('display', arrows ? 'inline' : 'none');
+    T.offText.setAttribute('display', arrows ? 'inline' : 'none');
+    T.lagText.setAttribute('display', lagShown ? 'inline' : 'none');
+    T.lagText.textContent = msText(lag);
+    // Pressed in while the arrows are out; picked out in yellow when a
+    // correction is left in.
+    T.speaker._body.setAttribute('stroke', T.speakerOpen ? '#ffffff'
+      : (lag !== 0 ? '#ffe9a0' : 'rgba(255,255,255,0.28)'));
+    T.speaker._body.setAttribute('stroke-width', T.speakerOpen || lag !== 0 ? 6 : 3);
+    layoutTune();
   }
 
   function paintBpm() {
@@ -1621,14 +1717,56 @@
     paintSongs();
   }
 
-  function layoutHint(x, y, size, lead) {
-    T.hintA.setAttribute('x', x); T.hintA.setAttribute('y', y);
-    T.hintB.setAttribute('x', x); T.hintB.setAttribute('y', y + lead);
-    T.hintA.setAttribute('font-size', size.toFixed(0));
-    T.hintB.setAttribute('font-size', size.toFixed(0));
+  // The words, as big as they will go across the width given and no
+  // bigger than maxFs, starting at top. Returns where they end.
+  //
+  // Measured rather than guessed where the browser will say, at a size
+  // of a hundred and scaled from there. A screen not on show measures as
+  // nothing, so then it is guessed from the letters, which is close
+  // enough until the screen is shown and laid out again.
+  //
+  // One line sits in the middle. Several are a list, so they share a
+  // left edge, and the whole block is centred instead.
+  function layoutText(cx, top, width, maxFs) {
+    var lines = tuneLines(), n = lines.length, widest = 0, i, w;
+    for (i = 0; i < T.lines.length; i++) {
+      var node = T.lines[i];
+      if (i >= n) { node.setAttribute('display', 'none'); continue; }
+      node.setAttribute('display', 'inline');
+      node.textContent = lines[i].t;
+      node.setAttribute('font-weight', lines[i].b ? '700' : '400');
+      node.setAttribute('fill', lines[i].b ? '#ffffff' : '#aab6e0');
+      node.setAttribute('font-size', '100');
+      w = 0;
+      try { w = node.getComputedTextLength(); } catch (e) { w = 0; }
+      if (!w) { w = lines[i].t.length * (lines[i].b ? 56 : 52); }
+      widest = Math.max(widest, w);
+    }
+    var fs = Math.min(maxFs, width / Math.max(1, widest) * 100);
+    var lead = fs * 1.42, y = top + fs * 0.9;
+    var left = cx - widest * fs / 200;
+    for (i = 0; i < n; i++) {
+      // A little air under a heading.
+      if (i === 1 && lines[0].b) { y += lead * 0.25; }
+      T.lines[i].setAttribute('text-anchor', n > 1 ? 'start' : 'middle');
+      T.lines[i].setAttribute('x', (n > 1 ? left : cx).toFixed(1));
+      T.lines[i].setAttribute('y', y.toFixed(1));
+      T.lines[i].setAttribute('font-size', fs.toFixed(1));
+      if (i < n - 1) { y += lead; }
+    }
+    return y + fs * 0.35;
+  }
+
+  // The left-hand twin of the corner button on the other side.
+  function cornerLeft(btn, band) {
+    var h = Math.min(band * 0.8, 100);
+    sizeButton(btn, h * 1.5, h);
+    place(btn, h * 0.92, band * 0.5);
+    return h;
   }
 
   function layoutTune() {
+    if (!L.W || !T.lines) { return; }
     var W = L.W, H = L.H;
     // The browser's own full screen button sits in the middle of the top
     // of the screen until it is pressed, and it is a fixed size in real
@@ -1639,19 +1777,35 @@
     var reserve = 58 * perPx;
     var band = Math.min(L.wide ? H * 0.16 : H * 0.075, 110);
     var corner = cornerButton(T.play, W, band);
+    cornerLeft(T.speaker, band);
+    cornerLeft(T.retry, band);
+    var lfs = corner * 0.36;
+    T.lagText.setAttribute('x', (corner * 1.92).toFixed(1));
+    T.lagText.setAttribute('y', (band * 0.5 + lfs * 0.36).toFixed(1));
+    T.lagText.setAttribute('font-size', lfs.toFixed(1));
+    var arrows = byHand() || (clk.have && T.speakerOpen);
     var bandTop, widest, nw, nh, fs;
 
     if (L.wide) {
-      var hf0 = Math.min(H * 0.05, 46), lead0 = Math.min(H * 0.065, 58);
-      var hintY0 = Math.max(H * 0.2, reserve + hf0 * 0.85);
-      layoutHint(W * 0.5, hintY0, hf0, lead0);
+      // Wide, the ring has the left half to itself, top to bottom, and
+      // everything with words or numbers on it stacks down the right
+      // under the play button. Three steps of instructions across the
+      // top would have left the ring the size of a coin.
+      var colX = W * 0.74, colW = W * 0.44;
+      var textBot = layoutText(colX, band * 1.12, colW, Math.min(H * 0.05, 40));
+      var rest = H * 0.97 - textBot;
 
       // Who leads comes first: it settles the key, the chords and the
       // tempo, so the number underneath is a consequence of it.
-      layoutSongRow(W * 0.74, H * 0.4, W * 0.46, Math.min(H * 0.2, 130));
+      var sh0 = Math.min(H * 0.2, 130, rest * 0.3);
+      var sl0 = Math.min(sh0 * 0.34, 34);
+      var bw = Math.min(W * 0.14, 160), bh = Math.min(H * 0.17, 125, rest * 0.26);
+      var lf = Math.min(H * 0.05, 38, bh * 0.36);
+      var gap0 = Math.max(0, rest - (sh0 + sl0 * 1.6) - (bh + lf * 1.6)) / 3;
+      var songY0 = textBot + gap0 + sh0 * 0.5;
+      layoutSongRow(colX, songY0, colW, sh0);
 
-      var bw = Math.min(W * 0.14, 160), bh = Math.min(H * 0.17, 125);
-      var bpmY = H * 0.75;
+      var bpmY = songY0 + sh0 * 0.5 + sl0 * 1.6 + gap0 + bh * 0.5;
       sizeButton(T.minus, bw, bh);
       sizeButton(T.plus, bw, bh);
       place(T.minus, W * 0.61, bpmY);
@@ -1659,28 +1813,27 @@
       T.bpmText.setAttribute('x', W * 0.77);
       T.bpmText.setAttribute('y', bpmY + bh * 0.34);
       T.bpmText.setAttribute('font-size', (bh * 0.95).toFixed(0));
-      var lf = Math.min(H * 0.05, 38);
       T.bpmLabel.setAttribute('x', W * 0.77);
       T.bpmLabel.setAttribute('y', bpmY + bh * 0.5 + lf * 1.3);
       T.bpmLabel.setAttribute('font-size', lf.toFixed(0));
 
       T.ringX = W * 0.27;
-      bandTop = hintY0 + lead0 + H * 0.04;
+      bandTop = band * 1.1;
       widest = W * 0.23;
       nw = Math.min(W * 0.1, 110); nh = Math.min(H * 0.14, 96);
       fs = Math.min(H * 0.045, 38);
     } else {
       // Portrait stacks, so each band is placed under the one above it
       // rather than at a fixed fraction: whatever the reserve and the
-      // corner button do to the hint, nothing below it collides.
-      var hf = Math.min(H * 0.019, 46), lead = Math.min(H * 0.026, 58);
-      var hintY = Math.max(H * 0.095, reserve + hf * 0.85, corner * 1.1 + hf * 0.85);
-      layoutHint(W * 0.5, hintY, hf, lead);
+      // corner buttons do to the words, nothing below them collides.
+      var hf = Math.min(H * 0.019, 46);
+      var textTop = Math.max(H * 0.095 - hf * 0.9, reserve, corner * 1.1);
+      var textEnd = layoutText(W * 0.5, textTop, W * 0.9, hf);
 
       // Who leads comes first: it settles the key, the chords and the
       // tempo, so the number underneath is a consequence of it.
       var sh2 = Math.min(H * 0.085, 190);
-      var songY = hintY + lead + sh2 * 0.5 + H * 0.03;
+      var songY = textEnd + sh2 * 0.5 + H * 0.03;
       layoutSongRow(W * 0.5, songY, W * 0.9, sh2);
 
       var bw2 = Math.min(W * 0.22, 240), bh2 = Math.min(H * 0.08, 160);
@@ -1707,9 +1860,9 @@
     // The ring, the two fine nudges under it and the reading under them
     // are one block, and it is that block that gets centred in what is
     // left - centring the ring alone left the nudges hanging halfway up
-    // an empty screen.
+    // an empty screen. With the arrows put away the ring has the lot.
     var bandBot = H * 0.985;
-    var below = nh * 1.12 + fs * 1.6;
+    var below = arrows ? nh * 1.12 + fs * 1.6 : 0;
     T.ringR = clamp(Math.min(widest, (bandBot - bandTop - below) / 2), 50, 340);
     var slack = (bandBot - bandTop) - (T.ringR * 2 + below);
     T.ringY = bandTop + Math.max(0, slack) / 2 + T.ringR;
@@ -2118,6 +2271,9 @@
     document.getElementById('jam').setAttribute('display', mode === 'jam' ? 'inline' : 'none');
     document.getElementById('keys').setAttribute('display', mode === 'keys' ? 'inline' : 'none');
     faceLandscape(mode === 'keys');
+    // The words could only be guessed at while the screen was hidden, so
+    // they are measured properly now it is not.
+    if (mode === 'tune') { layoutTune(); }
   }
 
   // One note of whichever sound was just chosen, straight away, so the
@@ -2193,6 +2349,11 @@
         paintVoices();
       } else if (act.indexOf('song') === 0) {
         setSong(+act.slice(4));
+      } else if (act === 'speaker') {
+        T.speakerOpen = !T.speakerOpen;
+        paintClock();
+      } else if (act === 'retry') {
+        askClock(10);
       } else {
         held = act;
         heldNode = btn;
@@ -2332,9 +2493,18 @@
     }
 
     // The readouts only have to change when they change.
-    var shown = clk.have ? lag : offset;
-    var ms = (shown >= 0 ? '+' : '−') + Math.round(Math.abs(shown) * 1000) + ' ms';
+    var ms = msText(clk.have ? lag : offset);
     if (ms !== T.offShown) { T.offShown = ms; T.offText.textContent = ms; }
+
+    // Turning while it asks, so a press of it is visibly heard. Without
+    // motion it dims instead.
+    if (clk.busy && byHand()) {
+      T.spinA = reduced ? 0 : (T.spinA + dt * 320) % 360;
+    } else {
+      T.spinA = 0;
+    }
+    T.retrySpin.setAttribute('transform', 'rotate(' + T.spinA.toFixed(1) + ')');
+    T.retry.setAttribute('opacity', clk.busy && reduced ? 0.55 : 1);
 
     // Down on the beat and up between: sin is zero at both ends of the
     // beat, so the stick lands exactly when the click sounds.
