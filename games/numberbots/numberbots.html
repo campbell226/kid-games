@@ -1,0 +1,1893 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#dfe9fb">
+<title>Numberbots</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #dfe9fb;
+    overflow: hidden;
+    touch-action: manipulation;
+    overscroll-behavior: none;
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #stage {
+    display: block;
+    width: 100vw; height: 100vh;
+    width: 100dvw; height: 100dvh;
+  }
+  .hit { fill: transparent; cursor: pointer; }
+  #scenery, #party, #fx { pointer-events: none; }
+
+  /* Parent controls. The only words in the game, and the only part
+     deliberately made fiddly to reach: a long press, so a toddler
+     pawing at the corner never opens it. */
+  #parent {
+    position: fixed; inset: 0;
+    display: none;
+    align-items: center; justify-content: center;
+    background: rgba(12, 24, 40, 0.55);
+    font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: 20px;
+  }
+  #parent.open { display: flex; }
+  #panel {
+    background: #fdfaf3; color: #22303f;
+    border-radius: 18px; padding: 20px 22px 22px;
+    width: min(420px, 100%); max-height: 100%; overflow: auto;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+  }
+  #panel h2 { margin: 0 0 4px; font-size: 19px; }
+  #panel p.sub { margin: 0 0 18px; font-size: 13.5px; color: #63727f; }
+  #panel h3 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
+  .row { margin-bottom: 18px; }
+  .seg { display: flex; flex-wrap: wrap; gap: 8px; }
+  .seg button {
+    flex: 1 1 auto; min-width: 60px; min-height: 46px;
+    border: 2px solid #cfd8e0; background: #fff; color: #22303f;
+    border-radius: 11px; font: inherit; font-size: 15px; cursor: pointer;
+  }
+  .seg button[aria-pressed="true"] { border-color: #e8692a; background: #fff0e6; font-weight: 600; }
+  .wide { display: block; width: 100%; min-height: 46px; border-radius: 11px; font: inherit; font-size: 15px; cursor: pointer; }
+  #restart { border: 2px solid #cfd8e0; background: #fff; color: #22303f; margin-bottom: 10px; }
+  #close { border: 0; background: #e8692a; color: #fff; font-weight: 600; }
+</style>
+</head>
+<body>
+<script>
+// Full screen on the first touch, and a way back if it is off.
+//
+// A browser will not do this by itself: the request has to come out of a
+// gesture the browser counts as user activation, and that list is fussier
+// than it looks. pointerdown only counts when the pointer is a mouse - on
+// a touchscreen it grants nothing at all, which is why listening for it
+// worked on a laptop and did nothing whatever on a tablet. For a finger it
+// is pointerup and touchend that count.
+//
+// Once full screen is on, the automatic asking stops, so leaving it stays
+// left. But leaving it used to mean reloading to get it back, so there is
+// now a small button at the top of the screen that is only there while
+// full screen is off, and takes itself away the moment it is on.
+//
+// An iPhone ignores the lot, because Safari there gives full screen to
+// video and nothing else, so no button is offered. That is what the home
+// screen tags above are for.
+(function () {
+  var el = document.documentElement;
+  var go = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (!go) { return; }
+  var EVENTS = ['pointerup', 'touchend', 'click', 'mousedown'];
+  var asking = false, done = false, btn = null, i;
+
+  function isFull() {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement);
+  }
+
+  function request() {
+    if (asking || isFull()) { return; }
+    asking = true;
+    try {
+      var p = go.call(el);
+      if (p && p.then) { p.then(function () { asking = false; }, function () { asking = false; }); }
+      else { setTimeout(function () { asking = false; }, 500); }
+    } catch (e) { asking = false; }
+  }
+
+  function stopAuto() {
+    done = true;
+    for (var k = 0; k < EVENTS.length; k++) {
+      document.removeEventListener(EVENTS[k], autoTry, true);
+    }
+  }
+
+  function autoTry() {
+    if (done) { return; }
+    if (isFull()) { stopAuto(); sync(); return; }
+    request();
+  }
+
+  function sync() {
+    var want = !isFull();
+    if (want && !btn && document.body) {
+      btn = document.createElement('button');
+      btn.setAttribute('aria-label', 'Full screen');
+      btn.style.cssText = 'position:fixed;top:5px;left:50%;transform:translateX(-50%);'
+        + 'z-index:30;width:46px;height:46px;padding:0;line-height:0;border:0;'
+        + 'border-radius:14px;background:rgba(255,255,255,0.68);cursor:pointer;'
+        + 'box-shadow:0 1px 5px rgba(0,0,0,0.22);-webkit-tap-highlight-color:transparent;';
+      btn.innerHTML = '<svg width="46" height="46" viewBox="0 0 46 46" aria-hidden="true">'
+        + '<g fill="none" stroke="#40563a" stroke-width="3.4" stroke-linecap="round"'
+        + ' stroke-linejoin="round">'
+        + '<path d="M19 14 H14 V19 M27 14 H32 V19 M19 32 H14 V27 M27 32 H32 V27"/>'
+        + '</g></svg>';
+      btn.addEventListener('click', function (e) { e.stopPropagation(); request(); });
+      document.body.appendChild(btn);
+    }
+    if (btn) { btn.style.display = want ? 'block' : 'none'; }
+  }
+
+  document.addEventListener('fullscreenchange', function () {
+    if (isFull()) { stopAuto(); }
+    sync();
+  });
+  document.addEventListener('webkitfullscreenchange', function () {
+    if (isFull()) { stopAuto(); }
+    sync();
+  });
+  for (i = 0; i < EVENTS.length; i++) {
+    document.addEventListener(EVENTS[i], autoTry, true);
+  }
+  sync();
+})();
+</script>
+
+<svg id="stage" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 640" preserveAspectRatio="xMidYMid meet" aria-label="Numberbots">
+  <defs>
+    <linearGradient id="wall" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d6e3f8"/>
+      <stop offset="1" stop-color="#eef3fc"/>
+    </linearGradient>
+    <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c7c0e8"/>
+      <stop offset="1" stop-color="#a39ad6"/>
+    </linearGradient>
+    <linearGradient id="porthole" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1f2a5c"/>
+      <stop offset="1" stop-color="#3b3f86"/>
+    </linearGradient>
+    <radialGradient id="bulbglow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fffbe0" stop-opacity="0.95"/>
+      <stop offset="0.5" stop-color="#ffe86b" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#ffe86b" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="cheer" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff8d4" stop-opacity="0.95"/>
+      <stop offset="0.55" stop-color="#ffe27a" stop-opacity="0.4"/>
+      <stop offset="1" stop-color="#ffe27a" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="ballg" cx="0.38" cy="0.32" r="0.75">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.5" stop-color="#c9d1e6"/>
+      <stop offset="1" stop-color="#7d87a8"/>
+    </radialGradient>
+    <clipPath id="ballclip"><circle cx="0" cy="0" r="1"/></clipPath>
+  </defs>
+
+  <g id="scenery"></g>
+  <g id="party"></g>
+  <g id="bots"></g>
+  <g id="btns"></g>
+  <g id="fx"></g>
+  <g id="corner"></g>
+</svg>
+
+<div id="parent" role="dialog" aria-modal="true" aria-label="Parent controls">
+  <div id="panel">
+    <h2>Parent controls</h2>
+    <p class="sub">She won't find this by accident &mdash; it needs a long press on the corner.</p>
+
+    <div class="row">
+      <h3>Which numbers</h3>
+      <div class="seg" id="segMode">
+        <button type="button" data-m="auto" aria-pressed="true">1&ndash;5, then 6&ndash;10</button>
+        <button type="button" data-m="low" aria-pressed="false">1&ndash;5</button>
+        <button type="button" data-m="high" aria-pressed="false">6&ndash;10</button>
+      </div>
+    </div>
+
+    <button type="button" id="restart" class="wide">Start again</button>
+    <button type="button" id="close" class="wide">Back to the game</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  var svg = document.getElementById('stage');
+
+  function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function f1(v) { return Math.round(v * 10) / 10; }
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+  function el(tag, attrs) {
+    var n = document.createElementNS(SVGNS, tag);
+    if (attrs) { for (var k in attrs) { n.setAttribute(k, attrs[k]); } }
+    return n;
+  }
+  function clear(n) { while (n.firstChild) { n.removeChild(n.firstChild); } }
+  function shuffle(a) {
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+  function nowS() { return performance.now() / 1000; }
+  function easeOutBack(x) { var c = 1.70158; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); }
+  function easeInOut(x) { return x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2; }
+
+  var reduceQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+  var reduced = reduceQuery.matches;
+  if (reduceQuery.addEventListener) {
+    reduceQuery.addEventListener('change', function (e) { reduced = e.matches; });
+  }
+
+  // Everything that happens "in a moment" goes through here. Starting
+  // again bumps the generation, so a pause that was already counting
+  // down when the parent pressed Start again quietly does nothing.
+  var gen = 0;
+  function later(sec, fn) {
+    var mine = gen;
+    setTimeout(function () { if (mine === gen) { fn(); } }, sec * 1000);
+  }
+
+  // ------------------------------------------------------------------
+  // The numerals, drawn rather than typed: the same strokes as Post a
+  // Number, so a 7 looks like the same 7 in both games. Grid is x from
+  // -32 to 32, y from -60 to 60. 10 is a 1 and a 0 side by side.
+  // ------------------------------------------------------------------
+  var DIGIT = {
+    0: ['M0 -60A28 60 0 1 0 0 60A28 60 0 1 0 0 -60'],
+    1: ['M-18 -34L6 -60V60', 'M-22 60H30'],
+    2: ['M-28 -36C-28 -70 28 -70 28 -32C28 -6 -26 28 -30 60H30'],
+    3: ['M-28 -48C-10 -68 28 -62 28 -32C28 -8 4 -2 -6 -2C8 -2 30 6 30 32C30 66 -16 68 -30 46'],
+    4: ['M14 60V-60L-30 24H34'],
+    5: ['M26 -60H-24L-28 -6C-8 -20 30 -12 30 22C30 62 -10 66 -30 42'],
+    6: ['M24 -52C4 -70 -30 -52 -30 6C-30 66 30 66 30 20C30 -20 -26 -24 -30 12'],
+    7: ['M-30 -60H30L-8 60'],
+    8: ['M0 -2C-28 -2 -28 -60 0 -60C28 -60 28 -2 0 -2C-32 -2 -32 60 0 60C32 60 32 -2 0 -2'],
+    9: ['M-24 52C-4 70 30 52 30 -6C30 -66 -30 -66 -30 -20C-30 20 26 24 30 -12']
+  };
+
+  function glyphParts(number) {
+    if (number < 10) { return [{ d: DIGIT[number], x: 0 }]; }
+    return [{ d: DIGIT[1], x: -38 }, { d: DIGIT[0], x: 38 }];
+  }
+
+  function strokeGlyph(parent, number, colour, width, opacity) {
+    var parts = glyphParts(number);
+    for (var k = 0; k < parts.length; k++) {
+      var holder = parts[k].x ? el('g', { transform: 'translate(' + parts[k].x + ',0)' }) : parent;
+      for (var i = 0; i < parts[k].d.length; i++) {
+        var p = el('path', {
+          d: parts[k].d[i], fill: 'none', stroke: colour, 'stroke-width': width,
+          'stroke-linecap': 'round', 'stroke-linejoin': 'round'
+        });
+        if (opacity !== undefined) { p.setAttribute('opacity', opacity); }
+        holder.appendChild(p);
+      }
+      if (holder !== parent) { parent.appendChild(holder); }
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Sound.
+  //
+  // Everything here is synthesised, so the game is never silent and
+  // never waits on a download. The one exception is Dad saying the
+  // numbers, further down, and every clip of his has a chime standing
+  // in for it.
+  // ------------------------------------------------------------------
+  var AC = null, master = null, noiseBuf = null;
+
+  function initAudio() {
+    if (AC) {
+      if (AC.state === 'suspended') { AC.resume(); }
+      return;
+    }
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) { return; }
+    AC = new Ctx();
+
+    var comp = AC.createDynamicsCompressor();
+    comp.threshold.setValueAtTime(-18, AC.currentTime);
+    comp.ratio.setValueAtTime(6, AC.currentTime);
+    comp.attack.setValueAtTime(0.004, AC.currentTime);
+    comp.release.setValueAtTime(0.2, AC.currentTime);
+
+    master = AC.createGain();
+    master.gain.setValueAtTime(0.5, AC.currentTime);
+    master.connect(comp);
+    comp.connect(AC.destination);
+
+    var n = Math.floor(AC.sampleRate * 0.5);
+    noiseBuf = AC.createBuffer(1, n, AC.sampleRate);
+    var data = noiseBuf.getChannelData(0);
+    for (var i = 0; i < n; i++) { data[i] = Math.random() * 2 - 1; }
+
+    if (AC.state === 'suspended') { AC.resume(); }
+  }
+
+  function toneAt(t, type, f0, f1, dur, gain) {
+    var o = AC.createOscillator(), g = AC.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(f0, t);
+    if (f1 && f1 !== f0) { o.frequency.exponentialRampToValueAtTime(f1, t + dur); }
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+
+  function tone(type, f0, f1, delay, dur, gain) {
+    if (!AC) { return; }
+    toneAt(AC.currentTime + (delay || 0), type, f0, f1, dur, gain);
+  }
+
+  // The robots' own voice: a square wave with the fizz filtered off, so
+  // it is clearly a machine but never a harsh one.
+  function chirpAt(t, f0, f1, dur, gain) {
+    var o = AC.createOscillator(), lp = AC.createBiquadFilter(), g = AC.createGain();
+    o.type = 'square';
+    o.frequency.setValueAtTime(f0, t);
+    if (f1 !== f0) { o.frequency.exponentialRampToValueAtTime(f1, t + dur); }
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(1700, t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t + 0.012);
+    g.gain.setValueAtTime(gain, t + dur * 0.7);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(lp); lp.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+
+  function chirp(f0, f1, delay, dur, gain) {
+    if (!AC) { return; }
+    chirpAt(AC.currentTime + (delay || 0), f0, f1, dur, gain);
+  }
+
+  function noiseAt(t, type, freq, dur, gain) {
+    var src = AC.createBufferSource();
+    src.buffer = noiseBuf;
+    var f = AC.createBiquadFilter();
+    f.type = type;
+    f.frequency.setValueAtTime(freq, t);
+    var g = AC.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f); f.connect(g); g.connect(master);
+    src.start(t); src.stop(t + dur + 0.05);
+  }
+
+  function mtof(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+
+  function pop() { tone('triangle', 420, 620, 0, 0.11, 0.2); }
+
+  // Each antenna as it lights. The note climbs with the count, so more
+  // sounds like more before she knows what the word means.
+  var PENT = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21];
+  function bip(k) {
+    var f = 523.25 * Math.pow(2, PENT[clamp(k, 0, 9)] / 12);
+    tone('triangle', f * 0.94, f, 0, 0.14, 0.16);
+  }
+
+  function hello() {
+    chirp(520, 700, 0, 0.1, 0.11);
+    chirp(780, 620, 0.13, 0.1, 0.11);
+    chirp(700, 980, 0.26, 0.16, 0.11);
+  }
+
+  // Rising at the end, the way a question does. Puzzled, never sad.
+  function hmm() {
+    chirp(360, 330, 0, 0.14, 0.08);
+    chirp(330, 480, 0.17, 0.22, 0.08);
+  }
+
+  function whoosh() { tone('sine', 300, 1100, 0, 0.45, 0.1); }
+
+  function tada() {
+    var notes = [523.25, 659.25, 783.99, 1046.5];
+    for (var i = 0; i < notes.length; i++) {
+      tone('triangle', notes[i], notes[i], i * 0.08, 0.32, 0.22);
+    }
+    chirp(1046.5, 1568, 0.34, 0.2, 0.06);
+  }
+
+  function boing() { tone('sine', 240, 620, 0, 0.16, 0.14); }
+
+  function bye() {
+    chirp(880, 700, 0, 0.12, 0.09);
+    chirp(700, 460, 0.15, 0.2, 0.09);
+  }
+
+  // A stand-in for Dad: each number its own pitch, so even with no
+  // recording at all the ten of them stay tellable apart by ear.
+  function chime(number) {
+    var f = 262 * Math.pow(2, (number - 1) / 10);
+    tone('triangle', f, f, 0, 0.28, 0.28);
+    tone('sine', f * 2, f * 2, 0.02, 0.2, 0.1);
+  }
+
+  // ------------------------------------------------------------------
+  // Dad's voice: ten recordings, one per number, in sounds/ beside this
+  // file. Copied from Post a Number rather than shared with it, so each
+  // game still stands on its own.
+  // ------------------------------------------------------------------
+  var CLIPS = {};
+  var unlocked = false;
+  var speaking = null;
+
+  function clipFor(number) {
+    var a = CLIPS[number];
+    if (!a) {
+      a = new window.Audio('sounds/' + number + '.mp3');
+      a.preload = 'auto';
+      a.addEventListener('error', function () { a.broken = true; });
+      CLIPS[number] = a;
+    }
+    return a;
+  }
+
+  // A phone will not play a sound that no finger asked for, and the
+  // robots count aloud on their own when she is stuck. So on the very
+  // first touch every clip is started and stopped again while muted,
+  // which is enough to buy the right to play it later.
+  function unlockClips() {
+    if (unlocked) { return; }
+    unlocked = true;
+    for (var i = 1; i <= 10; i++) {
+      (function (a) {
+        a.muted = true;
+        var p;
+        try { p = a.play(); } catch (e) { a.muted = false; return; }
+        if (p && p.then) {
+          p.then(function () {
+            a.pause();
+            try { a.currentTime = 0; } catch (e1) { /* not loaded yet */ }
+            a.muted = false;
+          }, function () { a.muted = false; });
+        } else {
+          a.pause();
+          a.muted = false;
+        }
+      })(clipFor(i));
+    }
+  }
+
+  // One voice at a time. A new number cuts the last one off rather than
+  // talking over it, which is what a person would do.
+  function say(number) {
+    var a = clipFor(number);
+    if (a.broken) { chime(number); return; }
+
+    if (speaking && speaking !== a) {
+      try { speaking.pause(); speaking.currentTime = 0; } catch (e) { /* fine */ }
+    }
+    speaking = a;
+    try { a.currentTime = 0; } catch (e1) { /* it will start from wherever it is */ }
+
+    var p;
+    try { p = a.play(); } catch (e2) { chime(number); return; }
+    if (p && p['catch']) { p['catch'](function () { chime(number); }); }
+  }
+
+  // ------------------------------------------------------------------
+  // The party tune. Twelve seconds of C major pentatonic over a plain
+  // I - vi - IV - V, scheduled against the audio clock so the robots'
+  // bounces land exactly on the kick drum.
+  // ------------------------------------------------------------------
+  var SPB = 0.5;
+  var PARTY_BEATS = 24;
+  var MEL_A = [72, 0, 76, 79, 81, 0, 79, 76, 74, 0, 76, 74, 72, 0, 0, 0];
+  var MEL_B = [76, 0, 79, 81, 84, 0, 81, 79, 81, 79, 76, 74, 72, 0, 0, 0];
+  var TUNE = MEL_A.concat(MEL_B, MEL_A);
+  var BASS = [36, 33, 29, 31];
+
+  var party = null;
+
+  function partyScheduler() {
+    if (!party || !AC || !master) { return; }
+    if (party.off === null) { party.off = AC.currentTime - nowS(); }
+    var ahead = AC.currentTime + 0.15;
+    while (party.next < PARTY_BEATS * 2) {
+      var e = party.next;
+      var t = party.t0 + party.off + e * SPB / 2;
+      if (t > ahead) { break; }
+      party.next++;
+      if (t < AC.currentTime - 0.02) { continue; }
+      if (e % 2 === 0) {
+        var beat = e / 2;
+        toneAt(t, 'sine', 150, 48, 0.2, 0.5);
+        if (beat % 2 === 1) { noiseAt(t, 'bandpass', 1400, 0.14, 0.18); }
+        var b = mtof(BASS[Math.floor(beat / 2) % 4]);
+        toneAt(t, 'triangle', b, b, SPB * 0.85, 0.3);
+      } else {
+        noiseAt(t, 'highpass', 7000, 0.05, 0.06);
+      }
+      if (TUNE[e]) { chirpAt(t, mtof(TUNE[e]), mtof(TUNE[e]), SPB * 0.45, 0.07); }
+    }
+  }
+  setInterval(partyScheduler, 25);
+
+  // ------------------------------------------------------------------
+  // Layout. The world is 1000 units wide and however tall the screen
+  // needs. Three places matter: the spot in front where the robot being
+  // counted stands, the row of three buttons under it, and the places
+  // further back where the counted robots dance.
+  //
+  // Those dancing places are filled furthest-out and back-row first. A
+  // robot walking to its place therefore never has to pass through a
+  // robot already standing in the way.
+  // ------------------------------------------------------------------
+  var L = null;
+  var BOT_H = 470;
+
+  function computeLayout() {
+    var vw = Math.max(1, window.innerWidth), vh = Math.max(1, window.innerHeight);
+    var W = 1000, H = clamp(Math.round(1000 * vh / vw), 400, 2600);
+    var wide = (vw / vh) >= 1.15;
+    var o = { W: W, H: H, wide: wide, mainX: 500, slots: [] };
+    var sb, sf, yb, yf, i, xs;
+
+    // Two rows of five across the whole width, the front row far enough
+    // in front that it stops just below the back row's tummies, so at the
+    // party every number is on show. The middle ones stand behind the
+    // robot being counted until then, which is only what standing at the
+    // back means.
+    if (wide) {
+      o.btnR = clamp(H * 0.1, 40, 78);
+      o.btnY = H - o.btnR - H * 0.03;
+      o.mainY = o.btnY - o.btnR - H * 0.04;
+      var hl = (o.mainY - H * 0.035) / BOT_H;
+      o.mainS1 = Math.min(hl, 460 / 380);
+      o.mainS2 = Math.min(hl, 460 / 570);
+      yf = o.mainY - H * 0.03;
+      // The back row is also kept short enough that the one standing
+      // directly behind the robot being counted is hidden by its head
+      // entirely. Any taller and its lit antennae would poke up between
+      // the ones she is counting, as extras that are not there.
+      sb = Math.min(0.35, (yf - H * 0.03) / 901, (yf - o.mainY + 330 * o.mainS2) / 899);
+      sf = sb * 1.12;
+      yb = yf - 431 * sb;
+      o.horizon = yb - 40 * sb - 14;
+      // The second pair stands a little further out than in portrait, so
+      // their antennae stay well clear of a wide robot's in the middle.
+      xs = [90, 910, 285, 715, 500];
+      o.ball = { x: 500, y: H * 0.19, r: clamp(H * 0.06, 24, 54) };
+    } else {
+      o.btnR = clamp(Math.min(W * 0.12, H * 0.075), 56, 120);
+      o.btnY = H - o.btnR - H * 0.03;
+      o.mainY = o.btnY - o.btnR - H * 0.035;
+      var top = H * 0.03;
+      yf = H * 0.36;
+      sb = Math.min((yf - top) / 904, 0.55);
+      sf = sb * 1.12;
+      yb = yf - 431 * sb;
+      o.horizon = yb - 40 * sb - 14;
+      var mainTop = yf + H * 0.02;
+      var hp = (o.mainY - mainTop) / BOT_H;
+      o.mainS1 = Math.min(hp, 900 / 380);
+      o.mainS2 = Math.min(hp, 900 / 570);
+      xs = [100, 900, 300, 700, 500];
+      o.ball = { x: 500, y: mainTop + (o.mainY - mainTop) * 0.28, r: clamp(W * 0.07, 40, 80) };
+    }
+    for (i = 0; i < 5; i++) { o.slots.push({ x: xs[i], y: yb, s: sb }); }
+    for (i = 0; i < 5; i++) { o.slots.push({ x: xs[i], y: yf, s: sf }); }
+    o.btnXs = [500 - o.btnR * 2.7, 500, 500 + o.btnR * 2.7];
+
+    L = o;
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    drawScenery();
+    drawParty();
+    drawCorner();
+  }
+
+  function mainSpot() {
+    return { x: L.mainX, y: L.mainY, s: level === 2 ? L.mainS2 : L.mainS1 };
+  }
+
+  function offstage(b, side) {
+    var m = 300 * b.s + 30;
+    return side < 0 ? -m : L.W + m;
+  }
+
+  function drawScenery() {
+    var g = document.getElementById('scenery');
+    clear(g);
+    var W = L.W, H = L.H, hz = L.horizon, i;
+
+    g.appendChild(el('rect', { x: 0, y: 0, width: W, height: H, fill: 'url(#wall)' }));
+    g.appendChild(el('rect', { x: 0, y: hz, width: W, height: H - hz, fill: 'url(#floor)' }));
+
+    // Floor tiles, running away to the back wall.
+    var d = '';
+    for (i = -8; i <= 8; i++) {
+      d += 'M' + f1(500 + i * 70) + ' ' + f1(hz) + 'L' + f1(500 + i * 260) + ' ' + H;
+    }
+    for (i = 1; i < 7; i++) {
+      var y = hz + (H - hz) * Math.pow(i / 7, 1.6);
+      d += 'M0 ' + f1(y) + 'H' + W;
+    }
+    g.appendChild(el('path', { d: d, stroke: '#ffffff', 'stroke-width': 2.5, opacity: 0.16, fill: 'none' }));
+    g.appendChild(el('rect', { x: 0, y: hz - 12, width: W, height: 12, fill: '#a9b6d9' }));
+
+    // Two portholes onto the night outside.
+    var pr = clamp(hz * 0.2, 26, 64), py = hz * 0.5;
+    [W * 0.17, W * 0.83].forEach(function (px, k) {
+      g.appendChild(el('circle', { cx: f1(px), cy: f1(py), r: f1(pr + 10), fill: '#a9b6d9' }));
+      g.appendChild(el('circle', { cx: f1(px), cy: f1(py), r: f1(pr), fill: 'url(#porthole)' }));
+      var st = '';
+      for (var j = 0; j < 4; j++) {
+        var sx = px + Math.cos(j * 2.1 + k) * pr * 0.55, sy = py + Math.sin(j * 2.1 + k) * pr * 0.5;
+        st += 'M' + f1(sx) + ' ' + f1(sy - 4) + 'L' + f1(sx + 1.5) + ' ' + f1(sy) + 'L' + f1(sx) + ' ' + f1(sy + 4) + 'L' + f1(sx - 1.5) + ' ' + f1(sy) + 'Z';
+      }
+      g.appendChild(el('path', { d: st, fill: '#fff6c8' }));
+      g.appendChild(el('path', {
+        d: 'M' + f1(px - pr * 0.6) + ' ' + f1(py - pr * 0.25) + 'A' + f1(pr * 0.7) + ' ' + f1(pr * 0.7) + ' 0 0 1 ' + f1(px - pr * 0.1) + ' ' + f1(py - pr * 0.68),
+        stroke: '#ffffff', 'stroke-width': 5, opacity: 0.35, fill: 'none', 'stroke-linecap': 'round'
+      }));
+    });
+
+    // Bunting, because this is a room that is expecting a party. Two
+    // swags with the middle left clear: the antennae she is counting
+    // stand up into exactly that space, and a row of flags behind them
+    // would be a second row of things to count.
+    var by = clamp(hz * 0.1, 14, 60), sag = clamp(hz * 0.09, 16, 50);
+    var cols = ['#f2705e', '#ffc546', '#52b6ea', '#74cf83', '#ff91b9', '#b48ff0'];
+    [[0, W * 0.33], [W * 0.67, W]].forEach(function (span, k) {
+      var x0 = span[0], x1 = span[1], cx = (x0 + x1) / 2;
+      g.appendChild(el('path', {
+        d: 'M' + f1(x0) + ' ' + f1(by) + 'Q' + f1(cx) + ' ' + f1(by + sag * 2) + ' ' + f1(x1) + ' ' + f1(by),
+        stroke: '#7d86a8', 'stroke-width': 3, fill: 'none'
+      }));
+      for (var j = 0; j < 6; j++) {
+        var u = (j + 0.5) / 6;
+        var fx = lerp(x0, x1, u), fy = (1 - u) * (1 - u) * by + 2 * u * (1 - u) * (by + sag * 2) + u * u * by;
+        g.appendChild(el('path', {
+          d: 'M' + f1(fx - 15) + ' ' + f1(fy) + 'L' + f1(fx + 15) + ' ' + f1(fy) + 'L' + f1(fx) + ' ' + f1(fy + 32) + 'Z',
+          fill: cols[(j + k * 3) % cols.length]
+        }));
+      }
+    });
+
+    // A pool of light where the robot being counted stands.
+    var ms = mainSpot().s;
+    g.appendChild(el('ellipse', {
+      cx: L.mainX, cy: f1(L.mainY), rx: f1(250 * ms), ry: f1(40 * ms), fill: '#ffffff', opacity: 0.3
+    }));
+  }
+
+  // The long-press corner for the parent controls. Deliberately dull.
+  function drawCorner() {
+    var g = document.getElementById('corner');
+    clear(g);
+    var r = Math.max(26, L.W * 0.032);
+    g.appendChild(el('circle', { id: 'cornerdot', cx: L.W - r * 0.9, cy: r * 0.9, r: r, fill: '#3a4a7a', opacity: 0.1 }));
+  }
+
+  // ------------------------------------------------------------------
+  // The robots.
+  //
+  // Drawn front-on, feet at y = 0, about 470 tall. Every robot has one
+  // row of antennae and nothing else in a row that could be mistaken
+  // for something to count. They differ in colour, body, head, eyes and
+  // how they get about, never in what she is counting.
+  // ------------------------------------------------------------------
+  var LIMB = '#4b5468', DARK = '#2b3245', GLASS = '#1d2740';
+  var BULB_OFF = '#e4e9f2', BULB_ON = '#ffe14d', INK = '#ffe45c';
+  var PARTY_COLS = ['#ff5fa2', '#5fd8ff', '#ffe14d', '#8dff7a', '#c39bff', '#ff9f43'];
+
+  var PALETTE = [
+    { body: '#f2705e', trim: '#c44c3c' },
+    { body: '#52b6ea', trim: '#2e86bb' },
+    { body: '#74cf83', trim: '#479f57' },
+    { body: '#b48ff0', trim: '#8763c7' },
+    { body: '#ffc546', trim: '#d39424' },
+    { body: '#ff91b9', trim: '#d4608c' },
+    { body: '#4fc4b4', trim: '#2f958a' },
+    { body: '#aab6c8', trim: '#77859b' },
+    { body: '#ff9c57', trim: '#d47233' },
+    { body: '#7090ff', trim: '#4a68d6' }
+  ];
+  var BODIES = ['box', 'round', 'bell'];
+  var HEADS = ['box', 'dome', 'tv'];
+  var EYES = ['two', 'visor', 'one'];
+  var MOVES = ['legs', 'wheels', 'tracks'];
+  var STALKS = ['straight', 'spring'];
+
+  // Each feature is dealt from its own shuffled deck, so ten robots in a
+  // row never share a colour and seldom share a shape.
+  var deck = {};
+  function deal(name, list) {
+    if (!deck[name] || !deck[name].length) { deck[name] = shuffle(list.slice()); }
+    return deck[name].pop();
+  }
+  function pickLook() {
+    return {
+      pal: deal('pal', PALETTE), body: deal('body', BODIES), head: deal('head', HEADS),
+      eyes: deal('eyes', EYES), move: deal('move', MOVES), stalk: deal('stalk', STALKS),
+      cheeks: Math.random() < 0.6
+    };
+  }
+
+  // Wider robots for more antennae, so the gaps between them stay the
+  // same size and every one can be told from its neighbour.
+  function geom(n) {
+    var cw = clamp(n * 38 + 88, 190, 470);
+    var g = {
+      cw: cw, bw: f1(cw * 0.9), hw: cw,
+      hip: -70, bodyTop: -240, neckTop: -254, headTop: -382,
+      eyeY: -330, mouthY: -287, tummyY: -155, shoulderY: -214
+    };
+    g.sw = Math.min(150, g.bw - 34);
+    var gap = n > 1 ? Math.min(48, (g.hw - 70) / (n - 1)) : 0;
+    g.ants = [];
+    for (var i = 0; i < n; i++) { g.ants.push(f1(-gap * (n - 1) / 2 + gap * i)); }
+    return g;
+  }
+
+  function antBase(look, g, x) {
+    if (look.head !== 'dome') { return g.headTop + 4; }
+    var k = x / (g.hw / 2);
+    return f1(g.headTop + 46 - 46 * Math.sqrt(Math.max(0, 1 - k * k)) + 4);
+  }
+
+  function artMove(look, g) {
+    var s = '', p = look.pal, i;
+    if (look.move === 'legs') {
+      var lx = f1(clamp(g.bw * 0.22, 30, 72));
+      [-1, 1].forEach(function (d) {
+        s += '<g class="leg" data-x="' + f1(lx * d) + '">'
+          + '<rect x="-11" y="-4" width="22" height="60" rx="11" fill="' + LIMB + '"/>'
+          + '<rect x="' + (d < 0 ? -30 : -22) + '" y="52" width="52" height="20" rx="10" fill="' + DARK + '"/>'
+          + '</g>';
+      });
+    } else if (look.move === 'wheels') {
+      var wx = f1(clamp(g.bw * 0.28, 46, 112));
+      s += '<rect x="' + (-wx) + '" y="-50" width="' + f1(wx * 2) + '" height="14" rx="7" fill="' + LIMB + '"/>'
+        + '<rect x="-18" y="-76" width="36" height="34" rx="6" fill="' + LIMB + '"/>';
+      [-1, 1].forEach(function (d) {
+        s += '<g transform="translate(' + f1(wx * d) + ',-36)">'
+          + '<circle r="34" fill="' + DARK + '"/>'
+          + '<circle r="21" fill="' + p.trim + '"/>'
+          + '<g class="spin" data-r="34"><path d="M-21 0H21M-10.5 -18.2L10.5 18.2M-10.5 18.2L10.5 -18.2" stroke="' + DARK + '" stroke-width="5" stroke-linecap="round"/></g>'
+          + '<circle r="7" fill="' + LIMB + '"/>'
+          + '</g>';
+      });
+    } else {
+      var tw = f1(clamp(g.bw * 0.94, 160, 400)), k = tw > 260 ? 4 : 3;
+      s += '<rect x="-20" y="-80" width="40" height="20" rx="6" fill="' + LIMB + '"/>'
+        + '<rect x="' + f1(-tw / 2) + '" y="-64" width="' + tw + '" height="62" rx="31" fill="' + DARK + '"/>'
+        + '<rect class="tread" x="' + f1(-tw / 2 + 5) + '" y="-59" width="' + f1(tw - 10) + '" height="52" rx="26" fill="none" stroke="' + LIMB + '" stroke-width="5" stroke-dasharray="9 11"/>';
+      for (i = 0; i < k; i++) {
+        var cx = f1(-tw / 2 + 31 + (tw - 62) * i / (k - 1));
+        s += '<g transform="translate(' + cx + ',-33)">'
+          + '<circle r="18" fill="' + p.trim + '"/>'
+          + '<g class="spin" data-r="18"><path d="M-12 0H12M0 -12V12" stroke="' + DARK + '" stroke-width="4" stroke-linecap="round"/></g>'
+          + '</g>';
+      }
+    }
+    return s;
+  }
+
+  function artArms(look) {
+    var s = '', p = look.pal;
+    [-1, 1].forEach(function (d) {
+      s += '<g class="arm" data-side="' + d + '">'
+        + '<path d="M0 0Q' + (d * 34) + ' 46 ' + (d * 18) + ' 92" fill="none" stroke="' + LIMB + '" stroke-width="16" stroke-linecap="round"/>'
+        + '<circle cx="' + (d * 18) + '" cy="100" r="17" fill="' + p.trim + '"/>'
+        + '<circle cx="' + (d * 18) + '" cy="100" r="7" fill="' + DARK + '" opacity="0.45"/>'
+        + '</g>';
+    });
+    return s;
+  }
+
+  function artBody(look, g) {
+    var p = look.pal, h = g.bw / 2, top = g.bodyTop, bot = g.hip, s = '';
+    if (look.body === 'bell') {
+      var t = f1(h * 0.8);
+      g.sx = t + 2;
+      g.topW = t * 2;
+      s += '<path d="M' + f1(-t + 22) + ' ' + top + 'H' + f1(t - 22) + 'Q' + t + ' ' + top + ' ' + f1(t + 3) + ' ' + (top + 22)
+        + 'L' + f1(h) + ' ' + (bot - 18) + 'Q' + f1(h) + ' ' + bot + ' ' + f1(h - 18) + ' ' + bot
+        + 'H' + f1(-h + 18) + 'Q' + f1(-h) + ' ' + bot + ' ' + f1(-h) + ' ' + (bot - 18)
+        + 'L' + f1(-t - 3) + ' ' + (top + 22) + 'Q' + f1(-t) + ' ' + top + ' ' + f1(-t + 22) + ' ' + top + 'Z" fill="' + p.body + '"/>';
+    } else {
+      g.sx = f1(h - 4);
+      g.topW = look.body === 'round' ? g.bw - 64 : g.bw - 24;
+      s += '<rect x="' + f1(-h) + '" y="' + top + '" width="' + g.bw + '" height="' + (bot - top) + '" rx="' + (look.body === 'round' ? 64 : 24) + '" fill="' + p.body + '"/>';
+    }
+    var inset = look.body === 'round' ? 32 : 12;
+    var sheenX = look.body === 'bell' ? -h * 0.8 + 18 : -h + (look.body === 'round' ? 30 : 16);
+    s += '<rect x="' + f1(sheenX) + '" y="' + (top + 26) + '" width="12" height="90" rx="6" fill="#ffffff" opacity="0.3"/>'
+      + '<rect x="' + f1(-h + inset) + '" y="' + (bot - 22) + '" width="' + f1(g.bw - inset * 2) + '" height="10" rx="5" fill="' + p.trim + '"/>';
+
+    // The tummy screen, blank until she finds its number.
+    var ty = g.tummyY, sw = g.sw;
+    s += '<rect x="' + f1(-sw / 2) + '" y="' + (ty - 56) + '" width="' + sw + '" height="112" rx="18" fill="' + GLASS + '" stroke="' + p.trim + '" stroke-width="7"/>'
+      + '<path d="M' + f1(-sw / 2 + 14) + ' ' + (ty - 42) + 'h28l-28 28z" fill="#ffffff" opacity="0.12"/>'
+      + '<g class="num" transform="translate(0,' + ty + ') scale(0.6)"></g>';
+
+    // Shoulder bolts sit over the tops of the arms.
+    [-1, 1].forEach(function (d) {
+      s += '<circle cx="' + f1(g.sx * d) + '" cy="' + g.shoulderY + '" r="13" fill="' + p.trim + '"/>';
+    });
+    return s;
+  }
+
+  function stalk(look) {
+    var s = '<rect x="-10" y="-6" width="20" height="12" rx="4" fill="' + DARK + '"/>';
+    if (look.stalk === 'spring') {
+      return s + '<path d="M0 0V-8L-8 -15L8 -24L-8 -33L8 -42L-8 -51L0 -58V-62" fill="none" stroke="' + LIMB + '" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>';
+    }
+    return s + '<path d="M0 0V-62" stroke="' + LIMB + '" stroke-width="7" stroke-linecap="round"/>';
+  }
+
+  function artHead(look, g, n) {
+    var p = look.pal, h = g.hw / 2, top = g.headTop, bot = g.neckTop, s = '', i;
+
+    // Antennae first, so their roots tuck in behind the head.
+    for (i = 0; i < n; i++) {
+      var ax = g.ants[i], by = antBase(look, g, ax);
+      s += '<g class="ant" data-x="' + ax + '" data-y="' + by + '">' + stalk(look)
+        + '<g class="bulbw" transform="translate(0,-72)">'
+        + '<circle class="glow" r="30" fill="url(#bulbglow)" opacity="0"/>'
+        + '<circle class="bulb" r="14" fill="' + BULB_OFF + '" stroke="' + DARK + '" stroke-width="3.5"/>'
+        + '<circle cx="-4.5" cy="-4.5" r="4" fill="#ffffff" opacity="0.8"/>'
+        + '</g></g>';
+    }
+
+    s += '<rect x="' + f1(-h - 13) + '" y="' + (g.eyeY - 20) + '" width="26" height="52" rx="10" fill="' + p.trim + '"/>'
+      + '<rect x="' + f1(h - 13) + '" y="' + (g.eyeY - 20) + '" width="26" height="52" rx="10" fill="' + p.trim + '"/>';
+
+    if (look.head === 'dome') {
+      s += '<path d="M' + f1(-h) + ' ' + (bot - 16) + 'V' + (top + 46) + 'A' + f1(h) + ' 46 0 0 1 ' + f1(h) + ' ' + (top + 46)
+        + 'V' + (bot - 16) + 'Q' + f1(h) + ' ' + bot + ' ' + f1(h - 16) + ' ' + bot + 'H' + f1(-h + 16)
+        + 'Q' + f1(-h) + ' ' + bot + ' ' + f1(-h) + ' ' + (bot - 16) + 'Z" fill="' + p.body + '"/>';
+    } else {
+      s += '<rect x="' + f1(-h) + '" y="' + top + '" width="' + g.hw + '" height="' + (bot - top) + '" rx="' + (look.head === 'tv' ? 16 : 28) + '" fill="' + p.body + '"/>';
+    }
+    if (look.head === 'tv') {
+      s += '<rect x="' + f1(-h + 16) + '" y="' + (top + 16) + '" width="' + f1(g.hw - 32) + '" height="' + (bot - top - 32) + '" rx="14" fill="#eef5ff" stroke="' + p.trim + '" stroke-width="5"/>';
+    }
+
+    var ey = g.eyeY, ex = f1(clamp(g.hw * 0.2, 34, 58)), my = g.mouthY;
+    s += '<g class="eyes">';
+    if (look.eyes === 'two') {
+      [-1, 1].forEach(function (d) {
+        s += '<circle cx="' + f1(ex * d) + '" cy="' + ey + '" r="25" fill="#ffffff" stroke="' + DARK + '" stroke-width="4"/>'
+          + '<g class="pupil" data-x="' + f1(ex * d) + '" data-mx="8" data-my="8"><circle r="11.5" fill="' + DARK + '"/><circle cx="4" cy="-4" r="3.5" fill="#ffffff"/></g>';
+      });
+    } else if (look.eyes === 'visor') {
+      var vw = f1(clamp(g.hw * 0.66, 120, 250));
+      s += '<rect x="' + f1(-vw / 2) + '" y="' + (ey - 25) + '" width="' + vw + '" height="50" rx="25" fill="' + GLASS + '"/>';
+      [-1, 1].forEach(function (d) {
+        s += '<g class="pupil" data-x="' + f1(vw * 0.22 * d) + '" data-mx="' + f1(vw * 0.16) + '" data-my="5"><ellipse rx="22" ry="17" fill="#7ff3ff" opacity="0.25"/><ellipse rx="13" ry="11" fill="#7ff3ff"/></g>';
+      });
+      ex = f1(vw / 2 - 10);
+    } else {
+      s += '<circle cx="0" cy="' + (ey - 2) + '" r="32" fill="#ffffff" stroke="' + DARK + '" stroke-width="4"/>'
+        + '<g class="pupil" data-x="0" data-mx="11" data-my="10"><circle r="15" fill="' + DARK + '"/><circle cx="5" cy="-5" r="4.5" fill="#ffffff"/></g>';
+      ex = 26;
+    }
+    s += '</g>';
+
+    s += '<path class="m-smile" d="M-22 ' + (my - 4) + 'Q0 ' + (my + 12) + ' 22 ' + (my - 4) + '" fill="none" stroke="' + DARK + '" stroke-width="6" stroke-linecap="round"/>'
+      + '<path class="m-grin" d="M-28 ' + (my - 8) + 'Q0 ' + (my + 26) + ' 28 ' + (my - 8) + 'Z" fill="' + DARK + '" display="none"/>'
+      + '<circle class="m-o" cx="0" cy="' + (my + 2) + '" r="9" fill="' + DARK + '" display="none"/>';
+
+    if (look.cheeks) {
+      s += '<circle cx="' + f1(-ex - 24) + '" cy="' + (my - 6) + '" r="11" fill="#ff86a6" opacity="0.8"/>'
+        + '<circle cx="' + f1(ex + 24) + '" cy="' + (my - 6) + '" r="11" fill="#ff86a6" opacity="0.8"/>';
+    }
+    return s;
+  }
+
+  var bots = [];
+
+  function makeBot(n, look) {
+    var g = geom(n);
+    var root = el('g', { 'class': 'bot' });
+    root.appendChild(el('ellipse', { cx: 0, cy: 0, rx: f1(g.cw * 0.52), ry: 15, fill: '#3a2f73', opacity: 0.16 }));
+    var bob = el('g');
+    var body = artBody(look, g);
+    // A broad collar rather than a thin neck. Besides looking sturdier, it
+    // closes the gap between head and body, so a dancer standing behind
+    // the robot being counted cannot show through it.
+    var cw = f1(Math.min(g.hw, g.topW) * 0.62);
+    bob.innerHTML = artMove(look, g) + artArms(look) + body
+      + '<rect x="' + f1(-cw / 2) + '" y="' + (g.neckTop - 8) + '" width="' + cw + '" height="26" rx="10" fill="' + LIMB + '"/>'
+      + '<g class="head">' + artHead(look, g, n) + '</g>';
+    root.appendChild(bob);
+    var hit = el('rect', { 'class': 'hit', x: f1(-g.cw / 2 - 60), y: -500, width: f1(g.cw + 120), height: 520 });
+    root.appendChild(hit);
+    document.getElementById('bots').appendChild(root);
+
+    function all(sel) { return Array.prototype.slice.call(bob.querySelectorAll(sel)); }
+
+    var b = {
+      n: n, look: look, g: g, root: root, bob: bob,
+      head: bob.querySelector('.head'),
+      eyes: bob.querySelector('.eyes'),
+      num: bob.querySelector('.num'),
+      tread: bob.querySelector('.tread'),
+      mouths: { smile: bob.querySelector('.m-smile'), grin: bob.querySelector('.m-grin'), o: bob.querySelector('.m-o') },
+      mood: 'smile',
+      arms: all('.arm').map(function (a) { return { node: a, side: +a.getAttribute('data-side') }; }),
+      legs: all('.leg').map(function (a) { return { node: a, x: +a.getAttribute('data-x') }; }),
+      spins: all('.spin').map(function (a) { return { node: a, r: +a.getAttribute('data-r') }; }),
+      pupils: all('.pupil').map(function (a) {
+        return { node: a, x: +a.getAttribute('data-x'), mx: +a.getAttribute('data-mx'), my: +a.getAttribute('data-my') };
+      }),
+      ants: all('.ant').map(function (a) {
+        return {
+          node: a, x: +a.getAttribute('data-x'), y: +a.getAttribute('data-y'),
+          wrap: a.querySelector('.bulbw'), bulb: a.querySelector('.bulb'), glow: a.querySelector('.glow'),
+          lit: false, wob: 0, wph: 0, ping: 0, shown: ''
+        };
+      }),
+      x: 0, y: 0, s: 1, vx: 0, vy: 0, travel: 0, walk: null,
+      role: 'main', slot: -1, lit: 0, misses: 0, helped: false,
+      hopT: 0, tiltT: 0, cheerT: 0, waveT: 0, waveDur: 1, lookT: 0, lookUpT: 0, lookAt: null,
+      lx: 0, ly: 0.3, blink: rnd(2, 5), blinkV: 1, seed: rnd(0, 6.3),
+      dance: Math.floor(Math.random() * 3), tapCool: 0
+    };
+    bots.push(b);
+    return b;
+  }
+
+  function removeBot(b) {
+    var i = bots.indexOf(b);
+    if (i >= 0) { bots.splice(i, 1); }
+    if (b.root.parentNode) { b.root.parentNode.removeChild(b.root); }
+  }
+
+  function place(b, p) { b.x = p.x; b.y = p.y; b.s = p.s; }
+
+  function setTummy(b) {
+    clear(b.num);
+    strokeGlyph(b.num, b.n, INK, 34, 0.25);
+    strokeGlyph(b.num, b.n, INK, 16);
+  }
+
+  function lightAnt(b, i) {
+    var a = b.ants[i];
+    a.lit = true; a.ping = 1; a.wob = 1;
+  }
+
+  function dimAll(b) {
+    for (var i = 0; i < b.ants.length; i++) { b.ants[i].lit = false; }
+    b.lit = 0;
+  }
+
+  // ------------------------------------------------------------------
+  // Walking. Always a straight line at a steady pace, getting smaller as
+  // a robot heads to the back of the room, with legs or wheels turning
+  // to match the ground actually covered.
+  // ------------------------------------------------------------------
+  function walkTo(b, to, done, speed, exact) {
+    var dist = Math.hypot(to.x - b.x, to.y - b.y);
+    var dur = dist / (speed || 380);
+    if (!exact) { dur = clamp(dur, 0.7, 2.2); }
+    if (reduced) {
+      place(b, to);
+      b.walk = null;
+      later(0.3, function () { if (done) { done(b); } });
+      return;
+    }
+    b.walk = { from: { x: b.x, y: b.y, s: b.s }, to: to, u: 0, dur: Math.max(0.05, dur), done: done };
+  }
+
+  function stepWalk(b, dt) {
+    var w = b.walk;
+    w.u = Math.min(1, w.u + dt / w.dur);
+    var nx = lerp(w.from.x, w.to.x, w.u), ny = lerp(w.from.y, w.to.y, w.u), ns = lerp(w.from.s, w.to.s, w.u);
+    var dx = nx - b.x, dy = ny - b.y;
+    b.vx = dx / Math.max(dt, 0.001);
+    b.vy = dy / Math.max(dt, 0.001);
+    b.travel += (dx >= 0 ? 1 : -1) * Math.hypot(dx, dy) / Math.max(ns, 0.05);
+    b.x = nx; b.y = ny; b.s = ns;
+    if (w.u >= 1) {
+      b.walk = null;
+      b.vx = 0; b.vy = 0;
+      if (w.done) { w.done(b); }
+    }
+  }
+
+  function finishWalk(b) {
+    if (!b.walk) { return; }
+    var w = b.walk;
+    b.walk = null;
+    place(b, w.to);
+    b.vx = 0; b.vy = 0;
+    if (w.done) { w.done(b); }
+  }
+
+  // ------------------------------------------------------------------
+  // Drawing a robot each frame
+  // ------------------------------------------------------------------
+  function setMood(b, m) {
+    if (b.mood === m) { return; }
+    b.mood = m;
+    b.mouths.smile.setAttribute('display', m === 'smile' ? 'inline' : 'none');
+    b.mouths.grin.setAttribute('display', m === 'grin' ? 'inline' : 'none');
+    b.mouths.o.setAttribute('display', m === 'o' ? 'inline' : 'none');
+  }
+
+  function updateBot(b, dt, t, beat) {
+    if (b.walk) { stepWalk(b, dt); }
+    if (bots.indexOf(b) < 0) { return; }
+
+    b.hopT = Math.max(0, b.hopT - dt);
+    b.tiltT = Math.max(0, b.tiltT - dt);
+    b.cheerT = Math.max(0, b.cheerT - dt);
+    b.waveT = Math.max(0, b.waveT - dt);
+    b.lookT = Math.max(0, b.lookT - dt);
+    b.lookUpT = Math.max(0, b.lookUpT - dt);
+
+    var g = b.g;
+    var walking = !!b.walk;
+    var dancing = beat >= 0 && b.role === 'dancer' && !walking;
+    var hop = 0, squash = 1, lean = 0, tilt = 0, legA = 0;
+    var raiseL = 12, raiseR = 12;
+
+    if (!reduced) {
+      if (walking) {
+        var ph = b.travel * 0.024;
+        if (b.look.move === 'legs') {
+          legA = Math.sin(ph) * 24;
+          hop = -Math.abs(Math.cos(ph)) * 6;
+        } else {
+          hop = -Math.abs(Math.sin(ph * 3)) * 1.6;
+        }
+        lean = clamp(b.vx / Math.max(b.s, 0.1) * 0.01, -5, 5);
+        raiseL = 14 + Math.sin(ph) * 14;
+        raiseR = 14 - Math.sin(ph) * 14;
+      } else if (dancing) {
+        var fr = beat - Math.floor(beat), up = Math.sin(fr * Math.PI);
+        if (b.dance === 0) {
+          // Bouncing, arms taking turns.
+          var v = (Math.cos(beat * Math.PI) + 1) / 2;
+          hop = -up * 26;
+          squash = 1 + up * 0.05;
+          raiseL = 30 + 120 * v;
+          raiseR = 150 - 120 * v;
+          legA = Math.sin(beat * Math.PI) * 10;
+        } else if (b.dance === 1) {
+          // Swaying, both arms up and waving.
+          lean = Math.sin(beat * Math.PI) * 10;
+          raiseL = 140 + Math.sin(beat * Math.PI * 2) * 18;
+          raiseR = 140 - Math.sin(beat * Math.PI * 2) * 18;
+          hop = -up * 8;
+        } else {
+          // Nodding, arms pumping.
+          hop = -up * 14;
+          raiseL = raiseR = 50 + up * 80;
+          tilt = Math.sin(beat * Math.PI) * 10;
+        }
+      } else if (b.role === 'dancer') {
+        // Dancing quietly at the back while the next one is counted.
+        var sway = t * 1.7 + b.seed;
+        lean = Math.sin(sway) * 3;
+        hop = -Math.abs(Math.sin(sway)) * 5;
+        raiseL = 22 + Math.abs(Math.sin(sway)) * 26;
+        raiseR = 22 + Math.abs(Math.cos(sway)) * 26;
+      } else {
+        hop = Math.sin(t * 2.1 + b.seed) * 2.5;
+      }
+
+      if (b.hopT > 0) {
+        var hh = Math.sin((1 - b.hopT / 0.5) * Math.PI);
+        hop -= hh * 34;
+        squash *= 1 + hh * 0.06;
+      }
+      if (b.tiltT > 0) { tilt += Math.sin((1 - b.tiltT / 1.1) * Math.PI) * 14; }
+      if (b.cheerT > 0) {
+        var c = Math.min(1, (1.6 - b.cheerT) * 5, b.cheerT * 4);
+        raiseL = lerp(raiseL, 150 + Math.sin(t * 14) * 12, c);
+        raiseR = lerp(raiseR, 150 - Math.sin(t * 14) * 12, c);
+        hop -= Math.abs(Math.sin(t * 9)) * 18 * c;
+      }
+      if (b.waveT > 0) {
+        var w = Math.min(1, (b.waveDur - b.waveT) * 6, b.waveT * 5);
+        raiseR = lerp(raiseR, 140 + Math.sin(t * 11) * 22, w);
+      }
+    } else {
+      // Still poses rather than movement.
+      if (dancing || b.cheerT > 0) { raiseL = raiseR = 140; }
+      if (b.waveT > 0) { raiseR = 140; }
+    }
+
+    b.root.setAttribute('transform', 'translate(' + f1(b.x) + ',' + f1(b.y) + ') scale(' + b.s.toFixed(4) + ')');
+    b.bob.setAttribute('transform', 'translate(0,' + f1(hop) + ') rotate(' + f1(lean) + ') scale(1,' + squash.toFixed(3) + ')');
+    b.head.setAttribute('transform', 'rotate(' + f1(tilt) + ' 0 ' + g.neckTop + ')');
+
+    var i;
+    for (i = 0; i < b.arms.length; i++) {
+      var arm = b.arms[i];
+      var raise = arm.side < 0 ? raiseL : raiseR;
+      arm.node.setAttribute('transform', 'translate(' + f1(g.sx * arm.side) + ',' + g.shoulderY + ') rotate(' + f1(-arm.side * raise) + ')');
+    }
+    for (i = 0; i < b.legs.length; i++) {
+      var lg = b.legs[i];
+      lg.node.setAttribute('transform', 'translate(' + lg.x + ',-76) rotate(' + f1(i ? -legA : legA) + ')');
+    }
+    for (i = 0; i < b.spins.length; i++) {
+      var sp = b.spins[i];
+      sp.node.setAttribute('transform', 'rotate(' + f1((b.travel / sp.r) * 57.3 % 360) + ')');
+    }
+    if (b.tread) { b.tread.setAttribute('stroke-dashoffset', f1(-b.travel % 20)); }
+
+    // Antennae: a gentle wobble always, a proper boing when one lights.
+    var k = Math.floor(beat);
+    for (i = 0; i < b.ants.length; i++) {
+      var a = b.ants[i];
+      a.ping = Math.max(0, a.ping - dt * 3);
+      if (a.wob > 0) { a.wob = Math.max(0, a.wob - dt * 1.4); a.wph += dt * 20; }
+      var ang = reduced ? 0 : Math.sin(t * 2.1 + i * 0.9 + b.seed) * 2 + Math.sin(a.wph) * 16 * a.wob;
+      a.node.setAttribute('transform', 'translate(' + a.x + ',' + a.y + ') rotate(' + f1(ang) + ')');
+      var pk = reduced ? 1 : 1 + a.ping * 0.45;
+      a.wrap.setAttribute('transform', 'translate(0,-72) scale(' + pk.toFixed(3) + ')');
+      var col, glow;
+      if (dancing) { col = PARTY_COLS[(k + i) % PARTY_COLS.length]; glow = 1; }
+      else if (a.lit) { col = BULB_ON; glow = 1; }
+      else { col = BULB_OFF; glow = 0; }
+      var key = col + glow;
+      if (key !== a.shown) {
+        a.shown = key;
+        a.bulb.setAttribute('fill', col);
+        a.glow.setAttribute('opacity', glow);
+      }
+    }
+
+    // Eyes go where its attention is: where it is walking, up at its own
+    // antennae while it is being counted, at a button she has just
+    // pressed, and otherwise at her.
+    var lx = 0, ly = 0.3;
+    var eyeWorldY = b.y + g.eyeY * b.s;
+    function toward(px, py) {
+      var dx = px - b.x, dy = py - eyeWorldY, m = Math.hypot(dx, dy) || 1;
+      lx = dx / m; ly = dy / m;
+    }
+    if (walking) {
+      var spd = Math.hypot(b.vx, b.vy);
+      if (spd > 1) { lx = b.vx / spd; ly = b.vy / spd * 0.5; }
+    } else if (b.lookUpT > 0) {
+      lx = 0; ly = -1;
+    } else if (b.lookT > 0 && b.lookAt) {
+      toward(b.lookAt.x, b.lookAt.y);
+    } else if (dancing) {
+      toward(L.ball.x, L.ball.y);
+    } else if (b.role === 'dancer') {
+      var ms = mainSpot();
+      toward(ms.x, ms.y - 250 * ms.s);
+    }
+    var ease = Math.min(1, dt * 10);
+    b.lx += (lx - b.lx) * ease;
+    b.ly += (ly - b.ly) * ease;
+    for (i = 0; i < b.pupils.length; i++) {
+      var pu = b.pupils[i];
+      pu.node.setAttribute('transform', 'translate(' + f1(pu.x + b.lx * pu.mx) + ',' + f1(g.eyeY + b.ly * pu.my) + ')');
+    }
+
+    b.blink -= dt;
+    if (b.blink <= 0) { b.blink = rnd(2.5, 6); b.blinkV = 0; }
+    b.blinkV = Math.min(1, b.blinkV + dt * 7);
+    var bk = reduced ? 1 : clamp(b.blinkV, 0.08, 1);
+    b.eyes.setAttribute('transform', 'translate(0,' + g.eyeY + ') scale(1,' + bk.toFixed(3) + ') translate(0,' + (-g.eyeY) + ')');
+
+    if (b.cheerT > 0 || b.waveT > 0 || dancing) { setMood(b, 'grin'); }
+    else if (b.tiltT > 0) { setMood(b, 'o'); }
+    else { setMood(b, 'smile'); }
+  }
+
+  // Nearer robots are drawn over further ones. Only reshuffled when the
+  // order has actually changed.
+  var drawn = [];
+  function sortBots() {
+    var s = bots.slice().sort(function (a, b) { return a.y - b.y; });
+    var same = s.length === drawn.length;
+    for (var i = 0; same && i < s.length; i++) { if (s[i] !== drawn[i]) { same = false; } }
+    if (same) { return; }
+    var g = document.getElementById('bots');
+    for (i = 0; i < s.length; i++) { g.appendChild(s[i].root); }
+    drawn = s;
+  }
+
+  // ------------------------------------------------------------------
+  // The three buttons. Always in order, smallest on the left, so the
+  // row of them reads as a little number line.
+  // ------------------------------------------------------------------
+  var buttons = [];
+
+  function makeButton(n, i) {
+    var g = el('g', { 'class': 'btn' });
+    var gs = n >= 10 ? 0.74 : 0.9;
+    // The glow is wider than the gap to the next button, so it must never
+    // catch a tap: a finger on the edge of a neighbour would answer this.
+    g.innerHTML = '<g class="ring" opacity="0" pointer-events="none"><circle r="175" fill="url(#cheer)"/>'
+      + '<circle r="118" fill="none" stroke="#ffd60a" stroke-width="16"/></g>'
+      + '<ellipse cx="0" cy="16" rx="100" ry="92" fill="#3a2f73" opacity="0.18"/>'
+      + '<circle cx="0" cy="8" r="100" fill="#d9601f"/>'
+      + '<circle r="100" fill="#ff8f3f"/>'
+      + '<circle cy="-2" r="80" fill="#fffaf0"/>'
+      + '<g class="bnum" transform="translate(0,-2) scale(' + gs + ')"></g>'
+      + '<circle class="hit" r="118"/>';
+    var num = g.querySelector('.bnum');
+    strokeGlyph(num, n, '#26306a', 17);
+    document.getElementById('btns').appendChild(g);
+    return {
+      n: n, g: g, num: num, ring: g.querySelector('.ring'), gs: gs, slot: i,
+      k: 0, delay: reduced ? 0 : 0.1 + i * 0.09, pressT: 0, wobT: 0, hide: false, ringOn: -1
+    };
+  }
+
+  function showButtons(answer) {
+    clearButtons();
+    var range = levelNumbers(level);
+    var others = shuffle(range.filter(function (k) { return k !== answer; })).slice(0, 2);
+    var picks = [answer].concat(others).sort(function (a, b) { return a - b; });
+    for (var i = 0; i < picks.length; i++) { buttons.push(makeButton(picks[i], i)); }
+  }
+
+  function clearButtons() {
+    clear(document.getElementById('btns'));
+    buttons = [];
+  }
+
+  function updateButtons(dt, t) {
+    for (var i = buttons.length - 1; i >= 0; i--) {
+      var b = buttons[i];
+      if (b.delay > 0) {
+        b.delay -= dt;
+        b.g.setAttribute('transform', 'scale(0)');
+        continue;
+      }
+      if (b.hide) { b.k = reduced ? 0 : Math.max(0, b.k - dt * 5); }
+      else { b.k = reduced ? 1 : Math.min(1, b.k + dt * 3.2); }
+      if (b.hide && b.k <= 0) {
+        if (b.g.parentNode) { b.g.parentNode.removeChild(b.g); }
+        buttons.splice(i, 1);
+        continue;
+      }
+      b.pressT = Math.max(0, b.pressT - dt);
+      b.wobT = Math.max(0, b.wobT - dt);
+
+      var sc = b.hide ? b.k : easeOutBack(b.k);
+      var rot = 0;
+      if (!reduced) {
+        if (b.pressT > 0) { sc *= 1 - Math.sin((b.pressT / 0.2) * Math.PI) * 0.1; }
+        if (b.wobT > 0) { rot = Math.sin(b.wobT * 30) * 12 * (b.wobT / 0.5); }
+      }
+      var helping = helpN === b.n && !b.hide;
+      if (helping && !reduced) { sc *= 1.05 + Math.sin(t * 6) * 0.06; }
+      var ringOp = helping ? (reduced ? 1 : 0.6 + Math.sin(t * 6) * 0.4) : 0;
+      if (Math.abs(ringOp - b.ringOn) > 0.01) { b.ringOn = ringOp; b.ring.setAttribute('opacity', ringOp.toFixed(2)); }
+
+      b.g.setAttribute('transform', 'translate(' + f1(L.btnXs[b.slot]) + ',' + f1(L.btnY) + ') rotate(' + f1(rot) + ') scale(' + (L.btnR / 100 * sc).toFixed(4) + ')');
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Effects: the numeral flying to its robot, sparkles, confetti.
+  // ------------------------------------------------------------------
+  var fxLayer = document.getElementById('fx');
+  var flights = [], bits = [], confetti = [];
+
+  function tummyPoint(b) {
+    return { x: b.x, y: b.y + b.g.tummyY * b.s, s: 0.6 * b.s };
+  }
+
+  function flyNumeral(btn, b, done) {
+    btn.num.setAttribute('opacity', '0');
+    var node = el('g');
+    strokeGlyph(node, b.n, '#26306a', 17);
+    fxLayer.appendChild(node);
+    flights.push({
+      node: node, b: b, u: 0, dur: reduced ? 0.01 : 0.7, done: done,
+      from: { x: L.btnXs[btn.slot], y: L.btnY - 2 * L.btnR / 100, s: btn.gs * L.btnR / 100 }
+    });
+  }
+
+  function celebrate(x, y, r) {
+    var glow = el('circle', { cx: f1(x), cy: f1(y), r: f1(r), fill: 'url(#cheer)', opacity: 0 });
+    fxLayer.appendChild(glow);
+    bits.push({ glow: glow, life: 0.9, max: 0.9 });
+    if (reduced) { glow.setAttribute('opacity', '0.55'); return; }
+    for (var i = 0; i < 10; i++) {
+      var ang = (Math.PI * 2 * i) / 10 + rnd(-0.2, 0.2), sp = rnd(0.5, 1.2) * r;
+      var n = el('circle', { cx: f1(x), cy: f1(y), r: f1(rnd(0.04, 0.07) * r), fill: i % 2 ? '#ffd84d' : '#fff6cf' });
+      fxLayer.appendChild(n);
+      bits.push({ n: n, x: x, y: y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - r * 0.3, life: 0.9, max: 0.9, grav: r * 2 });
+    }
+  }
+
+  function spawnConfetti() {
+    if (confetti.length >= 40 || reduced) { return; }
+    var n = el('rect', { x: -6, y: -3, width: 12, height: 6, rx: 2, fill: PARTY_COLS[Math.floor(Math.random() * PARTY_COLS.length)] });
+    fxLayer.appendChild(n);
+    confetti.push({ n: n, x: rnd(0, L.W), y: -20, vy: rnd(90, 160), sway: rnd(0, 6.3), rot: rnd(0, 360), vr: rnd(-240, 240) });
+  }
+
+  function clearFx() {
+    clear(fxLayer);
+    flights = []; bits = []; confetti = [];
+  }
+
+  function updateFx(dt, t, beat) {
+    var i;
+    for (i = flights.length - 1; i >= 0; i--) {
+      var f = flights[i];
+      f.u = Math.min(1, f.u + dt / f.dur);
+      var e = easeInOut(f.u), to = tummyPoint(f.b);
+      var x = lerp(f.from.x, to.x, e);
+      var y = lerp(f.from.y, to.y, e) - Math.sin(f.u * Math.PI) * L.H * 0.12;
+      var s = lerp(f.from.s, to.s, e);
+      f.node.setAttribute('transform', 'translate(' + f1(x) + ',' + f1(y) + ') scale(' + s.toFixed(4) + ')');
+      if (f.u >= 1) {
+        if (f.node.parentNode) { f.node.parentNode.removeChild(f.node); }
+        flights.splice(i, 1);
+        if (f.done) { f.done(); }
+      }
+    }
+
+    for (i = bits.length - 1; i >= 0; i--) {
+      var p = bits[i];
+      p.life -= dt;
+      var u = 1 - Math.max(0, p.life) / p.max;
+      if (p.glow) {
+        if (!reduced) { p.glow.setAttribute('opacity', (Math.sin(u * Math.PI) * 0.85).toFixed(3)); }
+      } else {
+        p.vy += p.grav * dt;
+        p.x += p.vx * dt; p.y += p.vy * dt;
+        p.n.setAttribute('cx', f1(p.x));
+        p.n.setAttribute('cy', f1(p.y));
+        p.n.setAttribute('opacity', (1 - u).toFixed(3));
+      }
+      if (p.life <= 0) {
+        var node = p.glow || p.n;
+        if (node.parentNode) { node.parentNode.removeChild(node); }
+        bits.splice(i, 1);
+      }
+    }
+
+    if (beat >= 0 && beat < PARTY_BEATS - 4) {
+      confettiAcc += dt * 10;
+      while (confettiAcc >= 1) { confettiAcc -= 1; spawnConfetti(); }
+    }
+    for (i = confetti.length - 1; i >= 0; i--) {
+      var c = confetti[i];
+      c.y += c.vy * dt;
+      c.sway += dt * 2.4;
+      c.rot += c.vr * dt;
+      var cx = c.x + Math.sin(c.sway) * 26;
+      c.n.setAttribute('transform', 'translate(' + f1(cx) + ',' + f1(c.y) + ') rotate(' + f1(c.rot) + ')');
+      if (c.y > L.H + 20) {
+        if (c.n.parentNode) { c.n.parentNode.removeChild(c.n); }
+        confetti.splice(i, 1);
+      }
+    }
+  }
+  var confettiAcc = 0;
+
+  // ------------------------------------------------------------------
+  // The party: the room goes dark, a disco ball comes down, coloured
+  // lights sweep the floor, and every robot dances to the beat.
+  // ------------------------------------------------------------------
+  var disco = { p: 0, target: 0 };
+
+  function drawParty() {
+    var g = document.getElementById('party');
+    clear(g);
+    disco.g = g;
+    disco.dim = el('rect', { x: 0, y: 0, width: L.W, height: L.H, fill: '#170f3c', opacity: 0 });
+    g.appendChild(disco.dim);
+
+    disco.spots = [];
+    for (var i = 0; i < 6; i++) {
+      var sp = el('ellipse', { cx: 0, cy: 0, rx: 80, ry: 22, fill: PARTY_COLS[i], opacity: 0 });
+      g.appendChild(sp);
+      disco.spots.push(sp);
+    }
+    disco.beams = [];
+    for (i = 0; i < 5; i++) {
+      var bm = el('path', { d: 'M0 0', fill: PARTY_COLS[i], opacity: 0 });
+      g.appendChild(bm);
+      disco.beams.push(bm);
+    }
+
+    disco.string = el('path', { d: 'M0 0', stroke: '#7d86a8', 'stroke-width': 3 });
+    g.appendChild(disco.string);
+    var ball = el('g');
+    ball.appendChild(el('circle', { r: 1, fill: 'url(#ballg)' }));
+    var clip = el('g', { 'clip-path': 'url(#ballclip)' });
+    var facets = el('g');
+    for (var row = -4; row < 4; row++) {
+      for (var col = -8; col < 8; col++) {
+        facets.appendChild(el('rect', {
+          x: col * 0.25 + 0.02, y: row * 0.25 + 0.02, width: 0.21, height: 0.21,
+          fill: (row + col) % 2 ? '#ffffff' : '#8e98b8', opacity: (row + col) % 2 ? 0.55 : 0.35
+        }));
+      }
+    }
+    clip.appendChild(facets);
+    ball.appendChild(clip);
+    ball.appendChild(el('circle', { r: 1, fill: 'none', stroke: '#5c6684', 'stroke-width': 0.04 }));
+    var shine = el('path', { d: 'M-0.5 -0.62L-0.42 -0.42L-0.22 -0.36L-0.42 -0.3L-0.5 -0.1L-0.58 -0.3L-0.78 -0.36L-0.58 -0.42Z', fill: '#ffffff' });
+    ball.appendChild(shine);
+    g.appendChild(ball);
+    disco.ball = ball;
+    disco.facets = facets;
+    disco.shine = shine;
+    g.setAttribute('display', disco.p > 0 ? 'inline' : 'none');
+  }
+
+  function updateParty(dt, t, beat) {
+    var was = disco.p;
+    if (reduced) { disco.p = disco.target; }
+    else if (disco.p < disco.target) { disco.p = Math.min(disco.target, disco.p + dt * 1.2); }
+    else if (disco.p > disco.target) { disco.p = Math.max(disco.target, disco.p - dt * 1.2); }
+    var p = disco.p;
+    if (p <= 0) {
+      if (was > 0 || disco.g.getAttribute('display') !== 'none') { disco.g.setAttribute('display', 'none'); }
+      return;
+    }
+    disco.g.setAttribute('display', 'inline');
+    disco.dim.setAttribute('opacity', (0.6 * p).toFixed(3));
+
+    var B = L.ball, k = Math.floor(Math.max(0, beat));
+    var by = lerp(-B.r * 1.5, B.y, easeInOut(p));
+    disco.string.setAttribute('d', 'M' + B.x + ' 0V' + f1(by - B.r));
+    disco.ball.setAttribute('transform', 'translate(' + B.x + ',' + f1(by) + ') scale(' + f1(B.r) + ')');
+    disco.facets.setAttribute('transform', 'translate(' + (reduced ? 0 : ((t * 0.3) % 0.5).toFixed(3)) + ',0)');
+    disco.shine.setAttribute('opacity', reduced ? 0.8 : (0.5 + Math.sin(t * 7) * 0.5).toFixed(2));
+
+    var i, len = L.H - by;
+    for (i = 0; i < disco.beams.length; i++) {
+      var th = reduced ? (i - 2) * 0.35 : Math.sin(t * 0.9 + i * 1.7) * 0.75, d = 0.08;
+      var xa = B.x + Math.tan(th - d) * len, xb = B.x + Math.tan(th + d) * len;
+      disco.beams[i].setAttribute('d', 'M' + B.x + ' ' + f1(by) + 'L' + f1(xa) + ' ' + L.H + 'L' + f1(xb) + ' ' + L.H + 'Z');
+      disco.beams[i].setAttribute('fill', PARTY_COLS[(i + (reduced ? k : 0)) % PARTY_COLS.length]);
+      disco.beams[i].setAttribute('opacity', (0.16 * p).toFixed(3));
+    }
+    var fl = L.H - L.horizon;
+    for (i = 0; i < disco.spots.length; i++) {
+      var sx = reduced ? 120 + i * 150 : 500 + Math.sin(t * 0.6 + i * 1.1) * 400;
+      var sy = L.horizon + fl * (0.2 + 0.65 * ((i * 0.37) % 1)) + (reduced ? 0 : Math.sin(t * 0.8 + i) * fl * 0.05);
+      var rx = 50 + 70 * ((sy - L.horizon) / fl);
+      var sp = disco.spots[i];
+      sp.setAttribute('cx', f1(sx));
+      sp.setAttribute('cy', f1(sy));
+      sp.setAttribute('rx', f1(rx));
+      sp.setAttribute('ry', f1(rx * 0.28));
+      sp.setAttribute('fill', PARTY_COLS[(i + k) % PARTY_COLS.length]);
+      sp.setAttribute('opacity', (0.35 * p).toFixed(3));
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // The game.
+  //
+  // A level is five robots. Each walks to the front, she counts its
+  // antennae and picks its number, the number flies onto its tummy, and
+  // it walks off to dance at the back. Five done is a party. Nothing
+  // can be lost: a wrong number is said aloud and the robot looks
+  // puzzled, and after two of those it counts itself, out loud, and the
+  // right button starts to glow.
+  // ------------------------------------------------------------------
+  var mode = 'auto';      // auto: 1-5 then 6-10 | low: 1-5 only | high: 6-10 only
+  var level = 1;
+  var queue = [];
+  var main = null;
+  var phase = 'idle';
+  var lockUntil = 0, countReady = 0, autoCounting = false, helpN = 0;
+  var slotNext = 0;
+  var nextSide = -1;
+  var greeted = false;
+
+  function levelNumbers(lv) { return lv === 1 ? [1, 2, 3, 4, 5] : [6, 7, 8, 9, 10]; }
+
+  function startGame() {
+    gen++;
+    while (bots.length) { removeBot(bots[0]); }
+    drawn = [];
+    clearButtons();
+    clearFx();
+    main = null;
+    party = null;
+    disco.target = 0;
+    deck = {};
+    slotNext = 0;
+    autoCounting = false;
+    helpN = 0;
+    startLevel(mode === 'high' ? 2 : 1);
+  }
+
+  function startLevel(lv) {
+    level = lv;
+    queue = shuffle(levelNumbers(lv));
+    phase = 'between';
+    drawScenery();
+    later(0.5, nextRobot);
+  }
+
+  function nextRobot() {
+    if (!queue.length) { return; }
+    var n = queue.shift();
+    var b = makeBot(n, pickLook());
+    var spot = mainSpot();
+    main = b;
+    b.role = 'main';
+    place(b, { x: 0, y: spot.y, s: spot.s });
+    b.x = offstage(b, nextSide);
+    phase = 'enter';
+    helpN = 0;
+    walkTo(b, spot, function () { arrive(b); });
+  }
+
+  function arrive(b) {
+    if (b !== main) { return; }
+    phase = 'ask';
+    b.waveDur = b.waveT = 1.3;
+    hello();
+    showButtons(b.n);
+    lockUntil = 0;
+    countReady = 0;
+  }
+
+  // Each tap on the robot lights the next antenna and Dad says the next
+  // number. She does the counting; the robot keeps track. Capped at
+  // about two a second so bashing it still counts one at a time.
+  function tapMain() {
+    if (phase !== 'ask' || autoCounting || !main) { return; }
+    var t = nowS();
+    if (t < countReady) { return; }
+    countReady = t + 0.55;
+    var b = main;
+    if (b.lit >= b.n) { dimAll(b); }
+    lightAnt(b, b.lit);
+    b.lit++;
+    bip(b.lit - 1);
+    say(b.lit);
+    b.lookUpT = 0.8;
+  }
+
+  function answer(btn) {
+    if (phase !== 'ask' || autoCounting || !main || btn.hide) { return; }
+    var t = nowS();
+    if (t < lockUntil) { return; }
+    btn.pressT = 0.2;
+    pop();
+    main.lookAt = { x: L.btnXs[btn.slot], y: L.btnY };
+    main.lookT = 1.4;
+    if (btn.n === main.n) { solve(btn); }
+    else { wrong(btn); }
+  }
+
+  // A wrong number is not wrong so much as a different number: it says
+  // itself, and the robot tilts its head as if to say "that one?".
+  function wrong(btn) {
+    var b = main;
+    lockUntil = nowS() + 0.85;
+    say(btn.n);
+    btn.wobT = 0.5;
+    b.tiltT = 1.1;
+    later(0.5, hmm);
+    b.misses++;
+    if (b.misses >= 2 && !b.helped) {
+      b.helped = true;
+      autoCounting = true;
+      later(1.2, function () { autoCount(b); });
+    }
+  }
+
+  // Help arrives on its own and never announces itself as help: the
+  // robot just counts its own antennae out loud, one at a time, and then
+  // its number starts to glow.
+  function autoCount(b) {
+    if (b !== main) { return; }
+    dimAll(b);
+    for (var i = 0; i < b.n; i++) {
+      (function (i) {
+        later(0.2 + i * 0.7, function () {
+          if (b !== main) { return; }
+          lightAnt(b, i);
+          b.lit = i + 1;
+          bip(i);
+          say(i + 1);
+          b.lookUpT = 0.75;
+        });
+      })(i);
+    }
+    later(0.2 + b.n * 0.7 + 0.15, function () {
+      if (b !== main) { return; }
+      autoCounting = false;
+      helpN = b.n;
+    });
+  }
+
+  function solve(btn) {
+    var b = main;
+    phase = 'solved';
+    helpN = 0;
+    say(b.n);
+    for (var i = 0; i < buttons.length; i++) { if (buttons[i] !== btn) { buttons[i].hide = true; } }
+    whoosh();
+    flyNumeral(btn, b, function () {
+      setTummy(b);
+      tada();
+      var tp = tummyPoint(b);
+      celebrate(tp.x, tp.y, 160 * b.s);
+      b.cheerT = 1.6;
+      btn.hide = true;
+      // Every antenna lights up in a quick sweep, the whole count at once.
+      for (var j = 0; j < b.n; j++) {
+        (function (j) {
+          later(j * 0.06, function () { if (!b.ants[j].lit) { lightAnt(b, j); } });
+        })(j);
+      }
+      b.lit = b.n;
+      later(1.7, function () { sendToSlot(b); });
+    });
+  }
+
+  function sendToSlot(b) {
+    var sl = slotNext % L.slots.length;
+    slotNext++;
+    b.slot = sl;
+    b.role = 'toSlot';
+    if (main === b) { main = null; }
+    var dest = L.slots[sl];
+    // The next robot comes in from the far side, so the two never cross.
+    nextSide = dest.x < 500 ? 1 : -1;
+    walkTo(b, dest, function () {
+      b.role = 'dancer';
+      if (!queue.length && !main) { startParty(); }
+    }, 300);
+    if (queue.length) {
+      phase = 'between';
+      later(0.7, nextRobot);
+    } else {
+      phase = 'waiting';
+    }
+  }
+
+  function startParty() {
+    if (phase === 'party') { return; }
+    phase = 'party';
+    clearButtons();
+    disco.target = 1;
+    var lead = reduced ? 0.3 : 1.0;
+    party = { t0: nowS() + lead, off: AC ? AC.currentTime - nowS() : null, next: 0 };
+    later(lead + PARTY_BEATS * SPB, endParty);
+  }
+
+  function endParty() {
+    party = null;
+    disco.target = 0;
+    tada();
+    for (var i = 0; i < bots.length; i++) { bots[i].cheerT = 1.4; }
+    later(1.6, function () {
+      if (mode === 'auto' && level === 1) { startLevel(2); }
+      else { exitAll(); }
+    });
+  }
+
+  // Everyone waves, then walks off to whichever side is nearer, all at
+  // one speed so nobody catches up with the robot in front.
+  function exitAll() {
+    phase = 'exit';
+    bye();
+    var list = bots.slice();
+    for (var i = 0; i < list.length; i++) { list[i].waveDur = list[i].waveT = 1.1; }
+    later(1.0, function () {
+      var left = list.length;
+      if (!left) { finishExit(); return; }
+      list.forEach(function (b) {
+        b.role = 'exiting';
+        var side = b.x < 500 ? -1 : 1;
+        walkTo(b, { x: offstage(b, side), y: b.y, s: b.s }, function () {
+          removeBot(b);
+          left--;
+          if (left === 0) { finishExit(); }
+        }, 220, true);
+      });
+    });
+  }
+
+  function finishExit() {
+    slotNext = 0;
+    startLevel(mode === 'high' ? 2 : 1);
+  }
+
+  function tapDancer(b) {
+    var t = nowS();
+    if (t < b.tapCool) { return; }
+    b.tapCool = t + 0.6;
+    b.hopT = 0.5;
+    boing();
+    say(b.n);
+  }
+
+  // ------------------------------------------------------------------
+  // Frame loop
+  // ------------------------------------------------------------------
+  var lastFrame = 0;
+  function frame() {
+    var t = nowS();
+    var dt = lastFrame ? Math.min(0.05, t - lastFrame) : 0.016;
+    lastFrame = t;
+    var beat = party ? (t - party.t0) / SPB : -1;
+    if (beat >= PARTY_BEATS) { beat = -1; }
+    var list = bots.slice();
+    for (var i = 0; i < list.length; i++) { updateBot(list[i], dt, t, beat); }
+    sortBots();
+    updateButtons(dt, t);
+    updateFx(dt, t, beat);
+    updateParty(dt, t, beat);
+    requestAnimationFrame(frame);
+  }
+
+  // A new shape of screen: finish any walk at once and put every robot
+  // where its job says it should be in the new layout.
+  function relayout() {
+    computeLayout();
+    var list = bots.slice();
+    for (var i = 0; i < list.length; i++) { finishWalk(list[i]); }
+    for (i = 0; i < bots.length; i++) {
+      var b = bots[i];
+      if (b.role === 'main') { place(b, mainSpot()); }
+      else if (b.slot >= 0) { place(b, L.slots[b.slot]); }
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Input
+  // ------------------------------------------------------------------
+  var pressTimer = 0;
+
+  function botFor(node) {
+    for (var i = 0; i < bots.length; i++) { if (bots[i].root === node) { return bots[i]; } }
+    return null;
+  }
+
+  svg.addEventListener('pointerdown', function (ev) {
+    initAudio();
+    unlockClips();
+    var t = ev.target;
+    if (!t || !t.closest) { return; }
+
+    if (t.id === 'cornerdot') {
+      clearTimeout(pressTimer);
+      pressTimer = setTimeout(openParent, 850);
+      return;
+    }
+
+    var bn = t.closest('.btn');
+    if (bn) {
+      greeted = true;
+      for (var i = 0; i < buttons.length; i++) {
+        if (buttons[i].g === bn) { answer(buttons[i]); return; }
+      }
+      return;
+    }
+
+    var node = t.closest('.bot');
+    if (node) {
+      greeted = true;
+      var b = botFor(node);
+      if (!b) { return; }
+      if (b === main && b.role === 'main') { tapMain(); }
+      else if (b.role === 'dancer') { tapDancer(b); }
+      return;
+    }
+
+    // The very first touch on an empty bit of floor: on a phone nothing
+    // could make a sound until now, so the robot says hello again.
+    if (!greeted) {
+      greeted = true;
+      if (phase === 'ask' && main) { main.waveDur = main.waveT = 1.3; hello(); }
+    }
+  });
+
+  function endPress() { clearTimeout(pressTimer); }
+  svg.addEventListener('pointerup', endPress);
+  svg.addEventListener('pointercancel', endPress);
+  svg.addEventListener('pointerleave', endPress);
+  svg.addEventListener('contextmenu', function (ev) { ev.preventDefault(); });
+
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden && AC && AC.state === 'suspended') { AC.resume(); }
+  });
+
+  var resizeTimer = 0;
+  window.addEventListener('resize', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(relayout, 120);
+  });
+  window.addEventListener('orientationchange', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(relayout, 220);
+  });
+
+  // ------------------------------------------------------------------
+  // Parent controls. Progress starts fresh every time, but which numbers
+  // are in play is remembered.
+  // ------------------------------------------------------------------
+  var parentEl = document.getElementById('parent');
+
+  function loadPrefs() {
+    try {
+      var raw = window.localStorage.getItem('numberbots');
+      if (!raw) { return; }
+      var p = JSON.parse(raw);
+      if (p.mode === 'auto' || p.mode === 'low' || p.mode === 'high') { mode = p.mode; }
+    } catch (e) { /* a fresh start is a perfectly good fallback */ }
+  }
+
+  function savePrefs() {
+    try {
+      window.localStorage.setItem('numberbots', JSON.stringify({ mode: mode }));
+    } catch (e) { /* private browsing, and it does not matter */ }
+  }
+
+  function syncPanel() {
+    var bs = document.querySelectorAll('#segMode button');
+    for (var i = 0; i < bs.length; i++) {
+      bs[i].setAttribute('aria-pressed', bs[i].getAttribute('data-m') === mode ? 'true' : 'false');
+    }
+  }
+
+  function openParent() { syncPanel(); parentEl.classList.add('open'); }
+  function closeParent() { parentEl.classList.remove('open'); }
+
+  document.getElementById('segMode').addEventListener('click', function (ev) {
+    var b = ev.target.closest('button');
+    if (!b) { return; }
+    mode = b.getAttribute('data-m');
+    savePrefs(); syncPanel();
+    startGame();
+  });
+
+  document.getElementById('restart').addEventListener('click', function () {
+    startGame();
+    closeParent();
+  });
+
+  document.getElementById('close').addEventListener('click', closeParent);
+  parentEl.addEventListener('click', function (ev) {
+    if (ev.target === parentEl) { closeParent(); }
+  });
+
+  // ------------------------------------------------------------------
+  loadPrefs();
+  level = mode === 'high' ? 2 : 1;
+  computeLayout();
+  startGame();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
