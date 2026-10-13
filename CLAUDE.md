@@ -60,8 +60,15 @@ in commit 6f2b3ce.
 ## Hosting
 
 Live on GitHub Pages from `campbell226/kid-games`, served straight off
-`main`, so a push is a release. Each game sits at
-`https://campbell226.github.io/kid-games/games/<name>/<name>.html`.
+`main`, so a push is a release, under the custom domain in `CNAME`. Each
+game sits at `https://kidgames.jamesinthe.uk/games/<name>/<name>.html`;
+the old `campbell226.github.io/kid-games/` address redirects there.
+
+The two workers (Dictionary, Equine Dentist Academy) refuse any page whose
+origin is not on their `ALLOWED_ORIGINS` list. If the domain ever changes
+again, both lists change with it and both workers are redeployed, or
+those games quietly stop answering — which is what the move to the custom
+domain did on 11 October 2026.
 
 That URL is not a convenience. A browser refuses the microphone and camera
 to any page that is not on https, so a game with ears does nothing at all

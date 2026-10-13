@@ -3,7 +3,7 @@
 Browser games for my two children. One self-contained HTML file per game, no
 build step, no dependencies. Open a file in a browser and it runs.
 
-Played at: https://campbell226.github.io/kid-games/
+Played at: https://kidgames.jamesinthe.uk/
 
 ## Layout
 

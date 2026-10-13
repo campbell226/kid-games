@@ -57,7 +57,14 @@
 // taps her name.
 // ---------------------------------------------------------------------
 
-const ALLOWED_ORIGIN = 'https://campbell226.github.io';
+// The games moved to their own domain on 11 October 2026, and GitHub now
+// redirects the old address there, so a page never actually runs from
+// github.io any more. It stays on the list so that dropping the custom
+// domain would not silently lock the academy a second time.
+const ALLOWED_ORIGINS = [
+  'https://kidgames.jamesinthe.uk',
+  'https://campbell226.github.io'
+];
 
 // A family, with room for cousins. The cap is what stops a stranger
 // filling the picker with a thousand names for a child to scroll past.
@@ -178,10 +185,11 @@ async function logLine(env, kind, rider, text) {
 
 function cors(origin) {
   return {
-    'Access-Control-Allow-Origin': origin === ALLOWED_ORIGIN ? origin : ALLOWED_ORIGIN,
+    'Access-Control-Allow-Origin': ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0],
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Allow-Headers': 'content-type',
-    'Access-Control-Max-Age': '86400'
+    'Access-Control-Max-Age': '86400',
+    'Vary': 'Origin'
   };
 }
 
@@ -373,7 +381,7 @@ export default {
         password: !!env.DIRECTOR_PASSWORD
       }, 405, origin);
     }
-    if (origin && origin !== ALLOWED_ORIGIN) {
+    if (origin && !ALLOWED_ORIGINS.includes(origin)) {
       return json({ error: 'origin' }, 403, origin);
     }
     if (!env.ACADEMY) {

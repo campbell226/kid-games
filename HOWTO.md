@@ -5,7 +5,7 @@ and pushes, and the live site follows about a minute later.
 
 | | |
 |---|---|
-| **Live site** | https://campbell226.github.io/kid-games/ |
+| **Live site** | https://kidgames.jamesinthe.uk/ |
 | **Repo (the real project)** | https://github.com/campbell226/kid-games |
 | **Copy on the laptop** | `C:\Users\campb\Projects\kid-games` |
 
