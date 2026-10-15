@@ -68,12 +68,33 @@ The two workers (Dictionary, Equine Dentist Academy) refuse any page whose
 origin is not on their `ALLOWED_ORIGINS` list. If the domain ever changes
 again, both lists change with it and both workers are redeployed, or
 those games quietly stop answering — which is what the move to the custom
-domain did on 11 October 2026.
+domain did on 11 October 2026. The Android app's `Site.HOST` changes too,
+and the app is reinstalled.
 
 That URL is not a convenience. A browser refuses the microphone and camera
 to any page that is not on https, so a game with ears does nothing at all
 opened off the disk — Recorder Garden is the first of those. Anything built
 on a permission like that needs a fallback that still works without it.
+
+## Android app
+
+`android/` is a thin wrapper for the kids to use on a phone: one
+full-screen web view, no address bar, links out blocked, and screen pinning
+offered at launch. `android/README.md` explains it, and
+`android/install.ps1` builds it and installs it over wireless debugging.
+
+It answers requests for the real domain itself, from a copy of `index.html`
+and `games/` bundled at build time, and when it opens it fetches from GitHub
+whatever main has changed since. So:
+
+- A push to a game reaches the app on its own. Only a change under
+  `android/` needs a rebuild and reinstall.
+- A game works offline in the app only if everything it needs is under
+  `games/`. Anything fetched from elsewhere works online only.
+- The app grants the microphone and nothing else. A game that needs the
+  camera or any other permission needs a change to `MainActivity` too.
+- Android's web view has no speech synthesis or recognition, so a game
+  built on those must work without them, as Dictionary already does.
 
 ## Secrets
 

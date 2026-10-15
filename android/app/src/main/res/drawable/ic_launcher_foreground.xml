@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hoot, as drawn on the Dentist Hoot tile, without the dentist's kit. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="0.8"
+        android:scaleY="0.8"
+        android:translateX="54"
+        android:translateY="57">
+        <!-- wings -->
+        <group
+            android:pivotX="-23"
+            android:pivotY="-4"
+            android:rotation="-30">
+            <path
+                android:fillColor="#9E6F4C"
+                android:pathData="M-38,-4a15,8 0,1 0,30 0a15,8 0,1 0,-30 0z" />
+        </group>
+        <group
+            android:pivotX="23"
+            android:pivotY="-4"
+            android:rotation="30">
+            <path
+                android:fillColor="#9E6F4C"
+                android:pathData="M8,-4a15,8 0,1 0,30 0a15,8 0,1 0,-30 0z" />
+        </group>
+        <!-- ear tufts -->
+        <path
+            android:fillColor="#A87B55"
+            android:pathData="M-19,-20L-8,-33L-4,-19ZM19,-20L8,-33L4,-19Z" />
+        <!-- body and tummy -->
+        <path
+            android:fillColor="#B98A62"
+            android:pathData="M-25,0a25,29 0,1 0,50 0a25,29 0,1 0,-50 0z" />
+        <path
+            android:fillColor="#E9D3B5"
+            android:pathData="M-16,13a16,13 0,1 0,32 0a16,13 0,1 0,-32 0z" />
+        <path
+            android:pathData="M-8,12l3,2.5l3,-2.5M2,12l3,2.5l3,-2.5M-3,19l3,2.5l3,-2.5"
+            android:strokeColor="#C9A57E"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:strokeWidth="1.6" />
+        <!-- eyes -->
+        <path
+            android:fillColor="#FFFDF6"
+            android:pathData="M-21,-8a11,11.5 0,1 0,22 0a11,11.5 0,1 0,-22 0zM-1,-8a11,11.5 0,1 0,22 0a11,11.5 0,1 0,-22 0z" />
+        <path
+            android:fillColor="#3B2A1E"
+            android:pathData="M-15.2,-8a5.2,5.6 0,1 0,10.4 0a5.2,5.6 0,1 0,-10.4 0zM4.8,-8a5.2,5.6 0,1 0,10.4 0a5.2,5.6 0,1 0,-10.4 0z" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M-13.8,-10a1.8,1.8 0,1 0,3.6 0a1.8,1.8 0,1 0,-3.6 0zM6.2,-10a1.8,1.8 0,1 0,3.6 0a1.8,1.8 0,1 0,-3.6 0z" />
+        <!-- beak -->
+        <path
+            android:fillColor="#F2B33D"
+            android:pathData="M-4,3h8l-4,6z" />
+    </group>
+</vector>
