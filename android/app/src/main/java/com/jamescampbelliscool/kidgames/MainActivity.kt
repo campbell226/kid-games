@@ -5,6 +5,7 @@ import android.app.Activity
 import android.app.ActivityManager
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
@@ -36,12 +37,15 @@ class MainActivity : Activity() {
     private lateinit var root: FrameLayout
     private lateinit var web: WebView
     private lateinit var site: Site
+    private lateinit var bridge: Bridge
 
     // A game's request for full screen. The app already is, but granting it
     // lets the game see that it is and put its own button away.
     private var fullView: View? = null
 
-    // A game asking for the microphone, held while Android asks the person.
+    // Whatever wants the microphone - the web view for a game, or the Ear -
+    // waiting while Android asks the person.
+    private val micWaiting = mutableListOf<(Boolean) -> Unit>()
     private var micRequest: PermissionRequest? = null
 
     // Offered once each time the app comes to the front, so turning the offer
@@ -79,6 +83,8 @@ class MainActivity : Activity() {
             WindowInsets.CONSUMED
         }
         web = makeWeb()
+        bridge = Bridge(this, web)
+        bridge.install()
         root.addView(web, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         setContentView(root)
 
@@ -116,6 +122,9 @@ class MainActivity : Activity() {
         // Only the games' own address. Anything else - a link out, a
         // redirect, an app link - goes nowhere.
         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest) = !Site.isOurs(request.url)
+
+        // Speech and wake locks belong to the page that asked for them.
+        override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) = bridge.reset()
 
         // A game newer than the phone's copy, with no connection to fetch it:
         // back to the front door rather than a browser error page.
@@ -158,13 +167,13 @@ class MainActivity : Activity() {
                 request.deny()
                 return
             }
-            if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-                request.grant(arrayOf(mic))
-                return
-            }
             micRequest?.deny()
             micRequest = request
-            requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), ASK_MIC)
+            withMic { granted ->
+                if (micRequest !== request) return@withMic
+                micRequest = null
+                if (granted) request.grant(arrayOf(mic)) else request.deny()
+            }
         }
 
         override fun onPermissionRequestCanceled(request: PermissionRequest) {
@@ -172,15 +181,22 @@ class MainActivity : Activity() {
         }
     }
 
+    /** Runs [then] with whether the app may use the microphone, asking first if it has not been. */
+    fun withMic(then: (Boolean) -> Unit) {
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            then(true)
+            return
+        }
+        micWaiting += then
+        if (micWaiting.size == 1) requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), ASK_MIC)
+    }
+
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         if (requestCode != ASK_MIC) return
-        val request = micRequest ?: return
-        micRequest = null
-        if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
-            request.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
-        } else {
-            request.deny()
-        }
+        val granted = grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED
+        val waiting = micWaiting.toList()
+        micWaiting.clear()
+        waiting.forEach { it(granted) }
     }
 
     // Back leaves a game for the front door, and from the front door goes
@@ -249,12 +265,16 @@ class MainActivity : Activity() {
         super.onPause()
     }
 
+    // Out of sight, rather than merely paused: Android's own permission
+    // question pauses the app, and must not cancel the listening it is for.
     override fun onStop() {
         super.onStop()
+        bridge.reset()
         askedToPin = false
     }
 
     override fun onDestroy() {
+        bridge.shutdown()
         web.destroy()
         super.onDestroy()
     }

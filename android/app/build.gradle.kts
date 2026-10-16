@@ -25,6 +25,12 @@ android {
     }
 }
 
+dependencies {
+    // Only for Bridge: a script run before each page's own, and a message
+    // channel, both offered to the games' own address and nowhere else.
+    implementation("androidx.webkit:webkit:1.17.1")
+}
+
 // The app carries a snapshot of the site so it works offline from the first
 // launch: index.html and games/, copied straight from the repo, plus a list of
 // each file's git blob hash so that Sync can tell which ones main has changed

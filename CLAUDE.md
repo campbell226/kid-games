@@ -93,8 +93,10 @@ whatever main has changed since. So:
   `games/`. Anything fetched from elsewhere works online only.
 - The app grants the microphone and nothing else. A game that needs the
   camera or any other permission needs a change to `MainActivity` too.
-- Android's web view has no speech synthesis or recognition, so a game
-  built on those must work without them, as Dictionary already does.
+- The app supplies speech synthesis, speech recognition and the screen wake
+  lock itself, under the standard browser names, because the web view has
+  none that work. A game uses them exactly as it would in Chrome, and still
+  needs its fallback for a browser that lacks them.
 
 ## Secrets
 

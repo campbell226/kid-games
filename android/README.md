@@ -53,7 +53,12 @@ Changes to the games don't need any of this: they arrive by themselves.
 - Signed with Rascal's debug key. Building on another machine gives a
   different key, so Android won't install it over the top. Uninstalling
   first works, but loses saved progress.
-- Dictionary's Hoot can't speak or listen in the app: Android's web view has
-  no speech, so he falls back to a grown-up typing the word.
+- Android's web view has no working speech or screen wake lock, so the app
+  supplies them under the browser's standard names (`Bridge.kt`,
+  `res/raw/bridge.js`). `speechSynthesis` is Android's text-to-speech, which
+  works offline with the phone's installed voices. `SpeechRecognition` is the
+  phone's on-device recogniser where it has English, else Google's online
+  one. `navigator.wakeLock` keeps the screen on. Games use them exactly as
+  they would in Chrome.
 - If the games ever move to a different domain, `Site.HOST` changes with it,
   just as the workers' allowed-origin lists do.
