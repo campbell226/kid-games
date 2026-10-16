@@ -5,6 +5,19 @@
 // games' own address only, and it fills a gap only where there is one.
 (function () {
   'use strict';
+
+  // And takes one thing away. The app is full screen already, so a game has
+  // nothing to offer by way of a full-screen button. Without the call to
+  // make one work, every game leaves its button out, as on an iPhone.
+  ['requestFullscreen', 'webkitRequestFullscreen', 'webkitRequestFullScreen'].forEach(function (name) {
+    try { delete Element.prototype[name]; } catch (e) { /* not there to begin with */ }
+  });
+  ['fullscreenEnabled', 'webkitFullscreenEnabled'].forEach(function (name) {
+    try {
+      Object.defineProperty(Document.prototype, name, { get: function () { return false; }, configurable: true });
+    } catch (e) { /* not there to begin with */ }
+  });
+
   var port = window.KidGamesBridge;
   if (!port) { return; }
 

@@ -745,6 +745,9 @@ document.getElementById('fsBtn').addEventListener('click', e=>{
   if(document.fullscreenElement) document.exitFullscreen();
   else document.documentElement.requestFullscreen && document.documentElement.requestFullscreen();
 });
+// No button where the page cannot go full screen: an iPhone, or the
+// Android app, which already is.
+if (!document.documentElement.requestFullscreen) document.getElementById('fsBtn').style.display = 'none';
 
 // roundRect fallback for older browsers
 if(!CanvasRenderingContext2D.prototype.roundRect){

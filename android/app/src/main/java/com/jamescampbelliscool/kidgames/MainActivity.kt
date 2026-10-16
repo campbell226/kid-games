@@ -39,8 +39,9 @@ class MainActivity : Activity() {
     private lateinit var site: Site
     private lateinit var bridge: Bridge
 
-    // A game's request for full screen. The app already is, but granting it
-    // lets the game see that it is and put its own button away.
+    // A game's request for full screen. Bridge takes full screen away from
+    // the games altogether, so this is only reached on a web view too old for
+    // Bridge, where granting it lets the game see it is and put its button away.
     private var fullView: View? = null
 
     // Whatever wants the microphone - the web view for a game, or the Ear -
