@@ -202,21 +202,37 @@
   // for one job: the last chord of the minor song needs a major third so
   // there is a leading tone pulling back to the root, which is the
   // difference between an adventure and a nap.
+  //
+  // style is the one word shown for the song, for a grown-up wondering
+  // what they are listening to or wanting to join in on a real
+  // instrument. Six songs, six different words, each the one that says
+  // most about it:
+  //
+  //   Major    C major, I V vi IV. The plain bright one.
+  //   Minor    A minor, i VII VI V, with the V made major: the
+  //            Andalusian cadence, and the leading tone a minor key
+  //            usually borrows.
+  //   Aeolian  E natural minor, i VII iv VII. Minor with nothing
+  //            borrowed, so the flat seventh never pulls home.
+  //   Pop      F major, but sitting on vi IV I V - the same four chords
+  //            as Major started from somewhere sadder.
+  //   Blues    G, all three chords dominant sevenths.
+  //   Dorian   D minor with a major sixth, i IV i VII. The folk tune.
   var SONGS = [
     { id: 'bright', leader: 'cow', key: 0, scale: SCALES.major, bpm: 100,
-      colour: '#f0c33c',
+      colour: '#f0c33c', style: 'Major',
       chords: [{ root: 0 }, { root: 4 }, { root: 5 }, { root: 3 }] },
     { id: 'adventure', leader: 'frog', key: 9, scale: SCALES.minor, bpm: 112,
-      colour: '#4aa3d8',
+      colour: '#4aa3d8', style: 'Minor',
       chords: [{ root: 0 }, { root: 6 }, { root: 5 }, { root: 4, raise: { 6: 1 } }] },
     // A drummer or a percussionist can lead a band without stating a
     // chord in their life. The song still carries the key; the leader
     // just never leaves.
     { id: 'stomp', leader: 'dog', key: 4, scale: SCALES.minor, bpm: 124,
-      colour: '#ef8f3c',
+      colour: '#ef8f3c', style: 'Aeolian',
       chords: [{ root: 0 }, { root: 6 }, { root: 3 }, { root: 6 }] },
     { id: 'scamper', leader: 'mouse', key: 5, scale: SCALES.major, bpm: 136,
-      colour: '#a97ad8',
+      colour: '#a97ad8', style: 'Pop',
       chords: [{ root: 5 }, { root: 3 }, { root: 0 }, { root: 4 }] },
     // Straight mixolydian gives a major seventh on the fourth and a
     // minor one on the fifth, which is folk, not blues. Flattening the
@@ -224,10 +240,10 @@
     // is the whole sound - and because the alteration applies to any
     // note sounding under that chord, the tune bends with it.
     { id: 'blues', leader: 'cat', key: 7, scale: SCALES.mixo, bpm: 96,
-      colour: '#e05a5a', seventh: true,
+      colour: '#e05a5a', style: 'Blues', seventh: true,
       chords: [{ root: 0 }, { root: 0 }, { root: 3, raise: { 2: -1 } }, { root: 4, raise: { 6: 1 } }] },
     { id: 'folk', leader: 'bird', key: 2, scale: SCALES.dorian, bpm: 88,
-      colour: '#5fbb63',
+      colour: '#5fbb63', style: 'Dorian',
       chords: [{ root: 0 }, { root: 3 }, { root: 0 }, { root: 6 }] }
   ];
 
@@ -1163,6 +1179,7 @@
     bpm = clamp(SONGS[songIdx].bpm, 60, 160);
     resyncGrid();
     paintBpm();
+    paintStyle();
     applyLeader();
     paintKeys();
   }
@@ -1764,6 +1781,11 @@
     g.appendChild(J.plus);
     g.appendChild(J.bpmText);
     g.appendChild(J.bpmLabel);
+    // What kind of music it is, in the leader's song's own colour, between
+    // where the loop is and how fast it goes. Nothing until the baton is
+    // in somebody's paw, because until then nobody has chosen it.
+    J.style = el('text', { 'text-anchor': 'middle', 'font-weight': '700', display: 'none' });
+    g.appendChild(J.style);
 
     // What the badge means, in words, because the person who needs to
     // know is the one setting up. Shown for a few seconds whenever it
@@ -1797,6 +1819,13 @@
 
   function paintBpm() {
     if (J && J.bpmText) { J.bpmText.textContent = String(bpm); }
+  }
+
+  function paintStyle() {
+    if (!J || !J.style) { return; }
+    J.style.textContent = SONGS[songIdx].style;
+    J.style.setAttribute('fill', SONGS[songIdx].colour);
+    J.style.setAttribute('display', B.holder ? 'inline' : 'none');
   }
 
   function paintLag() {
@@ -1918,9 +1947,9 @@
     var W = L.W, H = L.H;
     var cols = L.wide ? 3 : 2, rows = L.wide ? 2 : 3;
     var topBar = Math.min(L.wide ? H * 0.16 : H * 0.09, 130);
-    // Tall, the dots and the tempo stack, in room that would otherwise
-    // go spare under the cards. Wide, they share one row.
-    var botBar = L.wide ? Math.min(H * 0.18, 150) : Math.min(H * 0.16, 330);
+    // Tall, the dots, the kind of music and the tempo stack, in room that
+    // would otherwise go spare under the cards. Wide, they share one row.
+    var botBar = L.wide ? Math.min(H * 0.18, 150) : Math.min(H * 0.19, 400);
     var gap = 14;
     var padW = (W - gap * (cols + 1)) / cols;
     // A card taller than it is wide leaves the character stranded in a
@@ -1965,14 +1994,24 @@
     place(J.speaker, h * 2.54, topBar * 0.5);
     paintLag();
 
+    // The word's size is set by the longest of the six, so it does not
+    // change size when the baton moves.
+    var sf;
     if (L.wide) {
       var rowY = H - botBar * 0.5;
-      layoutDotRow(J.bar, W * 0.31, rowY, W * 0.54, botBar * 0.16);
+      layoutDotRow(J.bar, W * 0.25, rowY, W * 0.42, botBar * 0.16);
+      sf = Math.min(botBar * 0.36, W * 0.17 / 4.3);
+      J.style.setAttribute('x', (W * 0.555).toFixed(1));
+      J.style.setAttribute('y', (rowY + sf * 0.36).toFixed(1));
       layoutTempo(W * 0.8, rowY, botBar * 0.74);
     } else {
-      layoutDotRow(J.bar, W * 0.5, H - botBar * 0.82, W * 0.88, botBar * 0.08);
-      layoutTempo(W * 0.5, H - botBar * 0.36, botBar * 0.5);
+      layoutDotRow(J.bar, W * 0.5, H - botBar * 0.86, W * 0.88, botBar * 0.07);
+      sf = Math.min(botBar * 0.14, W * 0.5 / 4.3);
+      J.style.setAttribute('x', (W * 0.5).toFixed(1));
+      J.style.setAttribute('y', (H - botBar * 0.6 + sf * 0.36).toFixed(1));
+      layoutTempo(W * 0.5, H - botBar * 0.27, botBar * 0.42);
     }
+    J.style.setAttribute('font-size', sf.toFixed(1));
     layoutBubble();
   }
 
