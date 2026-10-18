@@ -310,8 +310,9 @@ which the CLI does not, so it has not been changed for the sake of matching.
 
 Vibe With Me has a third, `clock`, which only says what time it is so that
 every device playing keeps the same beat. It has no store and no secret, so for
-it only steps 1 and 3 apply. If it is down, the game goes back to each device's
-own clock and the ring on the tuning screen, and nothing else breaks.
+it only steps 1 and 3 apply. If it is down, each device plays on its own by its
+own clock, the badge in the game's corner says so and why, and nothing else
+breaks.
 
 ---
 

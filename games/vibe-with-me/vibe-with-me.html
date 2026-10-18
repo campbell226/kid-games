@@ -19,10 +19,13 @@
     -webkit-user-select: none; user-select: none;
     -webkit-tap-highlight-color: transparent;
   }
+  /* No panning or zooming on the stage at all, or the browser takes a
+     finger carrying the baton for a scroll and cancels the carry. */
   #stage {
     display: block;
     width: 100vw; height: 100vh;
     width: 100dvw; height: 100dvh;
+    touch-action: none;
   }
   .hit { fill: transparent; cursor: pointer; }
   text { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
@@ -134,8 +137,8 @@
   </defs>
 
   <g id="backdrop"></g>
-  <g id="tune"></g>
   <g id="jam"></g>
+  <g id="cal"></g>
   <g id="keys"></g>
 </svg>
 
@@ -185,8 +188,8 @@
   //
   // None of this needs any new agreement between devices. Which chord is
   // playing comes from the position in the loop, and that is already
-  // shared; the song itself is picked on the metronome screen next to
-  // the tempo, where agreeing things is what the screen is for.
+  // shared; the song itself comes with whoever holds the baton, and the
+  // leader of the day is the same on every device.
   // ------------------------------------------------------------------
   var SCALES = {
     major: [0, 2, 4, 5, 7, 9, 11],
@@ -526,6 +529,14 @@
         envelope(d, n, sr, 0.0004, 0.006);
         for (var i = 0; i < n; i++) { d[i] = d[i] * 0.45 + body[i] * 0.85; }
       });
+    } },
+    // The speaker screen's marker at the top of each bar: a small bell,
+    // sharp at the front, so two devices a few milliseconds apart are
+    // heard as two rather than as one fat note.
+    ping: { ref: 1760, gain: 0.4, make: function () {
+      return buffer(0.5, function (d, sr, n) {
+        fm(d, sr, n, 1760, 2, 1.1, 0.02, 0.11, 0.0005);
+      });
     } }
   };
 
@@ -698,10 +709,16 @@
   }
 
   // Drawn front-on so both eyes and the mouth read clearly. Feet sit on
-  // y = 0; everything else is above it.
+  // y = 0; everything else is above it. headY is the top of the head,
+  // where the z's drift from. paw is where the baton is held: on the
+  // left, where no tail is, at the edge of the body, so it reads as
+  // held rather than as stuck through - and for the frog and the bird
+  // at the end of a leg or a wing, in a colour that tells it from the
+  // limb.
   var SPECS = [
     {
-      id: 'dog', colour: '#b57a49', dark: '#8d5a32', top: -186, crownY: -186,
+      id: 'dog', colour: '#b57a49', dark: '#8d5a32', top: -186, headY: -186,
+      paw: [-50, -80], pawFill: '#8d5a32',
       art: function (s) {
         return '<path d="M 52 -62 Q 104 -78 96 -134" stroke="' + s.dark + '" stroke-width="19" fill="none" stroke-linecap="round"/>'
           + legPair(40, 24, 18, s.dark)
@@ -719,7 +736,8 @@
       }
     },
     {
-      id: 'mouse', colour: '#bab7c6', dark: '#9592a4', top: -172, crownY: -168,
+      id: 'mouse', colour: '#bab7c6', dark: '#9592a4', top: -172, headY: -168,
+      paw: [-40, -66], pawFill: '#f0b7c3',
       art: function (s) {
         return '<g class="tail"><path d="M 40 -40 Q 96 -34 88 -96" stroke="#e3b7c2" stroke-width="9" fill="none" stroke-linecap="round"/></g>'
           + legPair(28, 18, 12, s.dark)
@@ -738,7 +756,8 @@
       }
     },
     {
-      id: 'frog', colour: '#5fae4a', dark: '#3f8232', top: -132, crownY: -126,
+      id: 'frog', colour: '#5fae4a', dark: '#3f8232', top: -132, headY: -126,
+      paw: [-66, -70], pawFill: '#5fae4a',
       art: function (s) {
         return legPair(58, 26, 16, s.dark)
           + '<ellipse cx="-68" cy="-38" rx="27" ry="37" fill="' + s.dark + '"/>'
@@ -752,7 +771,8 @@
       }
     },
     {
-      id: 'cow', colour: '#f2f0ec', dark: '#3a3a46', top: -188, crownY: -184,
+      id: 'cow', colour: '#f2f0ec', dark: '#3a3a46', top: -188, headY: -184,
+      paw: [-68, -78], pawFill: '#3a3a46',
       art: function (s) {
         return legPair(44, 24, 22, '#3a3a46')
           + '<ellipse cx="0" cy="-74" rx="76" ry="58" fill="' + s.colour + '"/>'
@@ -771,7 +791,8 @@
       }
     },
     {
-      id: 'cat', colour: '#93949c', dark: '#6d6e77', top: -194, crownY: -184,
+      id: 'cat', colour: '#93949c', dark: '#6d6e77', top: -194, headY: -184,
+      paw: [-46, -84], pawFill: '#6d6e77',
       art: function (s) {
         return '<path d="M 48 -50 Q 104 -60 92 -120" stroke="' + s.dark + '" stroke-width="17" fill="none" stroke-linecap="round"/>'
           + legPair(36, 22, 16, s.dark)
@@ -794,7 +815,8 @@
       }
     },
     {
-      id: 'bird', colour: '#f2b134', dark: '#d68d1d', top: -182, crownY: -178,
+      id: 'bird', colour: '#f2b134', dark: '#d68d1d', top: -182, headY: -178,
+      paw: [-50, -104], pawFill: '#d68d1d',
       art: function (s) {
         return '<path d="M -6 -60 L -44 -6 L 30 -22 Z" fill="' + s.dark + '"/>'
           + legPair(20, 9, 18, '#e07a1f')
@@ -833,67 +855,45 @@
   // (worker.js, beside this file) that answers with the time to the
   // millisecond. Every device asks the same worker, so every device has
   // the same answer, and the same leader at the same tempo is the same
-  // beat of the same loop on all of them. That is the shared clock.
+  // beat of the same loop on all of them.
   //
-  // It used to be each device's own clock, which two devices can
-  // disagree about by a second - a beat and a half at ninety - so where
-  // in the loop to be had to be set by hand, by pointing at it on the
-  // ring and sliding with the arrows. Getting that right was more than a
-  // child could be asked to do, or than a grown-up much enjoyed. It is
-  // all still here, untouched, for when the worker cannot be reached:
-  // off the disk, with no signal, or on a day its free allowance has run
-  // out. A device that never hears from it plays exactly as it always
-  // did.
+  // Before it there was only each device's own clock, which two devices
+  // can disagree about by a second, and a whole screen of ring-tapping
+  // and arrows for making up the difference by hand. That went once the
+  // shared clock had proved itself: lining up by hand was more than a
+  // child could do, and not much fun for anybody else. A device that
+  // cannot reach the clock now simply plays on its own, and the badge in
+  // the corner says so and says why.
   //
-  // With the shared clock:
-  //
-  //   lag          the only control. How much later than the others
-  //                this device should sound, for a speaker that takes
-  //                longer than it admits to - a Bluetooth one, mostly.
-  //                Kept apart from offset because it means something
-  //                different, and clamped rather than wrapped, because
-  //                with nothing to rotate there is nowhere for a wrap to
-  //                go.
-  //   skew         where the audio clock sits against the shared one,
-  //                measured from what is coming out of the speaker
-  //                rather than what is being worked on, so how long each
-  //                device takes to get a sound out is already allowed
-  //                for, as far as the browser will say. Slewed as below,
-  //                except that an error that stays over twenty
-  //                milliseconds for most of a second is taken in one go:
-  //                that is the speaker delay being reported for the
-  //                first time, or a Bluetooth speaker arriving, and
-  //                easing that in at a millisecond a second would take
-  //                minutes.
-  //
-  // Without it:
-  //
-  //   beatShift    which beat of the sixteen this device calls the
-  //                first. Whole beats, so it rotates the pattern and
-  //                moves no timing at all.
-  //   offset       everything finer than a beat: the sub-second gap
-  //                between two system clocks, plus the difference in how
-  //                long each device takes to get a sound out of its
-  //                speaker. Wrapped to half a beat either way, because
-  //                past that it is a rotation in disguise and rotation
-  //                is beatShift's job.
-  //   skew         not a control. The audio clock is a separate,
-  //                free-running clock, so it is slewed onto the wall
-  //                clock rather than trusted: at most a millisecond a
-  //                second, far more than crystal drift ever needs and
-  //                slow enough to be inaudible. A real jump - the phone
-  //                picking up network time for the first time - is taken
-  //                in one go instead, because being a second out is
-  //                worse than one flinch.
-  //
-  // Tapping the ring sets both of those at once, from wherever you point
-  // to wherever the playhead is. With the shared clock the ring only
-  // shows: a tap there could only take a device out of time.
+  //   lag     the only control. How much later than the others this
+  //           device should sound, for a speaker that takes longer than
+  //           it admits to - a Bluetooth one, mostly. Set by ear on the
+  //           speaker screen, against a count every device plays at the
+  //           same tempo. Clamped rather than wrapped, because there is
+  //           nothing to rotate for a wrap to go to.
+  //   skew    not a control. Where the audio clock sits against the
+  //           shared one, measured from what is coming out of the speaker
+  //           rather than what is being worked on, so how long each
+  //           device takes to get a sound out is already allowed for, as
+  //           far as the browser will say. The audio clock is a separate,
+  //           free-running clock, so it is slewed onto the shared one
+  //           rather than trusted: at most a millisecond a second, which
+  //           nobody can hear. A real jump is taken in one go, and so is
+  //           an error that stays over twenty milliseconds for most of a
+  //           second: that is the speaker delay being reported for the
+  //           first time, or a Bluetooth speaker arriving, and easing
+  //           that in at a millisecond a second would take minutes.
   // ------------------------------------------------------------------
   var STEPS_PER_BEAT = 4, BEATS_PER_LOOP = 16;
   var STEPS_PER_LOOP = STEPS_PER_BEAT * BEATS_PER_LOOP;
   var LOOK = 0.14, MAX_SLEW = 0.001, JUMP = 0.25, NUDGE_STEP = 0.003;
   var MAX_LAG = 0.3, SETTLE = 0.02, SETTLE_FOR = 0.75;
+  // The speaker screen's tempo, whoever is leading. One number for
+  // everybody, so two devices with different leaders still check
+  // against the same count; and at a hundred, half a beat is exactly
+  // the furthest the nudge goes, so a late speaker can never be heard
+  // as an early one.
+  var CAL_BPM = 100;
 
   var SIDEMEN = 3;
   // How long a character keeps dancing after it stops playing, and how
@@ -906,13 +906,16 @@
   function idleSpan() { return 30 + Math.random() * 60; }
   // Notes closer together than this get every other hop skipped.
   var BOUNCE_FLOOR = 0.19;
-  var songIdx = clamp(Math.round(load('song', 0)), 0, SONGS.length - 1);
   var joinCount = 1;
-  var bpm = clamp(load('bpm', 90), 60, 160);
-  var offset = load('offset', 0);
-  var beatShift = ((Math.round(load('shift', 0)) % BEATS_PER_LOOP) + BEATS_PER_LOOP) % BEATS_PER_LOOP;
   var lag = clamp(load('lag', 0), -MAX_LAG, MAX_LAG);
-  var skew = 0, skewSet = false, offFor = 0, stepN = 0, visQ = [], mode = 'tune';
+  var skew = 0, skewSet = false, offFor = 0, stepN = 0, visQ = [], mode = 'jam';
+
+  // Left behind by older versions of the game, and nothing reads them
+  // now: the by-hand line-up is gone, and the song and tempo are the
+  // day's rather than the last visit's.
+  ['offset', 'shift', 'song', 'bpm'].forEach(function (k) {
+    try { window.localStorage.removeItem('vibe-' + k); } catch (e) { /* private mode */ }
+  });
 
   // ------------------------------------------------------------------
   // Asking the shared clock.
@@ -948,22 +951,28 @@
   // far better than one that was never right at all.
   // ------------------------------------------------------------------
   var CLOCK_URL = 'https://clock.campbell226.workers.dev/';
-  // tried is whether a first round of asking has finished at all. Until
-  // it has, nobody knows yet whether the clock is there, and the tuning
-  // screen shows its simple face rather than flashing up the by-hand one
-  // for the second it takes to find out.
-  var clk = { have: false, tried: false, off: 0, floor: Infinity, at: 0, dp: 0, busy: false };
+  // tried is whether a first round of asking has finished at all, why is
+  // what went wrong with the last round that got nothing usable, and
+  // byPerson is whether the round going on now was asked for by a press
+  // of the badge - which is the only time a round in progress is shown.
+  // The once-a-minute asks happen quietly, or a device playing on its
+  // own would announce that it was checking every minute.
+  var clk = {
+    have: false, tried: false, off: 0, floor: Infinity, at: 0, dp: 0,
+    busy: false, byPerson: false, why: ''
+  };
 
-  // Asking by hand only makes sense once asking has been tried and has
-  // not worked.
-  function byHand() { return clk.tried && !clk.have; }
-
-  function askClock(times) {
-    if (clk.busy || !window.fetch || !window.performance) {
-      if (!clk.tried && !clk.busy) { clk.tried = true; paintClock(); }
+  function askClock(times, byPerson) {
+    if (clk.busy) { return; }
+    if (!window.fetch || !window.performance) {
+      clk.tried = true;
+      clk.why = 'browser';
+      paintStatus();
       return;
     }
     clk.busy = true;
+    clk.byPerson = !!byPerson;
+    paintStatus();
     var best = null, done = 0;
     function one() {
       var ctl = window.AbortController ? new AbortController() : null;
@@ -982,17 +991,21 @@
         .then(function () {
           clearTimeout(stop);
           done += 1;
-          // Three in a row with nothing back and it is not there: a
-          // grown-up waiting to be told to line up by hand should not have
-          // to sit through the other seven failing as well.
+          // Three in a row with nothing back and it is not there: whoever
+          // is waiting to hear should not have to sit through the other
+          // seven failing as well.
           if (done < times && (best || done < 3)) { setTimeout(one, 90); } else { finish(); }
         });
     }
     function finish() {
       clk.busy = false;
+      clk.byPerson = false;
       clk.tried = true;
       take();
-      paintClock();
+      if (!clk.have) {
+        clk.why = best ? 'slow' : (navigator.onLine === false ? 'offline' : 'away');
+      }
+      paintStatus();
     }
     function take() {
       if (!best) { return; }
@@ -1006,8 +1019,7 @@
       clk.dp = Date.now() - nowMs;
       clk.have = true;
       if (first) {
-        // Straight onto it, and onto the shared grid with it: the ring's
-        // rotation and the old offset belonged to the guesswork.
+        // Straight onto it, and onto the shared grid with it.
         skewSet = false;
         resyncGrid();
       }
@@ -1028,42 +1040,34 @@
     }
   }
 
-  askClock(10);
-  setInterval(function () { if (!document.hidden) { askClock(6); } }, 60000);
-  document.addEventListener('visibilitychange', function () {
-    if (!document.hidden) { askClock(6); }
-  });
-  window.addEventListener('online', function () { askClock(8); });
+  // What the badge in the corner says: playing with others, finding out,
+  // or playing on its own.
+  function vibeState() {
+    if (clk.have) { return 'ready'; }
+    if (!clk.tried || clk.byPerson) { return 'checking'; }
+    return 'alone';
+  }
 
   function wallNow() {
     return clk.have ? (performance.now() + clk.off) / 1000 : Date.now() / 1000;
   }
-  function stepDur() { return 60 / bpm / STEPS_PER_BEAT; }
-  function beatDur() { return 60 / bpm; }
-
-  // The rotation only exists for lining devices up by hand. On the
-  // shared clock there is nothing to line up, so it is none.
-  function rot() { return clk.have ? 0 : beatShift; }
+  function tempo() { return mode === 'cal' ? CAL_BPM : bpm; }
+  function stepDur() { return 60 / tempo() / STEPS_PER_BEAT; }
 
   // Audio time of the grid's zero, which is where the layers meet.
-  function gridZero() { return (clk.have ? lag : offset) + skew; }
+  function gridZero() { return lag + skew; }
   function stepTime(n) { return n * stepDur() + gridZero(); }
 
-  // The audio time of whatever is coming out of the speaker right now.
-  // Without the shared clock it is just the audio clock, as it always
-  // was, and the ear and the arrows take up the speaker's delay.
-  //
-  // With it, the delay is taken off, so that a sound is placed by when
-  // it is heard rather than when it was worked out - which is the thing
-  // two devices actually have to agree on. Two ways to know the delay
-  // and neither is everywhere: the browser's timestamp of what is in the
-  // speaker, which is also smooth where the audio clock moves in jumps,
-  // and the delay it says it adds. The larger is believed, because a
-  // browser that leaves something out of its sums never leaves it out
-  // by having too much.
+  // The audio time of whatever is coming out of the speaker right now,
+  // so that a sound is placed by when it is heard rather than when it
+  // was worked out - which is the thing two devices actually have to
+  // agree on. Two ways to know the delay and neither is everywhere: the
+  // browser's timestamp of what is in the speaker, which is also smooth
+  // where the audio clock moves in jumps, and the delay it says it adds.
+  // The larger is believed, because a browser that leaves something out
+  // of its sums never leaves it out by having too much.
   function heardNow() {
     var c = AC.currentTime;
-    if (!clk.have) { return c; }
     var said = clamp((AC.baseLatency || 0) + (AC.outputLatency || 0), 0, 0.5);
     var ts = AC.getOutputTimestamp ? AC.getOutputTimestamp() : null;
     if (ts && ts.contextTime > 0 && ts.performanceTime > 0) {
@@ -1081,10 +1085,8 @@
     if (!skewSet) { skew = measured; skewSet = true; offFor = 0; return; }
     var err = measured - skew;
     if (err > JUMP || err < -JUMP) { skew = measured; return; }
-    if (clk.have) {
-      offFor = (err > SETTLE || err < -SETTLE) ? offFor + dt : 0;
-      if (offFor > SETTLE_FOR) { skew = measured; offFor = 0; return; }
-    }
+    offFor = (err > SETTLE || err < -SETTLE) ? offFor + dt : 0;
+    if (offFor > SETTLE_FOR) { skew = measured; offFor = 0; return; }
     var step = MAX_SLEW * dt;
     skew += clamp(err, -step, step);
   }
@@ -1098,6 +1100,21 @@
     return (heardNow() - gridZero()) / stepDur();
   }
 
+  // The leader of the day. Worked out from the shared clock's date, so
+  // every device opened on the same day starts with the same leader at
+  // the same tempo, and is in time with the others with nothing to set.
+  // It goes round all six in turn, so nobody's favourite waits more than
+  // five days. The day turns at midnight by the clock's own reckoning,
+  // which is the same everywhere, rather than by each device's idea of
+  // its time zone.
+  function dayLeader() {
+    var day = Math.floor(wallNow() / 86400);
+    return ((day % SONGS.length) + SONGS.length) % SONGS.length;
+  }
+
+  var songIdx = dayLeader();
+  var bpm = SONGS[songIdx].bpm;
+
   // The beat jumps when the tempo changes, and that is right: the grid
   // is worked out from the clock every time, so two devices that change
   // tempo minutes apart still land on the same grid. Holding the old
@@ -1106,7 +1123,6 @@
     var next = clamp(Math.round(v), 60, 160);
     if (next === bpm) { return; }
     bpm = next;
-    save('bpm', bpm);
     resyncGrid();
     paintBpm();
   }
@@ -1122,73 +1138,40 @@
     stepN = Math.floor((AC.currentTime - gridZero()) / stepDur());
   }
 
-  // Wrapped every time, including whatever was saved by an older version
-  // of this game: a stored offset of several beats would rotate the loop
-  // for good, invisibly, and no amount of agreeing the time would undo
-  // it.
-  //
-  // Taking a whole beat out of the offset does rotate the loop by a
-  // beat, so while somebody is sliding the arrows the rotation is put
-  // back and the wrap is invisible - a slide stays a slide. On load it
-  // is not put back, because there the whole point is to throw the old
-  // rotation away.
-  function wrapOffset(keepPlace) {
-    var b = beatDur(), k = Math.round(offset / b);
-    if (k) {
-      offset -= k * b;
-      if (keepPlace) { shiftBeats(-k); }
-    }
-    // A beat is not a whole number of nudges, so a wrap leaves a
-    // remainder and the readout starts settling on -1 instead of 0.
-    // Snapping back to the grid keeps zero reachable.
-    offset = Math.round(offset / NUDGE_STEP) * NUDGE_STEP;
-  }
-
   function nudge(seconds) {
-    // On the shared clock the arrows are only for a slow speaker, and
-    // they stop at the ends rather than going round.
-    if (clk.have) {
-      lag = clamp(Math.round((lag + seconds) / NUDGE_STEP) * NUDGE_STEP, -MAX_LAG, MAX_LAG);
-      save('lag', lag);
-      return;
-    }
-    offset += seconds;
-    wrapOffset(true);
-    save('offset', offset);
+    lag = clamp(Math.round((lag + seconds) / NUDGE_STEP) * NUDGE_STEP, -MAX_LAG, MAX_LAG);
+    save('lag', lag);
+    paintLag();
   }
 
-  function shiftBeats(n) {
-    beatShift = ((beatShift + n) % BEATS_PER_LOOP + BEATS_PER_LOOP) % BEATS_PER_LOOP;
-    save('shift', beatShift);
+  function songOf(id) {
+    for (var i = 0; i < SONGS.length; i++) { if (SONGS[i].leader === id) { return i; } }
+    return 0;
   }
 
-  // Picking a song picks its key, its chords and who leads the band -
-  // and its tempo, because a minor adventure at ninety is still a nap.
-  // Both devices choosing the same song therefore land on the same
-  // number as well, which is one less thing to agree by hand.
+  // A song is its leader's: handing the baton on picks its key, its
+  // chords and its tempo, because a minor adventure at ninety is still
+  // a nap. A different leader is a different tune, so the band starts
+  // again from just them rather than carrying the last one's players
+  // over.
   function setSong(i) {
     var was = songIdx;
     songIdx = clamp(i, 0, SONGS.length - 1);
-    // A different leader is a different tune, so the band starts again
-    // from just them rather than carrying the last one's players over.
     if (songIdx !== was) {
       for (var k = 0; k < pads.length; k++) { pads[k].want = -1; }
     }
-    save('song', songIdx);
     bpm = clamp(SONGS[songIdx].bpm, 60, 160);
-    save('bpm', bpm);
     resyncGrid();
     paintBpm();
     applyLeader();
-    paintSongs();
     paintKeys();
   }
 
-  // The leader is always playing. If the change of song hands the job to
-  // somebody new, the newcomer takes a place and the longest-serving
-  // sideman steps back to keep the band to four.
+  // The leader is always playing. When the baton goes to somebody new,
+  // the newcomer takes a place and the longest-serving sideman steps
+  // back to keep the band to four.
   function applyLeader() {
-    var lead = SONGS[songIdx].leader, i, p, on = [];
+    var lead = B.holder ? B.holder.id : null, i, p, on = [];
     for (i = 0; i < pads.length; i++) { pads[i].leads = (pads[i].id === lead); }
     for (i = 0; i < pads.length; i++) {
       p = pads[i];
@@ -1202,27 +1185,6 @@
       on.sort(function (a, b) { return a.since - b.since; });
       for (i = 0; i < on.length - SIDEMEN; i++) { on[i].want = -1; }
     }
-  }
-
-  // Where the playhead is now, as a fraction of the loop. This is the
-  // thing two devices have to agree on, and the ring both shows it and
-  // sets it.
-  function loopPosNow() {
-    var s = curStep() + rot() * STEPS_PER_BEAT;
-    return (((s % STEPS_PER_LOOP) + STEPS_PER_LOOP) % STEPS_PER_LOOP) / STEPS_PER_LOOP;
-  }
-
-  // Point at where the other device is and this one goes there. The
-  // whole beats become a rotation and the remainder becomes an offset,
-  // so a tap that lands a little early or late still leaves the loop on
-  // the right beat and only the fine part to nudge.
-  function setLoopPos(p) {
-    var d = p - loopPosNow();
-    d -= Math.round(d);
-    var beats = d * BEATS_PER_LOOP;
-    var whole = Math.round(beats);
-    shiftBeats(whole);
-    nudge(-(beats - whole) * beatDur());
   }
 
   var pads = [], byId = {};
@@ -1246,10 +1208,7 @@
       stepN += 1;
       if (t <= now + 0.002) { continue; }
 
-      // The rotation goes in here and nowhere else: it is a whole number
-      // of beats, so it moves which part of the pattern is playing
-      // without moving when anything sounds.
-      var inLoop = ((n + rot() * STEPS_PER_BEAT) % STEPS_PER_LOOP + STEPS_PER_LOOP) % STEPS_PER_LOOP;
+      var inLoop = ((n % STEPS_PER_LOOP) + STEPS_PER_LOOP) % STEPS_PER_LOOP;
       var onBeat = (inLoop % STEPS_PER_BEAT) === 0;
 
       // Coming in, going out and changing sound all happen on a beat, so
@@ -1264,8 +1223,15 @@
         }
       }
 
-      if (mode === 'tune') {
-        if (onBeat) { play('click', 69, t, 1); }
+      if (mode === 'cal') {
+        // The speaker screen's count: the block on every beat, and a ping
+        // on the first of each bar, higher on the first bar of the four,
+        // so where the bars start is as plain to the ear as the beat is.
+        if (onBeat) {
+          var bt = inLoop / STEPS_PER_BEAT;
+          play('click', 69, t, 1);
+          if (bt % 4 === 0) { play('ping', bt === 0 ? 93 : 88, t, bt === 0 ? 1 : 0.8); }
+        }
       } else {
         // Which chord is sounding falls straight out of where we are in
         // the loop, so every device works it out for itself and they all
@@ -1352,7 +1318,7 @@
     L = { W: W, H: H, wide: (vw / vh) >= 1.15 };
     svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
     drawBackdrop();
-    layoutTune();
+    layoutCal();
     layoutJam();
     layoutKeys();
   }
@@ -1439,10 +1405,6 @@
       + '</g>';
   }
 
-  function playGlyph() {
-    return '<path d="M -18 -26 L 30 0 L -18 26 Z" fill="#ffffff"/>';
-  }
-
   // Sixteen dots for the sixteen beats of the loop. Nothing to press:
   // where you are in the loop follows from the time, so this is a thing
   // to read, and two devices showing the same dot are together.
@@ -1475,22 +1437,24 @@
   }
 
   // ------------------------------------------------------------------
-  // Tuning up. One click a beat - no bar, no strong and weak, nothing to
-  // work out about which click is which - and two faces.
+  // The speaker screen, behind the speaker button.
   //
-  // With the shared clock, which is nearly always, there is nothing to
-  // line up, so there is nothing to do but pick a leader and a tempo.
-  // One line says so, the ring turns green and only shows, and the
-  // arrows go away behind a speaker button in the corner, because the
-  // one thing left for them to do is make up for a slow speaker.
+  // It is for one thing only: a speaker that sounds later than the
+  // browser says, which is most Bluetooth ones. Every device plays the
+  // same four bars at the same tempo whoever is leading, with the mouse
+  // striking a block on every beat and a ping at the top of each bar -
+  // higher at the top of the first. Stood side by side, a late device is
+  // heard as a flam, and the arrows move it until the two are one sound.
+  // The band stands down while it is open, as it does for the keyboard,
+  // so there is nothing else to listen through.
   //
-  // Without it, the grown-up setting up is told plainly that the clock
-  // is missing and what to do instead, in three steps, with the ring to
-  // tap and the arrows out. The corner holds a button to ask the clock
-  // again, which spins while it asks. The screen goes back to its simple
-  // face by itself the moment the clock answers.
+  // The ring is the four bars, one turn to all of them, with the first
+  // beat of each bar picked out. It only shows: there is nothing on it
+  // to set, because the shared clock already has every device in the
+  // same place. It is green while it has the shared clock, which is
+  // when lining two devices up by ear means anything.
   // ------------------------------------------------------------------
-  var T = {};
+  var C = {};
   var MINUS = '<rect x="-34" y="-8" width="68" height="16" rx="8" fill="#ffffff"/>';
   var PLUS = MINUS + '<rect x="-8" y="-34" width="16" height="68" rx="8" fill="#ffffff"/>';
 
@@ -1501,394 +1465,124 @@
       + '<path d="M 12 -14 Q 21 0 12 14"/><path d="M 23 -27 Q 39 0 23 27"/></g>';
   }
 
-  // Round and back again, with a head on it: ask again. Drawn in a group
-  // of its own so it can turn on the spot while it asks.
-  function retryGlyph() {
-    return '<g class="spin"><path d="M 19.9 16.7 A 26 26 0 1 1 22.5 -13" fill="none"'
-      + ' stroke="#ffffff" stroke-width="9" stroke-linecap="round"/>'
-      + '<path d="M 30.5 0.9 L 31.2 -26 L 7.8 -12.6 Z" fill="#ffffff"/></g>';
-  }
-
-  // The only words in the game, and they are for whoever sets it up.
-  function tuneLines() {
-    if (byHand()) {
-      return [
-        { t: 'No shared clock. Line them up by hand:', b: true },
-        { t: '1. Same leader and tempo on every device.' },
-        { t: '2. Tap this ring where another device’s dot is.' },
-        { t: '3. Nudge with the arrows until the clicks match.' }
-      ];
-    }
-    return [{ t: 'Pick the same leader and tempo on every device.' }];
-  }
-
-  function buildTune() {
-    var g = document.getElementById('tune');
-    clear(g);
-
-    T.text = el('g');
-    T.lines = [];
-    for (var n = 0; n < 4; n++) {
-      var line = el('text', { fill: '#aab6e0' });
-      T.text.appendChild(line);
-      T.lines.push(line);
-    }
-
-    T.speaker = bigButton('#3f4a7d', speakerGlyph());
-    T.speaker.setAttribute('data-act', 'speaker');
-    T.retry = bigButton('#3f4a7d', retryGlyph());
-    T.retry.setAttribute('data-act', 'retry');
-    T.retrySpin = T.retry.querySelector('.spin');
-    T.spinA = 0;
-    T.speakerOpen = false;
-    // A speaker correction left in place is shown beside the button even
-    // with the arrows put away. Hidden state is what made a stale offset
-    // so hard to find, and this is the same kind of thing.
-    T.lagText = el('text', { 'text-anchor': 'start', fill: '#ffe9a0' });
-
-    T.minus = bigButton('#3f4a7d', MINUS);
-    T.plus = bigButton('#3f4a7d', PLUS);
-    T.minus.setAttribute('data-act', 'bpm-');
-    T.plus.setAttribute('data-act', 'bpm+');
-
-    T.bpmText = el('text', {
-      'text-anchor': 'middle', fill: '#ffffff', 'font-weight': '700', 'font-size': '120'
-    });
-
-    // One turn per loop, not per beat. A beat is under two thirds of a
-    // second and the eye cannot follow a dot round in that; sixteen
-    // beats it can, and where in the loop you are is the thing two
-    // devices actually need to agree about.
-    T.ring = el('g');
-    T.ringLine = el('circle', {
-      cx: 0, cy: 0, r: 200, fill: 'none',
-      stroke: 'rgba(255,255,255,0.16)', 'stroke-width': 14
-    });
-    T.ring.appendChild(T.ringLine);
-    T.pips = [];
-    for (var i = 0; i < BEATS_PER_LOOP; i++) {
-      var pip = el('circle', { cx: 0, cy: 0, r: 10, fill: '#8ea0d8' });
-      T.ring.appendChild(pip);
-      T.pips.push(pip);
-    }
-    T.orbit = el('circle', { cx: 0, cy: 0, r: 26, fill: '#ffe9a0' });
-    T.ring.appendChild(T.orbit);
-
-    // The ring is the control. Tapping it is a bearing, not a button, so
-    // the target is the whole band the dots run round and the middle is
-    // left alone - an angle taken from a tap near the centre would be
-    // whatever the finger happened to land on.
-    T.ringHit = el('circle', { class: 'hit ringhit', cx: 0, cy: 0, r: 240 });
-    T.ring.appendChild(T.ringHit);
-
-    // Keeping time by hitting something, which is what keeping time
-    // looks like. The stick swings about the paw and lands on the block
-    // exactly on the beat.
-    T.cond = el('g');
-    T.condBob = el('g');
-    T.condBob.innerHTML = blockArt() + MOUSE_SPEC.art(MOUSE_SPEC) + stickArt();
-    T.cond.appendChild(T.condBob);
-    T.condEyes = T.condBob.querySelector('.eyes');
-    T.stick = T.condBob.querySelector('.stick');
-    T.block = T.condBob.querySelector('.block');
-    T.tail = T.condBob.querySelector('.tail');
-
-    T.left = bigButton('#2f6f8f', arrowGlyph(-1));
-    T.right = bigButton('#2f6f8f', arrowGlyph(1));
-    T.left.setAttribute('data-act', 'nudge-');
-    T.right.setAttribute('data-act', 'nudge+');
-
-    // Hidden state is what made a stale offset so hard to find, so it is
-    // not hidden any more.
-    T.offText = el('text', { 'text-anchor': 'middle', fill: '#8ea0d8' });
-
-    T.bpmLabel = el('text', { 'text-anchor': 'middle', fill: '#aab6e0' });
-    T.bpmLabel.textContent = 'bpm';
-
-    // Four songs, each shown as the animal who leads it. Picking one
-    // picks a key, four chords and a tempo, so it belongs here beside
-    // the other number both devices have to agree on.
-    T.songs = [];
-    T.songRow = el('g');
-    SONGS.forEach(function (song, i) {
-      var b = bigButton(song.colour, '');
-      b.setAttribute('data-act', 'song' + i);
-      var who = el('g');
-      who.innerHTML = byIdSpec(song.leader).art(byIdSpec(song.leader));
-      b.insertBefore(who, b.querySelector('.hit'));
-      T.songRow.appendChild(b);
-      T.songs.push({ btn: b, who: who, song: song });
-    });
-    T.songLabel = el('text', { 'text-anchor': 'middle', fill: '#aab6e0' });
-    T.songLabel.textContent = 'band leader';
-    T.songRow.appendChild(T.songLabel);
-
-    T.play = bigButton('#3fa564', playGlyph());
-    T.play.setAttribute('data-act', 'play');
-
-    g.appendChild(T.text);
-    g.appendChild(T.minus);
-    g.appendChild(T.plus);
-    g.appendChild(T.bpmText);
-    g.appendChild(T.bpmLabel);
-    g.appendChild(T.songRow);
-    // The mouse goes under the ring so that the ring's tap area is on
-    // top of it: a tap on the mouse is then a tap near the centre, which
-    // is ignored, rather than a tap that lands on an ear and does
-    // nothing at all.
-    g.appendChild(T.cond);
-    g.appendChild(T.ring);
-    g.appendChild(T.left);
-    g.appendChild(T.right);
-    g.appendChild(T.offText);
-    g.appendChild(T.play);
-    g.appendChild(T.speaker);
-    g.appendChild(T.retry);
-    g.appendChild(T.lagText);
-    paintBpm();
-    paintClock();
-  }
-
   function msText(s) {
     return (s >= 0 ? '+' : '−') + Math.round(Math.abs(s) * 1000) + ' ms';
   }
 
-  // Which face the tuning screen shows, and everything that hangs off
-  // it. Asked for whenever the clock might have changed its mind, so it
-  // only does any work when the answer is different.
-  //
-  // The ring turns green on the shared clock: every device showing a
-  // green ring with its dot in the same place is in time, and that is
-  // something a child can check by looking.
-  function paintClock(force) {
-    if (!T || !T.lines) { return; }
-    var shared = clk.have, hand = byHand();
-    var arrows = hand || (shared && T.speakerOpen);
-    var lagShown = shared && !T.speakerOpen && lag !== 0;
-    var key = [shared, hand, arrows, lagShown, lagShown ? lag : 0].join();
-    if (key === T.clockKey && !force) { return; }
-    T.clockKey = key;
+  function buildCal() {
+    var g = document.getElementById('cal');
+    clear(g);
 
-    T.ringLine.setAttribute('stroke', shared ? 'rgba(120,214,140,0.42)' : 'rgba(255,255,255,0.16)');
-    T.ringHit.setAttribute('display', shared ? 'none' : 'inline');
-    T.speaker.setAttribute('display', shared ? 'inline' : 'none');
-    T.retry.setAttribute('display', hand ? 'inline' : 'none');
-    T.left.setAttribute('display', arrows ? 'inline' : 'none');
-    T.right.setAttribute('display', arrows ? 'inline' : 'none');
-    T.offText.setAttribute('display', arrows ? 'inline' : 'none');
-    T.lagText.setAttribute('display', lagShown ? 'inline' : 'none');
-    T.lagText.textContent = msText(lag);
-    // Pressed in while the arrows are out; picked out in yellow when a
-    // correction is left in.
-    T.speaker._body.setAttribute('stroke', T.speakerOpen ? '#ffffff'
-      : (lag !== 0 ? '#ffe9a0' : 'rgba(255,255,255,0.28)'));
-    T.speaker._body.setAttribute('stroke-width', T.speakerOpen || lag !== 0 ? 6 : 3);
-    layoutTune();
-  }
+    // What the screen is about, in the corner where the button that
+    // opened it was. Not a button itself: the way out is the paw.
+    C.sign = el('g', { opacity: 0.5 });
+    C.sign.innerHTML = speakerGlyph();
 
-  function paintBpm() {
-    if (T.bpmText) { T.bpmText.textContent = String(bpm); }
-  }
-
-  function paintSongs() {
-    if (!T.songs) { return; }
-    for (var i = 0; i < T.songs.length; i++) {
-      var on = (i === songIdx);
-      T.songs[i].btn.setAttribute('opacity', on ? 1 : 0.42);
-      T.songs[i].btn._body.setAttribute('stroke', on ? '#ffffff' : 'rgba(255,255,255,0.2)');
-      T.songs[i].btn._body.setAttribute('stroke-width', on ? 7 : 3);
+    C.ring = el('g');
+    C.ringLine = el('circle', {
+      cx: 0, cy: 0, r: 200, fill: 'none',
+      stroke: 'rgba(255,255,255,0.16)', 'stroke-width': 14
+    });
+    C.ring.appendChild(C.ringLine);
+    C.pips = [];
+    for (var i = 0; i < BEATS_PER_LOOP; i++) {
+      var pip = el('circle', { cx: 0, cy: 0, r: 10, fill: '#8ea0d8' });
+      C.ring.appendChild(pip);
+      C.pips.push(pip);
     }
+    C.orbit = el('circle', { cx: 0, cy: 0, r: 26, fill: '#ffe9a0' });
+    C.ring.appendChild(C.orbit);
+
+    // Keeping time by hitting something, which is what keeping time
+    // looks like. The stick swings about the paw and lands on the block
+    // exactly on the beat.
+    C.cond = el('g');
+    C.condBob = el('g');
+    C.condBob.innerHTML = blockArt() + MOUSE_SPEC.art(MOUSE_SPEC) + stickArt();
+    C.cond.appendChild(C.condBob);
+    C.stick = C.condBob.querySelector('.stick');
+    C.block = C.condBob.querySelector('.block');
+    C.tail = C.condBob.querySelector('.tail');
+    C.face = {
+      mouth: C.condBob.querySelector('.mouth'), eyes: C.condBob.querySelector('.eyes'),
+      mouthT: 0, mouthAge: 99, blink: 3, blinkV: 1
+    };
+
+    // Earlier and later: the chevrons point the way the sound moves.
+    C.left = bigButton('#2f6f8f', arrowGlyph(-1));
+    C.right = bigButton('#2f6f8f', arrowGlyph(1));
+    C.left.setAttribute('data-act', 'nudge-');
+    C.right.setAttribute('data-act', 'nudge+');
+    C.msText = el('text', { 'text-anchor': 'middle', fill: '#ffe9a0', 'font-weight': '700' });
+
+    C.back = bigButton('#3f4a7d', pawGlyph());
+    C.back.setAttribute('data-act', 'animals');
+
+    g.appendChild(C.sign);
+    g.appendChild(C.cond);
+    g.appendChild(C.ring);
+    g.appendChild(C.left);
+    g.appendChild(C.right);
+    g.appendChild(C.msText);
+    g.appendChild(C.back);
   }
 
-  // A row of four leaders, sized to whatever width is going.
-  function layoutSongRow(cx, cy, span, h) {
-    var n = T.songs.length, gap = span * 0.04;
-    var w = (span - gap * (n - 1)) / n;
-    for (var i = 0; i < n; i++) {
-      var x = cx - span / 2 + w * (i + 0.5) + gap * i;
-      sizeButton(T.songs[i].btn, w, h);
-      place(T.songs[i].btn, x, cy);
-      fitAnimal(T.songs[i].who, byIdSpec(T.songs[i].song.leader), 0, 0, w * 0.72, h * 0.68);
-    }
-    var fs = Math.min(h * 0.34, 34);
-    T.songLabel.setAttribute('x', cx);
-    T.songLabel.setAttribute('y', cy + h * 0.5 + fs * 1.25);
-    T.songLabel.setAttribute('font-size', fs.toFixed(0));
-    paintSongs();
-  }
-
-  // The words, as big as they will go across the width given and no
-  // bigger than maxFs, starting at top. Returns where they end.
-  //
-  // Measured rather than guessed where the browser will say, at a size
-  // of a hundred and scaled from there. A screen not on show measures as
-  // nothing, so then it is guessed from the letters, which is close
-  // enough until the screen is shown and laid out again.
-  //
-  // One line sits in the middle. Several are a list, so they share a
-  // left edge, and the whole block is centred instead.
-  function layoutText(cx, top, width, maxFs) {
-    var lines = tuneLines(), n = lines.length, widest = 0, i, w;
-    for (i = 0; i < T.lines.length; i++) {
-      var node = T.lines[i];
-      if (i >= n) { node.setAttribute('display', 'none'); continue; }
-      node.setAttribute('display', 'inline');
-      node.textContent = lines[i].t;
-      node.setAttribute('font-weight', lines[i].b ? '700' : '400');
-      node.setAttribute('fill', lines[i].b ? '#ffffff' : '#aab6e0');
-      node.setAttribute('font-size', '100');
-      w = 0;
-      try { w = node.getComputedTextLength(); } catch (e) { w = 0; }
-      if (!w) { w = lines[i].t.length * (lines[i].b ? 56 : 52); }
-      widest = Math.max(widest, w);
-    }
-    var fs = Math.min(maxFs, width / Math.max(1, widest) * 100);
-    var lead = fs * 1.42, y = top + fs * 0.9;
-    var left = cx - widest * fs / 200;
-    for (i = 0; i < n; i++) {
-      // A little air under a heading.
-      if (i === 1 && lines[0].b) { y += lead * 0.25; }
-      T.lines[i].setAttribute('text-anchor', n > 1 ? 'start' : 'middle');
-      T.lines[i].setAttribute('x', (n > 1 ? left : cx).toFixed(1));
-      T.lines[i].setAttribute('y', y.toFixed(1));
-      T.lines[i].setAttribute('font-size', fs.toFixed(1));
-      if (i < n - 1) { y += lead; }
-    }
-    return y + fs * 0.35;
-  }
-
-  // The left-hand twin of the corner button on the other side.
-  function cornerLeft(btn, band) {
-    var h = Math.min(band * 0.8, 100);
-    sizeButton(btn, h * 1.5, h);
-    place(btn, h * 0.92, band * 0.5);
-    return h;
-  }
-
-  function layoutTune() {
-    if (!L.W || !T.lines) { return; }
+  function layoutCal() {
+    if (!L.W || !C.ring) { return; }
     var W = L.W, H = L.H;
-    // The browser's own full screen button sits in the middle of the top
-    // of the screen until it is pressed, and it is a fixed size in real
-    // pixels. So the room kept for it is measured in real pixels and
-    // converted, rather than guessed as a fraction of the world - a
-    // guess is right on one screen and wrong on the next.
-    var perPx = W / Math.max(1, svg.getBoundingClientRect().width || W);
-    var reserve = 58 * perPx;
-    var band = Math.min(L.wide ? H * 0.16 : H * 0.075, 110);
-    var corner = cornerButton(T.play, W, band);
-    cornerLeft(T.speaker, band);
-    cornerLeft(T.retry, band);
-    var lfs = corner * 0.36;
-    T.lagText.setAttribute('x', (corner * 1.92).toFixed(1));
-    T.lagText.setAttribute('y', (band * 0.5 + lfs * 0.36).toFixed(1));
-    T.lagText.setAttribute('font-size', lfs.toFixed(1));
-    var arrows = byHand() || (clk.have && T.speakerOpen);
-    var bandTop, widest, nw, nh, fs;
+    // The same top strip as the band's, so the paw lands exactly where
+    // the button that opened this was.
+    var band = Math.min(L.wide ? H * 0.16 : H * 0.09, 130);
+    var corner = cornerButton(C.back, W, band);
+    C.sign.setAttribute('transform', 'translate(' + (corner * 0.92).toFixed(1) + ','
+      + (band * 0.5).toFixed(1) + ') scale(' + (corner / 100).toFixed(4) + ')');
+    var top = band * 1.05, bot = H * 0.97, cx = W * 0.5;
+    var nw, nh, fs, R, cy, msY;
 
     if (L.wide) {
-      // Wide, the ring has the left half to itself, top to bottom, and
-      // everything with words or numbers on it stacks down the right
-      // under the play button. Three steps of instructions across the
-      // top would have left the ring the size of a coin.
-      var colX = W * 0.74, colW = W * 0.44;
-      var textBot = layoutText(colX, band * 1.12, colW, Math.min(H * 0.05, 40));
-      var rest = H * 0.97 - textBot;
-
-      // Who leads comes first: it settles the key, the chords and the
-      // tempo, so the number underneath is a consequence of it.
-      var sh0 = Math.min(H * 0.2, 130, rest * 0.3);
-      var sl0 = Math.min(sh0 * 0.34, 34);
-      var bw = Math.min(W * 0.14, 160), bh = Math.min(H * 0.17, 125, rest * 0.26);
-      var lf = Math.min(H * 0.05, 38, bh * 0.36);
-      var gap0 = Math.max(0, rest - (sh0 + sl0 * 1.6) - (bh + lf * 1.6)) / 3;
-      var songY0 = textBot + gap0 + sh0 * 0.5;
-      layoutSongRow(colX, songY0, colW, sh0);
-
-      var bpmY = songY0 + sh0 * 0.5 + sl0 * 1.6 + gap0 + bh * 0.5;
-      sizeButton(T.minus, bw, bh);
-      sizeButton(T.plus, bw, bh);
-      place(T.minus, W * 0.61, bpmY);
-      place(T.plus, W * 0.92, bpmY);
-      T.bpmText.setAttribute('x', W * 0.77);
-      T.bpmText.setAttribute('y', bpmY + bh * 0.34);
-      T.bpmText.setAttribute('font-size', (bh * 0.95).toFixed(0));
-      T.bpmLabel.setAttribute('x', W * 0.77);
-      T.bpmLabel.setAttribute('y', bpmY + bh * 0.5 + lf * 1.3);
-      T.bpmLabel.setAttribute('font-size', lf.toFixed(0));
-
-      T.ringX = W * 0.27;
-      bandTop = band * 1.1;
-      widest = W * 0.23;
-      nw = Math.min(W * 0.1, 110); nh = Math.min(H * 0.14, 96);
-      fs = Math.min(H * 0.045, 38);
+      // Wide, the arrows go either side of the ring and the reading
+      // under it, so the ring keeps the whole height.
+      nw = Math.min(W * 0.13, 150); nh = Math.min(H * 0.2, 130);
+      fs = Math.min(H * 0.06, 44);
+      var room = bot - top - fs * 2.2;
+      R = clamp(Math.min(room / 2, W * 0.25), 50, 340);
+      cy = top + Math.max(0, room - R * 2) / 2 + R;
+      place(C.left, cx - R - nw * 0.85, cy);
+      place(C.right, cx + R + nw * 0.85, cy);
+      msY = cy + R + fs * 1.6;
     } else {
-      // Portrait stacks, so each band is placed under the one above it
-      // rather than at a fixed fraction: whatever the reserve and the
-      // corner buttons do to the words, nothing below them collides.
-      var hf = Math.min(H * 0.019, 46);
-      var textTop = Math.max(H * 0.095 - hf * 0.9, reserve, corner * 1.1);
-      var textEnd = layoutText(W * 0.5, textTop, W * 0.9, hf);
-
-      // Who leads comes first: it settles the key, the chords and the
-      // tempo, so the number underneath is a consequence of it.
-      var sh2 = Math.min(H * 0.085, 190);
-      var songY = textEnd + sh2 * 0.5 + H * 0.03;
-      layoutSongRow(W * 0.5, songY, W * 0.9, sh2);
-
-      var bw2 = Math.min(W * 0.22, 240), bh2 = Math.min(H * 0.08, 160);
-      var bpmY2 = songY + sh2 * 0.5 + Math.min(sh2 * 0.34, 34) * 1.6 + bh2 * 0.5 + H * 0.03;
-      sizeButton(T.minus, bw2, bh2);
-      sizeButton(T.plus, bw2, bh2);
-      place(T.minus, W * 0.16, bpmY2);
-      place(T.plus, W * 0.84, bpmY2);
-      T.bpmText.setAttribute('x', W * 0.5);
-      T.bpmText.setAttribute('y', bpmY2 + bh2 * 0.36);
-      T.bpmText.setAttribute('font-size', bh2.toFixed(0));
-      var lf2 = Math.min(H * 0.017, 36);
-      T.bpmLabel.setAttribute('x', W * 0.5);
-      T.bpmLabel.setAttribute('y', bpmY2 + bh2 * 0.5 + lf2 * 1.3);
-      T.bpmLabel.setAttribute('font-size', lf2.toFixed(0));
-
-      T.ringX = W * 0.5;
-      bandTop = bpmY2 + bh2 * 0.5 + lf2 * 1.6 + H * 0.025;
-      widest = W * 0.34;
-      nw = Math.min(W * 0.2, 200); nh = Math.min(H * 0.075, 150);
-      fs = Math.min(H * 0.016, 38);
+      // Tall, the ring, the arrows under it and the reading under them
+      // are one block, centred in what is left.
+      nw = Math.min(W * 0.26, 260); nh = Math.min(H * 0.08, 160);
+      fs = Math.min(H * 0.026, 60);
+      var below = nh * 1.25 + fs * 2;
+      R = clamp(Math.min(W * 0.4, (bot - top - below) / 2), 50, 400);
+      cy = top + Math.max(0, bot - top - (R * 2 + below)) / 2 + R;
+      var ny = cy + R + nh * 0.75;
+      place(C.left, cx - nw * 0.62, ny);
+      place(C.right, cx + nw * 0.62, ny);
+      msY = ny + nh * 0.5 + fs * 1.4;
     }
+    sizeButton(C.left, nw, nh);
+    sizeButton(C.right, nw, nh);
+    C.msText.setAttribute('x', cx);
+    C.msText.setAttribute('y', msY.toFixed(1));
+    C.msText.setAttribute('font-size', fs.toFixed(0));
 
-    // The ring, the two fine nudges under it and the reading under them
-    // are one block, and it is that block that gets centred in what is
-    // left - centring the ring alone left the nudges hanging halfway up
-    // an empty screen. With the arrows put away the ring has the lot.
-    var bandBot = H * 0.985;
-    var below = arrows ? nh * 1.12 + fs * 1.6 : 0;
-    T.ringR = clamp(Math.min(widest, (bandBot - bandTop - below) / 2), 50, 340);
-    var slack = (bandBot - bandTop) - (T.ringR * 2 + below);
-    T.ringY = bandTop + Math.max(0, slack) / 2 + T.ringR;
-    var nudgeY = T.ringY + T.ringR + nh * 0.62;
-
-    sizeButton(T.left, nw, nh);
-    sizeButton(T.right, nw, nh);
-    place(T.left, T.ringX - nw * 0.72, nudgeY);
-    place(T.right, T.ringX + nw * 0.72, nudgeY);
-    T.offText.setAttribute('x', T.ringX);
-    T.offText.setAttribute('y', nudgeY + nh * 0.5 + fs * 1.35);
-    T.offText.setAttribute('font-size', fs.toFixed(0));
-
-    T.ringLine.setAttribute('r', T.ringR);
-    T.ringLine.setAttribute('stroke-width', Math.max(8, T.ringR * 0.055));
-    T.ring.setAttribute('transform', 'translate(' + T.ringX + ',' + T.ringY + ')');
+    C.ringR = R;
+    C.ringLine.setAttribute('r', R);
+    C.ringLine.setAttribute('stroke-width', Math.max(8, R * 0.055));
+    C.ring.setAttribute('transform', 'translate(' + cx + ',' + cy.toFixed(1) + ')');
     for (var i = 0; i < BEATS_PER_LOOP; i++) {
       var a = (-90 + i * (360 / BEATS_PER_LOOP)) * Math.PI / 180;
-      T.pips[i].setAttribute('cx', (Math.cos(a) * T.ringR).toFixed(1));
-      T.pips[i].setAttribute('cy', (Math.sin(a) * T.ringR).toFixed(1));
-      T.pips[i].setAttribute('r', (T.ringR * 0.055).toFixed(1));
+      C.pips[i].setAttribute('cx', (Math.cos(a) * R).toFixed(1));
+      C.pips[i].setAttribute('cy', (Math.sin(a) * R).toFixed(1));
+      // The top of each bar is bigger, the way its ping is louder.
+      C.pips[i].setAttribute('r', (R * (i % 4 === 0 ? 0.08 : 0.048)).toFixed(1));
     }
-    T.orbit.setAttribute('r', (T.ringR * 0.1).toFixed(1));
-    T.ringHit.setAttribute('r', (T.ringR * 1.12).toFixed(1));
+    C.orbit.setAttribute('r', (R * 0.1).toFixed(1));
 
-    fitConductor(T.ringX, T.ringY, T.ringR * 1.5, T.ringR * 1.2);
+    fitConductor(cx, cy, R * 1.5, R * 1.2);
   }
 
   // Centred on what is actually drawn rather than on the mouse's own
@@ -1896,24 +1590,59 @@
   // any fixed nudge is a guess. The measured box is the honest middle.
   function fitConductor(cx, cy, w, h) {
     var bb = null;
-    try { bb = T.condBob.getBBox(); } catch (e) { bb = null; }
+    try { bb = C.condBob.getBBox(); } catch (e) { bb = null; }
     if (!bb || !bb.width || !bb.height) {
-      fitAnimal(T.cond, MOUSE_SPEC, cx, cy, w, h, 20);
+      fitAnimal(C.cond, MOUSE_SPEC, cx, cy, w, h, 20);
       return;
     }
     var s = Math.min(w / bb.width, h / bb.height);
-    T.cond.setAttribute('transform',
+    C.cond.setAttribute('transform',
       'translate(' + (cx - (bb.x + bb.width / 2) * s).toFixed(1)
       + ',' + (cy - (bb.y + bb.height / 2) * s).toFixed(1)
       + ') scale(' + s.toFixed(4) + ')');
   }
 
   // ------------------------------------------------------------------
-  // The jam. Every character on every device, six sounds each. A short
-  // press moves to the next sound, a long press puts the character away.
+  // The band, which is the game's one screen. Every character, six
+  // sounds each: a short press moves to the next sound, a long press
+  // puts the character away, and whoever holds the baton leads.
+  //
+  // Across the top: the badge that says whether this device is playing
+  // with others, the speaker button, and the keyboard. Across the
+  // bottom: where the loop has got to, and how fast it is going.
   // ------------------------------------------------------------------
   var J = {};
   var HOLD = 0.5;
+
+  // A conductor's baton: a cork grip at the origin and a white shaft
+  // tapering away from it, back over the shoulder and a little up. It is
+  // raised further between beats and comes down on them.
+  var BATON_REST = 15, BATON_LEN = 76;
+  function batonArt() {
+    return '<g transform="rotate(' + BATON_REST + ')">'
+      + '<path d="M -10 -4.4 L -' + BATON_LEN + ' -1.8 L -' + BATON_LEN + ' 1.8 L -10 4.4 Z"'
+      + ' fill="#fbf8f0" stroke="#3a3350" stroke-width="2" stroke-linejoin="round"/>'
+      + '<ellipse cx="-8" cy="0" rx="14" ry="7.5" fill="#c98f55" stroke="#7a5230" stroke-width="1.8"/>'
+      + '</g>';
+  }
+
+  // Two tablets and what is between them: a line joining them while they
+  // share the clock, a dotted one while it is being asked, and a broken
+  // one while this device plays on its own.
+  function linkGlyph() {
+    function tablet(x) {
+      return '<rect x="' + (x - 17) + '" y="-26" width="34" height="50" rx="7" fill="none"'
+        + ' stroke="#ffffff" stroke-width="6"/>'
+        + '<circle cx="' + x + '" cy="15" r="3.2" fill="#ffffff"/>';
+    }
+    return tablet(-52) + tablet(52)
+      + '<path class="link-on" d="M -27 0 H 27" stroke="#ffffff" stroke-width="7" stroke-linecap="round"/>'
+      + '<path class="link-wait" d="M -27 0 H 27" stroke="#ffffff" stroke-width="7"'
+      + ' stroke-linecap="round" stroke-dasharray="0.1 13.4"/>'
+      + '<g class="link-off" fill="none" stroke="#ffffff" stroke-width="7" stroke-linecap="round">'
+      + '<path d="M -27 0 H -15"/><path d="M 15 0 H 27"/>'
+      + '<path d="M -6 -8 L 6 8"/><path d="M 6 -8 L -6 8"/></g>';
+  }
 
   function buildJam() {
     var g = document.getElementById('jam');
@@ -1939,14 +1668,18 @@
       var art = el('g');
       var bob = el('g');
       bob.innerHTML = spec.art(spec);
-      // Who is running the band, worn rather than labelled - inside the
-      // group that bobs and sways, so it goes where the head goes.
-      var crown = el('path', {
-        d: 'M -26 8 L -30 -14 L -13 -3 L 0 -18 L 13 -3 L 30 -14 L 26 8 Z',
-        fill: '#ffd75e', stroke: '#a97a12', 'stroke-width': 2.5, opacity: 0,
-        transform: 'translate(0,' + spec.crownY + ') scale(0.95)'
+      // Who is running the band, held rather than labelled - inside the
+      // group that bobs and sways, so it goes where the paw goes. The
+      // paw comes and goes with it, so nobody who is not leading has a
+      // hand up for nothing.
+      var baton = el('g', {
+        opacity: 0, transform: 'translate(' + spec.paw[0] + ',' + spec.paw[1] + ')'
       });
-      bob.appendChild(crown);
+      var wave = el('g');
+      wave.innerHTML = batonArt();
+      baton.appendChild(wave);
+      baton.appendChild(el('circle', { cx: 0, cy: 0, r: 10, fill: spec.pawFill }));
+      bob.appendChild(baton);
       // Three z's drifting off the head. Not a word - a picture of one.
       var zzz = el('g', { class: 'zzz', opacity: 0 });
       for (var zi = 0; zi < 3; zi++) {
@@ -1955,7 +1688,7 @@
           'stroke-width': 4, 'stroke-linecap': 'round', 'stroke-linejoin': 'round'
         }));
       }
-      zzz.setAttribute('transform', 'translate(52,' + (spec.crownY + 10) + ')');
+      zzz.setAttribute('transform', 'translate(52,' + (spec.headY + 10) + ')');
       bob.appendChild(zzz);
       art.appendChild(bob);
       node.appendChild(art);
@@ -1966,7 +1699,7 @@
       var p = {
         id: spec.id, spec: spec, kit: KITS[spec.id],
         node: node, card: card, tint: tint, glow: glow, art: art, bob: bob, hit: hit,
-        crown: crown, leads: false, since: 0,
+        baton: baton, wave: wave, leads: false, since: 0,
         quiet: 0, look: 0, lookTo: 0, lookIn: 1 + Math.random() * 3, bounceGate: false,
         tDance: idleSpan(), tFidget: idleSpan(),
         mouth: bob.querySelector('.mouth'),
@@ -1987,29 +1720,207 @@
       byId[spec.id] = p;
     });
 
-    // Along the bottom, where the browser's own full screen button
-    // cannot sit on them - and the row is itself the way back to the
-    // metronome, so there is no separate button for it. What it shows
-    // and what it takes you to are the same thing.
+    // Whether this device is playing with others. Coloured and drawn
+    // for anyone, and explained in words for whoever is setting up.
+    J.status = bigButton('#3f4a7d', linkGlyph());
+    J.status.setAttribute('data-act', 'status');
+    J.linkOn = J.status.querySelector('.link-on');
+    J.linkWait = J.status.querySelector('.link-wait');
+    J.linkOff = J.status.querySelector('.link-off');
+    g.appendChild(J.status);
+
+    // The way to the speaker screen. A correction left in place is worn
+    // on the button in yellow, because a setting nobody can see is the
+    // kind that gets forgotten and then blamed for months.
+    J.speaker = bigButton('#3f4a7d', speakerGlyph());
+    J.speaker.setAttribute('data-act', 'speaker');
+    J.lagPill = el('g', { display: 'none' });
+    J.lagBox = el('rect', { fill: '#ffe9a0' });
+    J.lagText = el('text', { 'text-anchor': 'middle', fill: '#2b2a40', 'font-weight': '700' });
+    J.lagPill.appendChild(J.lagBox);
+    J.lagPill.appendChild(J.lagText);
+    J.speaker.insertBefore(J.lagPill, J.speaker.querySelector('.hit'));
+    g.appendChild(J.speaker);
+
     // A keyboard for whoever wants to play over the top rather than
     // switch loops on and off.
     J.keysBtn = bigButton('#3f4a7d', keysGlyph());
     J.keysBtn.setAttribute('data-act', 'keys');
     g.appendChild(J.keysBtn);
 
+    // Sixteen dots for the sixteen beats, and the tempo under them. The
+    // tempo is the one thing besides the leader that every device has to
+    // agree on, so it sits on the screen where it can be seen to agree.
     J.bar = makeDotRow();
-    J.barBtn = el('g', { class: 'btn', 'data-act': 'home' });
-    J.barHit = el('rect', { class: 'hit', x: 0, y: 0, width: 10, height: 10 });
-    J.barBtn.appendChild(J.bar.g);
-    J.barBtn.appendChild(J.barHit);
-    g.appendChild(J.barBtn);
+    g.appendChild(J.bar.g);
+    J.minus = bigButton('#3f4a7d', MINUS);
+    J.plus = bigButton('#3f4a7d', PLUS);
+    J.minus.setAttribute('data-act', 'bpm-');
+    J.plus.setAttribute('data-act', 'bpm+');
+    J.bpmText = el('text', { 'text-anchor': 'middle', fill: '#ffffff', 'font-weight': '700' });
+    J.bpmLabel = el('text', { 'text-anchor': 'middle', fill: '#aab6e0' });
+    J.bpmLabel.textContent = 'bpm';
+    g.appendChild(J.minus);
+    g.appendChild(J.plus);
+    g.appendChild(J.bpmText);
+    g.appendChild(J.bpmLabel);
+
+    // What the badge means, in words, because the person who needs to
+    // know is the one setting up. Shown for a few seconds whenever it
+    // changes and whenever the badge is pressed, then put away again.
+    // Pressed, it goes at once.
+    J.bubble = el('g', { class: 'btn', 'data-act': 'bubble', display: 'none' });
+    J.bubbleTip = el('path', { fill: '#f4f6ff' });
+    J.bubbleBox = el('rect', { fill: '#f4f6ff' });
+    J.bubbleLines = [
+      el('text', { fill: '#22284a', 'font-weight': '700' }),
+      el('text', { fill: '#4a5380' })
+    ];
+    J.bubbleHit = el('rect', { class: 'hit' });
+    J.bubble.appendChild(J.bubbleTip);
+    J.bubble.appendChild(J.bubbleBox);
+    J.bubble.appendChild(J.bubbleLines[0]);
+    J.bubble.appendChild(J.bubbleLines[1]);
+    J.bubble.appendChild(J.bubbleHit);
+    g.appendChild(J.bubble);
+
+    // The baton while it is in nobody's paw - being carried, or on its
+    // way somewhere. On top of everything, and never in the way of a tap.
+    J.flyer = el('g', { display: 'none', 'pointer-events': 'none' });
+    J.flyer.innerHTML = batonArt();
+    g.appendChild(J.flyer);
+
+    paintBpm();
+    paintLag();
+    paintStatus();
+  }
+
+  function paintBpm() {
+    if (J && J.bpmText) { J.bpmText.textContent = String(bpm); }
+  }
+
+  function paintLag() {
+    if (!J || !J.speaker) { return; }
+    var on = lag !== 0;
+    J.speaker._body.setAttribute('stroke', on ? '#ffe9a0' : 'rgba(255,255,255,0.28)');
+    J.speaker._body.setAttribute('stroke-width', on ? 6 : 3);
+    J.lagPill.setAttribute('display', on ? 'inline' : 'none');
+    if (!on || !J.spH) { return; }
+    // Hung off the bottom corner of the button, the way a count is
+    // shown on an app's icon.
+    var txt = msText(lag), fs = J.spH * 0.25;
+    var pw = txt.length * fs * 0.58 + fs * 0.9, ph = fs * 1.4;
+    var cx = J.spW * 0.5 - pw * 0.4, cy = J.spH * 0.5 - ph * 0.1;
+    J.lagText.textContent = txt;
+    J.lagText.setAttribute('font-size', fs.toFixed(1));
+    J.lagText.setAttribute('x', cx.toFixed(1));
+    J.lagText.setAttribute('y', (cy + fs * 0.36).toFixed(1));
+    J.lagBox.setAttribute('x', (cx - pw / 2).toFixed(1));
+    J.lagBox.setAttribute('y', (cy - ph / 2).toFixed(1));
+    J.lagBox.setAttribute('width', pw.toFixed(1));
+    J.lagBox.setAttribute('height', ph.toFixed(1));
+    J.lagBox.setAttribute('rx', (ph / 2).toFixed(1));
+  }
+
+  // The only sentences in the game, and they are for whoever sets it up.
+  var WHY = {
+    offline: 'No internet connection.',
+    away: 'Can’t reach the shared clock.',
+    slow: 'The connection is too slow to share a beat.',
+    browser: 'This browser can’t ask the shared clock.'
+  };
+
+  function sayLines() {
+    var s = vibeState();
+    if (s === 'ready') { return ['Ready to vibe with other devices', 'Same leader and tempo on each one']; }
+    if (s === 'checking') { return ['Checking the shared clock…', '']; }
+    var why = WHY[clk.why] || WHY.away;
+    return ['Playing on its own', clk.why === 'browser' ? why : why + ' Tap to try again.'];
+  }
+
+  var STATUS_FILL = { ready: '#2f8a55', checking: '#3f4a7d', alone: '#5b5470' };
+
+  // Asked for whenever the clock might have changed its mind. The words
+  // come up by themselves only when the answer itself changes - not for
+  // a different reason for the same answer, which is news to nobody.
+  function paintStatus() {
+    if (!J || !J.status) { return; }
+    var s = vibeState();
+    J.status._body.setAttribute('fill', STATUS_FILL[s]);
+    J.linkOn.setAttribute('display', s === 'ready' ? 'inline' : 'none');
+    J.linkWait.setAttribute('display', s === 'checking' ? 'inline' : 'none');
+    J.linkOff.setAttribute('display', s === 'alone' ? 'inline' : 'none');
+    if (s !== J.said) {
+      J.said = s;
+      if (mode === 'jam') { showBubble(); }
+    } else {
+      layoutBubble();
+    }
+  }
+
+  function showBubble() {
+    J.bubbleUntil = performance.now() + 5000;
+    J.bubble.setAttribute('display', 'inline');
+    layoutBubble();
+  }
+
+  function hideBubble() {
+    J.bubbleUntil = 0;
+    J.bubble.setAttribute('display', 'none');
+  }
+
+  // Sized in real pixels, so the words are the same size to read on a
+  // phone as on a tablet, and hung under the badge with a point at it.
+  // Measured where the browser will say, and guessed from the letters
+  // where it will not.
+  function layoutBubble() {
+    if (!L.W || !J.bubbleUntil) { return; }
+    var lines = sayLines(), n = lines[1] ? 2 : 1, widest = 0, i, w;
+    var perPx = L.W / Math.max(1, svg.getBoundingClientRect().width || L.W);
+    for (i = 0; i < 2; i++) {
+      var node = J.bubbleLines[i];
+      node.textContent = lines[i];
+      node.setAttribute('display', lines[i] ? 'inline' : 'none');
+      node.setAttribute('font-size', '100');
+      w = 0;
+      if (lines[i]) {
+        try { w = node.getComputedTextLength(); } catch (e) { w = 0; }
+        if (!w) { w = lines[i].length * (i ? 50 : 56); }
+      }
+      widest = Math.max(widest, w);
+    }
+    var fs = 18 * perPx, pad = fs * 0.9;
+    fs = Math.min(fs, (L.W * 0.94 - pad * 2) / Math.max(1, widest) * 100);
+    var bw = widest * fs / 100 + pad * 2, bh = fs * (2.4 + 1.35 * (n - 1));
+    var tip = fs * 0.6;
+    var x0 = clamp(J.statusX - J.statusW / 2, L.W * 0.03, L.W * 0.97 - bw);
+    var y0 = J.statusY + J.statusH / 2 + tip + fs * 0.2;
+    J.bubbleBox.setAttribute('x', x0.toFixed(1));
+    J.bubbleBox.setAttribute('y', y0.toFixed(1));
+    J.bubbleBox.setAttribute('width', bw.toFixed(1));
+    J.bubbleBox.setAttribute('height', bh.toFixed(1));
+    J.bubbleBox.setAttribute('rx', (fs * 0.6).toFixed(1));
+    J.bubbleTip.setAttribute('d', 'M ' + (J.statusX - tip).toFixed(1) + ' ' + (y0 + 1).toFixed(1)
+      + ' L ' + J.statusX.toFixed(1) + ' ' + (y0 - tip).toFixed(1)
+      + ' L ' + (J.statusX + tip).toFixed(1) + ' ' + (y0 + 1).toFixed(1) + ' Z');
+    for (i = 0; i < 2; i++) {
+      J.bubbleLines[i].setAttribute('x', (x0 + pad).toFixed(1));
+      J.bubbleLines[i].setAttribute('y', (y0 + fs * 1.45 + i * fs * 1.35).toFixed(1));
+      J.bubbleLines[i].setAttribute('font-size', fs.toFixed(1));
+    }
+    J.bubbleHit.setAttribute('x', x0.toFixed(1));
+    J.bubbleHit.setAttribute('y', (y0 - tip).toFixed(1));
+    J.bubbleHit.setAttribute('width', bw.toFixed(1));
+    J.bubbleHit.setAttribute('height', (bh + tip).toFixed(1));
   }
 
   function layoutJam() {
     var W = L.W, H = L.H;
     var cols = L.wide ? 3 : 2, rows = L.wide ? 2 : 3;
     var topBar = Math.min(L.wide ? H * 0.16 : H * 0.09, 130);
-    var botBar = Math.min(L.wide ? H * 0.18 : H * 0.1, 160);
+    // Tall, the dots and the tempo stack, in room that would otherwise
+    // go spare under the cards. Wide, they share one row.
+    var botBar = L.wide ? Math.min(H * 0.18, 150) : Math.min(H * 0.16, 330);
     var gap = 14;
     var padW = (W - gap * (cols + 1)) / cols;
     // A card taller than it is wide leaves the character stranded in a
@@ -2043,20 +1954,49 @@
       p.scale = fitAnimal(p.art, p.spec, 0, 0, padW * 0.88, padH * 0.84);
     });
 
-    cornerButton(J.keysBtn, W, topBar);
+    // The middle of the top is left alone: the browser's own full screen
+    // button sits there until it is pressed.
+    var h = cornerButton(J.keysBtn, W, topBar);
+    J.statusX = h * 0.92; J.statusY = topBar * 0.5; J.statusW = h * 1.5; J.statusH = h;
+    sizeButton(J.status, J.statusW, h);
+    place(J.status, J.statusX, J.statusY);
+    J.spW = h * 1.5; J.spH = h;
+    sizeButton(J.speaker, J.spW, h);
+    place(J.speaker, h * 2.54, topBar * 0.5);
+    paintLag();
 
-    // Lifted off the very bottom edge and given a fatter dot, because it
-    // is a button as well as a reading and it was neither big enough nor
-    // far enough from the edge of the glass to hit reliably.
-    layoutDotRow(J.bar, W * 0.5, H - botBar * 0.56, W * 0.88, botBar * 0.34);
-    J.barHit.setAttribute('x', 0);
-    J.barHit.setAttribute('y', H - botBar);
-    J.barHit.setAttribute('width', W);
-    J.barHit.setAttribute('height', botBar);
+    if (L.wide) {
+      var rowY = H - botBar * 0.5;
+      layoutDotRow(J.bar, W * 0.31, rowY, W * 0.54, botBar * 0.16);
+      layoutTempo(W * 0.8, rowY, botBar * 0.74);
+    } else {
+      layoutDotRow(J.bar, W * 0.5, H - botBar * 0.82, W * 0.88, botBar * 0.08);
+      layoutTempo(W * 0.5, H - botBar * 0.36, botBar * 0.5);
+    }
+    layoutBubble();
   }
 
-  // Both screens carry the same corner button in the same place, so it
-  // reads as one switch rather than two controls.
+  // − 100 + with "bpm" under the number, in a block th high centred on
+  // (x, y). Wide enough for three digits, so the buttons never move
+  // under a finger that is holding one down.
+  function layoutTempo(x, y, th) {
+    var bw = th * 1.2, bh = th * 0.8, off = th * 1.3;
+    sizeButton(J.minus, bw, bh);
+    sizeButton(J.plus, bw, bh);
+    place(J.minus, x - off, y);
+    place(J.plus, x + off, y);
+    var nf = th * 0.62, lf = th * 0.2;
+    J.bpmText.setAttribute('x', x);
+    J.bpmText.setAttribute('y', (y + nf * 0.18).toFixed(1));
+    J.bpmText.setAttribute('font-size', nf.toFixed(0));
+    J.bpmLabel.setAttribute('x', x);
+    J.bpmLabel.setAttribute('y', (y + nf * 0.18 + lf * 1.25).toFixed(1));
+    J.bpmLabel.setAttribute('font-size', lf.toFixed(0));
+  }
+
+  // The band, the keyboard and the speaker screen all carry their way in
+  // or out in the same top corner, so it reads as one switch rather than
+  // several controls.
   function cornerButton(btn, W, band) {
     var h = Math.min(band * 0.8, 100);
     sizeButton(btn, h * 1.5, h);
@@ -2227,8 +2167,9 @@
     }, 150);
   }
 
-  // The keyboard is the instrument while it is open, so the band stands
-  // down - all of them, the leader included. Only what each character
+  // The keyboard is the instrument while it is open, and the speaker
+  // screen needs nothing in the way of its count, so for both the band
+  // stands down - all of them, the leader included. Only what each character
   // was set to is remembered, so coming back restores the sounds
   // themselves and not merely who was on; and because leaving and
   // rejoining still happen on the beat, it stops and starts in time
@@ -2267,13 +2208,13 @@
   }
 
   function showMode() {
-    document.getElementById('tune').setAttribute('display', mode === 'tune' ? 'inline' : 'none');
+    document.getElementById('cal').setAttribute('display', mode === 'cal' ? 'inline' : 'none');
     document.getElementById('jam').setAttribute('display', mode === 'jam' ? 'inline' : 'none');
     document.getElementById('keys').setAttribute('display', mode === 'keys' ? 'inline' : 'none');
     faceLandscape(mode === 'keys');
-    // The words could only be guessed at while the screen was hidden, so
-    // they are measured properly now it is not.
-    if (mode === 'tune') { layoutTune(); }
+    // The mouse could only be guessed at while the screen was hidden, so
+    // it is measured properly now it is not.
+    if (mode === 'cal') { layoutCal(); }
   }
 
   // One note of whichever sound was just chosen, straight away, so the
@@ -2287,8 +2228,184 @@
   }
 
   // ------------------------------------------------------------------
+  // The baton.
+  //
+  // Whoever holds it leads: their song, their key, their chords, their
+  // tempo. It is moved by picking it up off the leader and letting go
+  // over somebody else, and it floats the rest of the way into their
+  // paw. Let go anywhere else and it floats home.
+  //
+  // To begin with the game hands it out itself, so the first thing
+  // anybody sees the baton do is move. It floats down from the top
+  // into the paw of the leader of the day, every time the game opens.
+  //
+  // It cannot be thrown. It stays exactly under the finger while it is
+  // carried and keeps nothing of how fast it was going when let go, so
+  // the most a frantic child can do is change leader once per carry -
+  // and a new leader is a new band, which is worth doing on purpose
+  // rather than by accident. Only one finger can carry it, and while it
+  // is in the air it cannot be picked up.
+  // ------------------------------------------------------------------
+  var B = {
+    holder: null, state: 'none', to: null, pointer: null, over: null,
+    x: 0, y: 0, s: 1, fx: 0, fy: 0, fs: 1, dx: 0, dy: 0,
+    t: 0, dur: 0, arc: 0, spin: 0, born: 0, moved: false, byClock: false
+  };
+
+  // Where the paw that holds it is, in the world, leaving out the bob.
+  function gripAt(p) {
+    var hh = (-p.spec.top) + 18;
+    return {
+      x: p.cx + p.spec.paw[0] * p.scale,
+      y: p.cy + hh * p.scale * 0.5 + p.spec.paw[1] * p.scale
+    };
+  }
+
+  function padAt(pt) {
+    for (var i = 0; i < pads.length; i++) {
+      var p = pads[i];
+      if (Math.abs(pt.x - p.cx) <= p.w / 2 && Math.abs(pt.y - p.cy) <= p.h / 2) { return p; }
+    }
+    return null;
+  }
+
+  function distToSeg(px, py, ax, ay, bx, by) {
+    var vx = bx - ax, vy = by - ay, wx = px - ax, wy = py - ay;
+    var k = clamp((wx * vx + wy * vy) / Math.max(1e-6, vx * vx + vy * vy), 0, 1);
+    var ex = wx - vx * k, ey = wy - vy * k;
+    return Math.sqrt(ex * ex + ey * ey);
+  }
+
+  // A press near the leader's baton picks it up instead of changing the
+  // leader's sound. Near is generous - the baton is thin and fingers are
+  // not - and is measured along the whole of it, paw to tip, but only
+  // on the leader's own card, so a press on the card next door is
+  // always a press on the card next door.
+  function grabBaton(ev) {
+    var p = B.holder;
+    if (!p || B.state !== 'held' || B.pointer !== null) { return false; }
+    var pt = svgPoint(ev);
+    if (!pt) { return false; }
+    var on = padAt(pt);
+    if (on && on !== p) { return false; }
+    var g = gripAt(p), s = p.scale, a = BATON_REST * Math.PI / 180;
+    var tx = g.x - Math.cos(a) * BATON_LEN * s, ty = g.y - Math.sin(a) * BATON_LEN * s;
+    if (distToSeg(pt.x, pt.y, g.x, g.y, tx, ty) > 34 * s + 16) { return false; }
+    B.state = 'drag';
+    B.pointer = ev.pointerId;
+    B.dx = g.x - pt.x; B.dy = g.y - pt.y;
+    B.x = g.x; B.y = g.y; B.s = s;
+    return true;
+  }
+
+  function carryBaton(ev) {
+    if (B.state !== 'drag' || ev.pointerId !== B.pointer) { return; }
+    var pt = svgPoint(ev);
+    if (!pt) { return; }
+    B.x = pt.x + B.dx;
+    B.y = pt.y + B.dy;
+    B.over = padAt(pt);
+  }
+
+  // Let go over somebody else and they lead. Anywhere else - including
+  // a finger the browser took away for itself - and it goes home.
+  function dropBaton(ev) {
+    var pt = ev.type === 'pointerup' ? svgPoint(ev) : null;
+    var to = pt ? padAt(pt) : null;
+    B.pointer = null;
+    B.over = null;
+    if (to && to !== B.holder) { B.moved = true; } else { to = B.holder; }
+    fly(to, B.x, B.y, B.s);
+  }
+
+  // A short float, eased at both ends and lifted a little in the middle
+  // so it reads as being carried rather than slid. dur is given only for
+  // the first hand-out, which drops straight down and turns once on the
+  // way.
+  function fly(to, x, y, s, dur) {
+    var g = gripAt(to), dx = g.x - x, dy = g.y - y, d = Math.sqrt(dx * dx + dy * dy);
+    B.to = to;
+    B.fx = x; B.fy = y; B.fs = s;
+    B.x = x; B.y = y; B.s = s;
+    B.t = 0;
+    B.dur = reduced ? 0 : (dur || clamp(d / 1600, 0.25, 0.7));
+    B.arc = dur ? 0 : Math.min(80, d * 0.25);
+    B.spin = dur ? 1 : 0;
+    B.state = 'fly';
+  }
+
+  function land() {
+    var p = B.to;
+    B.state = 'held';
+    B.to = null;
+    B.spin = 0;
+    if (p === B.holder) { return; }
+    B.holder = p;
+    setSong(songOf(p.id));
+    p.pulse = 1;
+  }
+
+  // Anything half done is finished at once, for when the band is about
+  // to be put away.
+  function settleBaton() {
+    if (B.state === 'drag') {
+      B.pointer = null;
+      B.over = null;
+      B.state = 'held';
+    } else if (B.state === 'fly') {
+      land();
+    }
+  }
+
+  // The first hand-out waits for the shared clock, or for a couple of
+  // seconds of it not answering, because the clock's date is what says
+  // who leads today. If the clock turns up later with a different day
+  // and nobody has moved the baton yet, it moves to that day's leader -
+  // which is only the same thing happening again.
+  function maybeHandOut(nowMs) {
+    if (mode !== 'jam' || !L.W) { return; }
+    var to;
+    if (B.state === 'none') {
+      if (!clk.tried && nowMs - B.born < 2500) { return; }
+      to = byId[SONGS[dayLeader()].leader];
+      B.byClock = clk.have;
+      fly(to, L.W * 0.5, -L.W * 0.08, to.scale, 1.4);
+    } else if (B.state === 'held' && !B.byClock && clk.have) {
+      B.byClock = true;
+      to = byId[SONGS[dayLeader()].leader];
+      if (B.moved || to === B.holder) { return; }
+      var g = gripAt(B.holder);
+      fly(to, g.x, g.y, B.holder.scale);
+    }
+  }
+
+  function updateBaton(dt) {
+    var r = 0;
+    if (B.state === 'fly') {
+      B.t += dt;
+      var k = B.dur > 0 ? clamp(B.t / B.dur, 0, 1) : 1;
+      var e = k * k * (3 - 2 * k);
+      var g = gripAt(B.to);
+      B.x = B.fx + (g.x - B.fx) * e;
+      B.y = B.fy + (g.y - B.fy) * e - Math.sin(Math.PI * e) * B.arc;
+      B.s = B.fs + (B.to.scale - B.fs) * e;
+      r = B.spin * 360 * (1 - e);
+      if (k >= 1) { land(); }
+    } else if (B.state === 'drag') {
+      // Held up a little, so it looks picked up.
+      r = 15;
+    }
+    var show = B.state === 'drag' || B.state === 'fly';
+    J.flyer.setAttribute('display', show ? 'inline' : 'none');
+    if (show) {
+      J.flyer.setAttribute('transform', 'translate(' + B.x.toFixed(1) + ',' + B.y.toFixed(1)
+        + ') scale(' + B.s.toFixed(4) + ') rotate(' + r.toFixed(1) + ' -34 -9)');
+    }
+  }
+
+  // ------------------------------------------------------------------
   // Input. Buttons are press-and-hold as well as tap; cards tell a short
-  // press from a long one.
+  // press from a long one; and the baton can be picked up and carried.
   // ------------------------------------------------------------------
   var held = null, heldNode = null, repeatAt = 0, didRepeat = false;
   var pressPad = null;
@@ -2301,7 +2418,7 @@
   }
 
   // Tap coordinates in the world's own units, which is the only way to
-  // turn a finger into a bearing on the ring.
+  // tell whether a finger is on the baton or which card it let go over.
   function svgPoint(ev) {
     var m = svg.getScreenCTM();
     if (!m) { return null; }
@@ -2310,16 +2427,32 @@
     return pt.matrixTransform(m.inverse());
   }
 
-  function tapRing(ev) {
-    if (clk.have) { return; }
-    var p = svgPoint(ev);
-    if (!p) { return; }
-    var dx = p.x - T.ringX, dy = p.y - T.ringY;
-    // The middle is the mouse, and a bearing taken from there would be
-    // whatever the finger happened to land on.
-    if (dx * dx + dy * dy < (T.ringR * 0.45) * (T.ringR * 0.45)) { return; }
-    var deg = Math.atan2(dy, dx) * 180 / Math.PI + 90;
-    setLoopPos((((deg % 360) + 360) % 360) / 360);
+  // Moving between the band, the keyboard and the speaker screen. The
+  // band stands down for both of the others and comes back as it was,
+  // and the speaker screen keeps its own tempo, so the grid changes size
+  // going in and coming out.
+  function setMode(next) {
+    if (next === mode) { return; }
+    var was = mode;
+    if (was === 'jam') { settleBaton(); hideBubble(); silenceBand(); }
+    mode = next;
+    if (next === 'jam') { restoreBand(); }
+    if (was === 'cal' || next === 'cal') { resyncGrid(); }
+    showMode();
+  }
+
+  // The badge says what it means in words. While the game is playing on
+  // its own a press asks the clock again as well, and the badge shows it
+  // asking. Pressing the words puts them away.
+  function pressStatus(act) {
+    if (vibeState() === 'alone' && clk.why !== 'browser') {
+      askClock(10, true);
+      showBubble();
+    } else if (act === 'bubble') {
+      hideBubble();
+    } else {
+      showBubble();
+    }
   }
 
   svg.addEventListener('pointerdown', function (ev) {
@@ -2330,30 +2463,17 @@
     var btn = t.closest('.btn');
     if (btn) {
       var act = btn.getAttribute('data-act');
-      if (act === 'play') {
-        mode = 'jam';
-        showMode();
-      } else if (act === 'home') {
-        mode = 'tune';
-        showMode();
-      } else if (act === 'keys') {
-        mode = 'keys';
-        silenceBand();
-        showMode();
+      if (act === 'keys') {
+        setMode('keys');
+      } else if (act === 'speaker') {
+        setMode('cal');
       } else if (act === 'animals') {
-        mode = 'jam';
-        restoreBand();
-        showMode();
+        setMode('jam');
+      } else if (act === 'status' || act === 'bubble') {
+        pressStatus(act);
       } else if (act.indexOf('voice') === 0) {
         K.voice = +act.slice(5);
         paintVoices();
-      } else if (act.indexOf('song') === 0) {
-        setSong(+act.slice(4));
-      } else if (act === 'speaker') {
-        T.speakerOpen = !T.speakerOpen;
-        paintClock();
-      } else if (act === 'retry') {
-        askClock(10);
       } else {
         held = act;
         heldNode = btn;
@@ -2364,11 +2484,6 @@
       return;
     }
 
-    if (mode === 'tune' && t.closest('.ringhit')) {
-      tapRing(ev);
-      return;
-    }
-
     if (mode === 'keys') {
       var kn = t.closest('.pkey');
       if (kn) { pressKey(kn); }
@@ -2376,6 +2491,7 @@
     }
 
     if (mode === 'jam') {
+      if (grabBaton(ev)) { return; }
       var pn = t.closest('.pad');
       if (pn) {
         pressPad = byId[pn.getAttribute('data-id')];
@@ -2384,7 +2500,11 @@
     }
   });
 
-  function release() {
+  function release(ev) {
+    if (B.state === 'drag' && ev && ev.pointerId === B.pointer) {
+      dropBaton(ev);
+      return;
+    }
     if (held) {
       if (!didRepeat) { doOnce(held); }
       if (heldNode) { heldNode.removeAttribute('opacity'); }
@@ -2419,6 +2539,7 @@
     p.want = 0;
     p.since = joinCount++;
   }
+  window.addEventListener('pointermove', carryBaton);
   window.addEventListener('pointerup', release);
   window.addEventListener('pointercancel', release);
 
@@ -2437,9 +2558,8 @@
     }
     if (!held) { return; }
     if (nowMs < repeatAt) { return; }
-    // Every held control now repeats the same way, three milliseconds or
-    // five beats at a time. Nothing here has to cross a big gap any more:
-    // that is what pointing at the ring is for.
+    // Every held control repeats the same way, three milliseconds or
+    // five beats a minute at a time, about eight times a second.
     didRepeat = true;
     repeatAt = nowMs + 130;
     doOnce(held);
@@ -2480,51 +2600,49 @@
     return open;
   }
 
-  var condFace = { mouth: null, eyes: null, mouthT: 0, mouthAge: 99, blink: 3, blinkV: 1 };
-
-  function updateTune(dt, loopPos, beatPhase, tailPhase) {
+  function updateCal(dt, loopPos, beatPhase, barPhase) {
     var a = (-90 + loopPos * 360) * Math.PI / 180;
-    T.orbit.setAttribute('cx', (Math.cos(a) * T.ringR).toFixed(1));
-    T.orbit.setAttribute('cy', (Math.sin(a) * T.ringR).toFixed(1));
+    C.orbit.setAttribute('cx', (Math.cos(a) * C.ringR).toFixed(1));
+    C.orbit.setAttribute('cy', (Math.sin(a) * C.ringR).toFixed(1));
     for (var i = 0; i < BEATS_PER_LOOP; i++) {
       var on = (i === beatIdx);
-      T.pips[i].setAttribute('fill', on && beatFlash > 0.2 ? '#ffe9a0' : '#8ea0d8');
-      T.pips[i].setAttribute('opacity', (0.35 + (on ? beatFlash * 0.65 : 0)).toFixed(2));
+      C.pips[i].setAttribute('fill', on && beatFlash > 0.2 ? '#ffe9a0' : '#8ea0d8');
+      C.pips[i].setAttribute('opacity', (0.35 + (on ? beatFlash * 0.65 : 0)).toFixed(2));
     }
 
-    // The readouts only have to change when they change.
-    var ms = msText(clk.have ? lag : offset);
-    if (ms !== T.offShown) { T.offShown = ms; T.offText.textContent = ms; }
-
-    // Turning while it asks, so a press of it is visibly heard. Without
-    // motion it dims instead.
-    if (clk.busy && byHand()) {
-      T.spinA = reduced ? 0 : (T.spinA + dt * 320) % 360;
-    } else {
-      T.spinA = 0;
+    // The readout and the ring's colour only have to change when they
+    // change.
+    var ms = msText(lag);
+    if (ms !== C.msShown) { C.msShown = ms; C.msText.textContent = ms; }
+    if (clk.have !== C.green) {
+      C.green = clk.have;
+      C.ringLine.setAttribute('stroke', clk.have ? 'rgba(120,214,140,0.42)' : 'rgba(255,255,255,0.16)');
     }
-    T.retrySpin.setAttribute('transform', 'rotate(' + T.spinA.toFixed(1) + ')');
-    T.retry.setAttribute('opacity', clk.busy && reduced ? 0.55 : 1);
 
     // Down on the beat and up between: sin is zero at both ends of the
     // beat, so the stick lands exactly when the click sounds.
     var lift = reduced ? 14 : 34 * Math.sin(Math.PI * beatPhase);
-    T.stick.setAttribute('transform',
+    C.stick.setAttribute('transform',
       'rotate(' + lift.toFixed(2) + ' ' + STICK_X + ' ' + STICK_Y + ')');
-    T.block.setAttribute('transform',
+    C.block.setAttribute('transform',
       'translate(0,' + (reduced ? 0 : beatFlash * 3).toFixed(2) + ')');
-    // The tail keeps a slower time than the stick - one sweep to four
-    // beats - so the two together read as a bar rather than a twitch.
-    T.tail.setAttribute('transform',
-      'rotate(' + (reduced ? 0 : 11 * Math.sin(Math.PI * 2 * tailPhase)).toFixed(2) + ' 40 -40)');
+    // The tail keeps a slower time than the stick - one sweep to a bar -
+    // so the two together read as a bar rather than a twitch.
+    C.tail.setAttribute('transform',
+      'rotate(' + (reduced ? 0 : 11 * Math.sin(Math.PI * 2 * barPhase)).toFixed(2) + ' 40 -40)');
 
-    condFace.mouth = T.condBob.querySelector('.mouth');
-    condFace.eyes = T.condEyes;
-    faceUpdate(condFace, dt);
+    faceUpdate(C.face, dt);
   }
 
-  function updateJam(dt, beats) {
+  function updateJam(dt, beats, beatPhase, nowMs) {
     paintDotRow(J.bar);
+    updateBaton(dt);
+    if (J.bubbleUntil && nowMs > J.bubbleUntil) { hideBubble(); }
+    // The dots between the two tablets creep along while the clock is
+    // being asked, and stand still without motion.
+    if (J.said === 'checking') {
+      J.linkWait.setAttribute('stroke-dashoffset', reduced ? 0 : (-(nowMs / 45) % 13.5).toFixed(1));
+    }
 
     for (var k = 0; k < pads.length; k++) {
       var p = pads[k];
@@ -2552,6 +2670,13 @@
         p.tint.setAttribute('opacity', (0.44 * (1 - drain)).toFixed(3));
       } else {
         p.tint.setAttribute('opacity', 0);
+      }
+      // The card the baton is being carried over lights up, so whoever
+      // is carrying it can see where letting go will put it.
+      if (B.over === p && p !== B.holder) {
+        p.card.setAttribute('stroke', '#ffffff');
+        p.card.setAttribute('stroke-width', 12);
+        p.card.setAttribute('opacity', 1);
       }
 
       // A character left out does not stop dead. It keeps dancing for
@@ -2606,7 +2731,14 @@
         lg.setAttribute('transform', 'rotate(' + (step * (+lg.getAttribute('data-side'))).toFixed(2)
           + ' ' + lg.getAttribute('data-px') + ' ' + lg.getAttribute('data-py') + ')');
       }
-      p.crown.setAttribute('opacity', p.leads ? 1 : 0);
+      var holds = (p === B.holder && B.state === 'held');
+      p.baton.setAttribute('opacity', holds ? 1 : 0);
+      if (holds) {
+        // Down on the beat and up between, like the mouse's stick: a
+        // conductor's beat is the bottom of the stroke.
+        p.wave.setAttribute('transform', 'rotate('
+          + (reduced ? 10 : 30 * Math.sin(Math.PI * beatPhase)).toFixed(2) + ')');
+      }
       // Three z's on one drift, staggered, each rising and fading out.
       p.zzz.setAttribute('opacity', p.asleep && !reduced ? 1 : (p.asleep ? 0.75 : 0));
       if (p.asleep) {
@@ -2632,14 +2764,15 @@
     if (AC) { drainVis(heardNow()); }
     beatFlash = Math.max(0, beatFlash - dt * 3.4);
 
-    var s = curStep() + rot() * STEPS_PER_BEAT;
+    var s = curStep();
     var loopPos = (((s % STEPS_PER_LOOP) + STEPS_PER_LOOP) % STEPS_PER_LOOP) / STEPS_PER_LOOP;
     var beatPhase = (((s % STEPS_PER_BEAT) + STEPS_PER_BEAT) % STEPS_PER_BEAT) / STEPS_PER_BEAT;
     var beats = s / STEPS_PER_BEAT;
-    var tailPhase = (((beats % 4) + 4) % 4) / 4;
+    var barPhase = (((beats % 4) + 4) % 4) / 4;
 
-    if (mode === 'tune') { updateTune(dt, loopPos, beatPhase, tailPhase); }
-    else { updateJam(dt, beats); }
+    maybeHandOut(now);
+    if (mode === 'cal') { updateCal(dt, loopPos, beatPhase, barPhase); }
+    else { updateJam(dt, beats, beatPhase, now); }
 
     requestAnimationFrame(frame);
   }
@@ -2654,13 +2787,20 @@
     resizeTimer = setTimeout(computeLayout, 220);
   });
 
-  wrapOffset();
-  buildTune();
+  buildCal();
   buildJam();
   buildKeys();
-  applyLeader();
   computeLayout();
   showMode();
+
+  B.born = performance.now();
+  askClock(10);
+  setInterval(function () { if (!document.hidden) { askClock(6); } }, 60000);
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) { askClock(6); }
+  });
+  window.addEventListener('online', function () { askClock(8); });
+
   requestAnimationFrame(frame);
 })();
 </script>

@@ -7,15 +7,16 @@
 // same loop without anyone pressing anything together.
 //
 // It used to be each device's own clock, and two of those can disagree by
-// a second, which at ninety is a beat and a half. The ring and the arrows
-// on the tuning screen were there to make up the difference by hand, and
-// getting it right was more than a child could be asked to do.
+// a second, which at ninety is a beat and a half. There was a whole screen
+// for making up the difference by hand, and getting it right was more
+// than a child could be asked to do. Once this had proved itself, that
+// screen went.
 //
 // Worth stealing: nothing. There is no key, no storage and no money
 // behind it, and the answer is the time, which anybody can already have.
 // Somebody hammering it can at worst use up the day's free requests, and
-// then the game goes back to each device's own clock and the ring, the
-// way it worked before this existed.
+// then each device plays on its own, by its own clock, until the
+// allowance comes back - and the badge in the game's corner says so.
 //
 // The request is a plain GET with no headers of its own, so a browser
 // sends it straight off without asking first, and the round trip it is
