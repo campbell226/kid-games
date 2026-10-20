@@ -57,6 +57,16 @@ Stargazing's 72 lines of Dad's voice, in `games/stargazing/sounds/`,
 work the same way. They were cut from eight long recordings, which are
 in commit 6f2b3ce.
 
+## Maps
+
+Hoot's Postcards carries its own world: Natural Earth's 1:110m countries
+(public domain), from `world-atlas@2.0.2` on jsdelivr, quantised to 0.1°
+and baked into the page as its `WORLD` literal, about 25 KB. Nothing is
+fetched when it runs, so it works offline in the app. If a place ever
+needs another country picked out by name, `tools/hoots-postcards-map.js`
+re-bakes it from that file. Like the ffmpeg pass, it is a one-off, not a
+build step.
+
 ## Hosting
 
 Live on GitHub Pages from `campbell226/kid-games`, served straight off

@@ -1708,6 +1708,89 @@
       </svg>
       <span>Stargazing</span>
     </a>
+
+    <a class="game" href="games/hoots-postcards/hoots-postcards.html">
+      <svg viewBox="0 0 320 200" role="img" aria-label="Hoot's Postcards">
+        <defs>
+          <radialGradient id="hp-space" cx="0.4" cy="0.55" r="0.8">
+            <stop offset="0" stop-color="#1a2557"/><stop offset="1" stop-color="#05081a"/>
+          </radialGradient>
+          <radialGradient id="hp-sea" cx="0.38" cy="0.35" r="0.8">
+            <stop offset="0" stop-color="#4f9fe0"/><stop offset="1" stop-color="#2a66a8"/>
+          </radialGradient>
+          <linearGradient id="hp-night" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0.5" stop-color="#0a1030" stop-opacity="0"/><stop offset="0.7" stop-color="#0a1030" stop-opacity="0.5"/><stop offset="1" stop-color="#0a1030" stop-opacity="0.68"/>
+          </linearGradient>
+          <radialGradient id="hp-halo" cx="0.5" cy="0.5" r="0.5">
+            <stop offset="0.8" stop-color="#8fc0ff" stop-opacity="0.5"/><stop offset="1" stop-color="#8fc0ff" stop-opacity="0"/>
+          </radialGradient>
+          <clipPath id="hp-clip"><circle cx="124" cy="114" r="74"/></clipPath>
+        </defs>
+
+        <!-- space -->
+        <rect width="320" height="200" fill="url(#hp-space)"/>
+        <g fill="#e8eeff">
+          <circle cx="14" cy="20" r="0.9"/><circle cx="40" cy="64" r="0.7"/><circle cx="26" cy="150" r="0.8"/><circle cx="62" cy="14" r="0.7"/>
+          <circle cx="250" cy="18" r="0.9"/><circle cx="292" cy="40" r="0.7"/><circle cx="306" cy="96" r="0.8"/><circle cx="270" cy="88" r="0.6"/>
+          <circle cx="20" cy="188" r="0.7"/><circle cx="214" cy="104" r="0.6"/><circle cx="300" cy="190" r="0.6"/><circle cx="186" cy="12" r="0.7"/>
+          <circle cx="232" cy="66" r="0.6"/><circle cx="8" cy="104" r="0.6"/><circle cx="96" cy="12" r="0.6"/>
+        </g>
+
+        <!-- the globe, Europe and Africa, the night coming in from the east -->
+        <circle cx="124" cy="114" r="86" fill="url(#hp-halo)"/>
+        <circle cx="124" cy="114" r="74" fill="url(#hp-sea)"/>
+        <g clip-path="url(#hp-clip)">
+          <ellipse cx="86" cy="50" rx="18" ry="10" fill="#eef4f8"/>
+          <path d="M44 120 Q58 110 72 118 Q80 136 70 162 Q62 176 56 172 Q48 150 44 132 Z" fill="#5fae4e"/>
+          <path d="M104 84 Q102 76 110 70 Q124 60 142 62 Q160 64 170 74 Q164 82 150 86 Q132 90 118 92 Q108 90 104 84 Z" fill="#62ad50"/>
+          <path d="M100 70 Q98 62 104 60 Q108 64 106 72 Z" fill="#62ad50"/>
+          <path d="M106 108 Q112 94 130 96 Q150 98 160 108 Q168 120 160 136 Q150 156 140 176 Q132 184 126 172 Q120 152 114 140 Q100 132 100 120 Z" fill="#7fbc52"/>
+          <path d="M106 108 Q112 96 130 97 Q150 99 160 109 Q158 118 140 120 Q120 122 104 118 Z" fill="#e8cf8f"/>
+          <path d="M162 100 Q174 102 178 112 Q170 120 164 112 Z" fill="#e3c88a"/>
+          <path d="M136 132 Q144 128 150 136 Q146 146 138 144 Z" fill="#3f9a45"/>
+          <rect x="40" y="30" width="170" height="170" fill="url(#hp-night)"/>
+        </g>
+
+        <!-- Hoot's trail from Leeds, and Hoot -->
+        <path d="M103 66 Q150 4 210 46" fill="none" stroke="#fff6dc" stroke-width="2.4" stroke-dasharray="0.5 6" stroke-linecap="round"/>
+        <g transform="translate(224 70) scale(0.78) rotate(10)">
+          <ellipse cx="-34" cy="-38" rx="17" ry="8" fill="#9e6f4c" transform="rotate(-28 -34 -38)"/>
+          <ellipse cx="34" cy="-38" rx="17" ry="8" fill="#9e6f4c" transform="rotate(28 34 -38)"/>
+          <path d="M-19 -49 L-8 -62 L-4 -48 Z M19 -49 L8 -62 L4 -48 Z" fill="#a87b55"/>
+          <ellipse cx="0" cy="-29" rx="25" ry="29" fill="#b98a62"/>
+          <ellipse cx="0" cy="-22" rx="17" ry="20" fill="#f6e3c3"/>
+          <ellipse cx="-8" cy="-2" rx="5.5" ry="3.5" fill="#f2a65a"/><ellipse cx="8" cy="-2" rx="5.5" ry="3.5" fill="#f2a65a"/>
+          <ellipse cx="-10" cy="-37" rx="11" ry="11.5" fill="#fffdf6"/><ellipse cx="10" cy="-37" rx="11" ry="11.5" fill="#fffdf6"/>
+          <ellipse cx="-8" cy="-38" rx="5.2" ry="5.6" fill="#3b2a1e"/><ellipse cx="12" cy="-38" rx="5.2" ry="5.6" fill="#3b2a1e"/>
+          <circle cx="-10" cy="-40" r="1.8" fill="#ffffff"/><circle cx="10" cy="-40" r="1.8" fill="#ffffff"/>
+          <path d="M0 -31 L-5 -26 L5 -26 Z" fill="#f2a65a"/>
+          <ellipse cx="-18" cy="-27" rx="5" ry="3.5" fill="#ff8fb1" opacity="0.4"/><ellipse cx="18" cy="-27" rx="5" ry="3.5" fill="#ff8fb1" opacity="0.4"/>
+        </g>
+
+        <!-- a postcard from Kenya, stamped -->
+        <g transform="translate(250 150) rotate(7)">
+          <rect x="-46" y="-28" width="96" height="64" rx="4" fill="#000000" opacity="0.3"/>
+          <rect x="-50" y="-32" width="96" height="64" rx="4" fill="#fffaf0" stroke="#e0cfae" stroke-width="1"/>
+          <rect x="-45" y="-27" width="52" height="38" fill="#8fd0f5"/>
+          <rect x="-45" y="11" width="52" height="16" fill="#d8b85a"/>
+          <g transform="translate(-19 25) scale(0.62)">
+            <path d="M-6 0 L6 0 L10 -38 L-2 -40 Z" fill="#f2c45a"/>
+            <path d="M-4 -53 l-1 -8 M3 -51 l1 -8" stroke="#b8742e" stroke-width="3" stroke-linecap="round"/>
+            <circle cx="-5" cy="-61" r="2.6" fill="#7a4a20"/><circle cx="4" cy="-59" r="2.6" fill="#7a4a20"/>
+            <ellipse cx="-6" cy="-46" rx="13" ry="8" fill="#f2c45a" transform="rotate(-20 -6 -46)"/>
+            <ellipse cx="-17" cy="-42" rx="6" ry="5" fill="#f6dca0"/>
+            <circle cx="2" cy="-12" r="3.5" fill="#b8742e"/><circle cx="5" cy="-26" r="3" fill="#b8742e"/>
+            <circle cx="-6" cy="-49" r="2.2" fill="#3b2a1e"/>
+          </g>
+          <rect x="24" y="-27" width="17" height="21" fill="#ffffff" stroke="#d7a64a" stroke-width="0.8" stroke-dasharray="1.6 1"/>
+          <rect x="27" y="-24" width="11" height="15" fill="#8fd0f5"/>
+          <path d="M13 6 H40 M13 14 H40 M13 22 H40" stroke="#e3d8c2" stroke-width="1.4"/>
+          <circle cx="22" cy="-8" r="10" fill="none" stroke="#c0503a" stroke-width="1.6" opacity="0.85"/>
+          <circle cx="22" cy="-8" r="6.6" fill="none" stroke="#c0503a" stroke-width="0.8" opacity="0.6"/>
+        </g>
+      </svg>
+      <span>Hoot's Postcards</span>
+    </a>
   </div>
 
   <footer id="latest"></footer>
