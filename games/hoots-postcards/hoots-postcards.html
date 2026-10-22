@@ -650,8 +650,15 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
   // tried and dropped: it was more annoying than useful. Any clip that
   // won't load or play falls through to a chime; places without one
   // have only the animal's own call, and the hello written in its bubble.
+  // The recordings are real people's, from Wikimedia Commons, mostly
+  // Lingua Libre: sounds/CREDITS.md says whose, and under what licence.
   // ------------------------------------------------------------------
-  var HELLO_CLIPS = [];
+  // Which clip each place says; the three Spanish-speaking places share one.
+  var HELLO_CLIPS = {
+    kenya: 'kenya', egypt: 'egypt', india: 'india', china: 'china', japan: 'japan', australia: 'australia', nz: 'nz',
+    brazil: 'brazil', peru: 'hola', mexico: 'hola', galapagos: 'hola', spain: 'spain', usa: 'usa', canada: 'canada',
+    france: 'france', greece: 'greece', madagascar: 'madagascar', indonesia: 'indonesia', hawaii: 'hawaii'
+  };
   var CLIPS = {}, clipsUnlocked = false, speaking = null;
   function clipFor(id) {
     var a = CLIPS[id];
@@ -670,7 +677,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
   function unlockClips() {
     if (clipsUnlocked) { return; }
     clipsUnlocked = true;
-    HELLO_CLIPS.forEach(function (id) {
+    Object.keys(HELLO_CLIPS).map(function (k) { return HELLO_CLIPS[k]; }).filter(function (c, i, all) { return all.indexOf(c) === i; }).forEach(function (id) {
       var a = clipFor(id), p;
       a.muted = true;
       try { p = a.play(); } catch (e) { a.muted = false; return; }
@@ -686,8 +693,8 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
   // Plays a place's hello, if it has a recording, and says roughly how
   // long it will take.
   function playHello(p) {
-    if (HELLO_CLIPS.indexOf(p.id) < 0) { return 0; }
-    var a = clipFor(p.id);
+    if (!HELLO_CLIPS[p.id]) { return 0; }
+    var a = clipFor(HELLO_CLIPS[p.id]);
     if (a.broken) { SND.chime(); return 1; }
     if (speaking && speaking !== a) { try { speaking.pause(); speaking.currentTime = 0; } catch (e) { /* fine */ } }
     speaking = a;
@@ -7696,6 +7703,10 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
   // anything in the save that no longer means anything is dropped
   if (!BYID[saved.here]) { saved.here = 'leeds'; }
   saved.bag = saved.bag.filter(function (k) { return !!ITEMS[k]; });
+  // a save from when the story was one chapter long, finished, carries on
+  // with the next
+  if (saved.ch >= CHAPTERS.length) { saved.ch = CHAPTERS.length - 1; }
+  if (saved.chState === 'done' && CHAPTERS[saved.ch + 1]) { saved.ch += 1; saved.chState = CHAPTERS[saved.ch].start || 'find'; }
   here = saved.here;
   view.lon = goal.lon = BYID[here].lon;
   view.lat = goal.lat = clamp(BYID[here].lat - 20, -62, 62);

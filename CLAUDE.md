@@ -57,6 +57,14 @@ Stargazing's 72 lines of Dad's voice, in `games/stargazing/sounds/`,
 work the same way. They were cut from eight long recordings, which are
 in commit 6f2b3ce.
 
+Hoot's Postcards' hellos, in `games/hoots-postcards/sounds/`, are the
+one set that isn't ours: real speakers from Wikimedia Commons, mostly
+Lingua Libre, under CC0, CC BY or CC BY-SA. `sounds/CREDITS.md` names
+each speaker and licence, and has to stay with the clips: attribution
+is the condition of using them. The originals are on Commons, linked
+from there. The phone's own text-to-speech was tried for these and
+dropped: the hellos it read were more annoying than useful.
+
 ## Maps
 
 Hoot's Postcards carries its own world: Natural Earth's 1:110m countries
