@@ -48,7 +48,8 @@ const want = {
   kenya: 'Kenya', egypt: 'Egypt', india: 'India', china: 'China', japan: 'Japan',
   australia: 'Australia', nz: 'New Zealand', antarctica: 'Antarctica', brazil: 'Brazil',
   peru: 'Peru', usa: 'United States of America', canada: 'Canada', france: 'France',
-  uk: 'United Kingdom', greenland: 'Greenland'
+  uk: 'United Kingdom', greenland: 'Greenland', spain: 'Spain', greece: 'Greece', madagascar: 'Madagascar',
+  safrica: 'South Africa', nepal: 'Nepal', indonesia: 'Indonesia', mexico: 'Mexico'
 };
 const geoms = topo.objects.countries.geometries, idx = {};
 const polys = geoms.map((g, i) => {
