@@ -109,10 +109,19 @@
 
 <svg id="over" class="layer" xmlns="http://www.w3.org/2000/svg" aria-label="Hoot's Postcards">
   <rect id="ov-hit" class="hit" x="0" y="0" width="100%" height="100%"/>
+  <path id="routes" fill="none" stroke="#ffd36a" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="1 6" opacity="0.55"/>
   <path id="trail" fill="none" stroke="#fff6dc" stroke-width="3.2" stroke-linecap="round" stroke-dasharray="0.5 9" opacity="0"/>
+  <path id="pvok" fill="none" stroke="#ffffff" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="0.5 8"/>
+  <path id="pvgrey" fill="none" stroke="#8a93b0" stroke-width="3" stroke-linecap="round" stroke-dasharray="3 7"/>
+  <g id="pvpips"></g>
+  <g id="arrowg"></g>
+  <g id="splashg"></g>
   <g id="marks"></g>
+  <g id="ferryg"></g>
   <g id="ghoot"></g>
   <g id="counter" opacity="0"></g>
+  <g id="ovhud"></g>
+  <g id="cluezoom" display="none"></g>
 </svg>
 
 <svg id="scene" class="layer" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
@@ -153,17 +162,22 @@
   <g id="sc-stage">
     <g id="sc-back"></g>
     <g id="sc-ground"></g>
+    <g id="sc-dev"></g>
     <g id="sc-props"></g>
+    <g id="sc-piles"></g>
     <g id="sc-animal"></g>
     <g id="sc-hoot"></g>
     <g id="sc-front"></g>
     <g id="sc-glow"></g>
     <g id="sc-parts"></g>
     <g id="sc-bubble"></g>
+    <g id="sc-thought"></g>
   </g>
   <g id="sc-home" display="none"></g>
   <rect id="sc-warm" x="0" y="0" width="1000" height="640" fill="#ff8a4a" opacity="0" pointer-events="none"/>
+  <g id="sc-hud"></g>
   <g id="sc-ui"></g>
+  <g id="sc-fly"></g>
 </svg>
 
 <script>
@@ -249,23 +263,56 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
   }
 
   // ------------------------------------------------------------------
-  // The postcards are kept on this device. If storage is refused the
-  // game still plays; it just forgets them when it closes.
+  // Everything the game remembers, kept on this device: the story so far,
+  // what's in the satchel, what Hoot has found out, how the places have
+  // grown. If storage is refused the game still plays; it just forgets
+  // when it closes. The first version only kept postcards and miles, and
+  // those carry over.
   // ------------------------------------------------------------------
-  var SAVE_KEY = 'hoots-postcards-1';
-  var saved = { v: {}, miles: 0 };
-  try {
-    var raw = window.localStorage.getItem(SAVE_KEY);
-    if (raw) {
-      var o = JSON.parse(raw);
-      if (o && typeof o === 'object') {
-        if (o.v && typeof o.v === 'object') { saved.v = o.v; }
-        if (typeof o.miles === 'number' && isFinite(o.miles)) { saved.miles = Math.max(0, o.miles); }
+  var SAVE_KEY = 'hoots-postcards-2', OLD_KEY = 'hoots-postcards-1';
+  function freshSave() {
+    return {
+      v: {}, miles: 0, here: 'leeds',
+      puff: 5, cap: 2, bag: [], seen: {}, held: {},
+      prologue: false, ch: 0, chState: 'find',
+      dev: {}, routes: [], pieces: 0
+    };
+  }
+  var saved = freshSave();
+  (function () {
+    var o = null, full = false;
+    try {
+      var raw = window.localStorage.getItem(SAVE_KEY);
+      if (raw) { o = JSON.parse(raw); full = true; }
+      else {
+        raw = window.localStorage.getItem(OLD_KEY);
+        if (raw) { o = JSON.parse(raw); }
       }
-    }
-  } catch (e) { /* a private window, a data: page; nothing lost */ }
+    } catch (e) { o = null; /* a private window, a data: page; nothing lost */ }
+    if (!o || typeof o !== 'object') { return; }
+    function obj(x) { return (x && typeof x === 'object' && !Array.isArray(x)) ? x : {}; }
+    function int(x, a, b, d) { return (typeof x === 'number' && isFinite(x)) ? clamp(Math.round(x), a, b) : d; }
+    function strs(x) { return Array.isArray(x) ? x.filter(function (s) { return typeof s === 'string'; }) : []; }
+    saved.v = obj(o.v);
+    saved.miles = int(o.miles, 0, 999999, 0);
+    if (!full) { return; }
+    if (typeof o.here === 'string') { saved.here = o.here; }
+    saved.puff = int(o.puff, 1, 20, 5);
+    saved.cap = int(o.cap, 1, 4, 2);
+    saved.bag = strs(o.bag).slice(0, saved.cap);
+    saved.seen = obj(o.seen); saved.held = obj(o.held); saved.dev = obj(o.dev);
+    saved.prologue = o.prologue === true;
+    saved.ch = int(o.ch, 0, 99, 0);
+    saved.chState = (o.chState === 'need' || o.chState === 'done') ? o.chState : 'find';
+    saved.routes = strs(o.routes);
+    saved.pieces = int(o.pieces, 0, 255, 0);
+  })();
   function persist() {
     try { window.localStorage.setItem(SAVE_KEY, JSON.stringify(saved)); } catch (e) { /* as above */ }
+  }
+  function startAgain() {
+    try { window.localStorage.removeItem(SAVE_KEY); window.localStorage.removeItem(OLD_KEY); } catch (e) { /* fine */ }
+    window.location.reload();
   }
   function visits(id) {
     var n = saved.v[id];
@@ -1076,6 +1123,12 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
       + '<ellipse cx="0" cy="-22" rx="17" ry="20" fill="#f6e3c3"/>'
       + '<path d="M-7 -22 q3.5 3 7 0 q3.5 3 7 0 M-10 -14 q3.5 3 7 0 q3.5 3 7 0 q3.5 3 6 0" stroke="#e5cba3" stroke-width="1.6" fill="none" stroke-linecap="round"/>'
       + '<ellipse cx="-8" cy="-2" rx="5.5" ry="3.5" fill="#f2a65a"/><ellipse cx="8" cy="-2" rx="5.5" ry="3.5" fill="#f2a65a"/>'
+      + '<g class="h-bag" display="none">'
+      + '<path d="M-24 -30 L16 -9" stroke="#7a4a26" stroke-width="4" stroke-linecap="round"/>'
+      + '<path d="M12 -18 H34 V0 Q34 4 30 4 H16 Q12 4 12 0 Z" fill="#8a5a32"/>'
+      + '<path d="M12 -18 H34 V-10 Q23 -5 12 -10 Z" fill="#a06a3a"/>'
+      + '<circle cx="23" cy="-10" r="2.2" fill="#f2c033"/>'
+      + '</g>'
       + '<g class="h-eyes">'
       + '<ellipse cx="-10" cy="-37" rx="11" ry="11.5" fill="#fffdf6"/><ellipse cx="10" cy="-37" rx="11" ry="11.5" fill="#fffdf6"/>'
       + '<g class="h-pup"><ellipse cx="-10" cy="-37" rx="5.2" ry="5.6" fill="#3b2a1e"/><ellipse cx="10" cy="-37" rx="5.2" ry="5.6" fill="#3b2a1e"/>'
@@ -1083,6 +1136,7 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
       + '</g>'
       + '<g class="h-beak"><path d="M0 -31 L-5 -26 L5 -26 Z" fill="#f2a65a"/></g>'
       + '<ellipse cx="-18" cy="-27" rx="5" ry="3.5" fill="#ff8fb1" opacity="0.35"/><ellipse cx="18" cy="-27" rx="5" ry="3.5" fill="#ff8fb1" opacity="0.35"/>'
+      + '<g class="h-sweat" display="none"><path d="M25 -54 q6 8 0 11 q-6 -3 0 -11 Z" fill="#8fd0f5" stroke="#5aa8d8" stroke-width="1"/></g>'
       + '<g class="h-shades" display="none">'
       + '<rect x="-21.5" y="-43" width="19" height="12" rx="5" fill="#1f2333"/><rect x="2.5" y="-43" width="19" height="12" rx="5" fill="#1f2333"/>'
       + '<path d="M-3 -39 h6 M-21 -40 l-5 -2 M21 -40 l5 -2" stroke="#1f2333" stroke-width="2.4" stroke-linecap="round"/>'
@@ -1114,7 +1168,7 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
     function q(c) { return list(inner, '.' + c); }
     return {
       g: g, all: q('h-all'), wl: q('h-wl'), wr: q('h-wr'), eyes: q('h-eyes'), pup: q('h-pup'), beak: q('h-beak'),
-      shades: q('h-shades'), hat: q('h-hat'), scarf: q('h-scarf'), leaf: q('h-leaf'),
+      shades: q('h-shades'), hat: q('h-hat'), scarf: q('h-scarf'), leaf: q('h-leaf'), bag: q('h-bag'), sweat: q('h-sweat'),
       x: 0, y: 0, s: 1, lx: 0.6, ly: 0, flap: 0, flapAmp: 0, blink: 2 + Math.random() * 3, blinkV: 1,
       pop: 0, hootT: 0, wave: 0, fan: 0, lean: 0, squash: 0, shiver: 0, T: 0, gear: {}, op: 1
     };
@@ -1153,12 +1207,14 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
     setAll(H.beak, 'translate(0,-29) scale(1,' + f2(1 + open) + ') translate(0,29)');
     H.pop = Math.max(0, H.pop - dt * 3.5);
     H.squash = Math.max(0, H.squash - dt * 4);
-    var shake = 0;
+    var shake = 0, no = 0;
     if (H.shiver > 0) { H.shiver -= dt; shake = Math.sin(H.T * 70) * 1.3 * calm; }
+    // a shake of the head, no
+    if (H.shake > 0) { H.shake -= dt; no = Math.sin(H.shake * 24) * 9; }
     var bob = Math.sin(H.T * 2) * 0.8 * calm * (1 - H.flapAmp);
     var sq = Math.sin(H.squash * Math.PI) * calm;
     var sx = (1 + H.pop * 0.12) * (1 + sq * 0.1), sy = (1 + H.pop * 0.12) * (1 - sq * 0.14);
-    setAll(H.all, 'translate(' + f2(shake) + ',' + f2(bob) + ') rotate(' + f2(H.lean) + ') scale(' + f2(sx) + ',' + f2(sy) + ')');
+    setAll(H.all, 'translate(' + f2(shake) + ',' + f2(bob) + ') rotate(' + f2(H.lean + no) + ' 0 -30) scale(' + f2(sx) + ',' + f2(sy) + ')');
     H.g.setAttribute('transform', 'translate(' + f2(H.x) + ',' + f2(H.y) + ') scale(' + f2(H.s) + ')');
     H.g.setAttribute('opacity', f2(H.op));
   }
@@ -1821,6 +1877,17 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
         + '<g fill="#ffffff"><ellipse cx="520" cy="577" rx="10" ry="4"/><ellipse cx="645" cy="581" rx="10" ry="4"/></g>';
     },
     setup: function (S) { S.steamT = 0; },
+    // once the monkey is warm, the hot spring gets a roof and a lantern
+    dev: function (lvl) {
+      if (lvl < 1) { return ''; }
+      return '<path d="M452 522 V398 M768 522 V398" stroke="#6b4a2f" stroke-width="12"/>'
+        + '<path d="M452 424 H768" stroke="#6b4a2f" stroke-width="8"/>'
+        + '<path d="M406 402 Q610 352 814 402 L798 414 Q610 370 422 414 Z" fill="#4a3a3a"/>'
+        + '<path d="M418 399 Q610 350 802 399" stroke="#ffffff" stroke-width="7" fill="none" stroke-linecap="round"/>'
+        + '<path d="M690 424 V436" stroke="#3b2a1e" stroke-width="2"/>'
+        + '<g class="nl"><circle cx="690" cy="446" r="22" fill="#!ffd27a" opacity="0.35"/></g>'
+        + '<rect x="681" y="436" width="18" height="22" rx="6" fill="#!e0402f"/>';
+    },
     frame: function (S, dt) {
       if (reduced) { return; }
       S.steamT -= dt;
@@ -1892,6 +1959,9 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
           + '<g class="p-eyes"><circle cx="-16" cy="-88" r="4" fill="#2a1d14"/><circle cx="4" cy="-88" r="4" fill="#2a1d14"/><circle cx="-15" cy="-89.5" r="1.2" fill="#ffffff"/><circle cx="5" cy="-89.5" r="1.2" fill="#ffffff"/></g>'
           + '<path d="M-9 -80 q3 2 6 0" stroke="#a84a52" stroke-width="2.4" fill="none"/>'
           + '<g class="p-mouth"><ellipse cx="-6" cy="-70" rx="6" ry="1.8" fill="#8a3a42"/></g>'
+          // the towel Hoot brought, folded on its head the way it's done in a hot spring
+          + '<g class="dev1" display="none"><path d="M-30 -116 Q-4 -138 24 -116 L22 -106 Q-4 -126 -28 -106 Z" fill="#f28ab0"/>'
+          + '<path d="M-27 -112 Q-4 -132 21 -112" stroke="#ffffff" stroke-width="3" fill="none"/></g>'
           + '</g>';
       },
       busy: function (A, t, P) { P.eyes = 0.1; P.mouth = 0; },
@@ -3050,6 +3120,400 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
   });
 
   // ==================================================================
+  // The post. Every place has something of its own you can pick up;
+  // some animals are makers, who turn what you bring into something new;
+  // and friends need things, each for a reason a child can see. All of
+  // it is real where it can be: sheep's wool from New Zealand, cotton
+  // from Egypt, the oiled-paper umbrella from China.
+  // ==================================================================
+  var ITEMS = {
+    wool: { from: 'nz', art: '<circle cx="0" cy="-24" r="22" fill="#f2ead8"/>'
+      + '<path d="M-18 -36 Q0 -46 18 -34 M-21 -24 Q0 -36 21 -22 M-18 -12 Q0 -24 19 -10 M-10 -4 Q2 -12 14 -2" stroke="#d6c8aa" stroke-width="2.4" fill="none"/>'
+      + '<path d="M14 -6 Q26 2 30 -4" stroke="#f2ead8" stroke-width="3" fill="none" stroke-linecap="round"/>'
+      + '<path d="M-10 -40 L-4 -56 M4 -42 L10 -56" stroke="#b8946a" stroke-width="3" stroke-linecap="round"/>' },
+    cotton: { from: 'egypt', art: '<path d="M0 0 V-18" stroke="#7a5a3a" stroke-width="3"/>'
+      + '<path d="M-14 -20 L0 -13 L14 -20 L8 -10 L-8 -10 Z" fill="#7a5a3a"/>'
+      + '<g fill="#ffffff" stroke="#ddd6c6" stroke-width="1.5"><circle cx="-11" cy="-30" r="11"/><circle cx="11" cy="-30" r="11"/><circle cx="0" cy="-42" r="12"/><circle cx="0" cy="-26" r="10"/></g>' },
+    bamboo: { from: 'china', art: '<path d="M-12 0 L-14 -54 M0 0 L0 -60 M12 0 L14 -52" stroke="#7fb045" stroke-width="9" stroke-linecap="round"/>'
+      + '<path d="M-19 -20 h10 M-19 -40 h10 M-5 -24 h10 M-5 -46 h10 M7 -22 h10 M8 -40 h10" stroke="#5f8f30" stroke-width="3"/>'
+      + '<path d="M-19 -9 h38" stroke="#c8a060" stroke-width="5" stroke-linecap="round"/>'
+      + '<path d="M0 -58 q12 -9 22 -3 q-11 7 -22 3 Z" fill="#6fae3a"/>' },
+    kiwifruit: { from: 'china', art: '<ellipse cx="-8" cy="-24" rx="16" ry="21" fill="#8a6a3a"/>'
+      + '<ellipse cx="11" cy="-18" rx="15" ry="17" fill="#8a6a3a"/><ellipse cx="11" cy="-18" rx="12" ry="14" fill="#86c440"/>'
+      + '<ellipse cx="11" cy="-18" rx="5" ry="6" fill="#eef4c8"/>'
+      + '<g fill="#2a2a1a"><circle cx="11" cy="-27" r="1.4"/><circle cx="18" cy="-21" r="1.4"/><circle cx="18" cy="-14" r="1.4"/><circle cx="11" cy="-9" r="1.4"/><circle cx="4" cy="-14" r="1.4"/><circle cx="4" cy="-21" r="1.4"/></g>' },
+    paper: { from: 'japan', art: '<rect x="-20" y="-50" width="30" height="44" fill="#ece6d4" transform="rotate(-10 -5 -28)"/>'
+      + '<rect x="-12" y="-54" width="32" height="48" fill="#fbf8f0" stroke="#ddd6c4" stroke-width="1.5"/>'
+      + '<path d="M-6 -44 h20 M-6 -36 h20 M-6 -28 h14" stroke="#cfc6b2" stroke-width="2"/>'
+      + '<circle cx="12" cy="-15" r="5" fill="#d9434e"/>' },
+    tea: { from: 'kenya', art: '<rect x="-22" y="-34" width="44" height="34" rx="3" fill="#a8743e"/>'
+      + '<path d="M-22 -26 h44 M-22 -8 h44" stroke="#8a5a2e" stroke-width="2"/>'
+      + '<path d="M-8 -19 q10 -9 18 -2 q-9 8 -18 2 Z" fill="#4f9a44"/>'
+      + '<path d="M-4 -34 q-4 -16 10 -24 q4 16 -10 24 Z" fill="#5fae4a"/>' },
+    cocoa: { from: 'brazil', art: '<ellipse cx="0" cy="-28" rx="16" ry="26" fill="#c87a2a" transform="rotate(18 0 -28)"/>'
+      + '<path d="M-6 -50 Q-14 -28 -4 -4 M2 -52 Q-4 -28 6 -4 M10 -50 Q8 -28 14 -8" stroke="#a85a1a" stroke-width="2.4" fill="none"/>'
+      + '<path d="M8 -52 q6 -6 4 -10" stroke="#6b4a2a" stroke-width="3" fill="none"/>' },
+    maple: { from: 'canada', art: '<path d="M-8 -48 h16 v8 q14 4 14 22 v14 q0 4 -4 4 h-36 q-4 0 -4 -4 v-14 q0 -18 14 -22 Z" fill="#c8701a"/>'
+      + '<rect x="-6" y="-56" width="12" height="9" rx="2" fill="#d8332c"/>'
+      + '<path d="M0 -30 l3 4 l4 -2 l-1 5 l4 2 l-6 2 l1 4 l-5 -2 l-5 2 l1 -4 l-6 -2 l4 -2 l-1 -5 l4 2 Z" fill="#f6d36a"/>' },
+    honey: { from: 'australia', art: '<path d="M-22 -36 Q-26 -6 -12 0 H12 Q26 -6 22 -36 Z" fill="#e8a020"/>'
+      + '<rect x="-24" y="-43" width="48" height="9" rx="4" fill="#c8801a"/>'
+      + '<path d="M-12 -34 q3 12 -2 16 q-5 -4 -2 -16 Z" fill="#f8c840"/>'
+      + '<rect x="-2" y="-28" width="16" height="13" rx="3" fill="#fff4d0"/><circle cx="6" cy="-21" r="3" fill="#e8a020"/>' },
+    ice: { from: 'antarctica', art: '<path d="M-20 -6 L-20 -38 L4 -46 L24 -38 L24 -6 L0 2 Z" fill="#cfeaf8"/>'
+      + '<path d="M-20 -38 L4 -30 L24 -38 L4 -46 Z" fill="#eef9ff"/>'
+      + '<path d="M4 -30 V2" stroke="#a8d4ee" stroke-width="2"/>'
+      + '<path d="M-14 -28 l6 4 M10 -20 l6 -4" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>' },
+    fish: { from: 'arctic', art: '<path d="M-26 -24 Q-6 -44 14 -28 L26 -40 L24 -24 L26 -8 L14 -20 Q-6 -4 -26 -24 Z" fill="#5f8fc0"/>'
+      + '<circle cx="-15" cy="-26" r="2.6" fill="#1a1a22"/>'
+      + '<path d="M-4 -32 q5 8 0 16" stroke="#4a78a8" stroke-width="2" fill="none"/>' },
+    corn: { from: 'usa', art: '<path d="M-6 -2 Q-18 -30 -4 -56 Q10 -30 2 -2 Z" fill="#f2c033"/>'
+      + '<path d="M-10 -44 h12 M-12 -34 h16 M-12 -24 h16 M-10 -14 h12" stroke="#d9a020" stroke-width="2"/>'
+      + '<path d="M-6 -2 Q-24 -20 -20 -42 Q-10 -20 -2 -6 Z" fill="#7fb045"/><path d="M2 -2 Q18 -18 16 -38 Q8 -18 0 -6 Z" fill="#6fa03a"/>' },
+    panpipes: { from: 'peru', art: '<g fill="#d9b072" stroke="#a8803e" stroke-width="1.2">'
+      + '<rect x="-22" y="-54" width="7" height="50" rx="3"/><rect x="-14" y="-54" width="7" height="42" rx="3"/><rect x="-6" y="-54" width="7" height="34" rx="3"/>'
+      + '<rect x="2" y="-54" width="7" height="28" rx="3"/><rect x="10" y="-54" width="7" height="22" rx="3"/><rect x="18" y="-54" width="7" height="17" rx="3"/></g>'
+      + '<rect x="-24" y="-46" width="51" height="7" fill="#d9434e"/><path d="M-24 -42.5 h51" stroke="#f2c033" stroke-width="2"/>' },
+    jumper: { from: 'peru', made: ['wool'], art: '<path d="M-14 -50 Q0 -44 14 -50 L30 -40 L24 -26 L18 -30 L18 -2 L-18 -2 L-18 -30 L-24 -26 L-30 -40 Z" fill="#d9434e"/>'
+      + '<path d="M-18 -16 h36 M-18 -10 h36" stroke="#ffffff" stroke-width="2.5" stroke-dasharray="4 3"/>'
+      + '<path d="M-6 -48 Q0 -42 6 -48" stroke="#b8333c" stroke-width="3" fill="none"/>' },
+    // a fluffy towel hanging over a rail, fringe and all
+    towel: { from: 'india', made: ['cotton'], art: '<path d="M-28 -50 H28" stroke="#8a5a32" stroke-width="5" stroke-linecap="round"/>'
+      + '<path d="M-20 -50 H20 V-6 Q0 -2 -20 -6 Z" fill="#f28ab0"/>'
+      + '<path d="M-20 -50 H20 V-40 Q0 -36 -20 -40 Z" fill="#e06a98"/>'
+      + '<path d="M-20 -24 H20 M-20 -16 H20" stroke="#ffffff" stroke-width="3.5"/>'
+      + '<path d="M-16 -5 v6 M-8 -4 v6 M0 -3 v6 M8 -4 v6 M16 -5 v6" stroke="#f28ab0" stroke-width="2.5" stroke-linecap="round"/>' },
+    umbrella: { from: 'china', made: ['paper'], local: ['bamboo'], art: '<path d="M0 -4 V-42" stroke="#6b4a2f" stroke-width="3"/>'
+      + '<path d="M0 -4 q-4 5 -8 0" stroke="#6b4a2f" stroke-width="3" fill="none"/>'
+      + '<path d="M-28 -36 Q0 -62 28 -36 Z" fill="#d9434e"/>'
+      + '<path d="M0 -51 L-28 -36 M0 -51 L-10 -36 M0 -51 L10 -36 M0 -51 L28 -36" stroke="#f2c033" stroke-width="1.6"/>' },
+    cake: { from: 'france', made: ['cocoa', 'maple'], art: '<rect x="-22" y="-26" width="44" height="24" rx="3" fill="#6b3f24"/>'
+      + '<rect x="-22" y="-31" width="44" height="9" rx="3" fill="#f4e0c8"/><path d="M-22 -14 h44" stroke="#f4e0c8" stroke-width="3"/>'
+      + '<path d="M0 -31 V-42" stroke="#ec5a8f" stroke-width="3"/><path d="M0 -50 q4 4 0 7 q-4 -3 0 -7 Z" fill="#f2c033"/>' }
+  };
+  function itemArt(k) { return ITEMS[k] ? ITEMS[k].art : ''; }
+  function itemsAt(id) { return Object.keys(ITEMS).filter(function (k) { return ITEMS[k].from === id; }); }
+  function rawAt(id) { return itemsAt(id).filter(function (k) { return !ITEMS[k].made; }); }
+  function madeAt(id) { return itemsAt(id).filter(function (k) { return !!ITEMS[k].made; })[0] || null; }
+  function usesOf(item) { return Object.keys(ITEMS).filter(function (k) { return (ITEMS[k].made || []).indexOf(item) >= 0; }); }
+
+  // Where each place's basket of goods sits in its scene, clear of the
+  // animal and the props.
+  var PILES = {
+    kenya: [492, 560], egypt: [480, 560], china: [440, 590], japan: [452, 620], australia: [480, 560],
+    nz: [480, 562], antarctica: [480, 560], brazil: [478, 560], peru: [458, 562], usa: [472, 560],
+    canada: [458, 562], arctic: [452, 562]
+  };
+
+  // ------------------------------------------------------------------
+  // The story: Granny Hoot's satchel. Each chapter starts with one of her
+  // faded postcards, of which only a torn scrap of picture survives.
+  // Finding the place restores it; the friend there needs help; helping
+  // brings back a piece of the story and a piece of Granny's map. Granny's
+  // map is in eight strips of longitude, 45 degrees each, the first
+  // centred on 0 so that home is on the strip that's already there.
+  // ------------------------------------------------------------------
+  var HOME_PIECE = 3;
+  var CHAPTERS = [
+    {
+      place: 'japan', need: 'towel', piece: 6,
+      tear: [[0, 0], [1, 0], [1, 0.46], [0.84, 0.53], [0.62, 0.44], [0.4, 0.56], [0.18, 0.47], [0, 0.54]],
+      say: {
+        match: 'This is it! Granny was here!',
+        knows: 'The monkey knows Granny’s satchel!',
+        ask: 'Brrr. The monkey is so cold after the hot spring.',
+        tell: 'Long ago, Granny was caught in a snowstorm here. The monkey’s grandma kept her warm in the hot spring.',
+        piece: 'A piece of Granny’s map!',
+        next: 'I wonder where Granny went next…'
+      },
+      flash: function () {
+        var monkey = BYID.japan.animal.art();
+        return '<rect width="450" height="300" fill="#e9dcc0"/>'
+          + '<path d="M50 190 L190 72 Q225 60 260 72 L400 190 Z" fill="#9a8a70"/>'
+          + '<path d="M190 72 Q225 60 260 72 L282 94 L264 90 L248 106 L232 92 L214 108 L198 90 Z" fill="#f4ecd8"/>'
+          + '<rect y="188" width="450" height="112" fill="#f0e6d0"/>'
+          + '<ellipse cx="225" cy="236" rx="160" ry="36" fill="#a89a80"/><ellipse cx="225" cy="232" rx="146" ry="28" fill="#c9bb9d"/>'
+          + '<g transform="translate(286,246) scale(0.8)">' + monkey + '</g>'
+          + '<g transform="translate(158,250) scale(1.25)">' + grannyArt() + '</g>'
+          + '<path d="M70 236 Q225 276 380 236 Q380 268 225 274 Q70 268 70 236 Z" fill="#c4b494" opacity="0.92"/>'
+          + '<g fill="#ffffff" opacity="0.8"><circle cx="60" cy="40" r="3"/><circle cx="120" cy="96" r="2.5"/><circle cx="330" cy="30" r="3"/><circle cx="390" cy="110" r="2.5"/><circle cx="250" cy="140" r="2"/><circle cx="30" cy="150" r="2.5"/><circle cx="420" cy="60" r="2"/><circle cx="170" cy="30" r="2.5"/></g>'
+          + '<g fill="#ffffff" opacity="0.35"><ellipse cx="200" cy="200" rx="30" ry="14"/><ellipse cx="270" cy="190" rx="26" ry="12"/></g>';
+      }
+    }
+  ];
+  function chapter() { return CHAPTERS[saved.ch] || null; }
+  function needAt(id) {
+    var c = chapter();
+    return (c && saved.prologue && saved.chState === 'need' && c.place === id) ? c.need : null;
+  }
+
+  // Hoot says a line at the story's moments, in the device's own English
+  // voice. The pictures tell the story too, so a device with no voice
+  // loses nothing that matters; the pause is kept either way.
+  function narrate(text) {
+    if (!text) { return 0; }
+    var d = 0.8 + text.length * 0.062;
+    if (!SS || !window.SpeechSynthesisUtterance) { return d; }
+    if (!voices.length) { loadVoices(); }
+    var v = findVoice('en-GB') || findVoice('en');
+    if (!v) { return d; }
+    try {
+      var u = new window.SpeechSynthesisUtterance(text);
+      u.voice = v; u.lang = v.lang || 'en-GB'; u.rate = 0.95; u.pitch = 1.3; u.volume = 1;
+      SS.speak(u);
+    } catch (e) { /* the pictures carry it */ }
+    return d;
+  }
+
+  // Old things are drawn in sepia, from the same art.
+  function sepiaify(s) {
+    return dayify(s).replace(/#([0-9a-fA-F]{6})\b/g, function (m) {
+      var c = rgb(m), y = c[0] * 0.3 + c[1] * 0.55 + c[2] * 0.15;
+      return hex([lerp(y * 1.04 + 26, 236, 0.2), lerp(y * 0.88 + 14, 222, 0.2), lerp(y * 0.64 + 4, 192, 0.2)]);
+    });
+  }
+
+  // Granny Hoot: greyer, in spectacles and her postal cap.
+  function grannyArt() {
+    return hootArt().replace(/#b98a62/g, '#a8998a').replace(/#9e6f4c/g, '#8f8478').replace(/#a87b55/g, '#9a8e80').replace(/#f6e3c3/g, '#efe6d8')
+      + '<g fill="none" stroke="#4a3a2e" stroke-width="1.8"><circle cx="-10" cy="-37" r="9.5"/><circle cx="10" cy="-37" r="9.5"/><path d="M-1 -37 h2"/></g>'
+      + '<path d="M-20 -50 Q0 -64 20 -50 L20 -46 L-20 -46 Z" fill="#2c3a66"/><rect x="-27" y="-48" width="30" height="5" rx="2.5" fill="#1f2a4a"/>'
+      + '<circle cx="6" cy="-53" r="3" fill="#f2c033"/>';
+  }
+
+  // One of Granny's postcards, faded, with only a torn scrap of picture.
+  var clipUid = 0;
+  function fadedCard(c, w, h) {
+    var p = BYID[c.place], id = 'fc' + (++clipUid), pad = w * 0.06, pw = w - pad * 2, ph = h - pad * 2;
+    var tear = c.tear.map(function (q) { return f2(pad + q[0] * pw) + ' ' + f2(pad + q[1] * ph); }).join(' L');
+    var k = ph * 1.05 / 64, sw = f2(Math.max(1, w * 0.012));
+    var s = '<defs><clipPath id="' + id + '"><path d="M' + tear + ' Z"/></clipPath></defs>';
+    s += '<rect width="' + f2(w) + '" height="' + f2(h) + '" rx="' + f2(w * 0.04) + '" fill="#eadcbc" stroke="#c8b48c" stroke-width="' + sw + '"/>';
+    s += '<g clip-path="url(#' + id + ')"><rect x="' + f2(pad) + '" y="' + f2(pad) + '" width="' + f2(pw) + '" height="' + f2(ph) + '" fill="#d6c39c"/>';
+    s += '<g transform="translate(' + f2(pad + pw / 2) + ',' + f2(pad + ph * 0.98) + ') scale(' + f2(k) + ')">' + sepiaify(p.icon()) + '</g></g>';
+    s += '<path d="M' + tear + '" fill="none" stroke="#b89c6c" stroke-width="' + sw + '" stroke-dasharray="' + f2(w * 0.02) + ' ' + f2(w * 0.012) + '"/>';
+    // foxing, and a few lines of Granny's handwriting nobody can read now
+    s += '<circle cx="' + f2(w * 0.82) + '" cy="' + f2(h * 0.8) + '" r="' + f2(w * 0.03) + '" fill="#c8a870" opacity="0.4"/>';
+    s += '<circle cx="' + f2(w * 0.16) + '" cy="' + f2(h * 0.86) + '" r="' + f2(w * 0.02) + '" fill="#c8a870" opacity="0.35"/>';
+    var hw = '';
+    for (var i = 0; i < 2; i++) {
+      var y = h * (0.7 + i * 0.12), x = w * 0.2;
+      hw += 'M' + f2(x) + ' ' + f2(y);
+      for (var j = 0; j < 6; j++) { hw += ' q' + f2(w * 0.04) + ' ' + f2(-h * 0.06) + ' ' + f2(w * 0.08) + ' 0 q' + f2(w * 0.02) + ' ' + f2(h * 0.04) + ' ' + f2(w * 0.03) + ' 0'; }
+    }
+    s += '<path d="' + hw + '" stroke="#9a8460" stroke-width="' + f2(Math.max(1, w * 0.008)) + '" fill="none" opacity="0.6"/>';
+    return s;
+  }
+
+  // The letter Granny never delivered: sealed, a drawing of a penguin for
+  // the address, a polar bear's paw print for the stamp.
+  function pawArt() {
+    return '<ellipse cx="0" cy="5" rx="8" ry="6.5"/><circle cx="-8" cy="-5" r="3.2"/><circle cx="-3" cy="-9" r="3.2"/><circle cx="3" cy="-9" r="3.2"/><circle cx="8" cy="-5" r="3.2"/>';
+  }
+  function letterArt(w, h) {
+    var sw = f2(Math.max(1, w * 0.012));
+    return '<rect width="' + f2(w) + '" height="' + f2(h) + '" rx="' + f2(w * 0.04) + '" fill="#efe2c4" stroke="#c8b48c" stroke-width="' + sw + '"/>'
+      + '<path d="M0 0 L' + f2(w / 2) + ' ' + f2(h * 0.52) + ' L' + f2(w) + ' 0" fill="#e4d3ad" stroke="#c8b48c" stroke-width="' + sw + '"/>'
+      + '<circle cx="' + f2(w / 2) + '" cy="' + f2(h * 0.52) + '" r="' + f2(w * 0.07) + '" fill="#b8333c"/>'
+      + '<circle cx="' + f2(w / 2) + '" cy="' + f2(h * 0.52) + '" r="' + f2(w * 0.04) + '" fill="none" stroke="#8a2028" stroke-width="' + sw + '"/>'
+      + '<g transform="translate(' + f2(w * 0.24) + ',' + f2(h * 0.93) + ') scale(' + f2(h * 0.48 / 64) + ')">' + sepiaify(BYID.antarctica.icon()) + '</g>'
+      + '<rect x="' + f2(w * 0.72) + '" y="' + f2(h * 0.62) + '" width="' + f2(w * 0.2) + '" height="' + f2(h * 0.3) + '" fill="#fbf6ea" stroke="#c8a870" stroke-width="' + sw + '" stroke-dasharray="' + f2(w * 0.02) + ' ' + f2(w * 0.012) + '"/>'
+      + '<g transform="translate(' + f2(w * 0.82) + ',' + f2(h * 0.77) + ') scale(' + f2(w * 0.0055) + ')" fill="#3b3350">' + pawArt() + '</g>';
+  }
+
+  // The rest of Granny's postcards, face down, still to come.
+  function cardStackArt(w, h) {
+    var s = '';
+    for (var i = 2; i >= 0; i--) {
+      s += '<rect x="' + f2(i * w * 0.05) + '" y="' + f2(-i * h * 0.06) + '" width="' + f2(w * 0.86) + '" height="' + f2(h * 0.86) + '" rx="' + f2(w * 0.04) + '" fill="' + (i ? '#e2d2ae' : '#eadcbc') + '" stroke="#c8b48c" stroke-width="' + f2(Math.max(1, w * 0.012)) + '" transform="rotate(' + (i * 3 - 3) + ')"/>';
+    }
+    return s;
+  }
+
+  // A thought bubble with something in it, its tail at the origin.
+  function thoughtArt(items, ticks) {
+    items = [].concat(items);
+    var n = items.length, w = 64 + (n - 1) * 62;
+    var s = '<circle cx="0" cy="0" r="5" fill="#ffffff" stroke="#d8d2c4" stroke-width="1.5"/><circle cx="10" cy="-14" r="8" fill="#ffffff" stroke="#d8d2c4" stroke-width="1.5"/>'
+      + '<rect x="' + f2(22 - 4) + '" y="-96" width="' + f2(w + 8) + '" height="72" rx="36" fill="#ffffff" stroke="#d8d2c4" stroke-width="2.5"/>';
+    items.forEach(function (it, i) {
+      var cx = 22 + 36 + i * 62;
+      s += '<g transform="translate(' + f2(cx) + ',-34) scale(0.72)">' + itemArt(it) + '</g>';
+      if (ticks && ticks[i]) {
+        s += '<circle cx="' + f2(cx + 20) + '" cy="-80" r="10" fill="#5fb85a"/><path d="M' + f2(cx + 15) + ' -80 l4 4 l7 -8" stroke="#ffffff" stroke-width="3" fill="none" stroke-linecap="round"/>';
+      }
+    });
+    return s;
+  }
+  // A maker's recipe, in its thought bubble: what goes in, an arrow, what
+  // comes out. Things already given, or already there, are ticked.
+  function recipeArt(product, held) {
+    var it = ITEMS[product], ins = (it.made || []).concat(it.local || []);
+    var n = ins.length + 1, w = 64 + n * 62 + 30;
+    var s = '<circle cx="0" cy="0" r="5" fill="#ffffff" stroke="#d8d2c4" stroke-width="1.5"/><circle cx="10" cy="-14" r="8" fill="#ffffff" stroke="#d8d2c4" stroke-width="1.5"/>'
+      + '<rect x="18" y="-96" width="' + f2(w) + '" height="72" rx="36" fill="#ffffff" stroke="#d8d2c4" stroke-width="2.5"/>';
+    var x = 22 + 36;
+    ins.forEach(function (k, i) {
+      var have = (it.local || []).indexOf(k) >= 0 || (held || []).indexOf(k) >= 0;
+      s += '<g transform="translate(' + f2(x) + ',-34) scale(0.66)">' + itemArt(k) + '</g>';
+      if (have) { s += '<circle cx="' + f2(x + 20) + '" cy="-80" r="10" fill="#5fb85a"/><path d="M' + f2(x + 15) + ' -80 l4 4 l7 -8" stroke="#ffffff" stroke-width="3" fill="none" stroke-linecap="round"/>'; }
+      x += 62;
+      void i;
+    });
+    s += '<path d="M' + f2(x - 18) + ' -60 h22 l-7 -7 M' + f2(x + 4) + ' -60 l-7 7" stroke="#8a7a60" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>';
+    s += '<g transform="translate(' + f2(x + 34) + ',-34) scale(0.72)">' + itemArt(product) + '</g>';
+    return s;
+  }
+
+  // A basket of a place's goods.
+  function pileArt(item) {
+    return '<ellipse cx="0" cy="2" rx="38" ry="9" fill="#000000" opacity="0.18"/>'
+      + '<path d="M-34 -24 H34" stroke="#8a5a2e" stroke-width="4" stroke-linecap="round"/>'
+      + '<g transform="translate(-13,-14) scale(0.66)">' + itemArt(item) + '</g>'
+      + '<g transform="translate(13,-18) scale(0.66)">' + itemArt(item) + '</g>'
+      + '<path d="M-35 -24 L-28 2 H28 L35 -24 Z" fill="#b07a40"/>'
+      + '<path d="M-33 -16 H33 M-31 -7 H31" stroke="#8a5a2e" stroke-width="2.5"/>';
+  }
+
+  // A torn scrap of Granny's map.
+  function pieceArt() {
+    return '<path d="M-26 -30 L20 -34 L28 -6 L18 22 L-22 28 L-30 4 Z" fill="#e2cfa4" stroke="#b89c6c" stroke-width="2"/>'
+      + '<path d="M-14 -16 q10 6 20 -2 M-18 8 q12 -6 26 4" stroke="#9a7a4a" stroke-width="2.5" fill="none"/>';
+  }
+
+  // A feather of puff.
+  function featherArt(fill, stroke, dash) {
+    return '<path d="M0 0 Q-7 -15 0 -32 Q7 -15 0 0 Z" fill="' + fill + '" stroke="' + stroke + '" stroke-width="1.6"' + (dash ? ' stroke-dasharray="3 2"' : '') + '/>'
+      + (dash ? '' : '<path d="M0 -2 V-28" stroke="' + stroke + '" stroke-width="1.2"/>');
+  }
+
+  // The land, traced onto a flat canvas: for Granny's map, and for
+  // knowing whether Hoot is over land or sea when his puff runs out.
+  function traceLand(ctx, W, H, ci, off, close) {
+    function X(lon) { return (lon + 180) / 360 * W; }
+    function Y(lat) { return (90 - lat) / 180 * H; }
+    LAND[ci].forEach(function (poly) {
+      poly.forEach(function (ring) {
+        var p = ring.p, n = p.length;
+        ctx.moveTo(X(p[0][0] + off), Y(p[0][1]));
+        for (var k = 1; k < n; k++) { ctx.lineTo(X(p[k][0] + off), Y(p[k][1])); }
+        if (close) {
+          if (ring.pole) { ctx.lineTo(X(p[n - 1][0] + off), Y(ring.pole)); ctx.lineTo(X(p[0][0] + off), Y(ring.pole)); }
+          ctx.closePath();
+        }
+      });
+    });
+  }
+  var landMask = null, MASK_W = 360, MASK_H = 180;
+  function buildLandMask() {
+    var cv = document.createElement('canvas');
+    cv.width = MASK_W; cv.height = MASK_H;
+    var c = cv.getContext('2d');
+    c.fillStyle = '#ffffff';
+    for (var i = 0; i < LAND.length; i++) {
+      for (var off = -360; off <= 360; off += 360) { c.beginPath(); traceLand(c, MASK_W, MASK_H, i, off, true); c.fill('evenodd'); }
+    }
+    landMask = c.getImageData(0, 0, MASK_W, MASK_H).data;
+  }
+  function isLand(v) {
+    if (!landMask) { return true; }
+    var ll = latlon(v);
+    var x = clamp(Math.floor((ll[1] + 180) / 360 * MASK_W), 0, MASK_W - 1), y = clamp(Math.floor((90 - ll[0]) / 180 * MASK_H), 0, MASK_H - 1);
+    return landMask[(y * MASK_W + x) * 4 + 3] > 128;
+  }
+  function nearestPlace(v, not) {
+    var best = null, ba = 1e9;
+    PLACES.forEach(function (p) {
+      if (p.id === not) { return; }
+      var a = angBetween(v, vec(p.lat, p.lon));
+      if (a < ba) { ba = a; best = p; }
+    });
+    return best;
+  }
+
+  // Granny's map, flat and sepia, painted once.
+  var grannyURL = null;
+  function grannyMapURL() {
+    if (grannyURL) { return grannyURL; }
+    var W = 720, H = 360, cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    var c = cv.getContext('2d'), i, off;
+    c.fillStyle = '#ead9b4'; c.fillRect(0, 0, W, H);
+    c.strokeStyle = 'rgba(150,120,80,0.28)'; c.lineWidth = 1;
+    for (i = 1; i < 12; i++) { c.beginPath(); c.moveTo(i * W / 12, 0); c.lineTo(i * W / 12, H); c.stroke(); }
+    for (i = 1; i < 6; i++) { c.beginPath(); c.moveTo(0, i * H / 6); c.lineTo(W, i * H / 6); c.stroke(); }
+    c.fillStyle = '#c9a873';
+    for (i = 0; i < LAND.length; i++) { for (off = -360; off <= 360; off += 360) { c.beginPath(); traceLand(c, W, H, i, off, true); c.fill('evenodd'); } }
+    c.strokeStyle = 'rgba(120,88,48,0.8)'; c.lineWidth = 1;
+    for (i = 0; i < LAND.length; i++) { for (off = -360; off <= 360; off += 360) { c.beginPath(); traceLand(c, W, H, i, off, false); c.stroke(); } }
+    try { grannyURL = cv.toDataURL('image/png'); } catch (e) { grannyURL = ''; }
+    return grannyURL;
+  }
+  // The map on the board: the strips found so far, blank torn paper where
+  // the rest should be, a red pin wherever Hoot has been and a sepia card
+  // wherever Granny's postcards came from.
+  function grannyMapArt(w, h) {
+    var s = '<rect x="-6" y="-6" width="' + f2(w + 12) + '" height="' + f2(h + 12) + '" fill="#f3ead6" stroke="#c8b48c" stroke-width="2"/>';
+    var url = grannyMapURL();
+    if (url) { s += '<image href="' + url + '" x="0" y="0" width="' + f2(w) + '" height="' + f2(h) + '" preserveAspectRatio="none"/>'; }
+    function X(lon) { return (lon + 180) / 360 * w; }
+    function Y(lat) { return (90 - lat) / 180 * h; }
+    for (var i = 0; i < 8; i++) {
+      if (saved.pieces & (1 << i)) { continue; }
+      var lon0 = -157.5 + i * 45, spans = lon0 + 45 > 180 ? [[lon0, 180], [-180, lon0 + 45 - 360]] : [[lon0, lon0 + 45]];
+      spans.forEach(function (sp) {
+        var x0 = Math.max(0, X(sp[0])), x1 = Math.min(w, X(sp[1]));
+        if (x1 <= x0) { return; }
+        var d = 'M' + f2(x0) + ' 0', r = rnd(i * 7 + 3), steps = 10, k;
+        for (k = 1; k <= steps; k++) { d += ' L' + f2(x0 + (r() - 0.5) * w * 0.016) + ' ' + f2(h * k / steps); }
+        d += ' L' + f2(x1) + ' ' + f2(h);
+        for (k = steps - 1; k >= 0; k--) { d += ' L' + f2(x1 + (r() - 0.5) * w * 0.016) + ' ' + f2(h * k / steps); }
+        s += '<path d="' + d + ' Z" fill="#f3ead6"/>';
+        s += '<path d="' + d + ' Z" fill="none" stroke="#c8b48c" stroke-width="1.5" stroke-dasharray="4 3"/>';
+      });
+    }
+    var pr = Math.max(3, w * 0.012);
+    CHAPTERS.forEach(function (c, ci) {
+      if (ci > saved.ch || (ci === saved.ch && saved.chState === 'find')) { return; }
+      var p = BYID[c.place];
+      s += '<rect x="' + f2(X(p.lon) - pr * 1.6) + '" y="' + f2(Y(p.lat) - pr * 2.6) + '" width="' + f2(pr * 3.2) + '" height="' + f2(pr * 2.2) + '" fill="#eadcbc" stroke="#9a8460" stroke-width="1"/>';
+    });
+    PLACES.forEach(function (p) {
+      if (p.home) {
+        s += '<g transform="translate(' + f2(X(p.lon)) + ',' + f2(Y(p.lat)) + ') scale(' + f2(pr / 7) + ')">' + starArt() + '</g>';
+      } else if (visits(p.id) > 0) {
+        s += '<circle cx="' + f2(X(p.lon)) + '" cy="' + f2(Y(p.lat)) + '" r="' + f2(pr) + '" fill="#d9434e" stroke="#7a1a20" stroke-width="1"/>';
+        s += '<circle cx="' + f2(X(p.lon) - pr * 0.3) + '" cy="' + f2(Y(p.lat) - pr * 0.3) + '" r="' + f2(pr * 0.35) + '" fill="#ffffff" opacity="0.7"/>';
+      }
+    });
+    return s;
+  }
+
+  // What's needed now, as a card: the friend, their wish, and what Hoot
+  // has found out so far about how to make it. What he hasn't found out
+  // yet shows as a question mark.
+  function missionArt(c, w, h) {
+    var p = BYID[c.place], it = ITEMS[c.need], sw = f2(Math.max(1, w * 0.01));
+    var s = '<rect width="' + f2(w) + '" height="' + f2(h) + '" rx="' + f2(w * 0.04) + '" fill="#fffaf0" stroke="#e0cfae" stroke-width="' + sw + '"/>';
+    s += '<g transform="translate(' + f2(w * 0.2) + ',' + f2(h * 0.58) + ') scale(' + f2(h * 0.46 / 64) + ')">' + dayify(p.icon()) + '</g>';
+    s += '<g transform="translate(' + f2(w * 0.3) + ',' + f2(h * 0.46) + ') scale(' + f2(h * 0.0042) + ')">' + thoughtArt(c.need) + '</g>';
+    // the trail: ingredients, the maker, the thing
+    var steps = [], unk = '<circle cx="0" cy="-26" r="22" fill="#e8e0cc"/><path d="M-7 -34 q0 -9 8 -9 q8 0 8 8 q0 6 -8 8 v5 M1 -12 v2" stroke="#a89878" stroke-width="5" fill="none" stroke-linecap="round"/>';
+    if (it.made) {
+      it.made.forEach(function (k) { steps.push(saved.seen[ITEMS[k].from] ? itemArt(k) : unk); });
+      steps.push(saved.seen[it.from] ? dayify(BYID[it.from].icon()) : unk);
+    }
+    steps.push(itemArt(c.need));
+    var gap = w / (steps.length + 0.4), k = Math.min(h * 0.26 / 64, gap * 0.7 / 64);
+    steps.forEach(function (art, i) {
+      var x = gap * (i + 0.7);
+      s += '<g transform="translate(' + f2(x) + ',' + f2(h * 0.93) + ') scale(' + f2(k) + ')">' + art + '</g>';
+      if (i < steps.length - 1) { s += '<path d="M' + f2(x + gap * 0.32) + ' ' + f2(h * 0.84) + ' h' + f2(gap * 0.3) + '" stroke="#b8a888" stroke-width="' + f2(Math.max(1.5, w * 0.012)) + '" stroke-linecap="round" stroke-dasharray="1 ' + f2(w * 0.02) + '"/>'; }
+    });
+    return s;
+  }
+
+  // ==================================================================
   // Layout
   // ==================================================================
   var over = $('over'), scene = $('scene');
@@ -3069,6 +3533,7 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
     paintSpace();
     over.setAttribute('viewBox', '0 0 ' + VW + ' ' + VH);
     layoutCounter();
+    layoutGlobeHud();
     sceneLayout();
   }
 
@@ -3096,7 +3561,9 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
       else {
         placeBubble();
         resetWeather();
+        if (S.ready) { showThoughts(); }
       }
+      layoutSceneHud();
     }
   }
 
@@ -3110,19 +3577,121 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
     markers = [];
     PLACES.forEach(function (p) {
       var g = el('g', {}, marksG);
+      var badges = el('g', {}, g);
       el('ellipse', { cx: 0, cy: 0, rx: 17, ry: 5, fill: '#000000', opacity: 0.28 }, g);
       var art = el('g', {}, g);
       art.innerHTML = dayify(p.icon());
       var star = el('g', { transform: 'translate(24,-6)' }, g);
       star.innerHTML = starArt();
-      markers.push({ p: p, g: g, star: star, v: vec(p.lat, p.lon), sx: 0, sy: 0, z: 0, k: 1 });
+      var need = el('g', { display: 'none' }, g);
+      markers.push({ p: p, g: g, art: art, star: star, badges: badges, need: need, v: vec(p.lat, p.lon), sx: 0, sy: 0, z: 0, k: 1 });
     });
-    refreshStars();
+    refreshMarkers();
   }
-  function refreshStars() {
+  // Beside each place, once Hoot has been there, what can be had there
+  // (made things on gold); above it, a friend's wish.
+  function refreshMarkers() {
     markers.forEach(function (m) {
-      if (visits(m.p.id) > 0) { m.star.removeAttribute('display'); } else { m.star.setAttribute('display', 'none'); }
+      var id = m.p.id;
+      if (visits(id) > 0) { m.star.removeAttribute('display'); } else { m.star.setAttribute('display', 'none'); }
+      var s = '';
+      if (saved.seen[id]) {
+        itemsAt(id).forEach(function (it, i) {
+          var made = !!ITEMS[it].made;
+          s += '<g transform="translate(-36,' + (-12 - i * 32) + ')"><circle r="15" fill="' + (made ? '#fff1b8' : '#ffffff') + '" stroke="' + (made ? '#d9a440' : '#c9c0ac') + '" stroke-width="2"/>'
+            + '<g transform="translate(0,10) scale(0.38)">' + itemArt(it) + '</g></g>';
+        });
+      }
+      m.badges.innerHTML = s;
+      var want = needAt(id);
+      if (want) {
+        m.need.innerHTML = '<g transform="translate(14,-56) scale(0.62)">' + thoughtArt(want) + '</g>';
+        m.need.removeAttribute('display');
+      } else {
+        m.need.setAttribute('display', 'none');
+        clear(m.need);
+      }
     });
+  }
+  function refreshStars() { refreshMarkers(); }
+
+  // ------------------------------------------------------------------
+  // The globe's HUD: the satchel and Hoot's puff, bottom left, and what
+  // Hoot is after, top left: one of Granny's postcards while he's looking
+  // for its place, a friend's wish once he's found it.
+  // ------------------------------------------------------------------
+  var hud = { g: $('ovhud'), slots: [], feathers: null, goal: null };
+  var SLOT_PX = 58;
+
+  function bagArt(cap, slot, items, gap) {
+    var w = cap * (slot + gap) + gap, h = slot + gap * 2;
+    var s = '<rect x="0" y="-6" width="' + f2(w) + '" height="' + f2(h + 6) + '" rx="' + f2(slot * 0.3) + '" fill="#8a5a32"/>'
+      + '<rect x="0" y="-6" width="' + f2(w) + '" height="' + f2(slot * 0.3) + '" rx="' + f2(slot * 0.15) + '" fill="#a06a3a"/>'
+      + '<circle cx="' + f2(w / 2) + '" cy="' + f2(slot * 0.16 - 6) + '" r="' + f2(slot * 0.08) + '" fill="#f2c033"/>';
+    for (var i = 0; i < cap; i++) {
+      var cx = gap + slot / 2 + i * (slot + gap), cy = gap + slot / 2;
+      s += '<circle cx="' + f2(cx) + '" cy="' + f2(cy) + '" r="' + f2(slot / 2) + '" fill="#f6ead2"' + (items[i] ? '' : ' stroke="#c8a878" stroke-width="2" stroke-dasharray="4 4"') + '/>';
+      if (items[i]) { s += '<g transform="translate(' + f2(cx) + ',' + f2(cy + slot * 0.33) + ') scale(' + f2(slot * 0.66 / 64) + ')">' + itemArt(items[i]) + '</g>'; }
+    }
+    return { art: s, w: w, h: h };
+  }
+  function goalArt(w, h) {
+    var c = chapter();
+    if (!c) { return ''; }
+    if (saved.chState === 'find') { return fadedCard(c, w, h); }
+    if (saved.chState === 'need') { return missionArt(c, w, h); }
+    return '';
+  }
+
+  function layoutGlobeHud() {
+    var g = hud.g;
+    clear(g);
+    if (!saved.prologue) { return; }
+    var m = 14, gap = 8, b = bagArt(saved.cap, SLOT_PX, saved.bag, gap);
+    var bg = el('g', { transform: 'translate(' + m + ',' + f2(VH - m - b.h) + ')' }, g);
+    bg.innerHTML = b.art;
+    hud.feathers = el('g', { transform: 'translate(' + f2(m + b.w + 18) + ',' + f2(VH - m - 6) + ')' }, g);
+    var gw = Math.min(150, VW * 0.3), gh2 = gw * 0.7, art = goalArt(gw, gh2);
+    hud.goal = null;
+    if (art) {
+      hud.goal = el('g', { 'data-hit': 'goal', transform: 'translate(' + m + ',' + m + ') rotate(-3)' }, g);
+      hud.goal.innerHTML = art + '<circle cx="' + f2(gw / 2) + '" cy="6" r="6" fill="#d9434e"/>';
+      hud.goalSize = [gw, gh2];
+    }
+    refreshFeathers();
+  }
+  // One feather for every thousand miles Hoot can manage. While a trip is
+  // being planned, the feathers it would use turn gold, and any it would
+  // need beyond what he has show as dashed outlines: that's the shortfall.
+  function refreshFeathers() {
+    if (!hud.feathers) { return; }
+    var cost = sel ? tripCost(here, sel) : 0, s = '', n = Math.max(saved.puff, cost);
+    for (var i = 0; i < n; i++) {
+      var x = i * 20;
+      if (i >= saved.puff) { s += '<g transform="translate(' + x + ',0)">' + featherArt('none', '#a8b0c8', true) + '</g>'; }
+      else { s += '<g transform="translate(' + x + ',0)">' + featherArt(i < cost ? '#ffd34a' : '#f2e2c4', i < cost ? '#b07a10' : '#a87b55') + '</g>'; }
+    }
+    hud.feathers.innerHTML = s;
+  }
+  function showGoalZoom(on) {
+    var z = $('cluezoom');
+    clear(z);
+    if (!on) { z.setAttribute('display', 'none'); return; }
+    var w = Math.min(VW * 0.86, VH * 1.1, 560), h = w * 0.7, art = goalArt(w, h);
+    if (!art) { z.setAttribute('display', 'none'); return; }
+    z.setAttribute('data-hit', 'cluezoom');
+    el('rect', { x: 0, y: 0, width: VW, height: VH, fill: '#05081a', opacity: 0.6 }, z);
+    var g = el('g', { transform: 'translate(' + f2((VW - w) / 2) + ',' + f2((VH - h) / 2) + ') rotate(-2 ' + f2(w / 2) + ' ' + f2(h / 2) + ')' }, z);
+    g.innerHTML = art;
+    z.removeAttribute('display');
+    SND.rustle();
+  }
+  function goalLine() {
+    var c = chapter();
+    if (!c) { return ''; }
+    if (saved.chState === 'find') { return 'Where was Granny when she sent this one?'; }
+    if (saved.chState === 'need') { return c.say.ask; }
+    return '';
   }
 
   function layoutCounter() {
@@ -3146,10 +3715,14 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
   var mode = 'globe';   // globe, fly, land, zoomIn, scene, zoomOut
   var modeT = 0;
   var here = 'leeds';
-  var nextTrip = null;
   var view = { lon: -1.5, lat: 30 }, goal = { lon: -1.5, lat: 30 };
   var fl = null, zoom = 0, sceneA = 0, counterA = 0, trailA = 0;
   var drag = null;
+  var sel = null;          // the place picked for the next flight, shown as a ghost trail
+  var fe = null;           // a ride home on a sea creature's back, after running out of puff
+  var splash = null;       // where Hoot came down in the sea
+  var pointArrow = null;   // which way a puzzled friend pointed: { from, to }
+  var saidTooFar = false;
   var MAX_TURN = 150;   // degrees a second; a finger can't spin the world faster
 
   // Taps are rationed: each target has a cooldown, and no more than four
@@ -3178,13 +3751,41 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
     view.lat = clamp(view.lat + mp, -70, 70);
   }
 
+  function tripMiles(fromId, toId) {
+    var A = BYID[fromId], B = BYID[toId];
+    return angBetween(vec(A.lat, A.lon), vec(B.lat, B.lon)) * EARTH_MILES;
+  }
+  // A feather for every thousand miles or part of one.
+  function tripCost(fromId, toId) { return Math.ceil(tripMiles(fromId, toId) / 1000 - 1e-6); }
+
+  function select(id) {
+    sel = id;
+    refreshFeathers();
+    if (!id) { return; }
+    gh.pop = 0.6;
+    SND.pop(0.9);
+    var short = tripCost(here, id) > saved.puff;
+    setGear(gh, 'sweat', short);
+    if (short) {
+      gh.shiver = 0.6;
+      if (!saidTooFar) { saidTooFar = true; narrate('That’s too far for one go!'); }
+    }
+  }
+
   function startFlight(toId) {
     var A = BYID[here], B = BYID[toId];
-    var a = vec(A.lat, A.lon), b = vec(B.lat, B.lon), ang = angBetween(a, b);
+    var a = vec(A.lat, A.lon), b = vec(B.lat, B.lon), ang = angBetween(a, b), miles = ang * EARTH_MILES;
+    var cost = Math.ceil(miles / 1000 - 1e-6);
     fl = {
-      to: B, a: a, b: b, ang: ang, miles: Math.round(ang * EARTH_MILES), t: 0,
-      dur: reduced ? 0.6 : clamp(1.4 + ang * R2D / 42, 2, 5.6), nextFlap: 0, px: 0, py: 0
+      from: A.id, to: B, a: a, b: b, ang: ang, miles: Math.round(miles), t: 0, done: 0,
+      dur: reduced ? 0.6 : clamp(1.4 + ang * R2D / 42, 2, 5.6), nextFlap: 0, px: 0, py: 0,
+      carry: saved.bag.length > 0,
+      // if he hasn't the puff for it, how far along he'll get
+      runAt: cost > saved.puff ? saved.puff * 1000 / miles : 0
     };
+    sel = null; pointArrow = null;
+    setGear(gh, 'sweat', false);
+    refreshFeathers();
     mode = 'fly'; modeT = 0;
     gh.flapAmp = 1; gh.pop = 1;
     SND.flap();
@@ -3196,24 +3797,108 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
     }
   }
 
+  // He lands, wherever that turned out to be.
+  function arriveAt(id, miles, fromId, carry) {
+    saved.miles = Math.min(999999, Math.round(saved.miles + miles));
+    if (carry && fromId && fromId !== id) {
+      var key = [fromId, id].sort().join('|');
+      if (saved.routes.indexOf(key) < 0) { saved.routes.push(key); }
+    }
+    here = id;
+    saved.here = id;
+    persist();
+    SND.ding();
+    gh.flapAmp = 0; gh.squash = 1; gh.lean = 0;
+    mode = 'land'; modeT = 0;
+  }
+
   function flyFrame(dt) {
     fl.t += dt;
-    var k = clamp(fl.t / fl.dur, 0, 1), u = smooth(k);
+    var k = clamp(fl.t / fl.dur, 0, 1), u = fl.tired ? k : smooth(k);
     var P = slerp(fl.a, fl.b, u);
     var c = norm(slerp(P, fl.b, 0.3)), ll = latlon(c);
     goal.lon = ll[1]; goal.lat = clamp(ll[0], -62, 62);
     if (!reduced) { steerView(dt, 220, 3.2); }
-    fl.P = P; fl.lift = 1 + 0.16 * Math.sin(Math.PI * k);
-    setCounter(fl.miles * u);
-    if (!reduced && fl.t > fl.nextFlap && fl.t < fl.dur - 0.3) { fl.nextFlap = fl.t + 0.75; SND.flap(); }
+    fl.P = P;
+    fl.lift = fl.tired ? 1 + 0.05 * (1 - k) : 1 + 0.16 * Math.sin(Math.PI * k);
+    setCounter(fl.done + fl.miles * u);
+    if (!reduced && fl.t > fl.nextFlap && fl.t < fl.dur - 0.3) { fl.nextFlap = fl.t + (fl.tired ? 1.1 : 0.75); SND.flap(); }
+    if (fl.runAt && u >= fl.runAt) { puffedOut(); return; }
     if (fl.t >= fl.dur) {
-      saved.miles = Math.min(999999, saved.miles + fl.miles);
-      persist();
-      here = fl.to.id;
-      setCounter(fl.miles);
-      SND.ding();
-      gh.flapAmp = 0; gh.squash = 1;
-      mode = 'land'; modeT = 0;
+      setCounter(fl.done + fl.miles);
+      arriveAt(fl.to.id, fl.done + fl.miles, fl.from, fl.carry);
+    }
+  }
+
+  // Out of puff. Over land, a weary glide down to the nearest place; over
+  // the sea, a splash and a slow ride on a turtle's back (in warm water)
+  // or a whale's (in cold) to the nearest coast. Never to where he was
+  // going, however close: falling short has to cost a turn. It never
+  // costs anything he's carrying, and it can't be hurried.
+  function puffedOut() {
+    var P = slerp(fl.a, fl.b, fl.runAt), flown = fl.miles * fl.runAt, N = nearestPlace(P, fl.to.id);
+    var b = vec(N.lat, N.lon), ang = angBetween(P, b), miles = Math.round(ang * EARTH_MILES);
+    narrate('Oh no! I’m all puffed out!');
+    tone({ f: 900, f2: 280, d: 0.8, type: 'triangle', g: 0.08, a: 0.02, s: 0.2 });
+    if (isLand(P)) {
+      fl = {
+        from: fl.from, to: N, a: P, b: b, ang: ang, miles: miles, t: 0, done: flown, tired: true,
+        dur: reduced ? 0.6 : clamp(1.6 + ang * R2D / 14, 1.8, 4), nextFlap: 0, px: fl.px, py: fl.py, carry: fl.carry, runAt: 0
+      };
+      gh.flapAmp = 0.45;
+    } else {
+      // the ride only goes as far as the coast; any way left is flown
+      var lat = latlon(P)[0], shore = 1;
+      for (var s = 1; s <= 60; s++) { if (isLand(slerp(P, b, s / 60))) { shore = s / 60; break; } }
+      var swim = ang * shore;
+      fe = {
+        from: fl.from, to: N, a: P, b: slerp(P, b, shore), end: b, ang: swim, miles: Math.round(swim * EARTH_MILES), t: 0, done: flown, carry: fl.carry,
+        dur: reduced ? 1.2 : clamp(3 + swim * R2D / 5, 3.5, 9), kind: Math.abs(lat) < 35 ? 'turtle' : 'whale', px: 0, rest: shore < 1
+      };
+      splash = { P: P, t: 0 };
+      fl = null;
+      gh.flapAmp = 0;
+      SND.splash();
+      mode = 'ferry'; modeT = 0;
+      $('ferryg').innerHTML = fe.kind === 'turtle' ? turtleArt() : whaleArt();
+    }
+  }
+  function turtleArt() {
+    return '<g class="fe-body"><ellipse cx="0" cy="0" rx="34" ry="10" fill="#2f6aa8" opacity="0.35"/>'
+      + '<ellipse cx="-30" cy="-6" rx="10" ry="7" fill="#7fb45a"/><circle cx="-34" cy="-8" r="1.8" fill="#1a1a1a"/>'
+      + '<path d="M-14 0 l-8 8 M14 0 l8 8" stroke="#7fb45a" stroke-width="6" stroke-linecap="round"/>'
+      + '<ellipse cx="2" cy="-8" rx="24" ry="13" fill="#5f8a3a"/>'
+      + '<path d="M-14 -8 h32 M-6 -18 l-4 10 M8 -19 l4 11" stroke="#4a6e2c" stroke-width="2"/></g>';
+  }
+  function whaleArt() {
+    return '<g class="fe-body"><ellipse cx="0" cy="2" rx="44" ry="10" fill="#2f6aa8" opacity="0.35"/>'
+      + '<path d="M-40 0 Q-30 -26 6 -26 Q34 -26 40 -6 L56 -18 L52 0 L56 10 L40 2 Q20 6 -40 0 Z" fill="#33445a"/>'
+      + '<path d="M-36 -2 Q0 4 34 -2" stroke="#c8d4e0" stroke-width="3" fill="none"/>'
+      + '<circle cx="-26" cy="-12" r="2.2" fill="#ffffff"/>'
+      + '<path d="M-6 -26 q-4 -10 -10 -12 M-6 -26 q2 -10 8 -12" stroke="#cfeaf8" stroke-width="3" fill="none" stroke-linecap="round"/></g>';
+  }
+
+  function ferryFrame(dt) {
+    fe.t += dt;
+    var k = clamp(fe.t / fe.dur, 0, 1), P = slerp(fe.a, fe.b, k);
+    fe.P = P;
+    var c = norm(slerp(P, fe.b, 0.2)), ll = latlon(c);
+    goal.lon = ll[1]; goal.lat = clamp(ll[0], -62, 62);
+    if (!reduced) { steerView(dt, 120, 2.5); }
+    setCounter(fe.done + fe.miles * k);
+    if (k >= 1) {
+      $('ferryg').innerHTML = '';
+      var f = fe;
+      fe = null;
+      if (!f.rest) { arriveAt(f.to.id, f.done + f.miles, f.from, f.carry); return; }
+      // ashore: a weary flight the rest of the way
+      var ang = angBetween(f.b, f.end);
+      fl = {
+        from: f.from, to: f.to, a: f.b, b: f.end, ang: ang, miles: Math.round(ang * EARTH_MILES), t: 0, done: f.done + f.miles, tired: true,
+        dur: reduced ? 0.6 : clamp(1.6 + ang * R2D / 14, 1.8, 4), nextFlap: 0, px: 0, py: 0, carry: f.carry, runAt: 0
+      };
+      gh.flapAmp = 0.45;
+      mode = 'fly'; modeT = 0;
     }
   }
 
@@ -3239,6 +3924,9 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
     zoom = reduced ? 0 : 1;
     fl = null;
     gh.op = 1; gh.flapAmp = 0;
+    setGear(gh, 'bag', saved.prologue);
+    refreshMarkers();
+    layoutGlobeHud();
   }
 
   function globeTap(x, y) {
@@ -3261,24 +3949,30 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
       }
     }
     if (!best) {
+      select(null);
       if (tapOk('space', 1)) { SND.hoot(); gh.pop = 1; gh.hootT = 0.95; }
       return;
     }
-    if (!tapOk('globe', 0.5)) { return; }
-    if (best.id === here) { hopIn(); } else { startFlight(best.id); }
+    if (!tapOk('globe', 0.4)) { return; }
+    // Tap a place once to see the trip, again to go. Hoot's own place
+    // takes him in.
+    if (best.id === here) { select(null); setGear(gh, 'sweat', false); hopIn(); }
+    else if (sel === best.id) { startFlight(best.id); }
+    else { select(best.id); }
   }
 
   over.addEventListener('pointerdown', function (e) {
     unlock();
     if (mode !== 'globe' || drag) { return; }
-    drag = { id: e.pointerId, x0: e.clientX, y0: e.clientY, t0: performance.now(), moved: false, lon0: view.lon, lat0: view.lat };
+    var t = e.target, h = (t && t.closest) ? t.closest('[data-hit]') : null;
+    drag = { id: e.pointerId, x0: e.clientX, y0: e.clientY, t0: performance.now(), moved: false, lon0: view.lon, lat0: view.lat, hit: h ? h.getAttribute('data-hit') : null };
     try { over.setPointerCapture(e.pointerId); } catch (err) { /* not every browser */ }
   });
   over.addEventListener('pointermove', function (e) {
     if (!drag || drag.id !== e.pointerId) { return; }
     var dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
     if (!drag.moved && dx * dx + dy * dy > 100) { drag.moved = true; }
-    if (drag.moved) {
+    if (drag.moved && !drag.hit) {
       goal.lon = wrap180(drag.lon0 - dx / GR * R2D);
       goal.lat = clamp(drag.lat0 + dy / GR * R2D, -62, 62);
     }
@@ -3288,7 +3982,13 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
     var d = drag;
     drag = null;
     goal.lon = view.lon; goal.lat = view.lat;
-    if (!cancelled && !d.moved && performance.now() - d.t0 < 700 && mode === 'globe') { globeTap(d.x0, d.y0); }
+    if (cancelled || d.moved || performance.now() - d.t0 > 700 || mode !== 'globe') { return; }
+    if (d.hit === 'cluezoom') { showGoalZoom(false); return; }
+    if (d.hit === 'goal') {
+      if (tapOk('goal', 1)) { showGoalZoom(true); narrate(goalLine()); }
+      return;
+    }
+    globeTap(d.x0, d.y0);
   }
   over.addEventListener('pointerup', function (e) { endDrag(e, false); });
   over.addEventListener('pointercancel', function (e) { endDrag(e, true); });
@@ -3305,7 +4005,9 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
       if (vis <= 0.01) { m.g.setAttribute('display', 'none'); return; }
       m.g.removeAttribute('display');
       m.k = base * (0.55 + 0.45 * q.z);
-      m.g.setAttribute('transform', 'translate(' + f2(q.x) + ',' + f2(q.y) + ') scale(' + f2(m.k) + ')');
+      // the place picked for the next flight bounces gently
+      var bob = (m.p.id === sel && !reduced) ? 1 + 0.12 * Math.abs(Math.sin(modeT * 4)) : 1;
+      m.g.setAttribute('transform', 'translate(' + f2(q.x) + ',' + f2(q.y) + ') scale(' + f2(m.k * bob) + ')');
       m.g.setAttribute('opacity', f2(vis));
     });
   }
@@ -3313,6 +4015,7 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
   function hootOnGlobe(dt, R, alpha) {
     var P, lift = 1;
     if (mode === 'fly' && fl && fl.P) { P = fl.P; lift = fl.lift; }
+    else if (mode === 'ferry' && fe && fe.P) { P = fe.P; lift = 1.012; }
     else { P = vec(BYID[here].lat, BYID[here].lon); }
     var q = project(P, R * lift);
     var size = clamp(GR * 0.2, 38, 72) / 64;
@@ -3320,15 +4023,125 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
     if (mode === 'fly' && fl) {
       var vx = (q.x - fl.px) / Math.max(dt, 0.001);
       fl.px = q.x; fl.py = q.y;
-      gh.lean = clamp(vx * 0.03, -18, 18);
+      gh.lean = clamp(vx * 0.03, -18, 18) + (fl.tired ? 14 : 0);
     } else {
       gh.lean *= 0.9;
     }
     gh.x = q.x; gh.y = q.y; gh.s = size * (0.75 + 0.25 * Math.max(0, q.z)) * (mode === 'zoomIn' ? 1 - zoom * 0.6 : 1);
     gh.op = vis;
-    gh.lx = drag ? clamp((drag.x0 - q.x) / 200, -1, 1) : gh.lx * 0.95;
+    // he looks where the finger is, or at the trip being planned
+    if (drag) { gh.lx = clamp((drag.x0 - q.x) / 200, -1, 1); }
+    else if (sel) {
+      var t = project(vec(BYID[sel].lat, BYID[sel].lon), R);
+      gh.lx = lerp(gh.lx, clamp((t.x - q.x) / 160, -1, 1), 0.2); gh.ly = lerp(gh.ly, clamp((t.y - q.y) / 160, -1, 1), 0.2);
+    } else { gh.lx *= 0.95; gh.ly *= 0.95; }
     poseHoot(gh, dt);
     if (vis < 0.02) { gh.g.setAttribute('display', 'none'); } else { gh.g.removeAttribute('display'); }
+    // the sea creature under him
+    var fg = $('ferryg');
+    if (mode === 'ferry' && fe && fe.P) {
+      var vx2 = (q.x - fe.px) / Math.max(dt, 0.001);
+      fe.px = q.x;
+      var bob2 = reduced ? 0 : Math.sin(modeT * 3) * 1.5;
+      fg.setAttribute('transform', 'translate(' + f2(q.x) + ',' + f2(q.y + 4 + bob2) + ') scale(' + f2((vx2 < 0 ? 1 : -1) * gh.s * 0.9) + ',' + f2(gh.s * 0.9) + ')');
+      fg.setAttribute('opacity', f2(vis));
+    }
+  }
+
+  // A great-circle arc from a to b, between fractions f0 and f1, drawn
+  // only where it's on the near side of the globe.
+  function arcPath(a, b, f0, f1, R, lift, steps) {
+    var d = '', pen = false;
+    steps = steps || 40;
+    for (var i = 0; i <= steps; i++) {
+      var f = lerp(f0, f1, i / steps);
+      var q = project(slerp(a, b, f), R * (1 + lift * Math.sin(Math.PI * f)));
+      if (q.z < 0.02) { pen = false; continue; }
+      d += (pen ? 'L' : 'M') + f2(q.x) + ' ' + f2(q.y) + ' ';
+      pen = true;
+    }
+    return d;
+  }
+
+  // The trip being planned: white as far as Hoot's puff will take him,
+  // grey beyond, and a feather pip at every thousand miles.
+  var pipNodes = [];
+  function previewFrame(R, alpha) {
+    var ok = $('pvok'), grey = $('pvgrey'), pips = $('pvpips');
+    if (!sel || mode !== 'globe' || alpha <= 0) {
+      ok.setAttribute('d', ''); grey.setAttribute('d', ''); pips.setAttribute('display', 'none');
+      return;
+    }
+    var A = BYID[here], B = BYID[sel], a = vec(A.lat, A.lon), b = vec(B.lat, B.lon);
+    var miles = angBetween(a, b) * EARTH_MILES, reach = Math.min(1, saved.puff * 1000 / miles), lift = 0.07;
+    ok.setAttribute('d', arcPath(a, b, 0, reach, R, lift));
+    grey.setAttribute('d', reach < 1 ? arcPath(a, b, reach, 1, R, lift) : '');
+    pips.removeAttribute('display');
+    var n = Math.ceil(miles / 1000 - 1e-6);
+    while (pipNodes.length < n) { pipNodes.push(el('g', {}, pips)); }
+    for (var i = 0; i < pipNodes.length; i++) {
+      var g = pipNodes[i];
+      if (i >= n) { g.setAttribute('display', 'none'); continue; }
+      var f = Math.min(1, (i + 1) * 1000 / miles), q = project(slerp(a, b, f), R * (1 + lift * Math.sin(Math.PI * f)));
+      if (q.z < 0.02) { g.setAttribute('display', 'none'); continue; }
+      var inReach = i < saved.puff, want = inReach ? 'y' : 'n';
+      if (g.getAttribute('data-k') !== want) {
+        g.setAttribute('data-k', want);
+        g.innerHTML = '<circle r="11" fill="' + (inReach ? '#fff6dc' : '#4a5270') + '" stroke="' + (inReach ? '#b07a10' : '#8a93b0') + '" stroke-width="1.5"/>'
+          + '<g transform="translate(0,8) scale(0.5)">' + featherArt(inReach ? '#ffd34a' : 'none', inReach ? '#b07a10' : '#a8b0c8', !inReach) + '</g>';
+      }
+      g.removeAttribute('display');
+      g.setAttribute('transform', 'translate(' + f2(q.x) + ',' + f2(q.y) + ')');
+    }
+  }
+
+  // Every journey that carried something leaves a faint gold line: the
+  // world getting more connected, one delivery at a time.
+  function routesFrame(R, alpha) {
+    var d = '';
+    if (alpha > 0) {
+      saved.routes.forEach(function (key) {
+        var ab = key.split('|'), A = BYID[ab[0]], B = BYID[ab[1]];
+        if (!A || !B) { return; }
+        d += arcPath(vec(A.lat, A.lon), vec(B.lat, B.lon), 0, 1, R, 0.02, 32);
+      });
+    }
+    $('routes').setAttribute('d', d);
+  }
+
+  // Which way a puzzled friend pointed: an arrow along the true bearing.
+  function arrowFrame(R, alpha) {
+    var g = $('arrowg');
+    if (!pointArrow || mode !== 'globe' || alpha <= 0) { g.setAttribute('display', 'none'); return; }
+    var A = BYID[pointArrow.from], B = BYID[pointArrow.to], a = vec(A.lat, A.lon), b = vec(B.lat, B.lon);
+    var f1 = Math.min(1, 0.4 / Math.max(0.05, angBetween(a, b))), pts = [];
+    for (var i = 0; i <= 16; i++) {
+      var q = project(slerp(a, b, f1 * i / 16), R * 1.01);
+      if (q.z < 0.02) { break; }
+      pts.push(q);
+    }
+    if (pts.length < 3) { g.setAttribute('display', 'none'); return; }
+    var d = 'M' + pts.map(function (q) { return f2(q.x) + ' ' + f2(q.y); }).join(' L');
+    var e = pts[pts.length - 1], p = pts[pts.length - 3], ang = Math.atan2(e.y - p.y, e.x - p.x) * R2D;
+    var pulse = reduced ? 1 : 0.7 + 0.3 * Math.sin(modeT * 4);
+    g.innerHTML = '<path d="' + d + '" fill="none" stroke="#ff9a3a" stroke-width="5" stroke-linecap="round" opacity="' + f2(pulse) + '"/>'
+      + '<path d="M0 -11 L18 0 L0 11 Z" fill="#ff9a3a" transform="translate(' + f2(e.x) + ',' + f2(e.y) + ') rotate(' + f2(ang) + ')" opacity="' + f2(pulse) + '"/>';
+    g.removeAttribute('display');
+  }
+
+  function splashFrame(dt, R) {
+    var g = $('splashg');
+    if (!splash) { g.innerHTML = ''; return; }
+    splash.t += dt;
+    var q = project(splash.P, R);
+    if (splash.t > 1.4 || q.z < 0.02) { if (splash.t > 1.4) { splash = null; } g.innerHTML = ''; return; }
+    var s = '';
+    for (var i = 0; i < 3; i++) {
+      var k = clamp((splash.t - i * 0.18) / 1, 0, 1);
+      if (k <= 0) { continue; }
+      s += '<ellipse cx="' + f2(q.x) + '" cy="' + f2(q.y) + '" rx="' + f2(6 + k * 34) + '" ry="' + f2(3 + k * 12) + '" fill="none" stroke="#ffffff" stroke-width="3" opacity="' + f2(1 - k) + '"/>';
+    }
+    g.innerHTML = s;
   }
 
   function trailFrame(R) {
@@ -3356,6 +4169,8 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
       steerView(dt, MAX_TURN, drag ? 14 : 8);
     } else if (mode === 'fly') {
       flyFrame(dt);
+    } else if (mode === 'ferry') {
+      ferryFrame(dt);
     } else if (mode === 'land') {
       if (modeT > (reduced ? 0.15 : 0.5)) { beginZoomIn(); }
     } else if (mode === 'zoomIn') {
@@ -3374,19 +4189,25 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
       if (k2 >= 1) {
         mode = 'globe'; modeT = 0; zoom = 0; sceneA = 0;
         endScene();
-        if (nextTrip) { var t = nextTrip; nextTrip = null; startFlight(t); }
       }
     }
-    var showCounter = (mode === 'fly' || mode === 'land' || (mode === 'zoomIn' && modeT < 0.4)) && fl;
+    // the counter shows a trip's miles while it's planned and as it's flown
+    if (mode === 'globe' && sel) { setCounter(tripMiles(here, sel)); }
+    var showCounter = (mode === 'globe' && sel) || mode === 'fly' || mode === 'ferry' || mode === 'land' || (mode === 'zoomIn' && modeT < 0.4);
     counterA = clamp(counterA + (showCounter ? dt * 5 : -dt * 3), 0, 1);
     counterG.setAttribute('opacity', f2(counterA));
     VR = viewRows(view.lon, view.lat);
     var R = GR * (1 + 4 * zoom);
     drawGlobe(R);
     var mA = clamp(1 - zoom * 2.5, 0, 1);
+    routesFrame(R, mA);
     updateMarkers(R, mA);
     hootOnGlobe(dt, R, mA);
     trailFrame(R);
+    previewFrame(R, mA);
+    arrowFrame(R, mA);
+    splashFrame(dt, R);
+    hud.g.setAttribute('opacity', f2(mA));
   }
 
   // ==================================================================
@@ -3402,11 +4223,14 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
     S = {
       place: p, time: 0, q: [], phase: 'pre', phaseT: 0, hoot: null, animal: null, props: [], parts: [], wx: [],
       bubble: null, greeted: false, ready: false, nightV: -1, elev: 0, raining: false, rainT: 0, card: null,
-      sleepyHello: false, lookAt: null, nextShiver: 4, nextFan: 3, nextZ: 0, home: null, lampOn: true
+      sleepyHello: false, lookAt: null, nextShiver: 4, nextFan: 3, nextZ: 0, home: null, lampOn: true,
+      tw: [], busy: false, piles: [], thought: null, swap: null, storyStarted: false, hinted: false
     };
+    // being here is how Hoot finds out what's here
+    if (saved.prologue && !p.home && !saved.seen[p.id]) { saved.seen[p.id] = true; persist(); }
     var defs = p.defs ? p.defs() : '';
     $('sc-defs').innerHTML = defs ? (dayify(defs) + nightDefs(defs)) : '';
-    ['sc-back', 'sc-ground', 'sc-props', 'sc-animal', 'sc-hoot', 'sc-front', 'sc-glow', 'sc-parts', 'sc-bubble', 'sc-ui', 'sc-skyfx', 'sc-home'].forEach(function (id) { clear($(id)); });
+    ['sc-back', 'sc-ground', 'sc-dev', 'sc-props', 'sc-piles', 'sc-animal', 'sc-hoot', 'sc-front', 'sc-glow', 'sc-parts', 'sc-bubble', 'sc-thought', 'sc-ui', 'sc-fly', 'sc-skyfx', 'sc-home'].forEach(function (id) { clear($(id)); });
     if (p.home) {
       $('sc-stage').setAttribute('display', 'none');
       $('sc-home').removeAttribute('display');
@@ -3431,6 +4255,10 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
       el('rect', { class: 'hit', x: -38, y: -78, width: 76, height: 84 }, S.hoot.g);
       S.hoot.g.setAttribute('data-hit', 'hoot');
       S.hoot.x = -200; S.hoot.y = -200; S.hoot.s = HOOT_S; S.hoot.op = 0;
+      setGear(S.hoot, 'bag', saved.prologue);
+      applyPlaceDev(false);
+      applyAnimalDev();
+      buildPiles(p);
       if (p.setup) { p.setup(S); }
     }
     startBed(p.bed);
@@ -3444,7 +4272,7 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
     S = null;
     scene.style.visibility = 'hidden';
     scene.style.opacity = '0';
-    ['sc-back', 'sc-ground', 'sc-props', 'sc-animal', 'sc-hoot', 'sc-front', 'sc-glow', 'sc-parts', 'sc-bubble', 'sc-ui', 'sc-skyfx', 'sc-home', 'sc-stars'].forEach(function (id) { clear($(id)); });
+    ['sc-back', 'sc-ground', 'sc-dev', 'sc-props', 'sc-piles', 'sc-animal', 'sc-hoot', 'sc-front', 'sc-glow', 'sc-parts', 'sc-bubble', 'sc-thought', 'sc-ui', 'sc-fly', 'sc-hud', 'sc-skyfx', 'sc-home', 'sc-stars'].forEach(function (id) { clear($(id)); });
   }
 
   // Stars over the scene, and the right constellation for the hemisphere:
@@ -3604,7 +4432,30 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
       P.eyes = 0;
       P.bsy = 0.96 + Math.sin(T * 1.2) * 0.012 * calm;
       if (sp.sleep) { sp.sleep(A, t, P); }
+    } else if (m === 'joy') {
+      P.by = -Math.abs(Math.sin(t * 8)) * 16 * calm;
+      if (sp.wave) { P.arm = sp.wave[0] + Math.sin(t * 12) * sp.wave[1]; }
+      P.mouth = 0.5;
+      P.head = Math.sin(t * 6) * 5;
+      if (t > 1.6) { setMode(A, 'idle'); }
+    } else if (m === 'puzzled') {
+      // a shake of the head
+      P.head = Math.sin(t * 15) * 12 * Math.max(0, 1 - t);
+      if (t > 1.0) { setMode(A, 'idle'); }
+    } else if (m === 'point') {
+      // turn that way, look up and over, and turn back
+      if (t < 0.3) { A.faceGoal = A.pointDir || 1; }
+      else if (t < 1.9) { P.head = 14; P.by = -4; if (sp.wave) { P.arm = sp.wave[0]; } }
+      else { A.faceGoal = 1; }
+      if (t > 2.3) { setMode(A, 'idle'); }
+    } else if (m === 'make') {
+      // busy making: head down over the work, hands going
+      P.head = -10 + Math.sin(t * 10) * 6 * calm;
+      if (sp.wave) { P.arm = sp.wave[0] * 0.5 + Math.sin(t * 14) * sp.wave[1] * 0.7 * calm; }
+      if (t > 1.9) { setMode(A, 'idle'); }
     }
+    // a friend who's cold shivers now and then
+    if (A.cold && !reduced && m === 'idle' && (A.T % 3.4) < 0.7) { P.bx += Math.sin(A.T * 60) * 1.6; }
     if (sp.always) { sp.always(A, P, dt); }
     if (A.talk > 0) {
       A.talk -= dt;
@@ -3768,6 +4619,402 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
   }
 
   // ------------------------------------------------------------------
+  // Little tweens, for things that fly about the scene: goods into and
+  // out of the satchel, Granny's postcards, a piece of her map.
+  // ------------------------------------------------------------------
+  function tween(dur, fn, done) {
+    if (!S) { return; }
+    S.tw.push({ t: 0, d: Math.max(0.001, reduced ? Math.min(dur, 0.25) : dur), fn: fn, done: done });
+  }
+  function tweenFrame(dt) {
+    for (var i = S.tw.length - 1; i >= 0; i--) {
+      var w = S.tw[i];
+      w.t += dt;
+      var k = clamp(w.t / w.d, 0, 1);
+      w.fn(k);
+      if (k >= 1) {
+        S.tw.splice(i, 1);
+        if (w.done) { w.done(); }
+        if (!S) { return; }
+      }
+    }
+  }
+  // from stage coordinates to the scene's own
+  function toView(x, y) { return { x: stage.tx + x * stage.s, y: stage.ty + y * stage.s }; }
+  function flyThing(art, from, to, k0, k1, dur, done) {
+    var g = el('g', {}, $('sc-fly'));
+    g.innerHTML = art;
+    tween(dur, function (k) {
+      var u = easeOut(k), x = lerp(from.x, to.x, u), y = lerp(from.y, to.y, u) - Math.sin(Math.PI * k) * 70;
+      g.setAttribute('transform', 'translate(' + f2(x) + ',' + f2(y) + ') scale(' + f2(lerp(k0, k1, k)) + ')');
+    }, function () {
+      if (g.parentNode) { g.parentNode.removeChild(g); }
+      if (done) { done(); }
+    });
+  }
+  function removeLater(g, dur) {
+    tween(dur, function (k) { g.setAttribute('opacity', f2(1 - k)); }, function () { if (g.parentNode) { g.parentNode.removeChild(g); } });
+  }
+
+  // ------------------------------------------------------------------
+  // The satchel in a scene: big slots, bottom left, each one a button.
+  // Tapping one offers what's in it to whoever is here.
+  // ------------------------------------------------------------------
+  var shud = { slots: [], g: null };
+  function layoutSceneHud() {
+    var g = $('sc-hud');
+    clear(g);
+    shud.slots = []; shud.g = null;
+    if (!S || !saved.prologue) { return; }
+    var u = 1000 / VW, slot = SLOT_PX * 1.15 * u, gap = 8 * u, m = 14 * u;
+    var b = bagArt(saved.cap, slot, saved.bag, gap), x0 = m, y0 = SH - m - b.h;
+    shud.g = el('g', { transform: 'translate(' + f2(x0) + ',' + f2(y0) + ')' }, g);
+    shud.g.innerHTML = b.art;
+    shud.x0 = x0; shud.y0 = y0; shud.u = u; shud.slot = slot;
+    for (var i = 0; i < saved.cap; i++) {
+      var cx = x0 + gap + slot / 2 + i * (slot + gap), cy = y0 + gap + slot / 2;
+      shud.slots.push({ x: cx, y: cy });
+      el('circle', { class: 'hit', cx: f2(cx), cy: f2(cy), r: f2(slot / 2 + 5 * u), 'data-hit': 'slot:' + i }, g);
+    }
+  }
+  function slotPos(i) { return shud.slots[i] || { x: 60, y: SH - 60 }; }
+  function slotScale() { return (shud.slot || 60) * 0.66 / 64; }
+
+  // A place's baskets of its own goods.
+  function buildPiles(p) {
+    var g = $('sc-piles');
+    clear(g);
+    S.piles = [];
+    if (!saved.prologue || p.home || !PILES[p.id]) { return; }
+    rawAt(p.id).forEach(function (it, i) {
+      var x = PILES[p.id][0] + i * 70, y = PILES[p.id][1];
+      var pg = el('g', { 'data-hit': 'pile:' + it, transform: 'translate(' + x + ',' + y + ')' }, g);
+      pg.innerHTML = dn(pileArt(it));
+      el('rect', { class: 'hit', x: -44, y: -74, width: 88, height: 82 }, pg);
+      S.piles.push({ item: it, g: pg, x: x, y: y });
+    });
+  }
+
+  // Where the hello bubble sits, whether or not it's showing.
+  function bubbleSpot() {
+    var A = S.animal, at = A.sp.bubble || [-60, -260], q = animalPoint(A, at[0], at[1]);
+    return { x: clamp(q.x, stage.x0 + 120, stage.x1 - 120), y: Math.max(stage.y0 + 60, q.y - 62) };
+  }
+  // The animal's own thoughts: a friend's wish, or a maker's recipe.
+  function showThoughts() {
+    var g = $('sc-thought');
+    clear(g);
+    S.thought = null;
+    if (!S || !S.animal || !saved.prologue) { return; }
+    var p = S.place, want = needAt(p.id), made = madeAt(p.id), art = '', w = 0;
+    if (want) { art = thoughtArt(want); w = 90; }
+    else if (made) {
+      art = recipeArt(made, saved.held[p.id] || []);
+      w = 64 + ((ITEMS[made].made || []).length + (ITEMS[made].local || []).length + 1) * 62 + 50;
+    }
+    if (!art) { return; }
+    var b = bubbleSpot(), x = clamp(b.x + 40, stage.x0 + 20, stage.x1 - w - 20), y = Math.max(stage.y0 + 110, b.y - 52);
+    var tg = el('g', {}, g);
+    tg.innerHTML = art;
+    S.thought = { g: tg, x: x, y: y, t: 0 };
+  }
+  function thoughtFrame(dt) {
+    var T = S.thought;
+    if (!T) { return; }
+    T.t += dt;
+    var k = reduced ? 1 : easeOut(T.t / 0.3), bob = reduced ? 0 : Math.sin(T.t * 2) * 3;
+    T.g.setAttribute('transform', 'translate(' + f2(T.x) + ',' + f2(T.y + bob) + ') scale(' + f2(k) + ')');
+  }
+  // The point on an animal things are handed to.
+  function handPoint() {
+    var b = bubbleSpot();
+    return toView(lerp(S.animal.x, b.x, 0.5), b.y + 90);
+  }
+
+  function setBag(list2) {
+    saved.bag = list2.slice(0, saved.cap);
+    persist();
+  }
+
+  // Picking up from a basket. If the satchel's full, Hoot shakes his head
+  // and the slots wait to be told which thing to put back.
+  function pickUp(item) {
+    var pile = null;
+    S.piles.forEach(function (q) { if (q.item === item) { pile = q; } });
+    if (!pile) { return; }
+    if (saved.bag.length >= saved.cap) {
+      S.swap = { item: item, pile: pile, until: S.time + 6 };
+      S.hoot.shake = 0.6;
+      SND.bonk();
+      if (!S.saidFull) { S.saidFull = true; narrate('My satchel’s full!'); }
+      return;
+    }
+    var bag = saved.bag.slice();
+    bag.push(item);
+    setBag(bag);
+    S.busy = true;
+    S.hoot.pop = 0.6;
+    SND.rustle();
+    flyThing(itemArt(item), toView(pile.x, pile.y - 30), slotPos(bag.length - 1), stage.s * 0.66, slotScale(), 0.55, function () {
+      layoutSceneHud();
+      SND.pop(1.3);
+      S.busy = false;
+    });
+  }
+  // The satchel was full: whatever slot is tapped goes back where it came
+  // from, and the new thing takes its place.
+  function swapOut(i) {
+    var sw = S.swap, gone = saved.bag[i];
+    S.swap = null;
+    if (!gone) { return; }
+    var bag = saved.bag.slice();
+    bag[i] = sw.item;
+    setBag(bag);
+    S.busy = true;
+    var at = slotPos(i);
+    flyThing(itemArt(gone), at, { x: at.x + 120, y: -80 }, slotScale(), slotScale() * 0.6, 0.6);
+    flyThing(itemArt(sw.item), toView(sw.pile.x, sw.pile.y - 30), at, stage.s * 0.66, slotScale(), 0.6, function () {
+      layoutSceneHud();
+      SND.pop(1.3);
+      S.busy = false;
+    });
+  }
+
+  // Where a thing is wanted: by a friend who needs it, or by a maker who
+  // uses it.
+  function wantedAt(item) {
+    var c = chapter();
+    if (c && saved.prologue && saved.chState === 'need' && c.need === item) { return c.place; }
+    var u = usesOf(item);
+    return u.length ? ITEMS[u[0]].from : null;
+  }
+  // Facing the equator from the north, east is on the left; from the
+  // south, on the right. The animal turns that way and looks, and the
+  // globe will show an arrow along the true bearing.
+  function pointTo(id) {
+    var A = S.animal, p = S.place, T = BYID[id];
+    var east = wrap180(T.lon - p.lon) > 0;
+    A.pointDir = (east === (p.lat >= 0)) ? 1 : -1;
+    setMode(A, 'point');
+    pointArrow = { from: p.id, to: id };
+    tone({ f: 660, f2: 990, d: 0.25, g: 0.07, a: 0.01, s: 0 });
+  }
+  // A hint, when the friend here can't be helped yet: the needy one points
+  // towards whoever makes what it wants; a maker points towards what it's
+  // missing.
+  function hintFor(p) {
+    var want = needAt(p.id);
+    if (want && saved.bag.indexOf(want) < 0) { return ITEMS[want].from !== p.id ? ITEMS[want].from : null; }
+    var made = madeAt(p.id);
+    if (made) {
+      var held = saved.held[p.id] || [];
+      var missing = (ITEMS[made].made || []).filter(function (k) { return held.indexOf(k) < 0 && saved.bag.indexOf(k) < 0; });
+      if (missing.length) { return ITEMS[missing[0]].from; }
+    }
+    return null;
+  }
+
+  // Offering what's in a slot to whoever is here.
+  function offer(i) {
+    var item = saved.bag[i], p = S.place, A = S.animal, c = chapter();
+    if (!item || !A) { return; }
+    // asleep: it wakes up first, then takes what it's given
+    if (A.mode === 'sleep' || A.mode === 'yawn') {
+      if (A.mode === 'sleep') { A.after = 'idle'; A.awakeUntil = S.time + 14; setMode(A, 'yawn'); }
+      S.busy = true;
+      later(1.45, function () { S.busy = false; offer(i); });
+      return;
+    }
+    var from = slotPos(i), to = handPoint(), made = madeAt(p.id);
+    function take() { var bag = saved.bag.slice(); bag.splice(i, 1); setBag(bag); layoutSceneHud(); }
+    S.busy = true;
+    if (needAt(p.id) === item) {
+      take();
+      flyThing(itemArt(item), from, to, slotScale(), stage.s * 0.9, 0.6, function () { deliverStory(c); });
+      return;
+    }
+    if (made && (ITEMS[made].made || []).indexOf(item) >= 0 && (saved.held[p.id] || []).indexOf(item) < 0) {
+      take();
+      flyThing(itemArt(item), from, to, slotScale(), stage.s * 0.8, 0.6, function () { makerTakes(made, item); });
+      return;
+    }
+    if (ITEMS[item].from === p.id) {
+      take();
+      var back = S.piles.length ? toView(S.piles[0].x, S.piles[0].y - 30) : to;
+      flyThing(itemArt(item), from, back, slotScale(), stage.s * 0.6, 0.55, function () { SND.pop(0.8); S.busy = false; });
+      return;
+    }
+    // not wanted here: a puzzled look, and a point the right way
+    setMode(A, 'puzzled');
+    tone({ f: 330, path: [[0.5, 300], [1, 380]], d: 0.45, type: 'triangle', g: 0.07, a: 0.02, s: 0.3 });
+    var target = wantedAt(item);
+    later(1.05, function () {
+      if (target && target !== p.id) { pointTo(target); later(2.3, function () { S.busy = false; }); }
+      else { S.busy = false; }
+    });
+  }
+
+  // A maker takes an ingredient. When it has all it needs, it makes the
+  // thing, and the thing goes into the satchel (the ingredient made room).
+  function makerTakes(made, item) {
+    var p = S.place, A = S.animal, held = (saved.held[p.id] || []).slice();
+    held.push(item);
+    saved.held[p.id] = held;
+    persist();
+    showThoughts();
+    var complete = (ITEMS[made].made || []).every(function (k) { return held.indexOf(k) >= 0; });
+    if (!complete) { setMode(A, 'joy'); SND.pop(); S.busy = false; return; }
+    setMode(A, 'make');
+    if (room()) { hold(1.9); for (var j = 0; j < 9; j++) { tone({ t: now() + j * 0.19, f: 1800 + (j % 3) * 260, d: 0.05, g: 0.05, a: 0.002, s: 0 }); } }
+    for (var s = 0; s < 6; s++) {
+      (function (k) { later(0.25 * k, function () { var hp = handPoint(), v = { x: (hp.x - stage.tx) / stage.s, y: (hp.y - stage.ty) / stage.s }; spawn({ kind: 'spark', x: v.x + (Math.random() - 0.5) * 60, y: v.y - Math.random() * 40, vx: 0, vy: -30, life: 0.8, grow: 0.6, fill: '#ffe08a' }); }); })(s);
+    }
+    later(1.9, function () {
+      saved.held[p.id] = [];
+      var bag = saved.bag.slice();
+      bag.push(made);
+      setBag(bag);
+      showThoughts();
+      setMode(A, 'joy');
+      SND.ding();
+      flyThing(itemArt(made), handPoint(), slotPos(saved.bag.length - 1), stage.s * 0.9, slotScale(), 0.7, function () {
+        layoutSceneHud();
+        S.busy = false;
+      });
+    });
+  }
+
+  // ------------------------------------------------------------------
+  // The story's moments in a scene.
+  // ------------------------------------------------------------------
+  function arrivalStory() {
+    var p = S.place, c = chapter();
+    showThoughts();
+    if (!saved.prologue || !c || p.home) { return; }
+    if (saved.chState === 'find') {
+      if (c.place === p.id) { matchStory(c); } else { compareStory(c); }
+    } else if (saved.chState === 'need' && c.place === p.id) {
+      S.animal.cold = true;
+      narrate(c.say.ask);
+    }
+  }
+  // Not here: Hoot holds up Granny's card, looks, and shakes his head.
+  function compareStory(c) {
+    var H = S.hoot, w = 190, h = 133, hp = toView(H.x, H.y - 150);
+    var x = clamp(hp.x - w / 2, 10, 990 - w), y = Math.max(10, hp.y - h);
+    var g = el('g', { opacity: 0 }, $('sc-fly'));
+    g.innerHTML = fadedCard(c, w, h);
+    S.busy = true;
+    SND.rustle();
+    tween(0.35, function (k) {
+      g.setAttribute('opacity', f2(k));
+      g.setAttribute('transform', 'translate(' + f2(x) + ',' + f2(y + (1 - k) * 40) + ')');
+    }, function () {
+      S.lookAt = { x: H.x + 200, y: H.y - 260, until: S.time + 0.8 };
+      later(0.7, function () { H.shake = 0.7; });
+      later(1.5, function () { removeLater(g, 0.3); S.busy = false; });
+    });
+  }
+  // Found it: the card comes back to life, the friend knows the satchel,
+  // and its trouble shows.
+  function matchStory(c) {
+    var H = S.hoot, A = S.animal, p = S.place, w = Math.min(420, SH * 0.5), h = w * 0.7;
+    var x = (1000 - w) / 2, y = Math.max(16, (stage.hy - h) * 0.4);
+    var g = el('g', {}, $('sc-fly')), faded = el('g', {}, g), bright = el('g', { opacity: 0 }, g);
+    faded.innerHTML = fadedCard(c, w, h);
+    bright.innerHTML = cardArt(p, w, h, true);
+    var from = toView(H.x + 30, H.y - 60);
+    S.busy = true;
+    SND.rustle();
+    tween(0.5, function (k) {
+      var u = easeOut(k);
+      g.setAttribute('transform', 'translate(' + f2(lerp(from.x, x, u)) + ',' + f2(lerp(from.y, y, u)) + ') scale(' + f2(lerp(0.2, 1, u)) + ')');
+    }, function () {
+      later(0.5, function () {
+        SND.sparkle();
+        tween(1.2, function (k) { bright.setAttribute('opacity', f2(k)); });
+        var d1 = narrate(c.say.match);
+        later(d1 + 0.3, function () {
+          setMode(A, 'joy');
+          if (room()) { hold(1); p.animal.call(now(), false); }
+          var d2 = narrate(c.say.knows);
+          later(d2 + 0.3, function () {
+            tween(0.5, function (k) {
+              g.setAttribute('transform', 'translate(' + f2(lerp(x, 20, k)) + ',' + f2(lerp(y, 20, k)) + ') scale(' + f2(lerp(1, 0.2, k)) + ')');
+              g.setAttribute('opacity', f2(1 - k));
+            }, function () { if (g.parentNode) { g.parentNode.removeChild(g); } });
+            saved.chState = 'need';
+            persist();
+            A.cold = true;
+            showThoughts();
+            var d3 = narrate(c.say.ask);
+            later(d3, function () { S.busy = false; });
+          });
+        });
+      });
+    });
+  }
+  // Delivered: the friend is delighted and keeps the gift, tells its part
+  // of Granny's story in a sepia picture, and gives Hoot a piece of her
+  // map. And its place grows.
+  function deliverStory(c) {
+    var p = S.place, A = S.animal, H = S.hoot;
+    A.cold = false;
+    saved.dev[p.id] = Math.max(1, saved.dev[p.id] || 0);
+    persist();
+    applyAnimalDev();
+    showThoughts();
+    setMode(A, 'joy');
+    if (room()) { hold(1); p.animal.call(now(), false); }
+    var hp = handPoint(), hv = { x: (hp.x - stage.tx) / stage.s, y: (hp.y - stage.ty) / stage.s };
+    for (var i = 0; i < 6; i++) {
+      spawn({ kind: 'art', art: '<path d="M0 6 C-12 -4 -6 -14 0 -7 C6 -14 12 -4 0 6 Z" fill="#ec5a8f"/>', x: hv.x + (Math.random() - 0.5) * 60, y: hv.y - 20, vx: (Math.random() - 0.5) * 40, vy: -70 - Math.random() * 40, life: 1.6, sway: 14 });
+    }
+    later(2.0, function () {
+      var w = Math.min(860, SH * 0.6 * 1.5), h = w / 1.5, x = (1000 - w) / 2, y = (SH - h) / 2;
+      var g = el('g', { opacity: 0, transform: 'translate(' + f2(x) + ',' + f2(y) + ')' }, $('sc-fly'));
+      g.innerHTML = '<rect x="-14" y="-14" width="' + f2(w + 28) + '" height="' + f2(h + 28) + '" rx="10" fill="#fffaf0"/>'
+        + '<g transform="scale(' + f2(w / 450) + ',' + f2(h / 300) + ')">' + sepiaify(c.flash()) + '</g>'
+        + '<rect x="0" y="0" width="' + f2(w) + '" height="' + f2(h) + '" fill="none" stroke="#c8b48c" stroke-width="3"/>';
+      tween(0.6, function (k) { g.setAttribute('opacity', f2(k)); });
+      var d = narrate(c.say.tell);
+      later(Math.max(4.5, d + 1), function () {
+        removeLater(g, 0.5);
+        var start = handPoint(), end = toView(H.x, H.y - 60);
+        flyThing(pieceArt(), start, end, stage.s * 0.8, stage.s * 1.6, 1.0, function () {
+          saved.pieces |= (1 << c.piece);
+          persist();
+          H.pop = 1;
+          SND.chime();
+          var d2 = narrate(c.say.piece);
+          applyPlaceDev(true);
+          later(d2 + 0.8, function () {
+            var next = c.say.next;
+            if (CHAPTERS[saved.ch + 1]) { saved.ch += 1; saved.chState = 'find'; }
+            else { saved.chState = 'done'; }
+            persist();
+            var d3 = narrate(next);
+            later(d3, function () { S.busy = false; });
+          });
+        });
+      });
+    });
+  }
+  // The visible ways a place has grown: things in its scene, and gifts
+  // its animal keeps.
+  function applyPlaceDev(fade) {
+    var p = S.place, g = $('sc-dev');
+    g.innerHTML = p.dev ? dn(p.dev(saved.dev[p.id] || 0)) : '';
+    if (fade && g.firstChild) { g.setAttribute('opacity', '0'); tween(1.2, function (k) { g.setAttribute('opacity', f2(k)); }); }
+    else { g.removeAttribute('opacity'); }
+  }
+  function applyAnimalDev() {
+    var A = S.animal, lvl = saved.dev[S.place.id] || 0;
+    if (!A) { return; }
+    list(A.bob, '.dev1').forEach(function (n) { if (lvl >= 1) { n.removeAttribute('display'); } else { n.setAttribute('display', 'none'); } });
+  }
+
+  // ------------------------------------------------------------------
   // What happens in a scene, in order: Hoot glides in and lands, the
   // animal turns to him (waking first if it's asleep) and says hello, Hoot
   // hoots back. Then it's the child's to play with until Hoot is tapped.
@@ -3826,7 +5073,7 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
       H.lean = -10 * k2;
       if (k2 >= 1 && S.phase === 'leave') {
         S.phase = 'gone'; H.op = 0;
-        if (!S.place.home) { startCard(S.place); } else { beginZoomOut(); }
+        leaveDone();
       }
     }
   }
@@ -3845,12 +5092,18 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
       var A = S.animal;
       if (A && A.mode !== 'sleep' && A.mode !== 'act') { setMode(A, 'bye'); A.faceGoal = 1; }
       clear(bubbleG); S.bubble = null;
+      clear($('sc-thought')); S.thought = null;
+      S.swap = null;
     }
     if (SS) { try { SS.cancel(); } catch (e) { /* fine */ } }
     if (reduced) {
       S.phase = 'gone'; H.op = 0;
-      if (!S.place.home) { startCard(S.place); } else { beginZoomOut(); }
+      leaveDone();
     }
+  }
+  // Hoot's own postcard from a place comes the first time he leaves it.
+  function leaveDone() {
+    if (!S.place.home && visits(S.place.id) === 0) { startCard(S.place); } else { beginZoomOut(); }
   }
 
   function stageFrame(dt) {
@@ -3884,6 +5137,14 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
       // weather manners
       if (p.climate === 'cold' && S.time > S.nextShiver) { S.nextShiver = S.time + 6 + Math.random() * 4; H.shiver = 0.6; }
       if (p.climate === 'hot' && e > 2 && S.time > S.nextFan) { S.nextFan = S.time + 7 + Math.random() * 4; H.fan = 1.1; }
+      // once hellos are done, the story has its turn
+      if (S.ready && !S.storyStarted) { S.storyStarted = true; arrivalStory(); }
+    }
+    // a full satchel waits a few seconds to be told what to put back
+    if (S.swap && S.time > S.swap.until) { S.swap = null; }
+    if (shud.g) {
+      var wig = S.swap && !reduced ? Math.sin(S.time * 18) * 2.5 : 0;
+      shud.g.setAttribute('transform', 'translate(' + f2(shud.x0) + ',' + f2(shud.y0) + ') rotate(' + f2(wig) + ')');
     }
     if (S.phase === 'landed' || S.phase === 'leave') {
       var hot = p.climate === 'hot' && e > 2;
@@ -3925,6 +5186,7 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
     }
     if (p.frame) { p.frame(S, dt); }
     bubbleFrame(dt);
+    thoughtFrame(dt);
     weatherFrame(dt);
     partsFrame(dt);
     bedFrame(S.nightV);
@@ -3957,18 +5219,36 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
   function sceneTap(key) {
     if (!S || S.phase === 'pre' || S.phase === 'arrive' || S.phase === 'leave' || S.phase === 'gone' || S.card) { return; }
     var p = S.place, A = S.animal, H = S.hoot;
+    var slot = key.indexOf('slot:') === 0;
+    if (S.swap && !slot) { S.swap = null; }
     if (key === 'hoot') {
-      if (S.ready) { if (tapOk('hoot-go', 2)) { leaveScene(); } }
+      if (S.ready && !S.busy) { if (tapOk('hoot-go', 2)) { leaveScene(); } }
       else if (tapOk('hoot', 0.9)) { SND.hoot(); H.pop = 1; H.hootT = 0.95; }
       return;
     }
     if (p.home) { homeTap(key); return; }
+    if (slot) {
+      if (!S.ready || S.busy || !tapOk('slot', 0.6)) { return; }
+      var i = +key.slice(5);
+      if (S.swap) { swapOut(i); } else { offer(i); }
+      return;
+    }
+    if (key.indexOf('pile:') === 0) {
+      if (!S.ready || S.busy || !tapOk('pile', 0.6)) { return; }
+      pickUp(key.slice(5));
+      return;
+    }
     if (key === 'animal') {
       if (!S.greeted || !tapOk('animal', 0.8)) { return; }
+      var hint = (S.ready && !S.busy && !S.hinted && A.mode === 'idle') ? hintFor(p) : null;
       if (A.mode === 'sleep') {
         A.after = 'idle'; A.awakeUntil = S.time + 14;
         setMode(A, 'yawn');
         if (A.sp.yawnK && room()) { hold(1.1); SND.yawn(0, A.sp.yawnK); }
+      } else if (hint) {
+        // the first tap, when Hoot can't help yet, gets a pointer the right way
+        S.hinted = true;
+        pointTo(hint);
       } else if (A.mode === 'idle') {
         setMode(A, 'act');
         A.awakeUntil = S.time + 14;
@@ -4005,6 +5285,10 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
     sceneTap(h ? h.getAttribute('data-hit') : 'sky');
   });
   scene.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  function letGo() { if (S) { S.resetHold = null; } }
+  scene.addEventListener('pointerup', letGo);
+  scene.addEventListener('pointercancel', letGo);
+  scene.addEventListener('pointerleave', letGo);
 
   // ------------------------------------------------------------------
   // The postcard. When Hoot leaves a place it turns into one, gets a
@@ -4129,28 +5413,39 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
     var mini = el('g',{ transform: 'translate(' + (-cw * 3 - 38) + ',' + f2(chh * 0.32) + ') scale(' + f2(chh / 92) + ')' }, og);
     mini.innerHTML = hootArt();
 
-    // the board of postcards
+    // The board: Granny's map, the postcard Hoot's looking for (or the
+    // wish he's working on), and her letter. Bare cork until the satchel
+    // turns up.
     var bg = el('g', {}, hg);
+    S.home.board = bg;
     bg.innerHTML = '<rect x="' + (bd.x - 14) + '" y="' + (bd.y - 14) + '" width="' + (bd.w + 28) + '" height="' + (bd.h + 28) + '" rx="12" fill="#8a5a33"/>'
       + '<rect x="' + bd.x + '" y="' + bd.y + '" width="' + bd.w + '" height="' + bd.h + '" rx="6" fill="#d2a46d"/>';
-    var spots = PLACES.filter(function (q) { return !q.home; });
-    var cols = land ? 5 : 3, rows = Math.ceil(spots.length / cols);
-    var cellW = bd.w / cols, cellH = bd.h / rows;
-    var cardW = Math.min(cellW * 0.88, cellH * 0.86 * 1.5), cardH = cardW / 1.5;
-    S.home.cards = [];
-    spots.forEach(function (q, idx) {
-      var c = idx % cols, r = Math.floor(idx / cols);
-      var inRow = (r === rows - 1) ? spots.length - r * cols : cols;
-      var offX = (cols - inRow) * cellW / 2;
-      var cx = bd.x + offX + cellW * (c + 0.5), cy = bd.y + cellH * (r + 0.5);
-      var tilt = ((idx * 37) % 7) - 3;
-      var g = el('g', { 'data-hit': 'card:' + q.id, transform: 'translate(' + f2(cx) + ',' + f2(cy) + ') rotate(' + tilt + ')' }, bg);
-      var on = visits(q.id) > 0;
-      g.innerHTML = '<rect x="' + f2(-cardW / 2 + 4) + '" y="' + f2(-cardH / 2 + 6) + '" width="' + f2(cardW) + '" height="' + f2(cardH) + '" rx="' + f2(cardW * 0.035) + '" fill="#000000" opacity="0.18"/>'
-        + '<g transform="translate(' + f2(-cardW / 2) + ',' + f2(-cardH / 2) + ')">' + cardArt(q, cardW, cardH, on) + '</g>'
-        + (on ? '<circle cx="0" cy="' + f2(-cardH / 2 + 8) + '" r="' + f2(Math.max(5, cardW * 0.035)) + '" fill="#d9434e"/>' : '');
-      S.home.cards.push({ id: q.id, g: g, x: cx, y: cy, tilt: tilt, pop: 0 });
-    });
+    S.home.goal = null;
+    function pin(x, y) { return '<circle cx="' + f2(x) + '" cy="' + f2(y) + '" r="7" fill="#d9434e"/><circle cx="' + f2(x - 2) + '" cy="' + f2(y - 2) + '" r="2.4" fill="#ffffff" opacity="0.7"/>'; }
+    if (saved.prologue) {
+      var mx = bd.x + 18, my = bd.y + 18, mw, side;
+      if (land) { mw = bd.w * 0.62; side = { x: mx + mw + 26, y: my + 6, w: bd.x + bd.w - (mx + mw + 26) - 16 }; }
+      else { mw = bd.w - 36; side = { x: bd.x + 18, y: my + mw / 2 + 34, w: bd.w - 36 }; }
+      var mh = mw / 2;
+      var mg = el('g', { 'data-hit': 'map', transform: 'translate(' + f2(mx) + ',' + f2(my) + ')' }, bg);
+      mg.innerHTML = grannyMapArt(mw, mh) + pin(-2, -2) + pin(mw + 2, -2);
+      var gw, gh2, gx, gy, lw, lh, lx, ly;
+      if (land) {
+        gw = side.w; gh2 = gw * 0.7; gx = side.x; gy = side.y;
+        lw = side.w * 0.74; lh = lw * 0.62; lx = side.x + (side.w - lw) / 2; ly = gy + gh2 + 24;
+      } else {
+        gw = side.w * 0.56; gh2 = gw * 0.7; gx = side.x; gy = side.y;
+        lw = side.w * 0.36; lh = lw * 0.62; lx = side.x + side.w - lw; ly = side.y + 16;
+      }
+      var art = goalArt(gw, gh2) || (saved.chState === 'done' ? cardStackArt(gw, gh2) : '');
+      if (art) {
+        var gg = el('g', { 'data-hit': 'goal', transform: 'translate(' + f2(gx) + ',' + f2(gy) + ') rotate(-2 ' + f2(gw / 2) + ' ' + f2(gh2 / 2) + ')' }, bg);
+        gg.innerHTML = art + pin(gw / 2, 4);
+        S.home.goal = { g: gg, x: gx, y: gy, w: gw, h: gh2 };
+      }
+      var lg2 = el('g', { 'data-hit': 'letter', transform: 'translate(' + f2(lx) + ',' + f2(ly) + ') rotate(3 ' + f2(lw / 2) + ' ' + f2(lh / 2) + ')' }, bg);
+      lg2.innerHTML = letterArt(lw, lh) + pin(lw / 2, 4);
+    }
 
     // Hoot's perch and his lamp
     var pg = el('g', {}, hg);
@@ -4171,12 +5466,29 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
     var dim = el('rect', { x: 0, y: 0, width: 1000, height: H, fill: '#0d1440', opacity: 0, 'pointer-events': 'none' }, hg);
     S.home.dim = dim;
 
+    // Granny's satchel, before it's been opened, lying on the rug
+    S.home.rug = { x: land ? 560 : 500, y: floorY + (H - floorY) * 0.55 };
+    if (!saved.prologue) {
+      var ob = el('g', { 'data-hit': 'oldbag' }, hg);
+      ob.innerHTML = '<g class="ob-in">' + oldBagArt() + '</g><rect class="hit" x="-80" y="-160" width="160" height="170"/>';
+      S.home.oldbag = ob;
+    }
+
+    // a parent's control, small and out of the way: hold it, then confirm
+    var rx = land ? 1000 - 16 - 170 : 500 - 85, ry = H - 16 - 46;
+    var rs = el('g', { 'data-hit': 'reset', transform: 'translate(' + f2(rx) + ',' + f2(ry) + ')' }, hg);
+    rs.innerHTML = '<rect width="170" height="46" rx="23" fill="#efe2c8" opacity="0.85" stroke="#c8b48c" stroke-width="2"/>'
+      + '<text x="85" y="30" font-size="21" text-anchor="middle" fill="#7a6a5a">Start again</text>'
+      + '<rect class="rs-bar" x="14" y="38" width="0" height="5" rx="2.5" fill="#d9434e"/>';
+    S.home.resetBar = rs.querySelector('.rs-bar');
+
     // Hoot goes on top of all that
     var keep = S.hoot ? { x: S.hoot.x, y: S.hoot.y, op: S.hoot.op, gear: S.hoot.gear } : null;
     S.hoot = makeHoot(hg, false);
     S.hoot.g.setAttribute('data-hit', 'hoot');
     el('rect', { class: 'hit', x: -38, y: -78, width: 76, height: 84 }, S.hoot.g);
     S.hoot.s = land ? 1.7 : 2.3;
+    setGear(S.hoot, 'bag', saved.prologue);
     if (keep && S.phase !== 'pre') {
       S.hoot.op = keep.op;
       if (S.phase === 'landed') { S.hoot.x = perch.x; S.hoot.y = perch.y; } else { S.hoot.x = keep.x; S.hoot.y = keep.y; }
@@ -4187,30 +5499,175 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
     S.home.floorY = floorY;
   }
 
+  // Granny's satchel: older, bigger and more battered than anything Hoot
+  // has, with a feather on the buckle.
+  function oldBagArt() {
+    return '<ellipse cx="0" cy="4" rx="74" ry="12" fill="#000000" opacity="0.2"/>'
+      + '<path d="M-52 -84 Q0 -156 52 -84" stroke="#5a3418" stroke-width="8" fill="none"/>'
+      + '<path d="M-62 0 V-72 Q-62 -86 -48 -86 H48 Q62 -86 62 -72 V0 Z" fill="#7a4a26"/>'
+      + '<path d="M-44 -22 l12 4 M30 -14 l14 -3 M-20 -6 l8 2" stroke="#5a3418" stroke-width="2.4"/>'
+      + '<g class="ob-flap"><path d="M-64 -86 H64 V-42 Q0 -20 -64 -42 Z" fill="#9a6232"/>'
+      + '<rect x="-11" y="-48" width="22" height="18" rx="3" fill="#d9b040"/><rect x="-6" y="-44" width="12" height="9" fill="#7a4a26"/>'
+      + '<path d="M28 -76 q8 -10 16 -2 q-8 8 -16 2 Z M30 -74 l12 -4" fill="#efe6d8" stroke="#a8998a" stroke-width="1.2"/></g>';
+  }
+
+  // Opening the game for the first time: Hoot at home, and a dusty old
+  // satchel about to drop out of the loft.
+  function openHome() {
+    here = 'leeds';
+    buildScene(BYID.leeds);
+    scene.style.visibility = 'visible';
+    mode = 'scene'; modeT = 0; sceneA = 1;
+    S.phase = 'landed'; S.phaseT = 0;
+    S.hoot.x = S.home.perch.x; S.hoot.y = S.home.perch.y; S.hoot.op = 1;
+    if (!saved.prologue) {
+      S.pro = { stage: 'wait', t: 0, wig: 0 };
+      S.busy = true;
+    }
+  }
+
+  function prologueFrame(dt) {
+    var P = S.pro, ob = S.home.oldbag, r = S.home.rug;
+    if (!ob) { return; }
+    P.t += dt;
+    if (P.stage === 'wait') {
+      ob.setAttribute('transform', 'translate(' + f2(r.x) + ',-300)');
+      if (P.t > 1.2) { P.stage = 'drop'; P.t = 0; SND.whoosh(0.5); }
+    } else if (P.stage === 'drop') {
+      var k = clamp(P.t / 0.6, 0, 1), y = lerp(-300, r.y, easeIn(k));
+      ob.setAttribute('transform', 'translate(' + f2(r.x) + ',' + f2(y) + ')');
+      if (k >= 1) { P.stage = 'rest'; P.t = 0; SND.thump(); S.hoot.pop = 1; S.hoot.hootT = 0.95; SND.hoot(now() + 0.3); }
+    } else if (P.stage === 'rest') {
+      // it wiggles now and then, until someone opens it
+      var w = (P.t % 2.6) < 0.5 && !reduced ? Math.sin(P.t * 30) * 4 : 0;
+      ob.setAttribute('transform', 'translate(' + f2(r.x) + ',' + f2(r.y) + ') rotate(' + f2(w) + ')');
+    }
+  }
+
+  // Opening Granny's satchel: her postcards and her letter come out, go
+  // up on the board, and the satchel goes on Hoot.
+  function openSatchel() {
+    var P = S.pro, ob = S.home.oldbag, r = S.home.rug;
+    P.stage = 'open';
+    SND.rustle();
+    var flap = list(ob, '.ob-flap');
+    tween(0.4, function (k) { setAll(flap, 'rotate(' + f2(-150 * k) + ' 0 -86) '); });
+    var cards = el('g', {}, $('sc-fly')), w = 150, h = 105, n = 4;
+    var made = [];
+    for (var i = 0; i < n; i++) {
+      var cg = el('g', {}, cards);
+      cg.innerHTML = i === 0 ? fadedCard(CHAPTERS[0], w, h) : cardStackArt(w, h * 1.16);
+      made.push(cg);
+    }
+    var lg = el('g', {}, cards);
+    lg.innerHTML = letterArt(w * 0.9, w * 0.9 * 0.62);
+    tween(0.9, function (k) {
+      var u = easeOut(k);
+      made.forEach(function (cg, j) {
+        var a = (j - (n - 1) / 2) * 22 * u, x = r.x - w / 2 + Math.sin(a * D2R) * 180 * u, y = r.y - 90 - (240 - Math.abs(j - 1.5) * 30) * u;
+        cg.setAttribute('transform', 'translate(' + f2(x) + ',' + f2(y) + ') rotate(' + f2(a) + ' ' + f2(w / 2) + ' ' + f2(h / 2) + ') scale(' + f2(0.3 + 0.7 * u) + ')');
+      });
+      lg.setAttribute('transform', 'translate(' + f2(r.x - w * 0.45) + ',' + f2(r.y - 60 - 80 * u) + ') scale(' + f2(0.3 + 0.5 * u) + ')');
+    });
+    var d1 = narrate('Granny’s old satchel! She flew all over the world.');
+    later(Math.max(1.4, d1), function () {
+      // the letter comes to the front
+      SND.sparkle();
+      tween(0.6, function (k) {
+        var u = easeOut(k);
+        lg.setAttribute('transform', 'translate(' + f2(lerp(r.x - w * 0.45, 500 - w * 0.9 * 0.6, u)) + ',' + f2(lerp(r.y - 140, SH * 0.3, u)) + ') scale(' + f2(lerp(0.8, 1.35, u)) + ')');
+      });
+      var d2 = narrate('Her postcards… and a letter she never delivered.');
+      later(Math.max(1.6, d2 + 0.3), function () {
+        removeLater(cards, 0.5);
+        saved.prologue = true;
+        saved.pieces |= (1 << HOME_PIECE);
+        saved.chState = 'find';
+        persist();
+        // the satchel goes onto Hoot
+        var start = { x: r.x, y: r.y - 50 }, end = { x: S.hoot.x, y: S.hoot.y - 40 };
+        if (ob.parentNode) { ob.parentNode.removeChild(ob); }
+        S.home.oldbag = null;
+        flyThing(oldBagArt(), start, end, 1, 0.3, 0.7, function () {
+          S.pro = null;
+          layoutHome();
+          layoutSceneHud();
+          layoutGlobeHud();
+          S.hoot.pop = 1;
+          SND.chime();
+          var g = S.home.board;
+          if (g) { g.setAttribute('opacity', '0'); tween(0.6, function (k) { g.setAttribute('opacity', f2(k)); }); }
+          var d3 = narrate('Where was Granny when she sent this one?');
+          later(d3, function () { S.busy = false; });
+        });
+      });
+    });
+  }
+
+  // A closer look at the postcard or the letter, over everything.
+  function showHomeZoom(what) {
+    var z = el('g', { 'data-hit': 'zoom' }, $('sc-fly'));
+    var w = Math.min(760, SH * 0.62 * 1.4), h = what === 'letter' ? w * 0.62 : w * 0.7;
+    el('rect', { x: 0, y: 0, width: 1000, height: SH, fill: '#05081a', opacity: 0.55 }, z);
+    var g = el('g', { transform: 'translate(' + f2((1000 - w) / 2) + ',' + f2((SH - h) / 2) + ') rotate(-2 ' + f2(w / 2) + ' ' + f2(h / 2) + ')' }, z);
+    g.innerHTML = what === 'letter' ? letterArt(w, h) : (goalArt(w, h) || cardStackArt(w, h));
+    S.zoomed = z;
+    SND.rustle();
+  }
+  function showConfirm() {
+    var z = el('g', {}, $('sc-fly'));
+    el('rect', { x: 0, y: 0, width: 1000, height: SH, fill: '#05081a', opacity: 0.6, 'data-hit': 'confirm-no' }, z);
+    var px = 500, py = SH / 2, pg = el('g', { transform: 'translate(' + px + ',' + f2(py) + ')' }, z);
+    pg.innerHTML = '<rect x="-230" y="-110" width="460" height="220" rx="26" fill="#fffaf0" stroke="#c8b48c" stroke-width="3"/>'
+      + '<g data-hit="confirm-yes"><rect x="-200" y="-30" width="180" height="70" rx="35" fill="#d9434e"/><text x="-110" y="14" font-size="24" text-anchor="middle" fill="#ffffff">Start again</text></g>'
+      + '<g data-hit="confirm-no"><rect x="20" y="-30" width="180" height="70" rx="35" fill="#5fb85a"/><text x="110" y="14" font-size="24" text-anchor="middle" fill="#ffffff">Keep playing</text></g>';
+    S.confirm = z;
+  }
+
   function homeFrame(dt) {
     var H = S.hoot, h = S.home;
     hootFlight(dt);
     if (S.phase === 'landed') {
       S.phaseT += dt;
-      if (!S.ready && S.phaseT > 0.4) { S.ready = true; }
+      if (!S.ready && S.phaseT > 0.4 && saved.prologue && !S.busy) { S.ready = true; }
     }
     var n = S.nightV;
     h.dim.setAttribute('opacity', f2(n * (S.lampOn ? 0.12 : 0.5)));
     h.glow.setAttribute('opacity', f2(S.lampOn ? 0.45 + 0.55 * n : 0));
     h.shade.setAttribute('fill', S.lampOn ? '#f4c96b' : '#c9b28a');
-    h.cards.forEach(function (c) {
-      if (c.pop <= 0) { return; }
-      c.pop = Math.max(0, c.pop - dt * 3);
-      c.g.setAttribute('transform', 'translate(' + f2(c.x) + ',' + f2(c.y) + ') rotate(' + c.tilt + ') scale(' + f2(1 + c.pop * 0.12) + ')');
-    });
-    // Hoot keeps an eye on the board, and on the window at night
-    H.lx = lerp(H.lx, n > 0.5 ? -0.6 : 0.8, 0.05);
-    H.ly = lerp(H.ly, -0.4, 0.05);
+    if (S.pro) { prologueFrame(dt); }
+    // the reset takes a two-second hold
+    if (h.resetBar) {
+      if (S.resetHold) {
+        S.resetHold.t += dt;
+        h.resetBar.setAttribute('width', f2(142 * clamp(S.resetHold.t / 2, 0, 1)));
+        if (S.resetHold.t >= 2) { S.resetHold = null; showConfirm(); }
+      } else { h.resetBar.setAttribute('width', '0'); }
+    }
+    // Hoot keeps an eye on the satchel, the board, and the window at night
+    if (h.oldbag) { H.lx = lerp(H.lx, 0.9, 0.08); H.ly = lerp(H.ly, 0.8, 0.08); }
+    else { H.lx = lerp(H.lx, n > 0.5 ? -0.6 : 0.8, 0.05); H.ly = lerp(H.ly, -0.4, 0.05); }
+    // once he has somewhere to go, he's eager to be off
+    if (S.ready && !S.busy && saved.prologue && !reduced && (S.time % 6) < 0.05) { H.wave = 0.6; }
     poseHoot(H, dt);
     bedFrame(n);
   }
 
   function homeTap(key) {
+    if (S.confirm) {
+      var z = S.confirm;
+      S.confirm = null;
+      if (z.parentNode) { z.parentNode.removeChild(z); }
+      if (key === 'confirm-yes') { startAgain(); }
+      return;
+    }
+    if (S.zoomed) {
+      var zz = S.zoomed;
+      S.zoomed = null;
+      if (zz.parentNode) { zz.parentNode.removeChild(zz); }
+      return;
+    }
+    if (key === 'reset') { S.resetHold = { t: 0 }; return; }
     if (key === 'lamp') {
       if (!tapOk('lamp', 0.5)) { return; }
       S.lampOn = !S.lampOn;
@@ -4218,14 +5675,14 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
       if (!S.lampOn) { S.hoot.pop = 1; }
       return;
     }
-    if (key.indexOf('card:') === 0) {
-      if (!S.ready || !tapOk('card', 2)) { return; }
-      var id = key.slice(5);
-      S.home.cards.forEach(function (c) { if (c.id === id) { c.pop = 1; } });
-      SND.pop();
-      nextTrip = id;
-      later(0.3, leaveScene);
+    if (key === 'oldbag') {
+      if (S.pro && S.pro.stage === 'rest' && tapOk('oldbag', 1)) { openSatchel(); }
+      return;
     }
+    if (!saved.prologue || S.busy) { return; }
+    if (key === 'goal' && tapOk('goal', 1)) { showHomeZoom('goal'); narrate(goalLine()); return; }
+    if (key === 'letter' && tapOk('letter', 1.5)) { showHomeZoom('letter'); narrate('Who wrote this letter? And who is it for?'); return; }
+    if (key === 'map' && tapOk('map', 2)) { S.hoot.pop = 1; narrate('Granny’s old map. So many pieces missing!'); }
   }
 
   // ==================================================================
@@ -4246,11 +5703,12 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
     // so the size is checked every frame as well.
     if ((window.innerWidth !== VW || window.innerHeight !== VH) && !resizeTimer) { onResize(); }
     if (mode !== 'scene') { globeFrame(dt); }
-    if (S && mode !== 'globe' && mode !== 'fly' && mode !== 'land') {
+    if (S && mode !== 'globe' && mode !== 'fly' && mode !== 'ferry' && mode !== 'land') {
       S.time += dt;
       for (var i = S.q.length - 1; i >= 0; i--) {
         if (S.q[i].at <= S.time) { var f = S.q[i].fn; S.q.splice(i, 1); f(); if (!S) { break; } }
       }
+      if (S) { tweenFrame(dt); }
       if (S) {
         skyFrame();
         if (S.place.home) { homeFrame(dt); } else { stageFrame(dt); }
@@ -4273,11 +5731,20 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
   if (window.visualViewport) { window.visualViewport.addEventListener('resize', onResize); }
 
   decodeWorld();
+  buildLandMask();
+  // anything in the save that no longer means anything is dropped
+  if (!BYID[saved.here]) { saved.here = 'leeds'; }
+  saved.bag = saved.bag.filter(function (k) { return !!ITEMS[k]; });
+  here = saved.here;
+  view.lon = goal.lon = BYID[here].lon;
+  view.lat = goal.lat = clamp(BYID[here].lat - 20, -62, 62);
   layout();
   initGlobe();
   buildMarkers();
   gh = makeHoot(ghootG, false);
+  setGear(gh, 'bag', saved.prologue);
   VR = viewRows(view.lon, view.lat);
+  if (!saved.prologue) { openHome(); }
   requestAnimationFrame(frame);
 })();
 </script>
