@@ -1540,6 +1540,10 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
           + '<path d="M-60 -186 L-16 -196 L-68 -306 L-100 -298 Z" fill="#f2c45a"/>'
           + '<path d="M-17 -196 L-68 -305" stroke="#a8682a" stroke-width="7" stroke-linecap="round"/>'
           + '<path d="M-46 -214 l12 -4 l6 10 l-10 8 Z M-60 -246 l12 -4 l4 12 l-12 4 Z M-74 -276 l10 -2 l4 10 l-10 4 Z M-40 -238 l8 -2 l2 8 l-8 2 Z M-56 -222 l7 -2 l2 7 l-7 2 Z" fill="#b8742e"/>'
+          // the scarf Hoot brought, round that long neck
+          + '<g class="dev1" display="none"><path d="M-74 -204 L-24 -212 L-30 -230 L-80 -222 Z" fill="#c8302c"/>'
+          + '<path d="M-76 -213 L-27 -221" stroke="#1f4f3a" stroke-width="4"/><path d="M-62 -206 L-66 -226 M-44 -209 L-48 -229" stroke="#1f4f3a" stroke-width="3"/>'
+          + '<path d="M-34 -212 L-26 -168 L-14 -170 L-22 -214 Z" fill="#c8302c"/><path d="M-30 -190 l12 -2" stroke="#1f4f3a" stroke-width="3"/><path d="M-26 -168 v6 M-20 -169 v6 M-14 -170 v6" stroke="#c8302c" stroke-width="2"/></g>'
           + '<ellipse cx="-70" cy="-318" rx="12" ry="5" fill="#e8b64c" transform="rotate(-30 -70 -318)"/>'
           + '<path d="M-86 -324 L-90 -344 M-75 -322 L-75 -342" stroke="#b8742e" stroke-width="5" stroke-linecap="round"/>'
           + '<circle cx="-90" cy="-346" r="5" fill="#6b3f1e"/><circle cx="-75" cy="-344" r="5" fill="#6b3f1e"/>'
@@ -2229,6 +2233,14 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     id: 'nz', name: 'New Zealand', lat: -43.6, lon: 170.1, country: 'nz', climate: 'cool', bed: 'wind',
     hello: { t: 'Kia ora!', lang: 'mi-NZ', alt: 'en-NZ', native: 'Kia ora!', say: 'Kee-a ora!', pitch: 1.4 },
     skyDay: ['#5aa6e8', '#e2f2fa'], card: ['#a8d8f5', '#6fae58'],
+    // once the kiwi has tasted one, a kiwi-fruit vine on a post
+    dev: function (lvl) {
+      if (lvl < 1) { return ''; }
+      return '<path d="M760 550 V420 M720 420 H800" stroke="#7a5a3a" stroke-width="8" stroke-linecap="round"/>'
+        + '<path d="M760 540 Q740 480 762 430 Q790 410 800 430" stroke="#6a8a3a" stroke-width="4" fill="none"/>'
+        + '<g fill="#5f9a3a"><ellipse cx="730" cy="428" rx="20" ry="10"/><ellipse cx="770" cy="424" rx="22" ry="11"/><ellipse cx="800" cy="430" rx="16" ry="9"/></g>'
+        + '<g fill="#8a6a3a"><ellipse cx="740" cy="442" rx="6" ry="8"/><ellipse cx="764" cy="444" rx="6" ry="8"/><ellipse cx="790" cy="442" rx="6" ry="8"/></g>';
+    },
     icon: function () {
       return '<path d="M0 -6 V0 M8 -6 V0" stroke="#d9c9a0" stroke-width="3"/>'
         + '<ellipse cx="4" cy="-20" rx="18" ry="15" fill="#8a6a45"/>'
@@ -2343,6 +2355,14 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
   place({
     id: 'antarctica', name: 'Antarctica', lat: -70.6, lon: -8.0, country: 'antarctica', climate: 'cold', bed: 'wind', weather: 'snow',
     skyDay: ['#7ab8ec', '#eaf4fb'], card: ['#bfe0f7', '#f2f7fb'],
+    // once the first letter has come, a post box at the bottom of the world
+    dev: function (lvl) {
+      if (lvl < 1) { return ''; }
+      return '<rect x="776" y="440" width="44" height="108" rx="8" fill="#2a6ac0"/><path d="M770 444 Q798 420 826 444 Z" fill="#1f4f9a"/>'
+        + '<rect x="786" y="470" width="24" height="5" rx="2" fill="#1a1a2a"/><rect x="784" y="490" width="28" height="16" rx="3" fill="#f6f0e4"/>'
+        + '<path d="M798 506 L788 492 L796 496 L798 488 L800 496 L808 492 Z" fill="#e8a020"/>'
+        + '<path d="M774 548 h52" stroke="#ffffff" stroke-width="6" stroke-linecap="round"/>';
+    },
     icon: function () {
       return '<ellipse cx="-5" cy="-1" rx="5" ry="2.5" fill="#f08a2a"/><ellipse cx="5" cy="-1" rx="5" ry="2.5" fill="#f08a2a"/>'
         + '<ellipse cx="0" cy="-26" rx="15" ry="24" fill="#22252e"/>'
@@ -2462,6 +2482,13 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     id: 'brazil', name: 'Brazil', lat: -3.1, lon: -60.0, country: 'brazil', climate: 'rain', bed: 'jungle', weather: 'rain', rainy: true,
     hello: { t: 'Olá!', lang: 'pt-BR', native: 'Olá!', say: 'Oh-lah!', pitch: 1.3 },
     skyDay: ['#6aaee0', '#dff0e4'], card: ['#a8d6ea', '#2f8a3d'],
+    // once the toucan has its umbrella, it keeps it up over its perch
+    dev: function (lvl) {
+      if (lvl < 1) { return ''; }
+      return '<path d="M690 470 V318" stroke="#6b4a2f" stroke-width="5"/><path d="M690 470 q-8 10 -16 0" stroke="#6b4a2f" stroke-width="5" fill="none"/>'
+        + '<path d="M610 330 Q690 262 770 330 Z" fill="#d9434e"/>'
+        + '<path d="M690 290 L610 330 M690 290 L650 330 M690 290 L730 330 M690 290 L770 330" stroke="#f2c033" stroke-width="2.4"/>';
+    },
     icon: function () {
       return '<path d="M-26 0 H26" stroke="#7a5230" stroke-width="5" stroke-linecap="round"/>'
         + '<path d="M6 -14 L14 4 L8 4 Z" fill="#1d1d24"/>'
@@ -2608,6 +2635,16 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     id: 'peru', name: 'Peru', lat: -13.16, lon: -72.55, country: 'peru', climate: 'cool', bed: 'wind',
     hello: { t: '¡Hola!', lang: 'es-PE', alt: 'es-ES', native: '¡Hola!', say: 'Oh-la!', pitch: 1.0 },
     skyDay: ['#5aa2e6', '#e6f0f6'], card: ['#a2d0f2', '#7fb85a'],
+    // once the llama has knitted the satchel, woolly bunting
+    dev: function (lvl) {
+      if (lvl < 1) { return ''; }
+      var d = '<path d="M330 330 Q590 380 860 320" stroke="#7a6a5a" stroke-width="2" fill="none"/>', cols = ['#e8504a', '#f2c033', '#35a8b8', '#ec5a8f'];
+      for (var i = 0; i < 14; i++) {
+        var f = (i + 0.5) / 14, x = 330 + 530 * f, y = (1 - f) * (1 - f) * 330 + 2 * f * (1 - f) * 380 + f * f * 320;
+        d += '<path d="M' + f2(x - 11) + ' ' + f2(y) + ' L' + f2(x + 11) + ' ' + f2(y) + ' L' + f2(x) + ' ' + f2(y + 22) + ' Z" fill="' + cols[i % 4] + '"/>';
+      }
+      return d;
+    },
     icon: function () {
       return '<path d="M-10 -14 V0 M-3 -14 V0 M10 -14 V0 M16 -14 V0" stroke="#e9dcc5" stroke-width="4" stroke-linecap="round"/>'
         + '<ellipse cx="3" cy="-20" rx="18" ry="10" fill="#f6efe2"/>'
@@ -2965,6 +3002,14 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     id: 'arctic', name: 'The Arctic', lat: 78.2, lon: 15.6, climate: 'cold', bed: 'wind', weather: 'snow',
     hello: { t: 'Hei!', lang: 'nb-NO', alt: 'no', native: 'Hei!', say: 'Hi!', pitch: 0.6 },
     skyDay: ['#6aa8e0', '#e0eef8'], card: ['#2a3f7a', '#eef4f8'],
+    // once Granny's letter has been seen, a post box at the top of the world
+    dev: function (lvl) {
+      if (lvl < 1) { return ''; }
+      return '<rect x="806" y="440" width="44" height="108" rx="8" fill="#d9434e"/><path d="M800 444 Q828 420 856 444 Z" fill="#b8333c"/>'
+        + '<rect x="816" y="470" width="24" height="5" rx="2" fill="#3a2a2a"/><rect x="814" y="490" width="28" height="16" rx="3" fill="#f6f0e4"/>'
+        + '<g transform="translate(828,500) scale(0.8)" fill="#3b3350">' + pawArt() + '</g>'
+        + '<path d="M804 548 h52" stroke="#ffffff" stroke-width="6" stroke-linecap="round"/>';
+    },
     icon: function () {
       return '<path d="M-32 0 H32" stroke="#dbe9f5" stroke-width="3"/>'
         + '<rect x="-14" y="-12" width="7" height="12" rx="3" fill="#ece6d6"/><rect x="12" y="-12" width="7" height="12" rx="3" fill="#ece6d6"/>'
@@ -3844,6 +3889,17 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     id: 'nepal', name: 'Nepal', lat: 27.99, lon: 86.93, country: 'nepal', climate: 'cold', bed: 'wind', weather: 'snow',
     hello: { t: 'Namaste!', pitch: 1.1 },
     skyDay: ['#3f8fe0', '#e4eef6'], card: ['#98c6ee', '#e8eef2'],
+    // once the red panda is fed, a bamboo grove of its own
+    dev: function (lvl) {
+      if (lvl < 1) { return ''; }
+      var d = '';
+      [[790, 548, 150], [812, 552, 190], [834, 546, 130], [856, 550, 170]].forEach(function (b) {
+        d += '<path d="M' + b[0] + ' ' + b[1] + ' V' + (b[1] - b[2]) + '" stroke="#7fb045" stroke-width="9" stroke-linecap="round"/>';
+        for (var y = b[1] - 30; y > b[1] - b[2]; y -= 34) { d += '<path d="M' + (b[0] - 5) + ' ' + y + ' h10" stroke="#5f8f30" stroke-width="3"/>'; }
+        d += '<path d="M' + b[0] + ' ' + (b[1] - b[2] + 10) + ' q16 -10 26 -2 q-14 8 -26 2 Z M' + b[0] + ' ' + (b[1] - b[2] + 30) + ' q-16 -10 -26 -2 q14 8 26 2 Z" fill="#6fae3a"/>';
+      });
+      return d;
+    },
     icon: function () {
       return '<path d="M-30 0 L-4 -50 L8 -36 L14 -44 L32 0 Z" fill="#7a8aa0"/>'
         + '<path d="M-4 -50 L4 -36 L0 -38 L-8 -32 L-12 -34 Z M14 -44 L20 -30 L14 -32 Z" fill="#ffffff"/>'
@@ -4299,6 +4355,15 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     id: 'hawaii', name: 'Hawaii', lat: 19.6, lon: -155.5, climate: 'hot', bed: 'water',
     hello: { t: 'Aloha!', pitch: 1.0 },
     skyDay: ['#4aa6ea', '#f6ecd4'], card: ['#90d0f2', '#f0d8a0'],
+    // once the turtle has its ice cream, a little ice-cream stand
+    dev: function (lvl) {
+      if (lvl < 1) { return ''; }
+      return '<rect x="740" y="470" width="90" height="70" rx="6" fill="#f6f0e4"/><path d="M736 470 H834" stroke="#e84a6a" stroke-width="8" stroke-linecap="round"/>'
+        + '<path d="M752 520 h66" stroke="#e8c8a0" stroke-width="3" stroke-dasharray="8 6"/>'
+        + '<path d="M760 540 v12 M810 540 v12" stroke="#8a6a4a" stroke-width="5"/>'
+        + '<path d="M785 470 V420" stroke="#8a6a4a" stroke-width="3"/><path d="M745 424 Q785 392 825 424 Z" fill="#f2c033"/>'
+        + '<path d="M776 466 L785 446 L794 466 Z" fill="#d8a060"/><circle cx="785" cy="442" r="9" fill="#f6eaa0"/>';
+    },
     icon: function () {
       return '<path d="M-30 0 L-8 -34 L8 -34 L30 0 Z" fill="#6a5a50"/>'
         + '<path d="M-8 -34 L8 -34 L4 -26 L0 -30 L-4 -24 Z" fill="#e8582a"/>'
@@ -4479,7 +4544,11 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
       + '<path d="M0 -51 L-28 -36 M0 -51 L-10 -36 M0 -51 L10 -36 M0 -51 L28 -36" stroke="#f2c033" stroke-width="1.6"/>' },
     cake: { from: 'france', made: ['cocoa', 'maple'], art: '<rect x="-22" y="-26" width="44" height="24" rx="3" fill="#6b3f24"/>'
       + '<rect x="-22" y="-31" width="44" height="9" rx="3" fill="#f4e0c8"/><path d="M-22 -14 h44" stroke="#f4e0c8" stroke-width="3"/>'
-      + '<path d="M0 -31 V-42" stroke="#ec5a8f" stroke-width="3"/><path d="M0 -50 q4 4 0 7 q-4 -3 0 -7 Z" fill="#f2c033"/>' }
+      + '<path d="M0 -31 V-42" stroke="#ec5a8f" stroke-width="3"/><path d="M0 -50 q4 4 0 7 q-4 -3 0 -7 Z" fill="#f2c033"/>' },
+    // Granny's letter, and the penguins' answer. They come from nowhere and
+    // can't be put back: they only ever go where they're addressed.
+    letter: { keep: true, art: '<g transform="translate(-27,-40)">' + letterArt(54, 36) + '</g>' },
+    reply: { keep: true, art: '<g transform="translate(-27,-40)">' + replyArt(54, 36) + '</g>' }
   };
   function itemArt(k) { return ITEMS[k] ? ITEMS[k].art : ''; }
   function itemsAt(id) { return Object.keys(ITEMS).filter(function (k) { return ITEMS[k].from === id; }); }
@@ -4502,7 +4571,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     maple: 'maple syrup', honey: 'honey', ice: 'ice', fish: 'fish', corn: 'corn', panpipes: 'panpipes',
     jumper: 'a jumper', towel: 'a towel', umbrella: 'an umbrella', cake: 'a cake',
     scarf: 'a tartan scarf', oranges: 'oranges', olives: 'olives', vanilla: 'vanilla', gem: 'a sparkly gem', hat: 'a woolly hat',
-    spice: 'spices', avocado: 'avocados', pineapple: 'a pineapple'
+    spice: 'spices', avocado: 'avocados', pineapple: 'a pineapple', letter: 'Granny’s letter', reply: 'the penguins’ letter'
   };
   var VERBS = { jumper: 'knit', towel: 'weave', umbrella: 'make', cake: 'bake' };
 
@@ -4587,12 +4656,189 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
           + '<g fill="#ffffff" opacity="0.8"><circle cx="60" cy="40" r="3"/><circle cx="120" cy="96" r="2.5"/><circle cx="330" cy="30" r="3"/><circle cx="390" cy="110" r="2.5"/><circle cx="250" cy="140" r="2"/><circle cx="30" cy="150" r="2.5"/><circle cx="420" cy="60" r="2"/><circle cx="170" cy="30" r="2.5"/></g>'
           + '<g fill="#ffffff" opacity="0.35"><ellipse cx="200" cy="200" rx="30" ry="14"/><ellipse cx="270" cy="190" rx="26" ry="12"/></g>';
       }
+    },
+    {
+      place: 'nepal', need: ['bamboo'], piece: 5, mood: 'sad', reward: { puff: 2 },
+      clue: 'Dear Hoot, I’m staying under the tallest mountain in the whole world. Geese fly right over the top of it! Love, Granny',
+      lines: {
+        match: [['hoot', 'The tallest mountain in the world! This is the place on Granny’s postcard!'], ['a', 'Granny Hoot’s satchel! My grandma told me all about her.']],
+        ask: [['a', 'I’m so hungry. Red pandas love bamboo, but none grows up here in the snow. It comes from China.']],
+        thanks: [['a', 'Bamboo! Crunchy, munchy bamboo! Thank you, Hoot!']],
+        tell: [['a', 'Granny stayed here for a whole week, long ago. Every morning she went up with the geese, to learn how they ride the wind.']],
+        give: [['a', 'Granny left this with my grandma, to keep safe.'], ['hoot', 'Another piece of Granny’s map!']],
+        reward: [['a', 'Watch the geese, Hoot. Spread your wings wide, like them, and let the wind carry you.'], ['hoot', 'I’m soaring! Now I can fly two feathers further.']],
+        mystery: [['a', 'Granny said the letter came from the very top of the world. Not the top of a mountain: the top of the whole Earth, where the sea is frozen.']]
+      },
+      clueLetter: 'It came from the very top of the world, where the sea is frozen.',
+      flash: function () {
+        var g = '';
+        [[90, 70], [120, 84], [150, 70], [180, 84], [210, 70]].forEach(function (p) { g += '<path d="M' + (p[0] - 9) + ' ' + p[1] + ' q4.5 -6 9 0 q4.5 -6 9 0" stroke="#5a5a64" stroke-width="2.4" fill="none"/>'; });
+        return flashOf('nepal', { extra: g + '<g transform="translate(250,96) scale(0.9) rotate(-8)">' + grannyArt() + '</g>', snowy: true, away: true });
+      }
+    },
+    {
+      place: 'kenya', need: ['scarf', 'honey'], piece: 4, mood: 'sad',
+      clue: 'Dear Hoot, the animals here have the longest necks you ever saw. They eat the leaves from the tops of the trees! Love, Granny',
+      lines: {
+        match: [['hoot', 'Long necks and tall trees! This is the place on Granny’s postcard!'], ['a', 'Hello, Hoot. Ahem! Excuse me. My grandma knew Granny Hoot.']],
+        ask: [['a', 'I’ve got a sore throat, and my neck is so long it gets cold all the way down! I’d love a warm scarf, and some honey for my throat.']],
+        thanks: [['a', 'A tartan scarf, and honey! My throat feels better already. Thank you, Hoot!']],
+        tell: [['a', 'Granny got lost in a dust storm here once. My grandma stretched her neck up high, spotted her, and showed her the way out.']],
+        give: [['a', 'Granny gave my grandma this before she flew on.'], ['hoot', 'Another piece of Granny’s map!']],
+        mystery: [['a', 'Granny said the letter was written by someone big and white and furry, with enormous paws.']]
+      },
+      clueLetter: 'It was written by someone big, white and furry, with enormous paws.',
+      flash: function () {
+        return flashOf('kenya', { extra: '<g fill="#c8a870" opacity="0.5"><ellipse cx="120" cy="150" rx="140" ry="60"/><ellipse cx="60" cy="110" rx="80" ry="40"/></g>'
+          + '<path d="M40 120 q30 -20 60 0 q30 20 60 0 M20 160 q30 -20 60 0 q30 20 60 0" stroke="#a88a5a" stroke-width="3" fill="none" opacity="0.6"/>' });
+      }
+    },
+    {
+      place: 'brazil', need: ['umbrella'], piece: 2, mood: 'sad',
+      clue: 'Dear Hoot, it rains here every single day, in a jungle as big as a country. The birds have big, bright beaks! Love, Granny',
+      lines: {
+        match: [['hoot', 'Rain, rain, rain! And a bird with a big bright beak. This is it!'], ['a', 'Granny Hoot’s satchel! My grandma talked about her all the time.']],
+        ask: [['a', 'It rains every single day here, and my feathers never get dry. If only I had an umbrella!']],
+        thanks: [['a', 'An umbrella! Now I can stay dry in the rain. Thank you, Hoot!']],
+        tell: [['a', 'Granny sheltered from a great storm here, under my grandma’s biggest leaf. They sang songs together until the rain stopped.']],
+        give: [['a', 'And Granny left this behind. It’s been waiting for you.'], ['hoot', 'Another piece of Granny’s map!']],
+        mystery: [['a', 'Granny said the letter was for some black-and-white birds who can’t fly, but swim like fish.']]
+      },
+      clueLetter: 'It’s for some black-and-white birds who can’t fly, but swim like fish.',
+      flash: function () {
+        var r = '';
+        for (var i = 0; i < 40; i++) { r += 'M' + ((i * 53) % 450) + ' ' + ((i * 37) % 260) + ' l-6 14 '; }
+        return flashOf('brazil', { extra: '<path d="M360 250 Q300 170 330 120 Q380 160 380 250 Z" fill="#7a9a52"/><path d="' + r + '" stroke="#8aa0b0" stroke-width="2"/>' });
+      }
+    },
+    {
+      place: 'peru', need: ['wool', 'cotton'], piece: 1, reward: { cap: 3 },
+      clue: 'Dear Hoot, I’m high in the mountains, among old stone ruins in the clouds. My woolly friend hums while she knits! Love, Granny',
+      lines: {
+        match: [['hoot', 'Old stone ruins, high in the mountains. This is the place!'], ['a', 'Mmmm! Granny Hoot’s satchel! My grandma knitted that satchel for her, you know.']],
+        ask: [['a', 'I’d love to knit you a bigger satchel, like my grandma did for Granny. I need the softest wool from the sheep in New Zealand, and cotton from Egypt for the lining.']],
+        thanks: [['a', 'Wool and cotton! Now watch me knit…']],
+        tell: [['a', 'Granny’s old satchel was always too full of letters. So my grandma knitted her a bigger one, and off she flew.']],
+        give: [['a', 'Granny left this with us, too.'], ['hoot', 'Another piece of Granny’s map!']],
+        reward: [['a', 'And here’s your new satchel, Hoot!'], ['hoot', 'It has three pockets! Now I can carry three things at once.']],
+        mystery: [['a', 'When Granny left here, she said she was flying south. As far south as anyone can go.']]
+      },
+      clueLetter: 'Granny was flying south, as far south as anyone can go.',
+      flash: function () { return flashOf('peru', { extra: '<g transform="translate(232,206)"><path d="M-10 -40 L-2 0 M14 -40 L6 0" stroke="#6a5a48" stroke-width="3" stroke-linecap="round"/><rect x="-16" y="-12" width="30" height="20" rx="4" fill="#a87a4a"/><path d="M-14 -6 h26 M-14 0 h26" stroke="#8a5a32" stroke-width="2"/></g>' }); }
+    },
+    {
+      place: 'nz', need: ['kiwifruit'], piece: 7, mood: 'sad',
+      clue: 'Dear Hoot, there are more sheep than people here! And a little brown bird who can’t fly comes out at night to sniff for worms. Love, Granny',
+      lines: {
+        match: [['hoot', 'Sheep everywhere, and a little bird who can’t fly. This is it!'], ['a', 'Granny Hoot’s satchel! My grandma was her friend.']],
+        ask: [['a', 'Everyone thinks kiwi fruit come from here, because they’re named after us. But they first came from China! I’ve never even tasted one.']],
+        thanks: [['a', 'A kiwi fruit! It’s brown and fuzzy, just like me! Thank you, Hoot!']],
+        tell: [['a', 'This is where Granny set off on her longest flight ever. South, over the cold, grey sea.']],
+        give: [['a', 'She gave my grandma this before she went.'], ['hoot', 'Another piece of Granny’s map!']],
+        mystery: [['a', 'But it was too far, Hoot. Granny ran out of puff over the sea, and a whale carried her all the way back here.'], ['hoot', 'So that’s why the letter never got there.']]
+      },
+      clueLetter: 'Granny ran out of puff over the cold sea, and a whale carried her back. The letter never got there.',
+      flash: function () {
+        return '<rect width="450" height="300" fill="#e4dcc8"/><rect y="150" width="450" height="150" fill="#b8b4a4"/>'
+          + '<path d="M0 160 q40 -8 80 0 t80 0 t80 0 t80 0 t80 0 t80 0" stroke="#d4ccb8" stroke-width="3" fill="none"/>'
+          + '<g transform="translate(240,236) scale(1.6)">' + whaleArt() + '</g>'
+          + '<g transform="translate(240,192) scale(1.05) rotate(12)">' + grannyArt() + '</g>'
+          + '<g fill="#a89a80" opacity="0.5"><path d="M20 40 q30 -16 60 0 q30 -16 60 0 Z M300 70 q30 -16 60 0 q30 -16 60 0 Z"/></g>';
+      }
+    },
+    {
+      place: 'hawaii', need: ['ice', 'vanilla'], piece: 0, mood: 'sad', reward: { stars: true },
+      clue: 'Dear Hoot, I’m on a warm island in the middle of the biggest ocean, under a smoking volcano. Aloha! Love, Granny',
+      lines: {
+        match: [['hoot', 'A warm island under a smoking volcano. Aloha! This is it!'], ['a', 'Aloha, Hoot! That’s Granny Hoot’s satchel. My grandma met her right here, on this beach.']],
+        ask: [['a', 'The sand is so hot today! I’d love some ice cream. I need ice from Antarctica, and vanilla from Madagascar, to make it.']],
+        thanks: [['a', 'Ice, and vanilla! Vanilla ice cream! Thank you, Hoot!']],
+        tell: [['a', 'Long ago, my grandma swam beside the great canoes that sailed across this ocean. Their sailors steered by the stars, all night long. She taught Granny how.']],
+        give: [['a', 'Granny left this with my grandma.'], ['hoot', 'The last piece of Granny’s map!']],
+        reward: [['a', 'Now I’ll teach you, Hoot. Watch the stars, and you’ll always find your way.'], ['hoot', 'Star-steering! When I set off at night, every feather takes me further.']],
+        mystery: [['a', 'Do you know, Hoot? Polar bears live at the top of the world, and penguins at the bottom. They’ve never met!'],
+          ['hoot', 'Big, white and furry, with enormous paws… The letter is from a polar bear, to the penguins!'],
+          ['hoot', 'I’ll take it to the top of the world first, and find out.']]
+      },
+      clueLetter: 'Polar bears live at the top of the world, and penguins at the bottom. The letter is from a polar bear to the penguins!',
+      flash: function () {
+        var st = '';
+        for (var i = 0; i < 24; i++) { st += '<circle cx="' + ((i * 71) % 450) + '" cy="' + (10 + (i * 29) % 120) + '" r="' + (i % 4 ? 1.6 : 2.6) + '"/>'; }
+        return '<rect width="450" height="300" fill="#d8ccb4"/><g fill="#f4ecd8">' + st + '</g><rect y="170" width="450" height="130" fill="#b8ae98"/>'
+          + '<path d="M120 190 Q200 210 300 190 L280 206 Q200 222 140 206 Z" fill="#8a7a62"/><path d="M200 196 V110 M200 110 L250 180 L200 176 Z" stroke="#8a7a62" stroke-width="4" fill="#e8dcc0"/>'
+          + '<g transform="translate(330,250) scale(0.55)">' + BYID.hawaii.animal.art() + '</g>'
+          + '<g transform="translate(206,178) scale(0.9)">' + grannyArt() + '</g>';
+      }
+    },
+    // The end of the story: Granny's letter, at last.
+    {
+      place: 'arctic', need: [], card: 'letter', gift: 'letter',
+      clue: 'Granny’s letter has a polar bear’s paw print for a stamp. I’ll take it to the polar bears, at the top of the world!',
+      lines: {
+        notHere: [['hoot', 'No polar bears here. They live at the very top of the world.']],
+        match: [['hoot', 'The top of the world! Excuse me, Polar bear. Do you know this paw print?'], ['a', 'That’s my grandma’s paw print! She wrote that letter, long, long ago.']],
+        tell: [['a', 'My grandma always wondered about the black-and-white birds at the bottom of the world. She wrote to them, and Granny Hoot promised to take her letter.'], ['a', 'But it was too far, and the letter never got there.']],
+        give: [['a', 'Will you take it, Hoot? You can fly further than any owl there has ever been.'], ['hoot', 'I will! All the way to the bottom of the world.']],
+        next: [['hoot', 'Antarctica is the furthest place there is. I’ll need to plan this flight very carefully.']]
+      },
+      flash: function () {
+        return flashOf('arctic', { under: '<rect y="150" width="450" height="150" fill="#6a7a8a" opacity="0.45"/><rect width="450" height="150" fill="#5a6a80" opacity="0.3"/>',
+          extra: '<g transform="translate(200,200) scale(0.9) rotate(-6)">' + letterArt(80, 52) + '</g>', snowy: true });
+      }
+    },
+    {
+      place: 'antarctica', need: ['letter'], start: 'need',
+      lines: {
+        ask: [['a', 'Is that a letter? For us? Nobody has ever written to a penguin before!']],
+        thanks: [['a', 'A letter, all the way from the top of the world! Let me read it…'],
+          ['a', '“Dear black-and-white birds, are you real? I am big and white and furry, and I live where it’s icy, just like you. Please write back! Love from a polar bear.”']],
+        tell: [['a', 'Polar bears! We always thought they were just a story.']],
+        give: [['a', 'We must write back straight away. Will you take our letter to the polar bears, Hoot?'], ['hoot', 'Of course I will!']],
+        next: [['hoot', 'Now back to the top of the world!']]
+      },
+      gift: 'reply'
+    },
+    {
+      place: 'arctic', need: ['reply'], start: 'need', final: true,
+      lines: {
+        ask: [['a', 'Hoot, you’re back! Did the letter get there? Are the penguins real?']],
+        thanks: [['a', 'A letter from the penguins! They’re real! They really are!'],
+          ['a', '“Dear polar bear, we are real, and so are you! Let’s write to each other for ever. Love from the penguins.”']],
+        tell: [['a', 'Thank you, Hoot. You finished Granny’s journey.']],
+        give: [['hoot', 'I couldn’t have done it without all my friends, all round the world.']]
+      }
     }
   ];
+  // The chapter where the letter leaves home, and so leaves the board.
+  var CH_LETTER = 7;
+  function letterHome() { return saved.ch < CH_LETTER || (saved.ch === CH_LETTER && saved.chState === 'find'); }
+  function storyDone() { return saved.ch === CHAPTERS.length - 1 && saved.chState === 'done'; }
+  // A flashback drawn from the place's own scenery: its friend's
+  // grandmother and Granny Hoot, long ago, in sepia. The scenery runs far
+  // past the edges of the picture, so it's drawn inside its own frame.
+  // o: extra (drawn on top), under (over the land, under the animals),
+  // snowy, and away (Granny is somewhere else in the picture).
+  function flashOf(id, o) {
+    var p = BYID[id], A = p.animal, k = 0.45;
+    var land = (p.back ? p.back() : '') + (p.ground ? p.ground() : '');
+    land = land.replace(/<g class="nl">[\s\S]*?<\/g>/g, '');
+    var s = '<rect width="450" height="300" fill="#e9dcc0"/>'
+      + '<g transform="translate(0,-14) scale(' + k + ')">' + land + '</g>' + (o.under || '')
+      + '<g transform="translate(' + f2(A.x * k) + ',' + f2(A.y * k - 14) + ') scale(' + f2(k * (A.scale || 1)) + ')">' + A.art() + '</g>'
+      + (o.away ? '' : '<g transform="translate(150,228) scale(1.15)">' + grannyArt() + '</g>')
+      + (o.extra || '');
+    if (o.snowy) { for (var i = 0; i < 30; i++) { s += '<circle cx="' + ((i * 67) % 450) + '" cy="' + ((i * 43) % 280) + '" r="2.4" fill="#ffffff" opacity="0.8"/>'; } }
+    return '<svg width="450" height="300" viewBox="0 0 450 300" overflow="hidden">' + s + '</svg>';
+  }
   function chapter() { return CHAPTERS[saved.ch] || null; }
   function chLines(c, list) { return (list || []).map(function (l) { return { who: l[0] === 'a' ? c.place : l[0], text: l[1] }; }); }
   // What the chapter's friend still needs, if this is its place.
   function needAt(id) {
+    if (storyDone()) {
+      if (id === 'antarctica' && saved.bag.indexOf('letter') >= 0) { return ['letter']; }
+      if (id === 'arctic' && saved.bag.indexOf('reply') >= 0) { return ['reply']; }
+      return null;
+    }
     var c = chapter();
     if (!c || !saved.prologue || saved.chState !== 'need' || c.place !== id) { return null; }
     var given = saved.given || [];
@@ -4666,6 +4912,18 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
       + '<g transform="translate(' + f2(w * 0.24) + ',' + f2(h * 0.93) + ') scale(' + f2(h * 0.48 / 64) + ')">' + sepiaify(BYID.antarctica.icon()) + '</g>'
       + '<rect x="' + f2(w * 0.72) + '" y="' + f2(h * 0.62) + '" width="' + f2(w * 0.2) + '" height="' + f2(h * 0.3) + '" fill="#fbf6ea" stroke="#c8a870" stroke-width="' + sw + '" stroke-dasharray="' + f2(w * 0.02) + ' ' + f2(w * 0.012) + '"/>'
       + '<g transform="translate(' + f2(w * 0.82) + ',' + f2(h * 0.77) + ') scale(' + f2(w * 0.0055) + ')" fill="#3b3350">' + pawArt() + '</g>';
+  }
+
+  // The penguins' answer: a fresh white envelope, a polar bear on the
+  // front, and a penguin's footprint for a stamp.
+  function replyArt(w, h) {
+    var sw = f2(Math.max(1, w * 0.012));
+    return '<rect width="' + f2(w) + '" height="' + f2(h) + '" rx="' + f2(w * 0.04) + '" fill="#fbfaf6" stroke="#a8c4d8" stroke-width="' + sw + '"/>'
+      + '<path d="M0 0 L' + f2(w / 2) + ' ' + f2(h * 0.52) + ' L' + f2(w) + ' 0" fill="#eef4f8" stroke="#a8c4d8" stroke-width="' + sw + '"/>'
+      + '<circle cx="' + f2(w / 2) + '" cy="' + f2(h * 0.52) + '" r="' + f2(w * 0.07) + '" fill="#2a6ac0"/>'
+      + '<g transform="translate(' + f2(w * 0.26) + ',' + f2(h * 0.93) + ') scale(' + f2(h * 0.4 / 64) + ')">' + dayify(BYID.arctic.icon()) + '</g>'
+      + '<rect x="' + f2(w * 0.72) + '" y="' + f2(h * 0.62) + '" width="' + f2(w * 0.2) + '" height="' + f2(h * 0.3) + '" fill="#ffffff" stroke="#7aa0c0" stroke-width="' + sw + '" stroke-dasharray="' + f2(w * 0.02) + ' ' + f2(w * 0.012) + '"/>'
+      + '<g transform="translate(' + f2(w * 0.82) + ',' + f2(h * 0.77) + ') scale(' + f2(w * 0.005) + ')" fill="#e8a020"><path d="M0 10 L-10 -8 L-2 -2 L0 -12 L2 -2 L10 -8 Z"/></g>';
   }
 
   // The rest of Granny's postcards, face down, still to come.
@@ -4849,22 +5107,34 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
   // has found out so far about how to make it. What he hasn't found out
   // yet shows as a question mark.
   function missionArt(c, w, h) {
-    var p = BYID[c.place], it = ITEMS[c.need], sw = f2(Math.max(1, w * 0.01));
+    var p = BYID[c.place], sw = f2(Math.max(1, w * 0.01));
+    var want = needAt(c.place) || c.need, given = saved.given || [];
     var s = '<rect width="' + f2(w) + '" height="' + f2(h) + '" rx="' + f2(w * 0.04) + '" fill="#fffaf0" stroke="#e0cfae" stroke-width="' + sw + '"/>';
-    s += '<g transform="translate(' + f2(w * 0.2) + ',' + f2(h * 0.58) + ') scale(' + f2(h * 0.46 / 64) + ')">' + dayify(p.icon()) + '</g>';
-    s += '<g transform="translate(' + f2(w * 0.3) + ',' + f2(h * 0.46) + ') scale(' + f2(h * 0.0042) + ')">' + thoughtArt(c.need) + '</g>';
-    // the trail: ingredients, the maker, the thing
-    var steps = [], unk = '<circle cx="0" cy="-26" r="22" fill="#e8e0cc"/><path d="M-7 -34 q0 -9 8 -9 q8 0 8 8 q0 6 -8 8 v5 M1 -12 v2" stroke="#a89878" stroke-width="5" fill="none" stroke-linecap="round"/>';
-    if (it.made) {
-      it.made.forEach(function (k) { steps.push(saved.seen[ITEMS[k].from] ? itemArt(k) : unk); });
-      steps.push(saved.seen[it.from] ? dayify(BYID[it.from].icon()) : unk);
-    }
-    steps.push(itemArt(c.need));
-    var gap = w / (steps.length + 0.4), k = Math.min(h * 0.26 / 64, gap * 0.7 / 64);
-    steps.forEach(function (art, i) {
-      var x = gap * (i + 0.7);
-      s += '<g transform="translate(' + f2(x) + ',' + f2(h * 0.93) + ') scale(' + f2(k) + ')">' + art + '</g>';
-      if (i < steps.length - 1) { s += '<path d="M' + f2(x + gap * 0.32) + ' ' + f2(h * 0.84) + ' h' + f2(gap * 0.3) + '" stroke="#b8a888" stroke-width="' + f2(Math.max(1.5, w * 0.012)) + '" stroke-linecap="round" stroke-dasharray="1 ' + f2(w * 0.02) + '"/>'; }
+    s += '<g transform="translate(' + f2(w * 0.17) + ',' + f2(h * 0.5) + ') scale(' + f2(h * 0.38 / 64) + ')">' + dayify(p.icon()) + '</g>';
+    s += '<g transform="translate(' + f2(w * 0.27) + ',' + f2(h * 0.4) + ') scale(' + f2(h * 0.0036) + ')">' + thoughtArt(c.need, c.need.map(function (k) { return given.indexOf(k) >= 0; })) + '</g>';
+    // a trail for each thing still wanted: where it comes from, or its
+    // ingredients and its maker, then the thing; question marks for what
+    // Hoot hasn't found out yet
+    var unk = '<circle cx="0" cy="-26" r="22" fill="#e8e0cc"/><path d="M-7 -34 q0 -9 8 -9 q8 0 8 8 q0 6 -8 8 v5 M1 -12 v2" stroke="#a89878" stroke-width="5" fill="none" stroke-linecap="round"/>';
+    var rows = want.map(function (need) {
+      var it = ITEMS[need], steps = [];
+      if (it.made) {
+        it.made.forEach(function (k) { steps.push(saved.seen[ITEMS[k].from] ? itemArt(k) : unk); });
+        steps.push(saved.seen[it.from] ? dayify(BYID[it.from].icon()) : unk);
+      } else if (it.from) {
+        steps.push(saved.seen[it.from] ? dayify(BYID[it.from].icon()) : unk);
+      }
+      steps.push(itemArt(need));
+      return steps;
+    });
+    var rowH = h * 0.36 / rows.length;
+    rows.forEach(function (steps, r) {
+      var gap = w / (steps.length + 0.4), k = Math.min(rowH * 0.85 / 64, gap * 0.7 / 64), y = h * 0.66 + rowH * (r + 0.95);
+      steps.forEach(function (art, i) {
+        var x = gap * (i + 0.7);
+        s += '<g transform="translate(' + f2(x) + ',' + f2(y) + ') scale(' + f2(k) + ')">' + art + '</g>';
+        if (i < steps.length - 1) { s += '<path d="M' + f2(x + gap * 0.32) + ' ' + f2(y - rowH * 0.3) + ' h' + f2(gap * 0.3) + '" stroke="#b8a888" stroke-width="' + f2(Math.max(1.5, w * 0.012)) + '" stroke-linecap="round" stroke-dasharray="1 ' + f2(w * 0.02) + '"/>'; }
+      });
     });
     return s;
   }
@@ -5007,7 +5277,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
   function goalArt(w, h) {
     var c = chapter();
     if (!c) { return ''; }
-    if (saved.chState === 'find') { return fadedCard(c, w, h); }
+    if (saved.chState === 'find') { return c.card === 'letter' ? letterArt(w, h) : fadedCard(c, w, h); }
     if (saved.chState === 'need') { return missionArt(c, w, h); }
     return '';
   }
@@ -5059,7 +5329,8 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
   function goalLines() {
     var c = chapter();
     if (!c) { return []; }
-    if (saved.chState === 'find') { return [{ who: 'card', text: c.clue }]; }
+    if (storyDone()) { return [{ who: 'hoot', text: 'A postcard from the bottom of the world. That’s my own, for Granny’s board.' }]; }
+    if (saved.chState === 'find') { return [{ who: c.card === 'letter' ? 'hoot' : 'card', text: c.clue }]; }
     if (saved.chState === 'need') {
       var still = needAt(c.place) || c.need;
       return chLines(c, c.lines.ask).concat([{ who: 'hoot', text: 'The ' + whoIs(c.place) + ' in ' + inName(c.place) + ' needs ' + andList(still.map(itemName)) + '.' }]);
@@ -5095,7 +5366,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
   var fe = null;           // a ride home on a sea creature's back, after running out of puff
   var splash = null;       // where Hoot came down in the sea
   var pointArrow = null;   // which way a puzzled friend pointed: { from, to }
-  var saidTooFar = false;
+  var saidTooFar = false, saidStars = false;
   var MAX_TURN = 150;   // degrees a second; a finger can't spin the world faster
 
   // Taps are rationed: each target has a cooldown, and no more than four
@@ -5128,8 +5399,11 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     var A = BYID[fromId], B = BYID[toId];
     return angBetween(vec(A.lat, A.lon), vec(B.lat, B.lon)) * EARTH_MILES;
   }
-  // A feather for every thousand miles or part of one.
-  function tripCost(fromId, toId) { return Math.ceil(tripMiles(fromId, toId) / 1000 - 1e-6); }
+  // A feather for every thousand miles or part of one; or, once Hoot can
+  // steer by the stars and sets off in the dark, every fifteen hundred.
+  function starry(fromId) { var A = BYID[fromId]; return !!saved.stars && sunElev(A.lat, A.lon) < -4; }
+  function perFeather(fromId) { return starry(fromId) ? 1500 : 1000; }
+  function tripCost(fromId, toId) { return Math.ceil(tripMiles(fromId, toId) / perFeather(fromId) - 1e-6); }
 
   function select(id) {
     sel = id;
@@ -5137,7 +5411,17 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     if (!id) { return; }
     gh.pop = 0.6;
     SND.pop(0.9);
+    // a trip that's mostly round the back of the globe (over the pole, say)
+    // would squash all its feather stops into a sliver, so the globe turns
+    // to show it
+    var a = vec(BYID[here].lat, BYID[here].lon), b = vec(BYID[id].lat, BYID[id].lon), seen = 0;
+    for (var i = 0; i <= 20; i++) { if (project(slerp(a, b, i / 20), GR).z > 0.15) { seen += 1; } }
+    if (seen < 16) {
+      var mid = latlon(norm(slerp(a, b, 0.5)));
+      goal.lon = mid[1]; goal.lat = clamp(mid[0], -62, 62);
+    }
     var short = tripCost(here, id) > saved.puff;
+    if (starry(here) && !saidStars) { saidStars = true; talk({ who: 'hoot', text: 'It’s dark, so I can steer by the stars. Every feather will take me further!' }); }
     setGear(gh, 'sweat', short);
     if (short) {
       gh.shiver = 0.6;
@@ -5148,13 +5432,13 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
   function startFlight(toId) {
     var A = BYID[here], B = BYID[toId];
     var a = vec(A.lat, A.lon), b = vec(B.lat, B.lon), ang = angBetween(a, b), miles = ang * EARTH_MILES;
-    var cost = Math.ceil(miles / 1000 - 1e-6);
+    var per = perFeather(here), cost = Math.ceil(miles / per - 1e-6);
     fl = {
       from: A.id, to: B, a: a, b: b, ang: ang, miles: Math.round(miles), t: 0, done: 0,
       dur: reduced ? 0.6 : clamp(1.4 + ang * R2D / 42, 2, 5.6), nextFlap: 0, px: 0, py: 0,
       carry: saved.bag.length > 0,
       // if he hasn't the puff for it, how far along he'll get
-      runAt: cost > saved.puff ? saved.puff * 1000 / miles : 0
+      runAt: cost > saved.puff ? saved.puff * per / miles : 0
     };
     sel = null; pointArrow = null;
     setGear(gh, 'sweat', false);
@@ -5520,13 +5804,14 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     for (i = 0; i < pipNodes.length; i++) {
       var g = pipNodes[i];
       if (i >= n) { g.setAttribute('display', 'none'); continue; }
-      var p = at(tot * (i + 1) / (n + 1)), inReach = i < saved.puff, want = inReach ? 'y' : 'n';
+      var p = at(tot * (i + 1) / (n + 1)), inReach = i < saved.puff, want = (inReach ? 'y' : 'n') + (starry(here) ? 's' : '');
       if (g.getAttribute('data-k') !== want) {
         g.setAttribute('data-k', want);
         g.innerHTML = '<circle r="15" fill="' + (inReach ? '#fff6dc' : '#3a4260') + '" stroke="' + (inReach ? '#b07a10' : '#8a93b0') + '" stroke-width="2"' + (inReach ? '' : ' stroke-dasharray="4 3"') + '/>'
           + '<g transform="translate(-3,12) scale(0.64)">' + featherArt(inReach ? '#ffd34a' : 'none', inReach ? '#8a5a10' : '#a8b0c8', !inReach) + '</g>'
           + '<circle cx="12" cy="11" r="8.5" fill="' + (inReach ? '#b07a10' : '#5a6380') + '" stroke="#ffffff" stroke-width="1.5"/>'
-          + '<text x="12" y="15" text-anchor="middle" font-size="12" fill="#ffffff">' + (i + 1) + '</text>';
+          + '<text x="12" y="15" text-anchor="middle" font-size="12" fill="#ffffff">' + (i + 1) + '</text>'
+          + (starry(here) ? '<path d="M-12 -16 l2 5 l5 1 l-4 3 l1 5 l-4 -3 l-4 3 l1 -5 l-4 -3 l5 -1 Z" fill="#fff2a0" stroke="#b07a10" stroke-width="0.8"/>' : '');
       }
       g.removeAttribute('display');
       g.setAttribute('transform', 'translate(' + f2(p.x) + ',' + f2(p.y) + ')');
@@ -6207,6 +6492,11 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     var sw = S.swap, gone = saved.bag[i];
     S.swap = null;
     if (!gone) { return; }
+    if (ITEMS[gone].keep) {
+      S.hoot.shake = 0.6;
+      talk({ who: 'hoot', text: 'Not ' + itemName(gone) + '! I promised to deliver it.' });
+      return;
+    }
     var bag = saved.bag.slice();
     bag[i] = sw.item;
     setBag(bag);
@@ -6223,6 +6513,8 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
   // Where a thing is wanted: by a friend who needs it, or by a maker who
   // uses it.
   function wantedAt(item) {
+    if (storyDone() && item === 'letter') { return 'antarctica'; }
+    if (storyDone() && item === 'reply') { return 'arctic'; }
     var c = chapter();
     if (c && saved.prologue && saved.chState === 'need' && c.need.indexOf(item) >= 0 && (saved.given || []).indexOf(item) < 0) { return c.place; }
     var u = usesOf(item);
@@ -6253,7 +6545,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
       out = chLines(c, c.lines.ask);
       var missing = want.filter(function (x) { return saved.bag.indexOf(x) < 0; });
       if (!missing.length) { out.push({ who: p.id, text: 'Is that ' + andList(want.map(itemName)) + ' in your satchel? Can I have it?' }); }
-      else if (ITEMS[missing[0]].from !== p.id) { k = missing[0]; out.push({ who: p.id, text: sourceLine(k) }); point = ITEMS[k].from; }
+      else if (ITEMS[missing[0]].from && ITEMS[missing[0]].from !== p.id) { k = missing[0]; out.push({ who: p.id, text: sourceLine(k) }); point = ITEMS[k].from; }
     } else if (made) {
       var held = saved.held[p.id] || [], still = ITEMS[made].made.filter(function (x) { return held.indexOf(x) < 0; });
       var away = still.filter(function (x) { return saved.bag.indexOf(x) < 0; });
@@ -6336,6 +6628,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
   // of them, the story moves on.
   function friendTakes(c, item) {
     var p = S.place, A = S.animal;
+    if (storyDone()) { postTakes(item); return; }
     saved.given = (saved.given || []).concat([item]);
     persist();
     showThoughts();
@@ -6387,6 +6680,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     var p = S.place, c = chapter();
     showThoughts();
     if (!saved.prologue || !c || p.home) { return; }
+    if (storyDone()) { postArrival(); return; }
     if (saved.chState === 'find') {
       if (c.place === p.id) { matchStory(c); } else { compareStory(c); }
     } else if (saved.chState === 'need' && c.place === p.id) {
@@ -6401,7 +6695,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     var H = S.hoot, w = 190, h = 133, hp = toView(H.x, H.y - 150);
     var x = clamp(hp.x - w / 2, 10, 990 - w), y = Math.max(10, hp.y - h);
     var g = el('g', { opacity: 0 }, $('sc-fly'));
-    g.innerHTML = fadedCard(c, w, h);
+    g.innerHTML = c.card === 'letter' ? letterArt(w, h * 0.66) : fadedCard(c, w, h);
     S.busy = true;
     SND.rustle();
     compareCount += 1;
@@ -6413,7 +6707,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
       later(0.7, function () { H.shake = 0.7; });
       later(1.5, function () {
         var done = function () { removeLater(g, 0.3); S.busy = false; };
-        if (compareCount <= 2) { talk({ who: 'hoot', text: 'Hmm. This doesn’t look like the place on Granny’s postcard.' }, done); }
+        if (compareCount <= 2) { talk(c.lines.notHere ? chLines(c, c.lines.notHere) : { who: 'hoot', text: 'Hmm. This doesn’t look like the place on Granny’s postcard.' }, done); }
         else { done(); }
       });
     });
@@ -6424,8 +6718,8 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     var H = S.hoot, A = S.animal, p = S.place, w = Math.min(420, SH * 0.5), h = w * 0.7;
     var x = (1000 - w) / 2, y = Math.max(16, (stage.hy - h) * 0.4);
     var g = el('g', {}, $('sc-fly')), faded = el('g', {}, g), bright = el('g', { opacity: 0 }, g);
-    faded.innerHTML = fadedCard(c, w, h);
-    bright.innerHTML = cardArt(p, w, h, true);
+    faded.innerHTML = c.card === 'letter' ? letterArt(w, h * 0.66) : fadedCard(c, w, h);
+    bright.innerHTML = c.card === 'letter' ? '' : cardArt(p, w, h, true);
     var from = toView(H.x + 30, H.y - 60);
     S.busy = true;
     SND.rustle();
@@ -6446,6 +6740,8 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
           saved.chState = 'need';
           saved.given = [];
           persist();
+          // a visit with nothing to bring: straight on to the story
+          if (!c.need.length) { deliverStory(c); return; }
           A.mood = c.mood;
           showThoughts();
           talk(chLines(c, c.lines.ask), function () { S.busy = false; });
@@ -6471,45 +6767,140 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     }
     talk(chLines(c, c.lines.thanks), function () {
       // the friend's part of Granny's story, in a sepia picture
-      var w = Math.min(860, SH * 0.52 * 1.5), h = w / 1.5, x = (1000 - w) / 2, y = Math.max(20, (SH - h) * 0.32);
-      var g = el('g', { opacity: 0, transform: 'translate(' + f2(x) + ',' + f2(y) + ')' }, $('sc-fly'));
-      g.innerHTML = '<rect x="-14" y="-14" width="' + f2(w + 28) + '" height="' + f2(h + 28) + '" rx="10" fill="#fffaf0"/>'
-        + '<g transform="scale(' + f2(w / 450) + ',' + f2(h / 300) + ')">' + sepiaify(c.flash()) + '</g>'
-        + '<rect x="0" y="0" width="' + f2(w) + '" height="' + f2(h) + '" fill="none" stroke="#c8b48c" stroke-width="3"/>';
-      tween(0.6, function (k) { g.setAttribute('opacity', f2(k)); });
+      var g = null;
+      if (c.flash) {
+        var w = Math.min(860, SH * 0.52 * 1.5), h = w / 1.5, x = (1000 - w) / 2, y = Math.max(20, (SH - h) * 0.32);
+        g = el('g', { opacity: 0, transform: 'translate(' + f2(x) + ',' + f2(y) + ')' }, $('sc-fly'));
+        g.innerHTML = '<rect x="-14" y="-14" width="' + f2(w + 28) + '" height="' + f2(h + 28) + '" rx="10" fill="#fffaf0"/>'
+          + '<g transform="scale(' + f2(w / 450) + ',' + f2(h / 300) + ')">' + sepiaify(c.flash()) + '</g>'
+          + '<rect x="0" y="0" width="' + f2(w) + '" height="' + f2(h) + '" fill="none" stroke="#c8b48c" stroke-width="3"/>';
+        tween(0.6, function (k) { g.setAttribute('opacity', f2(k)); });
+      }
       talk(chLines(c, c.lines.tell), function () {
-        removeLater(g, 0.5);
-        var give = chLines(c, c.lines.give);
-        talk(give.slice(0, 1), function () {
-          // a piece of Granny's map
-          flyThing(pieceArt(), handPoint(), toView(H.x, H.y - 60), stage.s * 0.8, stage.s * 1.6, 1.0, function () {
-            saved.pieces |= (1 << c.piece);
-            persist();
-            H.pop = 1;
-            SND.chime();
-            applyPlaceDev(true);
-            var after = give.slice(1);
-            if (c.reward) { applyReward(c.reward); after = after.concat(chLines(c, c.lines.reward)); }
-            after = after.concat(chLines(c, c.lines.mystery));
-            talk(after, function () {
-              advanceChapter();
-              var n = chapter();
-              if (n && saved.chState === 'find') {
-                // and the next of Granny's postcards, out of the satchel
-                var cw = Math.min(520, SH * 0.48 * 1.43), chh = cw * 0.7;
-                var cg = el('g', { opacity: 0, transform: 'translate(' + f2((1000 - cw) / 2) + ',' + f2(Math.max(16, (SH - chh) * 0.25)) + ')' }, $('sc-fly'));
-                cg.innerHTML = fadedCard(n, cw, chh);
-                tween(0.5, function (k) { cg.setAttribute('opacity', f2(k)); });
-                talk([{ who: 'hoot', text: 'Look! Another one of Granny’s old postcards!' }, { who: 'card', text: n.clue }], function () {
-                  removeLater(cg, 0.4);
-                  S.busy = false;
-                });
-              } else { S.busy = false; }
-            });
+        if (g) { removeLater(g, 0.5); }
+        var give = chLines(c, c.lines.give), after = give.slice(1);
+        function rest() {
+          applyPlaceDev(true);
+          if (c.reward) { applyReward(c.reward); after = after.concat(chLines(c, c.lines.reward)); }
+          after = after.concat(chLines(c, c.lines.mystery));
+          talk(after, function () {
+            advanceChapter();
+            if (c.final) { finaleStory(); return; }
+            nextChapterStory(c);
           });
+        }
+        talk(give.slice(0, 1), function () {
+          if (c.piece != null) {
+            // a piece of Granny's map
+            flyThing(pieceArt(), handPoint(), toView(H.x, H.y - 60), stage.s * 0.8, stage.s * 1.6, 1.0, function () {
+              saved.pieces |= (1 << c.piece);
+              persist();
+              H.pop = 1;
+              SND.chime();
+              rest();
+            });
+          } else if (c.gift) { giveToBag(c.gift, rest); }
+          else { rest(); }
         });
       });
     });
+  }
+  // What comes next: another of Granny's postcards out of the satchel, or
+  // her letter to look at again, or just where to go.
+  function nextChapterStory(prev) {
+    var n = chapter();
+    if (!n) { S.busy = false; return; }
+    if (saved.chState === 'find') {
+      var cw = Math.min(520, SH * 0.48 * 1.43), chh = cw * 0.7, isLetter = n.card === 'letter';
+      var cg = el('g', { opacity: 0, transform: 'translate(' + f2((1000 - cw) / 2) + ',' + f2(Math.max(16, (SH - chh) * 0.25)) + ')' }, $('sc-fly'));
+      cg.innerHTML = isLetter ? letterArt(cw, chh * 0.66) : fadedCard(n, cw, chh);
+      tween(0.5, function (k) { cg.setAttribute('opacity', f2(k)); });
+      var lines = isLetter ? [{ who: 'hoot', text: n.clue }] : [{ who: 'hoot', text: 'Look! Another one of Granny’s old postcards!' }, { who: 'card', text: n.clue }];
+      talk(lines, function () { removeLater(cg, 0.4); S.busy = false; });
+      return;
+    }
+    talk(chLines(prev, prev.lines.next), function () { S.busy = false; });
+  }
+  // Something goes into the satchel from a friend's hands. If it's full,
+  // the last ordinary thing in it goes back where it came from.
+  function giveToBag(item, done) {
+    var bag = saved.bag.slice();
+    function put() {
+      bag.push(item);
+      setBag(bag);
+      SND.ding();
+      flyThing(itemArt(item), handPoint(), slotPos(bag.length - 1), stage.s * 0.9, slotScale(), 0.8, function () {
+        layoutSceneHud();
+        S.hoot.pop = 1;
+        done();
+      });
+    }
+    if (bag.length < saved.cap) { put(); return; }
+    var i = bag.length - 1;
+    while (i >= 0 && ITEMS[bag[i]].keep) { i -= 1; }
+    if (i < 0) { put(); return; }
+    var gone = bag[i], at = slotPos(i);
+    bag.splice(i, 1);
+    setBag(bag);
+    flyThing(itemArt(gone), at, { x: at.x + 120, y: -80 }, slotScale(), slotScale() * 0.6, 0.6);
+    layoutSceneHud();
+    talk({ who: 'hoot', text: 'I’ll send ' + itemName(gone) + ' back home, to make room.' }, put);
+  }
+
+  // The end: the polar bear's answer has come. Granny's map, whole, with
+  // every friend on it, and a cheer.
+  function finaleStory() {
+    var p = S.place, A = S.animal, H = S.hoot;
+    var w = Math.min(880, SH * 0.6 * 2), h = w / 2, x = (1000 - w) / 2, y = Math.max(20, (SH - h) * 0.3);
+    var g = el('g', { opacity: 0, transform: 'translate(' + f2(x) + ',' + f2(y) + ')' }, $('sc-fly'));
+    var s = '<rect x="-14" y="-14" width="' + f2(w + 28) + '" height="' + f2(h + 28) + '" rx="10" fill="#fffaf0"/>' + grannyMapArt(w, h);
+    PLACES.forEach(function (q) {
+      if (q.home) { return; }
+      var mx = (q.lon + 180) / 360 * w, my = (90 - q.lat) / 180 * h;
+      s += '<g transform="translate(' + f2(mx) + ',' + f2(my + 10) + ') scale(' + f2(w / 1700) + ')">' + dayify(q.icon()) + '</g>';
+    });
+    var ax = (BYID.arctic.lon + 180) / 360 * w, ay = (90 - BYID.arctic.lat) / 180 * h, bx = (BYID.antarctica.lon + 180) / 360 * w, by = (90 - BYID.antarctica.lat) / 180 * h;
+    s += '<path d="M' + f2(ax) + ' ' + f2(ay) + ' Q' + f2(ax - w * 0.08) + ' ' + f2(h / 2) + ' ' + f2(bx) + ' ' + f2(by) + '" stroke="#d9434e" stroke-width="' + f2(Math.max(2, w * 0.004)) + '" stroke-dasharray="' + f2(w * 0.01) + ' ' + f2(w * 0.008) + '" fill="none"/>';
+    g.innerHTML = s;
+    tween(0.8, function (k) { g.setAttribute('opacity', f2(k)); });
+    setMode(A, 'joy');
+    H.pop = 1;
+    SND.sparkle();
+    var cols = ['#d9434e', '#f2c033', '#3a8ad8', '#5fb85a', '#ec5a8f'];
+    for (var i = 0; i < 40; i++) {
+      (function (k) { later(k * 0.04, function () { spawn({ kind: 'art', art: '<rect x="-4" y="-2.5" width="8" height="5" fill="' + cols[k % 5] + '"/>', x: 100 + Math.random() * 800, y: -20, vx: (Math.random() - 0.5) * 60, vy: 60 + Math.random() * 80, g: 40, life: 4, spin: 300, sway: 30 }); }); })(i);
+    }
+    talk([{ who: 'hoot', text: 'Granny’s map is whole again, and her letter got there at last.' },
+      { who: 'hoot', text: 'Thank you, everyone! Now the polar bears and the penguins can write to each other for ever.' },
+      { who: 'arctic', text: 'And you’ll carry our letters, won’t you, Hoot?' },
+      { who: 'hoot', text: 'Every one of them!' }], function () {
+      removeLater(g, 0.6);
+      S.busy = false;
+    });
+  }
+  // After the story: the polar bears always have a letter for the penguins,
+  // and the penguins always write back.
+  function postArrival() {
+    var p = S.place;
+    if (p.id !== 'arctic' || saved.bag.indexOf('letter') >= 0 || saved.bag.indexOf('reply') >= 0) { return; }
+    S.busy = true;
+    talk({ who: 'arctic', text: 'Hoot! Here’s another letter for the penguins. Will you take it?' }, function () {
+      giveToBag('letter', function () { S.busy = false; });
+    });
+  }
+  function postTakes(item) {
+    var p = S.place, A = S.animal;
+    setMode(A, 'joy');
+    SND.chime();
+    if (item === 'letter') {
+      talk({ who: p.id, text: 'Another letter from the polar bears! Wait there, Hoot, and we’ll write back.' }, function () {
+        giveToBag('reply', function () { S.busy = false; });
+      });
+    } else {
+      talk({ who: p.id, text: 'A letter from the penguins! Thank you, Hoot!' }, function () {
+        talk({ who: p.id, text: 'Here’s my next one for them.' }, function () { giveToBag('letter', function () { S.busy = false; }); });
+      });
+    }
   }
   // What a chapter teaches Hoot.
   function applyReward(r) {
@@ -6521,7 +6912,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
   }
   function advanceChapter() {
     saved.given = [];
-    if (CHAPTERS[saved.ch + 1]) { saved.ch += 1; saved.chState = 'find'; }
+    if (CHAPTERS[saved.ch + 1]) { saved.ch += 1; saved.chState = CHAPTERS[saved.ch].start || 'find'; }
     else { saved.chState = 'done'; }
     compareCount = 0;
     persist();
@@ -6969,14 +7360,16 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
         gw = side.w * 0.56; gh2 = gw * 0.7; gx = side.x; gy = side.y;
         lw = side.w * 0.36; lh = lw * 0.62; lx = side.x + side.w - lw; ly = side.y + 16;
       }
-      var art = goalArt(gw, gh2) || (saved.chState === 'done' ? cardStackArt(gw, gh2) : '');
+      var art = goalArt(gw, gh2) || (storyDone() ? cardArt(BYID.antarctica, gw, gh2, true) : '');
       if (art) {
         var gg = el('g', { 'data-hit': 'goal', transform: 'translate(' + f2(gx) + ',' + f2(gy) + ') rotate(-2 ' + f2(gw / 2) + ' ' + f2(gh2 / 2) + ')' }, bg);
         gg.innerHTML = art + pin(gw / 2, 4);
         S.home.goal = { g: gg, x: gx, y: gy, w: gw, h: gh2 };
       }
-      var lg2 = el('g', { 'data-hit': 'letter', transform: 'translate(' + f2(lx) + ',' + f2(ly) + ') rotate(3 ' + f2(lw / 2) + ' ' + f2(lh / 2) + ')' }, bg);
-      lg2.innerHTML = letterArt(lw, lh) + pin(lw / 2, 4);
+      if (letterHome() || storyDone()) {
+        var lg2 = el('g', { 'data-hit': 'letter', transform: 'translate(' + f2(lx) + ',' + f2(ly) + ') rotate(3 ' + f2(lw / 2) + ' ' + f2(lh / 2) + ')' }, bg);
+        lg2.innerHTML = (storyDone() ? replyArt(lw, lh) : letterArt(lw, lh)) + pin(lw / 2, 4);
+      }
     }
 
     // Hoot's perch and his lamp
@@ -7154,7 +7547,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     var w = Math.min(760, SH * 0.62 * 1.4), h = what === 'letter' ? w * 0.62 : w * 0.7;
     el('rect', { x: 0, y: 0, width: 1000, height: SH, fill: '#05081a', opacity: 0.55 }, z);
     var g = el('g', { transform: 'translate(' + f2((1000 - w) / 2) + ',' + f2((SH - h) / 2) + ') rotate(-2 ' + f2(w / 2) + ' ' + f2(h / 2) + ')' }, z);
-    g.innerHTML = what === 'letter' ? letterArt(w, h) : (goalArt(w, h) || cardStackArt(w, h));
+    g.innerHTML = what === 'letter' ? (storyDone() ? replyArt(w, h) : letterArt(w, h)) : (goalArt(w, h) || (storyDone() ? cardArt(BYID.antarctica, w, h, true) : cardStackArt(w, h)));
     S.zoomed = z;
     SND.rustle();
   }
@@ -7233,6 +7626,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
   }
   // What Hoot has worked out about the letter so far.
   function letterLines() {
+    if (storyDone()) { return [{ who: 'hoot', text: 'The penguins wrote to say thank you. It came all the way from the bottom of the world!' }]; }
     var out = [{ who: 'hoot', text: 'Granny’s letter. It’s still sealed, so I mustn’t open it.' }];
     var told = (saved.ch > 0 || saved.chState === 'done') ? Math.min(CHAPTERS.length, saved.ch + (saved.chState === 'done' ? 1 : 0)) : 0;
     for (var i = 0; i < told; i++) {
@@ -7245,6 +7639,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
   function mapLines() {
     var n = 0;
     for (var i = 0; i < 8; i++) { if (saved.pieces & (1 << i)) { n += 1; } }
+    if (n >= 8 && storyDone()) { return [{ who: 'hoot', text: 'Granny’s map is whole again, and her letter got there in the end.' }]; }
     if (n >= 8) { return [{ who: 'hoot', text: 'Granny’s map is whole again! Her journey ends in the cold sea, far in the south.' }]; }
     return [{ who: 'hoot', text: 'Granny’s old map. I’ve found ' + n + ' of the 8 pieces.' }];
   }
