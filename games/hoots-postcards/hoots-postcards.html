@@ -29,6 +29,26 @@
   .nl { opacity: var(--n, 0); }
   .dl { opacity: var(--d, 1); }
   .hit { fill: transparent; }
+  /* Dialogue boxes, like the old Pokémon games. */
+  #dlgcatch { position: fixed; left: 0; top: 0; right: 0; bottom: 0; z-index: 19; }
+  #dlg {
+    position: fixed; left: 50%; bottom: max(14px, env(safe-area-inset-bottom)); transform: translateX(-50%);
+    width: min(94vw, 780px); z-index: 20; box-sizing: border-box;
+    display: flex; align-items: center; gap: 14px; padding: 14px 18px 16px;
+    background: #fffaf0; color: #2e2840; border: 4px solid #3b3350; border-radius: 20px;
+    box-shadow: 0 0 0 4px #fffaf0, 0 8px 0 4px rgba(0, 0, 0, 0.28);
+    font-family: ui-rounded, "Arial Rounded MT Bold", "Comic Sans MS", system-ui, sans-serif;
+    font-size: clamp(19px, 4.6vw, 28px); line-height: 1.3; cursor: pointer;
+  }
+  #dlg[hidden], #dlgcatch[hidden] { display: none; }
+  #dlg-face { flex: none; width: clamp(58px, 13vw, 88px); height: clamp(58px, 13vw, 88px); border-radius: 14px; background: #e3eef8; overflow: hidden; }
+  #dlg-face svg { width: 100%; height: 100%; display: block; }
+  #dlg-body { flex: 1; min-width: 0; }
+  #dlg-name { font-size: 0.68em; font-weight: 800; color: #8a5a32; }
+  #dlg-text { font-weight: 700; min-height: 2.6em; }
+  #dlg-more { flex: none; align-self: flex-end; font-size: 0.8em; color: #d9434e; visibility: hidden; animation: dlgbob 0.8s ease-in-out infinite; }
+  @keyframes dlgbob { 50% { transform: translateY(4px); } }
+  @media (prefers-reduced-motion: reduce) { #dlg-more { animation: none; } }
 </style>
 </head>
 <body>
@@ -180,6 +200,13 @@
   <g id="sc-fly"></g>
 </svg>
 
+<div id="dlgcatch" hidden></div>
+<div id="dlg" hidden>
+  <div id="dlg-face"></div>
+  <div id="dlg-body"><div id="dlg-name"></div><div id="dlg-text"></div></div>
+  <div id="dlg-more">&#9660;</div>
+</div>
+
 <script>
 // Natural Earth 1:110m countries (public domain), via world-atlas@2.0.2,
 // quantised to 0.1 degree. a: arcs; c: each country's polygons as arc
@@ -274,7 +301,7 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
     return {
       v: {}, miles: 0, here: 'leeds',
       puff: 5, cap: 2, bag: [], seen: {}, held: {},
-      prologue: false, ch: 0, chState: 'find',
+      prologue: false, ch: 0, chState: 'find', given: [], stars: false,
       dev: {}, routes: [], pieces: 0
     };
   }
@@ -303,7 +330,9 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
     saved.seen = obj(o.seen); saved.held = obj(o.held); saved.dev = obj(o.dev);
     saved.prologue = o.prologue === true;
     saved.ch = int(o.ch, 0, 99, 0);
-    saved.chState = (o.chState === 'need' || o.chState === 'done') ? o.chState : 'find';
+    saved.chState = (['need', 'done', 'letter', 'reply', 'post'].indexOf(o.chState) >= 0) ? o.chState : 'find';
+    saved.given = strs(o.given);
+    saved.stars = o.stars === true;
     saved.routes = strs(o.routes);
     saved.pieces = int(o.pieces, 0, 255, 0);
   })();
@@ -615,87 +644,155 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
   }
 
   // ------------------------------------------------------------------
-  // Speech. Every hello is said by the browser's own voice in its own
-  // language where the device has one; failing that an English voice
-  // reads it as it sounds; failing that it is a chime, so a hello is
-  // never silent. On a phone nothing speaks until a finger has touched
-  // the screen, so the first touch spends a silent utterance.
+  // Hellos. Where a real recording of a place's hello exists it sits in
+  // sounds/ beside this file and is played as an ordinary clip, the way
+  // Post a Letter plays its letters. The device's own synthetic voice was
+  // tried and dropped: it was more annoying than useful. Any clip that
+  // won't load or play falls through to a chime; places without one
+  // have only the animal's own call, and the hello written in its bubble.
   // ------------------------------------------------------------------
-  var SS = null;
-  try { SS = window.speechSynthesis || null; } catch (e) { SS = null; }
-  var voices = [], speechWarm = false;
-  function loadVoices() {
-    if (!SS) { return; }
-    try { voices = SS.getVoices() || []; } catch (e) { voices = []; }
-  }
-  if (SS) {
-    loadVoices();
-    try {
-      if (SS.addEventListener) { SS.addEventListener('voiceschanged', loadVoices); }
-      else { SS.onvoiceschanged = loadVoices; }
-    } catch (e) { /* the list we have will do */ }
-  }
-  function normLang(l) { return String(l || '').replace('_', '-').toLowerCase(); }
-  function findVoice(lang) {
-    if (!voices.length) { loadVoices(); }
-    var want = normLang(lang), base = want.split('-')[0], best = null, i, v;
-    for (i = 0; i < voices.length; i++) {
-      v = voices[i];
-      if (normLang(v.lang) === want && (!best || v.localService)) { best = v; }
+  var HELLO_CLIPS = [];
+  var CLIPS = {}, clipsUnlocked = false, speaking = null;
+  function clipFor(id) {
+    var a = CLIPS[id];
+    if (!a) {
+      a = new window.Audio('sounds/' + id + '.mp3');
+      a.preload = 'auto';
+      a.addEventListener('error', function () { a.broken = true; });
+      CLIPS[id] = a;
     }
-    if (best) { return best; }
-    for (i = 0; i < voices.length; i++) {
-      v = voices[i];
-      if (normLang(v.lang).split('-')[0] === base) { return v; }
-    }
-    return null;
+    return a;
   }
-  function warmSpeech() {
-    if (!SS || speechWarm || !window.SpeechSynthesisUtterance) { return; }
-    speechWarm = true;
-    try {
-      var u = new window.SpeechSynthesisUtterance(' ');
-      u.volume = 0;
-      SS.speak(u);
-    } catch (e) { /* nothing lost */ }
+  // A phone won't play a sound no finger asked for, and a hello comes when
+  // Hoot lands, not when anything's tapped. So on the very first touch
+  // every clip is started and stopped again, muted, which buys the right
+  // to play it later.
+  function unlockClips() {
+    if (clipsUnlocked) { return; }
+    clipsUnlocked = true;
+    HELLO_CLIPS.forEach(function (id) {
+      var a = clipFor(id), p;
+      a.muted = true;
+      try { p = a.play(); } catch (e) { a.muted = false; return; }
+      if (p && p.then) {
+        p.then(function () {
+          a.pause();
+          try { a.currentTime = 0; } catch (e1) { /* not loaded yet */ }
+          a.muted = false;
+        }, function () { a.muted = false; });
+      } else { a.pause(); a.muted = false; }
+    });
   }
-  function utter(text, voice, lang, rate, pitch) {
-    var u = new window.SpeechSynthesisUtterance(text);
-    if (voice) { u.voice = voice; }
-    u.lang = lang; u.rate = rate; u.pitch = pitch; u.volume = 1;
-    u.onerror = function (e) {
-      if (!e || (e.error !== 'interrupted' && e.error !== 'canceled')) { SND.chime(); }
+  // Plays a place's hello, if it has a recording, and says roughly how
+  // long it will take.
+  function playHello(p) {
+    if (HELLO_CLIPS.indexOf(p.id) < 0) { return 0; }
+    var a = clipFor(p.id);
+    if (a.broken) { SND.chime(); return 1; }
+    if (speaking && speaking !== a) { try { speaking.pause(); speaking.currentTime = 0; } catch (e) { /* fine */ } }
+    speaking = a;
+    try { a.currentTime = 0; } catch (e1) { /* from wherever it is */ }
+    var pr;
+    try { pr = a.play(); } catch (e2) { SND.chime(); return 1; }
+    if (pr && pr['catch']) { pr['catch'](function () { SND.chime(); }); }
+    return (isFinite(a.duration) && a.duration > 0) ? a.duration : 1.2;
+  }
+  function hushHello() {
+    if (speaking) { try { speaking.pause(); } catch (e) { /* fine */ } speaking = null; }
+  }
+
+  // ------------------------------------------------------------------
+  // Dialogue boxes, like the old Pokémon and Final Fantasy games: who's
+  // talking, their face, and what they say typed out a letter at a time
+  // with a little blip for a voice. A tap finishes the line; the next tap
+  // moves on. Story moments wait for them to be read.
+  // ------------------------------------------------------------------
+  var dlg = {
+    box: $('dlg'), catcher: $('dlgcatch'), face: $('dlg-face'), name: $('dlg-name'), text: $('dlg-text'), more: $('dlg-more'),
+    q: [], cur: null, shown: 0, since: 0, blip: 0
+  };
+  // lines: one or a list of { who, text }. who is 'hoot', 'granny', 'card',
+  // or a place's id for the animal that lives there.
+  function talk(lines, done) {
+    lines = [].concat(lines).filter(function (l) { return l && l.text; });
+    if (!lines.length) { if (done) { done(); } return; }
+    lines.forEach(function (l, i) { dlg.q.push({ who: l.who, text: l.text, done: i === lines.length - 1 ? done : null }); });
+    if (!dlg.cur) { nextLine(); }
+  }
+  function talking() { return !!dlg.cur; }
+  function speakerOf(who) {
+    var SPK = {
+      hoot: { name: 'Hoot', art: hootArt(), box: '-36 -70 72 72', pitch: 560 },
+      granny: { name: 'Granny Hoot', art: grannyArt(), box: '-36 -74 72 76', pitch: 430 },
+      card: { name: 'Granny’s postcard', art: '<rect x="-30" y="-22" width="60" height="42" rx="4" fill="#eadcbc" stroke="#b89c6c" stroke-width="2"/><path d="M-22 -10 q6 -4 12 0 t12 0 t12 0 M-22 0 q6 -4 12 0 t12 0 M-22 10 q6 -4 12 0 t12 0 t12 0" stroke="#8a7650" stroke-width="2" fill="none"/>', box: '-36 -36 72 72', pitch: 0 }
     };
-    SS.speak(u);
+    if (SPK[who]) { return SPK[who]; }
+    var p = BYID[who];
+    if (!p || !p.animal) { return SPK.hoot; }
+    var hb = p.animal.hit;
+    return { name: p.animal.name || p.name, art: dayify(p.animal.art()), box: hb.join(' '), pitch: 220 + ((p.hello && p.hello.pitch) || 1) * 260 };
   }
-  // Says the place's hello and returns roughly how long that takes.
-  function sayHello(p, sleepy) {
-    var h = p.hello;
-    if (!h) { return 0; }
-    var parts = h.parts || [{ text: h.native || h.t, lang: h.lang, say: h.say || h.t, alt: h.alt }];
-    var rate = sleepy ? 0.72 : 0.88;
-    var pitch = clamp((h.pitch || 1) - (sleepy ? 0.15 : 0), 0.1, 2);
-    if (!SS || !window.SpeechSynthesisUtterance) { SND.chime(); return 1.1; }
-    if (!voices.length) { loadVoices(); }
-    if (!voices.length) { SND.chime(); return 1.1; }
-    var dur = 0;
-    try {
-      SS.cancel();
-      parts.forEach(function (q) {
-        var v = findVoice(q.lang) || (q.alt ? findVoice(q.alt) : null);
-        if (v) {
-          utter(q.text, v, v.lang || q.lang, rate, pitch);
-          dur += 0.6 + q.text.length * 0.09;
-        } else {
-          var en = findVoice('en-GB') || findVoice('en');
-          var say = q.say || q.text;
-          if (en) { utter(say, en, en.lang || 'en-GB', rate, pitch); dur += 0.6 + say.length * 0.08; }
-          else { SND.chime(); dur += 1; }
+  function nextLine() {
+    var l = dlg.q.shift();
+    dlg.cur = l || null;
+    if (!l) {
+      dlg.box.hidden = true;
+      dlg.catcher.hidden = true;
+      return;
+    }
+    var sp = speakerOf(l.who);
+    l.pitch = sp.pitch;
+    dlg.face.innerHTML = '<svg viewBox="' + sp.box + '" preserveAspectRatio="xMidYMid meet" aria-hidden="true">' + sp.art + '</svg>';
+    dlg.name.textContent = sp.name;
+    dlg.text.textContent = '';
+    dlg.more.style.visibility = 'hidden';
+    dlg.shown = reduced ? l.text.length : 0;
+    dlg.since = 0;
+    dlg.box.hidden = false;
+    dlg.catcher.hidden = false;
+    // an animal's mouth moves while it talks
+    if (S && S.animal && l.who === S.place.id) { S.animal.talk = l.text.length / 38; }
+    if (S && S.hoot && l.who === 'hoot') { S.hoot.hootT = Math.min(1.5, l.text.length / 38); }
+  }
+  function dlgFrame(dt) {
+    var l = dlg.cur;
+    if (!l) { return; }
+    var n = l.text.length;
+    if (dlg.shown < n) {
+      var before = Math.floor(dlg.shown);
+      dlg.shown = Math.min(n, dlg.shown + dt * 38);
+      var after = Math.floor(dlg.shown);
+      if (after !== before) {
+        dlg.text.textContent = l.text.slice(0, after);
+        // a blip every few letters, in the speaker's own pitch
+        dlg.blip += after - before;
+        if (dlg.blip >= 3 && l.pitch && AC) {
+          dlg.blip = 0;
+          if (/\w/.test(l.text.charAt(after - 1))) {
+            tone({ f: l.pitch * (0.92 + Math.random() * 0.16), d: 0.05, type: 'triangle', g: 0.035, a: 0.004, s: 0 });
+          }
         }
-      });
-    } catch (e) { SND.chime(); return 1.1; }
-    return dur / rate * 0.9;
+      }
+    } else {
+      dlg.text.textContent = l.text;
+      dlg.since += dt;
+      dlg.more.style.visibility = 'visible';
+    }
   }
+  function dlgTap(e) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    unlock();
+    var l = dlg.cur;
+    if (!l) { return; }
+    if (dlg.shown < l.text.length) { dlg.shown = l.text.length; dlg.text.textContent = l.text; return; }
+    // a moment to read before a bashed tap skips it
+    if (dlg.since < 0.35) { return; }
+    var done = l.done;
+    nextLine();
+    if (done) { done(); }
+  }
+  dlg.box.addEventListener('pointerdown', dlgTap);
+  dlg.catcher.addEventListener('pointerdown', dlgTap);
 
   // ------------------------------------------------------------------
   // The world map: Natural Earth's 1:110m countries, public domain, baked
@@ -3205,27 +3302,70 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
     canada: [458, 562], arctic: [452, 562]
   };
 
+  // What things are called in a sentence.
+  var NAMES = {
+    wool: 'wool', cotton: 'cotton', bamboo: 'bamboo', kiwifruit: 'kiwi fruit', paper: 'paper', tea: 'tea', cocoa: 'cocoa beans',
+    maple: 'maple syrup', honey: 'honey', ice: 'ice', fish: 'fish', corn: 'corn', panpipes: 'panpipes',
+    jumper: 'a jumper', towel: 'a towel', umbrella: 'an umbrella', cake: 'a cake'
+  };
+  var VERBS = { jumper: 'knit', towel: 'weave', umbrella: 'make', cake: 'bake' };
+
+  // Each friend's name, and the things it likes to tell you about its
+  // home when it's tapped, written for a seven-year-old to read.
+  var ANIMAL_NAMES = {
+    kenya: 'Giraffe', egypt: 'Camel', india: 'Elephant', china: 'Panda', japan: 'Snow monkey', australia: 'Kangaroo',
+    nz: 'Kiwi', antarctica: 'Penguin', brazil: 'Toucan', peru: 'Llama', usa: 'Eagle', canada: 'Moose', arctic: 'Polar bear', france: 'Cockerel'
+  };
+  var FACTS = {
+    kenya: ['My tongue is as long as your arm! It helps me reach the leaves at the top of the trees.', 'Giraffes only sleep for a few minutes at a time. We often sleep standing up!'],
+    egypt: ['My hump is full of fat, not water. It keeps me going for days in the desert.', 'The pyramids were built more than four thousand years ago!'],
+    india: ['The Taj Mahal is made of white marble. It glows pink at sunrise!', 'Elephants can hear each other through their feet, from miles away.'],
+    china: ['Pandas eat bamboo for about twelve hours every day!', 'The Great Wall of China is thousands of miles long.'],
+    japan: ['Snow monkeys bathe in hot springs to keep warm in winter.', 'Mount Fuji is a volcano. It has snow on top for most of the year.'],
+    australia: ['Baby kangaroos are called joeys. Mine lives in my pouch!', 'Uluru is a giant red rock in the middle of Australia.'],
+    nz: ['Kiwis can’t fly. We come out at night to sniff for worms.', 'There are more sheep in New Zealand than people!'],
+    antarctica: ['Antarctica is the coldest place on Earth. It’s covered in ice!', 'Penguins can’t fly, but we can swim very fast.'],
+    brazil: ['My beak looks heavy, but it’s very light, like a sponge inside.', 'The Amazon is the biggest rainforest in the world. It rains here nearly every day!'],
+    peru: ['Llamas hum when they’re happy. Mmmmm!', 'Machu Picchu was built high in the mountains, more than five hundred years ago.'],
+    usa: ['The Grand Canyon was carved by a river, over millions of years.', 'Eagles can spot a rabbit from more than a mile away!'],
+    canada: ['Moose are great swimmers. We love lakes!', 'Maple syrup is made from the sap of maple trees.'],
+    arctic: ['In winter the sun doesn’t come up here for months!', 'Polar bears have black skin under our white fur. It soaks up the sunshine.'],
+    france: ['The Eiffel Tower sparkles with lights every night!', 'Cockerels crow in the morning. In France we say cocorico!']
+  };
+  function itemName(k) { return NAMES[k] || k; }
+  function andList(a) { return a.length < 2 ? (a[0] || '') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1]; }
+  function wrapText(str, n) {
+    var out = [], cur = '';
+    str.split(' ').forEach(function (w) {
+      if (cur && (cur + ' ' + w).length > n) { out.push(cur); cur = w; } else { cur = cur ? cur + ' ' + w : w; }
+    });
+    if (cur) { out.push(cur); }
+    return out;
+  }
+
   // ------------------------------------------------------------------
   // The story: Granny Hoot's satchel. Each chapter starts with one of her
-  // faded postcards, of which only a torn scrap of picture survives.
-  // Finding the place restores it; the friend there needs help; helping
-  // brings back a piece of the story and a piece of Granny's map. Granny's
-  // map is in eight strips of longitude, 45 degrees each, the first
-  // centred on 0 so that home is on the strip that's already there.
+  // old postcards: a faded picture and a line in her handwriting. Finding
+  // the place brings the card back to life; the friend there needs help;
+  // helping brings back a piece of the story and a piece of Granny's map.
+  // Her map is in eight strips of 45 degrees of longitude, the first from
+  // 160°W, so that home is on the strip that's already there.
+  // Each chapter's lines are [who, text], where 'a' is its animal.
   // ------------------------------------------------------------------
-  var HOME_PIECE = 3;
+  var HOME_PIECE = 3, STRIP0 = -160;
   var CHAPTERS = [
     {
-      place: 'japan', need: 'towel', piece: 6,
-      tear: [[0, 0], [1, 0], [1, 0.46], [0.84, 0.53], [0.62, 0.44], [0.4, 0.56], [0.18, 0.47], [0, 0.54]],
-      say: {
-        match: 'This is it! Granny was here!',
-        knows: 'The monkey knows Granny’s satchel!',
-        ask: 'Brrr. The monkey is so cold after the hot spring.',
-        tell: 'Long ago, Granny was caught in a snowstorm here. The monkey’s grandma kept her warm in the hot spring.',
-        piece: 'A piece of Granny’s map!',
-        next: 'I wonder where Granny went next…'
+      place: 'japan', need: ['towel'], piece: 6, mood: 'cold',
+      clue: 'Dear Hoot, the monkeys here have hot baths in the snow, under a mountain with a white top! Love, Granny',
+      lines: {
+        match: [['hoot', 'This is it! This is where Granny’s postcard came from!'], ['a', 'Is that Granny Hoot’s old satchel? My grandma knew her!']],
+        ask: [['a', 'Brrr! I get so cold when I climb out of the hot spring. I wish I had a towel.']],
+        thanks: [['a', 'A towel! It’s so soft. Thank you, Hoot!']],
+        tell: [['a', 'Long ago, Granny got caught in a snowstorm here. My grandma kept her warm in the hot spring until it stopped.']],
+        give: [['a', 'Granny gave my grandma this to keep safe. I think it should be yours now.'], ['hoot', 'A piece of Granny’s map!']],
+        mystery: [['a', 'Granny said she was carrying a very special letter, to somewhere very far away.']]
       },
+      clueLetter: 'Granny told the snow monkey’s grandma the letter was very special, and going somewhere very far away.',
       flash: function () {
         var monkey = BYID.japan.animal.art();
         return '<rect width="450" height="300" fill="#e9dcc0"/>'
@@ -3242,27 +3382,14 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
     }
   ];
   function chapter() { return CHAPTERS[saved.ch] || null; }
+  function chLines(c, list) { return (list || []).map(function (l) { return { who: l[0] === 'a' ? c.place : l[0], text: l[1] }; }); }
+  // What the chapter's friend still needs, if this is its place.
   function needAt(id) {
     var c = chapter();
-    return (c && saved.prologue && saved.chState === 'need' && c.place === id) ? c.need : null;
-  }
-
-  // Hoot says a line at the story's moments, in the device's own English
-  // voice. The pictures tell the story too, so a device with no voice
-  // loses nothing that matters; the pause is kept either way.
-  function narrate(text) {
-    if (!text) { return 0; }
-    var d = 0.8 + text.length * 0.062;
-    if (!SS || !window.SpeechSynthesisUtterance) { return d; }
-    if (!voices.length) { loadVoices(); }
-    var v = findVoice('en-GB') || findVoice('en');
-    if (!v) { return d; }
-    try {
-      var u = new window.SpeechSynthesisUtterance(text);
-      u.voice = v; u.lang = v.lang || 'en-GB'; u.rate = 0.95; u.pitch = 1.3; u.volume = 1;
-      SS.speak(u);
-    } catch (e) { /* the pictures carry it */ }
-    return d;
+    if (!c || !saved.prologue || saved.chState !== 'need' || c.place !== id) { return null; }
+    var given = saved.given || [];
+    var left = c.need.filter(function (k) { return given.indexOf(k) < 0; });
+    return left.length ? left : null;
   }
 
   // Old things are drawn in sepia, from the same art.
@@ -3281,27 +3408,39 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
       + '<circle cx="6" cy="-53" r="3" fill="#f2c033"/>';
   }
 
-  // One of Granny's postcards, faded, with only a torn scrap of picture.
-  var clipUid = 0;
+  // One of Granny's postcards: whole, but faded to sepia with age, the
+  // picture on the left and her clue in her own handwriting on the right.
+  // Small, the writing is just squiggles; big enough, it can be read.
+  var HAND = '&quot;Segoe Print&quot;, &quot;Bradley Hand&quot;, &quot;Comic Sans MS&quot;, cursive';
   function fadedCard(c, w, h) {
-    var p = BYID[c.place], id = 'fc' + (++clipUid), pad = w * 0.06, pw = w - pad * 2, ph = h - pad * 2;
-    var tear = c.tear.map(function (q) { return f2(pad + q[0] * pw) + ' ' + f2(pad + q[1] * ph); }).join(' L');
-    var k = ph * 1.05 / 64, sw = f2(Math.max(1, w * 0.012));
-    var s = '<defs><clipPath id="' + id + '"><path d="M' + tear + ' Z"/></clipPath></defs>';
-    s += '<rect width="' + f2(w) + '" height="' + f2(h) + '" rx="' + f2(w * 0.04) + '" fill="#eadcbc" stroke="#c8b48c" stroke-width="' + sw + '"/>';
-    s += '<g clip-path="url(#' + id + ')"><rect x="' + f2(pad) + '" y="' + f2(pad) + '" width="' + f2(pw) + '" height="' + f2(ph) + '" fill="#d6c39c"/>';
-    s += '<g transform="translate(' + f2(pad + pw / 2) + ',' + f2(pad + ph * 0.98) + ') scale(' + f2(k) + ')">' + sepiaify(p.icon()) + '</g></g>';
-    s += '<path d="M' + tear + '" fill="none" stroke="#b89c6c" stroke-width="' + sw + '" stroke-dasharray="' + f2(w * 0.02) + ' ' + f2(w * 0.012) + '"/>';
-    // foxing, and a few lines of Granny's handwriting nobody can read now
-    s += '<circle cx="' + f2(w * 0.82) + '" cy="' + f2(h * 0.8) + '" r="' + f2(w * 0.03) + '" fill="#c8a870" opacity="0.4"/>';
-    s += '<circle cx="' + f2(w * 0.16) + '" cy="' + f2(h * 0.86) + '" r="' + f2(w * 0.02) + '" fill="#c8a870" opacity="0.35"/>';
-    var hw = '';
-    for (var i = 0; i < 2; i++) {
-      var y = h * (0.7 + i * 0.12), x = w * 0.2;
-      hw += 'M' + f2(x) + ' ' + f2(y);
-      for (var j = 0; j < 6; j++) { hw += ' q' + f2(w * 0.04) + ' ' + f2(-h * 0.06) + ' ' + f2(w * 0.08) + ' 0 q' + f2(w * 0.02) + ' ' + f2(h * 0.04) + ' ' + f2(w * 0.03) + ' 0'; }
+    var p = BYID[c.place], pad = w * 0.045, picW = w * 0.52, pw = picW - pad, ph = h - pad * 2, sw = f2(Math.max(1, w * 0.01));
+    var s = '<rect width="' + f2(w) + '" height="' + f2(h) + '" rx="' + f2(w * 0.035) + '" fill="#eadcbc" stroke="#c8b48c" stroke-width="' + sw + '"/>';
+    s += '<rect x="' + f2(pad) + '" y="' + f2(pad) + '" width="' + f2(pw) + '" height="' + f2(ph * 0.7) + '" fill="#dccba6"/>';
+    s += '<rect x="' + f2(pad) + '" y="' + f2(pad + ph * 0.7) + '" width="' + f2(pw) + '" height="' + f2(ph * 0.3) + '" fill="#c9b48b"/>';
+    s += '<g transform="translate(' + f2(pad + pw / 2) + ',' + f2(pad + ph * 0.93) + ') scale(' + f2(ph * 0.74 / 64) + ')">' + sepiaify(p.icon()) + '</g>';
+    // washed out with age, with a brown stain in one corner
+    s += '<rect x="' + f2(pad) + '" y="' + f2(pad) + '" width="' + f2(pw) + '" height="' + f2(ph) + '" fill="#f2e6cc" opacity="0.28"/>';
+    s += '<circle cx="' + f2(pad + pw * 0.86) + '" cy="' + f2(pad + ph * 0.16) + '" r="' + f2(w * 0.05) + '" fill="#b89058" opacity="0.18"/>';
+    s += '<rect x="' + f2(pad) + '" y="' + f2(pad) + '" width="' + f2(pw) + '" height="' + f2(ph) + '" fill="none" stroke="#b89c6c" stroke-width="' + sw + '"/>';
+    var rx = picW + pad * 0.7, rw = w - rx - pad;
+    // an old stamp, and its postmark
+    var stw = rw * 0.3, sth = stw * 1.2, stx = w - pad - stw;
+    s += '<rect x="' + f2(stx) + '" y="' + f2(pad) + '" width="' + f2(stw) + '" height="' + f2(sth) + '" fill="#e2d2ae" stroke="#a88c5c" stroke-width="' + sw + '" stroke-dasharray="' + f2(stw * 0.08) + ' ' + f2(stw * 0.05) + '"/>';
+    s += '<circle cx="' + f2(stx - stw * 0.1) + '" cy="' + f2(pad + sth * 0.8) + '" r="' + f2(stw * 0.45) + '" fill="none" stroke="#9a7a50" stroke-width="' + sw + '" opacity="0.6"/>';
+    if (w >= 260) {
+      var fs = Math.min(h * 0.072, rw * 0.088), lines2 = wrapText(c.clue, Math.max(10, Math.floor(rw / (fs * 0.5))));
+      lines2.forEach(function (ln, i) {
+        s += '<text x="' + f2(rx) + '" y="' + f2(pad + sth + fs * (1.3 + i * 1.22)) + '" font-size="' + f2(fs) + '" fill="#5e4628" style="font-family:' + HAND + ';font-weight:400">' + ln + '</text>';
+      });
+    } else {
+      var hw = '';
+      for (var i = 0; i < 4; i++) {
+        var y = pad + sth + h * (0.12 + i * 0.13), x = rx;
+        hw += 'M' + f2(x) + ' ' + f2(y);
+        for (var j = 0; j < 4; j++) { hw += ' q' + f2(rw * 0.06) + ' ' + f2(-h * 0.05) + ' ' + f2(rw * 0.12) + ' 0 q' + f2(rw * 0.04) + ' ' + f2(h * 0.03) + ' ' + f2(rw * 0.08) + ' 0'; }
+      }
+      s += '<path d="' + hw + '" stroke="#7a6240" stroke-width="' + f2(Math.max(1, w * 0.01)) + '" fill="none" opacity="0.75"/>';
     }
-    s += '<path d="' + hw + '" stroke="#9a8460" stroke-width="' + f2(Math.max(1, w * 0.008)) + '" fill="none" opacity="0.6"/>';
     return s;
   }
 
@@ -3381,10 +3520,19 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
       + '<path d="M-14 -16 q10 6 20 -2 M-18 8 q12 -6 26 4" stroke="#9a7a4a" stroke-width="2.5" fill="none"/>';
   }
 
-  // A feather of puff.
+  // A feather of puff: a curved quill feather, shaded down one side, with
+  // two splits in its vane and the quill showing at the bottom. A dashed
+  // outline is a feather he would need but hasn't got.
   function featherArt(fill, stroke, dash) {
-    return '<path d="M0 0 Q-7 -15 0 -32 Q7 -15 0 0 Z" fill="' + fill + '" stroke="' + stroke + '" stroke-width="1.6"' + (dash ? ' stroke-dasharray="3 2"' : '') + '/>'
-      + (dash ? '' : '<path d="M0 -2 V-28" stroke="' + stroke + '" stroke-width="1.2"/>');
+    var vane = 'M0 -3 C-11 -9 -11 -27 9 -35 C11 -24 9 -11 2 -4 Z';
+    if (dash) {
+      return '<path d="' + vane + '" fill="none" stroke="' + stroke + '" stroke-width="1.6" stroke-dasharray="3 2"/>'
+        + '<path d="M-1 6 Q0 1 0 -3" stroke="' + stroke + '" stroke-width="1.6" fill="none" stroke-linecap="round"/>';
+    }
+    return '<path d="' + vane + '" fill="' + fill + '" stroke="' + stroke + '" stroke-width="1.3" stroke-linejoin="round"/>'
+      + '<path d="M2 -4 Q4 -18 9 -35 C11 -24 9 -11 2 -4 Z" fill="' + stroke + '" opacity="0.3"/>'
+      + '<path d="M-7.3 -14.5 L-3.3 -12.5 M-3.8 -25.7 L-0.4 -23.2" stroke="' + stroke + '" stroke-width="1.4" stroke-linecap="round"/>'
+      + '<path d="M-1 6 Q2 -14 9 -35" stroke="' + stroke + '" stroke-width="1.7" fill="none" stroke-linecap="round"/>';
   }
 
   // The land, traced onto a flat canvas: for Granny's map, and for
@@ -3460,7 +3608,7 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
     function Y(lat) { return (90 - lat) / 180 * h; }
     for (var i = 0; i < 8; i++) {
       if (saved.pieces & (1 << i)) { continue; }
-      var lon0 = -157.5 + i * 45, spans = lon0 + 45 > 180 ? [[lon0, 180], [-180, lon0 + 45 - 360]] : [[lon0, lon0 + 45]];
+      var lon0 = STRIP0 + i * 45, spans = lon0 + 45 > 180 ? [[lon0, 180], [-180, lon0 + 45 - 360]] : [[lon0, lon0 + 45]];
       spans.forEach(function (sp) {
         var x0 = Math.max(0, X(sp[0])), x1 = Math.min(w, X(sp[1]));
         if (x1 <= x0) { return; }
@@ -3623,16 +3771,27 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
   var hud = { g: $('ovhud'), slots: [], feathers: null, goal: null };
   var SLOT_PX = 58;
 
+  // Hoot's satchel: brown leather, a strap, a flap with a brass buckle,
+  // and a stitched pocket for each thing it can carry, with whatever is in
+  // a pocket peeking out of the top. Pockets are centred where the slots'
+  // tap targets are.
   function bagArt(cap, slot, items, gap) {
-    var w = cap * (slot + gap) + gap, h = slot + gap * 2;
-    var s = '<rect x="0" y="-6" width="' + f2(w) + '" height="' + f2(h + 6) + '" rx="' + f2(slot * 0.3) + '" fill="#8a5a32"/>'
-      + '<rect x="0" y="-6" width="' + f2(w) + '" height="' + f2(slot * 0.3) + '" rx="' + f2(slot * 0.15) + '" fill="#a06a3a"/>'
-      + '<circle cx="' + f2(w / 2) + '" cy="' + f2(slot * 0.16 - 6) + '" r="' + f2(slot * 0.08) + '" fill="#f2c033"/>';
+    var w = cap * (slot + gap) + gap, h = slot + gap * 2, sw = f2(Math.max(1.5, slot * 0.035));
+    var top = -slot * 0.34, bot = h + slot * 0.08;
+    var s = '<path d="M' + f2(w * 0.12) + ' ' + f2(top + 4) + ' Q' + f2(w / 2) + ' ' + f2(top - slot * 0.95) + ' ' + f2(w * 0.88) + ' ' + f2(top + 4) + '" stroke="#6b4022" stroke-width="' + f2(slot * 0.12) + '" fill="none" stroke-linecap="round"/>'
+      + '<rect x="' + f2(-slot * 0.1) + '" y="' + f2(top) + '" width="' + f2(w + slot * 0.2) + '" height="' + f2(bot - top) + '" rx="' + f2(slot * 0.22) + '" fill="#8a5a32"/>'
+      + '<rect x="' + f2(-slot * 0.1 + 4) + '" y="' + f2(top + 4) + '" width="' + f2(w + slot * 0.2 - 8) + '" height="' + f2(bot - top - 8) + '" rx="' + f2(slot * 0.18) + '" fill="none" stroke="#c89060" stroke-width="' + sw + '" stroke-dasharray="5 4" opacity="0.7"/>';
     for (var i = 0; i < cap; i++) {
       var cx = gap + slot / 2 + i * (slot + gap), cy = gap + slot / 2;
-      s += '<circle cx="' + f2(cx) + '" cy="' + f2(cy) + '" r="' + f2(slot / 2) + '" fill="#f6ead2"' + (items[i] ? '' : ' stroke="#c8a878" stroke-width="2" stroke-dasharray="4 4"') + '/>';
-      if (items[i]) { s += '<g transform="translate(' + f2(cx) + ',' + f2(cy + slot * 0.33) + ') scale(' + f2(slot * 0.66 / 64) + ')">' + itemArt(items[i]) + '</g>'; }
+      var py = cy - slot * 0.08, ph = slot * 0.62;
+      // the thing in this pocket, poking out of the top
+      if (items[i]) { s += '<g transform="translate(' + f2(cx) + ',' + f2(cy + slot * 0.12) + ') scale(' + f2(slot * 0.72 / 64) + ')">' + itemArt(items[i]) + '</g>'; }
+      s += '<path d="M' + f2(cx - slot * 0.46) + ' ' + f2(py) + ' H' + f2(cx + slot * 0.46) + ' V' + f2(py + ph - slot * 0.12) + ' Q' + f2(cx + slot * 0.46) + ' ' + f2(py + ph) + ' ' + f2(cx + slot * 0.34) + ' ' + f2(py + ph) + ' H' + f2(cx - slot * 0.34) + ' Q' + f2(cx - slot * 0.46) + ' ' + f2(py + ph) + ' ' + f2(cx - slot * 0.46) + ' ' + f2(py + ph - slot * 0.12) + ' Z" fill="' + (items[i] ? '#b07a46' : '#9a6a3c') + '"/>';
+      s += '<path d="M' + f2(cx - slot * 0.4) + ' ' + f2(py + 5) + ' H' + f2(cx + slot * 0.4) + '" stroke="#e0b07a" stroke-width="' + sw + '" stroke-dasharray="4 3"/>';
     }
+    // the flap over the top, and its buckle
+    s += '<path d="M' + f2(-slot * 0.1) + ' ' + f2(top + slot * 0.2) + ' Q' + f2(-slot * 0.1) + ' ' + f2(top) + ' ' + f2(slot * 0.12) + ' ' + f2(top) + ' H' + f2(w - slot * 0.12) + ' Q' + f2(w + slot * 0.1) + ' ' + f2(top) + ' ' + f2(w + slot * 0.1) + ' ' + f2(top + slot * 0.2) + ' L' + f2(w + slot * 0.1) + ' ' + f2(top + slot * 0.24) + ' Q' + f2(w / 2) + ' ' + f2(top + slot * 0.42) + ' ' + f2(-slot * 0.1) + ' ' + f2(top + slot * 0.24) + ' Z" fill="#a06a3a"/>';
+    s += '<rect x="' + f2(w / 2 - slot * 0.1) + '" y="' + f2(top + slot * 0.2) + '" width="' + f2(slot * 0.2) + '" height="' + f2(slot * 0.17) + '" rx="' + f2(slot * 0.03) + '" fill="#e8b830" stroke="#8a6a10" stroke-width="' + sw + '"/>';
     return { art: s, w: w, h: h };
   }
   function goalArt(w, h) {
@@ -3667,7 +3826,7 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
     if (!hud.feathers) { return; }
     var cost = sel ? tripCost(here, sel) : 0, s = '', n = Math.max(saved.puff, cost);
     for (var i = 0; i < n; i++) {
-      var x = i * 20;
+      var x = i * 21;
       if (i >= saved.puff) { s += '<g transform="translate(' + x + ',0)">' + featherArt('none', '#a8b0c8', true) + '</g>'; }
       else { s += '<g transform="translate(' + x + ',0)">' + featherArt(i < cost ? '#ffd34a' : '#f2e2c4', i < cost ? '#b07a10' : '#a87b55') + '</g>'; }
     }
@@ -3686,12 +3845,16 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
     z.removeAttribute('display');
     SND.rustle();
   }
-  function goalLine() {
+  // What the card in the corner says when it's opened.
+  function goalLines() {
     var c = chapter();
-    if (!c) { return ''; }
-    if (saved.chState === 'find') { return 'Where was Granny when she sent this one?'; }
-    if (saved.chState === 'need') { return c.say.ask; }
-    return '';
+    if (!c) { return []; }
+    if (saved.chState === 'find') { return [{ who: 'card', text: c.clue }]; }
+    if (saved.chState === 'need') {
+      var still = needAt(c.place) || c.need;
+      return chLines(c, c.lines.ask).concat([{ who: 'hoot', text: 'The ' + whoIs(c.place) + ' in ' + inName(c.place) + ' needs ' + andList(still.map(itemName)) + '.' }]);
+    }
+    return [];
   }
 
   function layoutCounter() {
@@ -3738,7 +3901,7 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
     return true;
   }
 
-  function unlock() { initAudio(); warmSpeech(); }
+  function unlock() { initAudio(); unlockClips(); }
 
   // The view turns towards its goal at a capped speed, so dragging can't
   // fling the globe and letting go stops it where it is.
@@ -3768,7 +3931,7 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
     setGear(gh, 'sweat', short);
     if (short) {
       gh.shiver = 0.6;
-      if (!saidTooFar) { saidTooFar = true; narrate('That’s too far for one go!'); }
+      if (!saidTooFar) { saidTooFar = true; talk({ who: 'hoot', text: 'That’s too far for me to fly in one go! I’ll need to stop somewhere on the way.' }); }
     }
   }
 
@@ -3838,7 +4001,7 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
   function puffedOut() {
     var P = slerp(fl.a, fl.b, fl.runAt), flown = fl.miles * fl.runAt, N = nearestPlace(P, fl.to.id);
     var b = vec(N.lat, N.lon), ang = angBetween(P, b), miles = Math.round(ang * EARTH_MILES);
-    narrate('Oh no! I’m all puffed out!');
+    talk({ who: 'hoot', text: 'Oh no! I’m all puffed out!' });
     tone({ f: 900, f2: 280, d: 0.8, type: 'triangle', g: 0.08, a: 0.02, s: 0.2 });
     if (isLand(P)) {
       fl = {
@@ -3985,7 +4148,7 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
     if (cancelled || d.moved || performance.now() - d.t0 > 700 || mode !== 'globe') { return; }
     if (d.hit === 'cluezoom') { showGoalZoom(false); return; }
     if (d.hit === 'goal') {
-      if (tapOk('goal', 1)) { showGoalZoom(true); narrate(goalLine()); }
+      if (tapOk('goal', 1)) { showGoalZoom(true); talk(goalLines(), function () { showGoalZoom(false); }); }
       return;
     }
     globeTap(d.x0, d.y0);
@@ -4063,35 +4226,64 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
     return d;
   }
 
-  // The trip being planned: white as far as Hoot's puff will take him,
-  // grey beyond, and a feather pip at every thousand miles.
-  var pipNodes = [];
+  // The trip being planned, as a string of stops: one numbered feather
+  // for each feather it will cost. They're spaced evenly along the line as
+  // it looks on screen, not as it lies on the curved globe (where they
+  // bunch up towards the rim), with a gap before the first and after the
+  // last as wide as the gaps between, so they never sit on either end.
+  // Stops Hoot has the puff for are gold; the line goes grey after the
+  // last of them.
+  var pipNodes = [], PV_STEPS = 64;
   function previewFrame(R, alpha) {
     var ok = $('pvok'), grey = $('pvgrey'), pips = $('pvpips');
     if (!sel || mode !== 'globe' || alpha <= 0) {
       ok.setAttribute('d', ''); grey.setAttribute('d', ''); pips.setAttribute('display', 'none');
       return;
     }
-    var A = BYID[here], B = BYID[sel], a = vec(A.lat, A.lon), b = vec(B.lat, B.lon);
-    var miles = angBetween(a, b) * EARTH_MILES, reach = Math.min(1, saved.puff * 1000 / miles), lift = 0.07;
-    ok.setAttribute('d', arcPath(a, b, 0, reach, R, lift));
-    grey.setAttribute('d', reach < 1 ? arcPath(a, b, reach, 1, R, lift) : '');
+    var A = BYID[here], B = BYID[sel], a = vec(A.lat, A.lon), b = vec(B.lat, B.lon), lift = 0.07;
+    var n = tripCost(here, sel), fs = [], xs = [], ys = [], len = [], tot = 0, px = null, py = 0, i;
+    for (i = 0; i <= PV_STEPS; i++) {
+      var f = i / PV_STEPS, q = project(slerp(a, b, f), R * (1 + lift * Math.sin(Math.PI * f)));
+      if (q.z < 0.02) { px = null; continue; }
+      if (px !== null) { tot += Math.hypot(q.x - px, q.y - py); }
+      fs.push(f); xs.push(q.x); ys.push(q.y); len.push(tot);
+      px = q.x; py = q.y;
+    }
+    // where on the line a given distance along it (on screen) falls
+    function at(t) {
+      for (var j = 0; j < len.length - 1; j++) {
+        if (t <= len[j + 1]) {
+          var u = len[j + 1] > len[j] ? (t - len[j]) / (len[j + 1] - len[j]) : 0;
+          return { f: lerp(fs[j], fs[j + 1], u), x: lerp(xs[j], xs[j + 1], u), y: lerp(ys[j], ys[j + 1], u) };
+        }
+      }
+      var k = len.length - 1;
+      return { f: fs[k], x: xs[k], y: ys[k] };
+    }
+    if (n > saved.puff) {
+      var cut = at(tot * (saved.puff + 0.5) / (n + 1)).f;
+      ok.setAttribute('d', arcPath(a, b, 0, cut, R, lift));
+      grey.setAttribute('d', arcPath(a, b, cut, 1, R, lift));
+    } else {
+      ok.setAttribute('d', arcPath(a, b, 0, 1, R, lift));
+      grey.setAttribute('d', '');
+    }
+    if (len.length < 2) { pips.setAttribute('display', 'none'); return; }
     pips.removeAttribute('display');
-    var n = Math.ceil(miles / 1000 - 1e-6);
     while (pipNodes.length < n) { pipNodes.push(el('g', {}, pips)); }
-    for (var i = 0; i < pipNodes.length; i++) {
+    for (i = 0; i < pipNodes.length; i++) {
       var g = pipNodes[i];
       if (i >= n) { g.setAttribute('display', 'none'); continue; }
-      var f = Math.min(1, (i + 1) * 1000 / miles), q = project(slerp(a, b, f), R * (1 + lift * Math.sin(Math.PI * f)));
-      if (q.z < 0.02) { g.setAttribute('display', 'none'); continue; }
-      var inReach = i < saved.puff, want = inReach ? 'y' : 'n';
+      var p = at(tot * (i + 1) / (n + 1)), inReach = i < saved.puff, want = inReach ? 'y' : 'n';
       if (g.getAttribute('data-k') !== want) {
         g.setAttribute('data-k', want);
-        g.innerHTML = '<circle r="11" fill="' + (inReach ? '#fff6dc' : '#4a5270') + '" stroke="' + (inReach ? '#b07a10' : '#8a93b0') + '" stroke-width="1.5"/>'
-          + '<g transform="translate(0,8) scale(0.5)">' + featherArt(inReach ? '#ffd34a' : 'none', inReach ? '#b07a10' : '#a8b0c8', !inReach) + '</g>';
+        g.innerHTML = '<circle r="15" fill="' + (inReach ? '#fff6dc' : '#3a4260') + '" stroke="' + (inReach ? '#b07a10' : '#8a93b0') + '" stroke-width="2"' + (inReach ? '' : ' stroke-dasharray="4 3"') + '/>'
+          + '<g transform="translate(-3,12) scale(0.64)">' + featherArt(inReach ? '#ffd34a' : 'none', inReach ? '#8a5a10' : '#a8b0c8', !inReach) + '</g>'
+          + '<circle cx="12" cy="11" r="8.5" fill="' + (inReach ? '#b07a10' : '#5a6380') + '" stroke="#ffffff" stroke-width="1.5"/>'
+          + '<text x="12" y="15" text-anchor="middle" font-size="12" fill="#ffffff">' + (i + 1) + '</text>';
       }
       g.removeAttribute('display');
-      g.setAttribute('transform', 'translate(' + f2(q.x) + ',' + f2(q.y) + ')');
+      g.setAttribute('transform', 'translate(' + f2(p.x) + ',' + f2(p.y) + ')');
     }
   }
 
@@ -4268,7 +4460,7 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
 
   function endScene() {
     stopBed();
-    if (SS) { try { SS.cancel(); } catch (e) { /* fine */ } }
+    hushHello();
     S = null;
     scene.style.visibility = 'hidden';
     scene.style.opacity = '0';
@@ -4454,8 +4646,9 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
       if (sp.wave) { P.arm = sp.wave[0] * 0.5 + Math.sin(t * 14) * sp.wave[1] * 0.7 * calm; }
       if (t > 1.9) { setMode(A, 'idle'); }
     }
-    // a friend who's cold shivers now and then
-    if (A.cold && !reduced && m === 'idle' && (A.T % 3.4) < 0.7) { P.bx += Math.sin(A.T * 60) * 1.6; }
+    // a friend who's cold shivers now and then; a sad one hangs its head
+    if (A.mood === 'cold' && !reduced && m === 'idle' && (A.T % 3.4) < 0.7) { P.bx += Math.sin(A.T * 60) * 1.6; }
+    if (A.mood === 'sad' && m === 'idle') { P.head += (sp.sleepHead || 14) * 0.35; P.eyes = Math.min(P.eyes, 0.7); }
     if (sp.always) { sp.always(A, P, dt); }
     if (A.talk > 0) {
       A.talk -= dt;
@@ -4743,10 +4936,11 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
     S.piles.forEach(function (q) { if (q.item === item) { pile = q; } });
     if (!pile) { return; }
     if (saved.bag.length >= saved.cap) {
-      S.swap = { item: item, pile: pile, until: S.time + 6 };
       S.hoot.shake = 0.6;
       SND.bonk();
-      if (!S.saidFull) { S.saidFull = true; narrate('My satchel’s full!'); }
+      var arm = function () { if (S) { S.swap = { item: item, pile: pile, until: S.time + 6 }; } };
+      if (!S.saidFull) { S.saidFull = true; talk({ who: 'hoot', text: 'My satchel is full! Which thing shall I put back?' }, arm); }
+      else { arm(); }
       return;
     }
     var bag = saved.bag.slice();
@@ -4784,9 +4978,54 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
   // uses it.
   function wantedAt(item) {
     var c = chapter();
-    if (c && saved.prologue && saved.chState === 'need' && c.need === item) { return c.place; }
+    if (c && saved.prologue && saved.chState === 'need' && c.need.indexOf(item) >= 0 && (saved.given || []).indexOf(item) < 0) { return c.place; }
     var u = usesOf(item);
     return u.length ? ITEMS[u[0]].from : null;
+  }
+  // Talking about places and friends.
+  var IN_NAMES = { usa: 'the USA', arctic: 'the Arctic' };
+  function inName(id) { return IN_NAMES[id] || BYID[id].name; }
+  function whoIs(id) { return ((BYID[id].animal && BYID[id].animal.name) || 'friend').toLowerCase(); }
+  function capFirst(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+  // Where a thing comes from, in a sentence.
+  function sourceLine(k) {
+    var it = ITEMS[k], src = it.from, n = itemName(k);
+    if (it.made) { return 'The ' + whoIs(src) + ' in ' + inName(src) + ' can ' + VERBS[k] + ' ' + n + '.'; }
+    return capFirst(n) + (/s$/.test(n) ? ' come' : ' comes') + ' from ' + inName(src) + '.';
+  }
+  var MAKER_LINES = {
+    towel: 'I weave cotton into soft, fluffy towels.',
+    jumper: 'I knit wool into cosy jumpers.',
+    umbrella: 'I make umbrellas out of paper and my bamboo.',
+    cake: 'I bake the best cakes in Paris, with cocoa beans and maple syrup.'
+  };
+  // What a friend says when it's tapped: its wish and where to find it,
+  // or its recipe and what it's missing, or else something about its home.
+  function animalTalk(p) {
+    var c = chapter(), want = needAt(p.id), made = madeAt(p.id), out = [], point = null, k;
+    if (want && c) {
+      out = chLines(c, c.lines.ask);
+      var missing = want.filter(function (x) { return saved.bag.indexOf(x) < 0; });
+      if (!missing.length) { out.push({ who: p.id, text: 'Is that ' + andList(want.map(itemName)) + ' in your satchel? Can I have it?' }); }
+      else if (ITEMS[missing[0]].from !== p.id) { k = missing[0]; out.push({ who: p.id, text: sourceLine(k) }); point = ITEMS[k].from; }
+    } else if (made) {
+      var held = saved.held[p.id] || [], still = ITEMS[made].made.filter(function (x) { return held.indexOf(x) < 0; });
+      var away = still.filter(function (x) { return saved.bag.indexOf(x) < 0; });
+      out.push({ who: p.id, text: MAKER_LINES[made] || ('I can make ' + itemName(made) + '!') });
+      if (still.length && !away.length) { out.push({ who: p.id, text: 'Have you brought me ' + andList(still.map(itemName)) + '? Pass it here!' }); }
+      else if (away.length) {
+        out.push({ who: p.id, text: 'Bring me ' + andList(away.map(itemName)) + ' and I’ll make you ' + itemName(made) + '! ' + sourceLine(away[0]) });
+        point = ITEMS[away[0]].from;
+      }
+    }
+    if (!out.length) {
+      var f = FACTS[p.id] || [];
+      if (f.length) {
+        S.factI = ((S.factI == null ? -1 : S.factI) + 1) % f.length;
+        out.push({ who: p.id, text: f[S.factI] });
+      }
+    }
+    return { lines: out, point: point };
   }
   // Facing the equator from the north, east is on the left; from the
   // south, on the right. The animal turns that way and looks, and the
@@ -4799,21 +5038,6 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
     pointArrow = { from: p.id, to: id };
     tone({ f: 660, f2: 990, d: 0.25, g: 0.07, a: 0.01, s: 0 });
   }
-  // A hint, when the friend here can't be helped yet: the needy one points
-  // towards whoever makes what it wants; a maker points towards what it's
-  // missing.
-  function hintFor(p) {
-    var want = needAt(p.id);
-    if (want && saved.bag.indexOf(want) < 0) { return ITEMS[want].from !== p.id ? ITEMS[want].from : null; }
-    var made = madeAt(p.id);
-    if (made) {
-      var held = saved.held[p.id] || [];
-      var missing = (ITEMS[made].made || []).filter(function (k) { return held.indexOf(k) < 0 && saved.bag.indexOf(k) < 0; });
-      if (missing.length) { return ITEMS[missing[0]].from; }
-    }
-    return null;
-  }
-
   // Offering what's in a slot to whoever is here.
   function offer(i) {
     var item = saved.bag[i], p = S.place, A = S.animal, c = chapter();
@@ -4825,12 +5049,12 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
       later(1.45, function () { S.busy = false; offer(i); });
       return;
     }
-    var from = slotPos(i), to = handPoint(), made = madeAt(p.id);
+    var from = slotPos(i), to = handPoint(), made = madeAt(p.id), want = needAt(p.id);
     function take() { var bag = saved.bag.slice(); bag.splice(i, 1); setBag(bag); layoutSceneHud(); }
     S.busy = true;
-    if (needAt(p.id) === item) {
+    if (want && want.indexOf(item) >= 0) {
       take();
-      flyThing(itemArt(item), from, to, slotScale(), stage.s * 0.9, 0.6, function () { deliverStory(c); });
+      flyThing(itemArt(item), from, to, slotScale(), stage.s * 0.9, 0.6, function () { friendTakes(c, item); });
       return;
     }
     if (made && (ITEMS[made].made || []).indexOf(item) >= 0 && (saved.held[p.id] || []).indexOf(item) < 0) {
@@ -4844,14 +5068,39 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
       flyThing(itemArt(item), from, back, slotScale(), stage.s * 0.6, 0.55, function () { SND.pop(0.8); S.busy = false; });
       return;
     }
-    // not wanted here: a puzzled look, and a point the right way
+    // not wanted here: a puzzled look, a word, and a point the right way
     setMode(A, 'puzzled');
     tone({ f: 330, path: [[0.5, 300], [1, 380]], d: 0.45, type: 'triangle', g: 0.07, a: 0.02, s: 0.3 });
-    var target = wantedAt(item);
-    later(1.05, function () {
-      if (target && target !== p.id) { pointTo(target); later(2.3, function () { S.busy = false; }); }
-      else { S.busy = false; }
+    var target = wantedAt(item), line = 'Hmm. I don’t need ' + itemName(item) + '.';
+    if (target && target !== p.id) {
+      var forFriend = c && saved.chState === 'need' && c.place === target;
+      var use = usesOf(item)[0];
+      line = forFriend
+        ? 'I don’t need ' + itemName(item) + ', but I think the ' + whoIs(target) + ' in ' + inName(target) + ' does!'
+        : 'I don’t need ' + itemName(item) + '. The ' + whoIs(target) + ' in ' + inName(target) + ' uses it to ' + VERBS[use] + ' ' + itemName(use) + '!';
+    }
+    later(0.9, function () {
+      talk({ who: p.id, text: line }, function () {
+        if (target && target !== p.id) { pointTo(target); later(2.3, function () { S.busy = false; }); }
+        else { S.busy = false; }
+      });
     });
+  }
+  // The chapter's friend takes one of the things it needs. If that's all
+  // of them, the story moves on.
+  function friendTakes(c, item) {
+    var p = S.place, A = S.animal;
+    saved.given = (saved.given || []).concat([item]);
+    persist();
+    showThoughts();
+    var still = needAt(p.id);
+    if (still) {
+      setMode(A, 'joy');
+      SND.pop();
+      talk({ who: p.id, text: 'Thank you! Now I just need ' + andList(still.map(itemName)) + '.' }, function () { S.busy = false; });
+      return;
+    }
+    deliverStory(c);
   }
 
   // A maker takes an ingredient. When it has all it needs, it makes the
@@ -4887,6 +5136,7 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
   // ------------------------------------------------------------------
   // The story's moments in a scene.
   // ------------------------------------------------------------------
+  var compareCount = 0;
   function arrivalStory() {
     var p = S.place, c = chapter();
     showThoughts();
@@ -4894,11 +5144,13 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
     if (saved.chState === 'find') {
       if (c.place === p.id) { matchStory(c); } else { compareStory(c); }
     } else if (saved.chState === 'need' && c.place === p.id) {
-      S.animal.cold = true;
-      narrate(c.say.ask);
+      S.animal.mood = c.mood;
+      S.busy = true;
+      talk(chLines(c, c.lines.ask), function () { S.busy = false; });
     }
   }
-  // Not here: Hoot holds up Granny's card, looks, and shakes his head.
+  // Not here: Hoot holds up Granny's card, looks, and shakes his head; the
+  // first couple of times, he says so.
   function compareStory(c) {
     var H = S.hoot, w = 190, h = 133, hp = toView(H.x, H.y - 150);
     var x = clamp(hp.x - w / 2, 10, 990 - w), y = Math.max(10, hp.y - h);
@@ -4906,13 +5158,18 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
     g.innerHTML = fadedCard(c, w, h);
     S.busy = true;
     SND.rustle();
+    compareCount += 1;
     tween(0.35, function (k) {
       g.setAttribute('opacity', f2(k));
       g.setAttribute('transform', 'translate(' + f2(x) + ',' + f2(y + (1 - k) * 40) + ')');
     }, function () {
       S.lookAt = { x: H.x + 200, y: H.y - 260, until: S.time + 0.8 };
       later(0.7, function () { H.shake = 0.7; });
-      later(1.5, function () { removeLater(g, 0.3); S.busy = false; });
+      later(1.5, function () {
+        var done = function () { removeLater(g, 0.3); S.busy = false; };
+        if (compareCount <= 2) { talk({ who: 'hoot', text: 'Hmm. This doesn’t look like the place on Granny’s postcard.' }, done); }
+        else { done(); }
+      });
     });
   }
   // Found it: the card comes back to life, the friend knows the satchel,
@@ -4933,23 +5190,19 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
       later(0.5, function () {
         SND.sparkle();
         tween(1.2, function (k) { bright.setAttribute('opacity', f2(k)); });
-        var d1 = narrate(c.say.match);
-        later(d1 + 0.3, function () {
+        talk(chLines(c, c.lines.match), function () {
           setMode(A, 'joy');
           if (room()) { hold(1); p.animal.call(now(), false); }
-          var d2 = narrate(c.say.knows);
-          later(d2 + 0.3, function () {
-            tween(0.5, function (k) {
-              g.setAttribute('transform', 'translate(' + f2(lerp(x, 20, k)) + ',' + f2(lerp(y, 20, k)) + ') scale(' + f2(lerp(1, 0.2, k)) + ')');
-              g.setAttribute('opacity', f2(1 - k));
-            }, function () { if (g.parentNode) { g.parentNode.removeChild(g); } });
-            saved.chState = 'need';
-            persist();
-            A.cold = true;
-            showThoughts();
-            var d3 = narrate(c.say.ask);
-            later(d3, function () { S.busy = false; });
-          });
+          tween(0.5, function (k) {
+            g.setAttribute('transform', 'translate(' + f2(lerp(x, 20, k)) + ',' + f2(lerp(y, 20, k)) + ') scale(' + f2(lerp(1, 0.2, k)) + ')');
+            g.setAttribute('opacity', f2(1 - k));
+          }, function () { if (g.parentNode) { g.parentNode.removeChild(g); } });
+          saved.chState = 'need';
+          saved.given = [];
+          persist();
+          A.mood = c.mood;
+          showThoughts();
+          talk(chLines(c, c.lines.ask), function () { S.busy = false; });
         });
       });
     });
@@ -4959,7 +5212,7 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
   // map. And its place grows.
   function deliverStory(c) {
     var p = S.place, A = S.animal, H = S.hoot;
-    A.cold = false;
+    A.mood = null;
     saved.dev[p.id] = Math.max(1, saved.dev[p.id] || 0);
     persist();
     applyAnimalDev();
@@ -4970,35 +5223,62 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
     for (var i = 0; i < 6; i++) {
       spawn({ kind: 'art', art: '<path d="M0 6 C-12 -4 -6 -14 0 -7 C6 -14 12 -4 0 6 Z" fill="#ec5a8f"/>', x: hv.x + (Math.random() - 0.5) * 60, y: hv.y - 20, vx: (Math.random() - 0.5) * 40, vy: -70 - Math.random() * 40, life: 1.6, sway: 14 });
     }
-    later(2.0, function () {
-      var w = Math.min(860, SH * 0.6 * 1.5), h = w / 1.5, x = (1000 - w) / 2, y = (SH - h) / 2;
+    talk(chLines(c, c.lines.thanks), function () {
+      // the friend's part of Granny's story, in a sepia picture
+      var w = Math.min(860, SH * 0.52 * 1.5), h = w / 1.5, x = (1000 - w) / 2, y = Math.max(20, (SH - h) * 0.32);
       var g = el('g', { opacity: 0, transform: 'translate(' + f2(x) + ',' + f2(y) + ')' }, $('sc-fly'));
       g.innerHTML = '<rect x="-14" y="-14" width="' + f2(w + 28) + '" height="' + f2(h + 28) + '" rx="10" fill="#fffaf0"/>'
         + '<g transform="scale(' + f2(w / 450) + ',' + f2(h / 300) + ')">' + sepiaify(c.flash()) + '</g>'
         + '<rect x="0" y="0" width="' + f2(w) + '" height="' + f2(h) + '" fill="none" stroke="#c8b48c" stroke-width="3"/>';
       tween(0.6, function (k) { g.setAttribute('opacity', f2(k)); });
-      var d = narrate(c.say.tell);
-      later(Math.max(4.5, d + 1), function () {
+      talk(chLines(c, c.lines.tell), function () {
         removeLater(g, 0.5);
-        var start = handPoint(), end = toView(H.x, H.y - 60);
-        flyThing(pieceArt(), start, end, stage.s * 0.8, stage.s * 1.6, 1.0, function () {
-          saved.pieces |= (1 << c.piece);
-          persist();
-          H.pop = 1;
-          SND.chime();
-          var d2 = narrate(c.say.piece);
-          applyPlaceDev(true);
-          later(d2 + 0.8, function () {
-            var next = c.say.next;
-            if (CHAPTERS[saved.ch + 1]) { saved.ch += 1; saved.chState = 'find'; }
-            else { saved.chState = 'done'; }
+        var give = chLines(c, c.lines.give);
+        talk(give.slice(0, 1), function () {
+          // a piece of Granny's map
+          flyThing(pieceArt(), handPoint(), toView(H.x, H.y - 60), stage.s * 0.8, stage.s * 1.6, 1.0, function () {
+            saved.pieces |= (1 << c.piece);
             persist();
-            var d3 = narrate(next);
-            later(d3, function () { S.busy = false; });
+            H.pop = 1;
+            SND.chime();
+            applyPlaceDev(true);
+            var after = give.slice(1);
+            if (c.reward) { applyReward(c.reward); after = after.concat(chLines(c, c.lines.reward)); }
+            after = after.concat(chLines(c, c.lines.mystery));
+            talk(after, function () {
+              advanceChapter();
+              var n = chapter();
+              if (n && saved.chState === 'find') {
+                // and the next of Granny's postcards, out of the satchel
+                var cw = Math.min(520, SH * 0.48 * 1.43), chh = cw * 0.7;
+                var cg = el('g', { opacity: 0, transform: 'translate(' + f2((1000 - cw) / 2) + ',' + f2(Math.max(16, (SH - chh) * 0.25)) + ')' }, $('sc-fly'));
+                cg.innerHTML = fadedCard(n, cw, chh);
+                tween(0.5, function (k) { cg.setAttribute('opacity', f2(k)); });
+                talk([{ who: 'hoot', text: 'Look! Another one of Granny’s old postcards!' }, { who: 'card', text: n.clue }], function () {
+                  removeLater(cg, 0.4);
+                  S.busy = false;
+                });
+              } else { S.busy = false; }
+            });
           });
         });
       });
     });
+  }
+  // What a chapter teaches Hoot.
+  function applyReward(r) {
+    if (r.puff) { saved.puff += r.puff; }
+    if (r.cap) { saved.cap = Math.max(saved.cap, r.cap); }
+    if (r.stars) { saved.stars = true; }
+    persist();
+    layoutSceneHud();
+  }
+  function advanceChapter() {
+    saved.given = [];
+    if (CHAPTERS[saved.ch + 1]) { saved.ch += 1; saved.chState = 'find'; }
+    else { saved.chState = 'done'; }
+    compareCount = 0;
+    persist();
   }
   // The visible ways a place has grown: things in its scene, and gifts
   // its animal keeps.
@@ -5040,7 +5320,7 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
     var callDur = p.animal.call ? (p.animal.call(now(), sleepy) || 0.6) : 0.6;
     A.talk = callDur;
     later(callDur + 0.15, function () {
-      var d = sayHello(p, sleepy);
+      var d = playHello(p);
       A.talk = Math.max(A.talk, d);
       showBubble();
       later(d + 0.35, function () {
@@ -5095,7 +5375,7 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
       clear($('sc-thought')); S.thought = null;
       S.swap = null;
     }
-    if (SS) { try { SS.cancel(); } catch (e) { /* fine */ } }
+    hushHello();
     if (reduced) {
       S.phase = 'gone'; H.op = 0;
       leaveDone();
@@ -5240,20 +5520,24 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
     }
     if (key === 'animal') {
       if (!S.greeted || !tapOk('animal', 0.8)) { return; }
-      var hint = (S.ready && !S.busy && !S.hinted && A.mode === 'idle') ? hintFor(p) : null;
       if (A.mode === 'sleep') {
         A.after = 'idle'; A.awakeUntil = S.time + 14;
         setMode(A, 'yawn');
         if (A.sp.yawnK && room()) { hold(1.1); SND.yawn(0, A.sp.yawnK); }
-      } else if (hint) {
-        // the first tap, when Hoot can't help yet, gets a pointer the right way
-        S.hinted = true;
-        pointTo(hint);
-      } else if (A.mode === 'idle') {
-        setMode(A, 'act');
-        A.awakeUntil = S.time + 14;
-        if (room()) { hold(1); A.talk = (p.animal.call(now(), false) || 0.6) * 0.8; }
-        H.pop = 0.6;
+      } else if (A.mode === 'idle' && S.ready && !S.busy) {
+        // A friend says something useful, if it has something to say, and
+        // then either points the way or does its trick.
+        var said = animalTalk(p);
+        A.awakeUntil = S.time + 20;
+        S.busy = true;
+        talk(said.lines, function () {
+          S.busy = false;
+          if (!S || S.place !== p) { return; }
+          if (said.point) { pointTo(said.point); return; }
+          setMode(A, 'act');
+          if (room()) { hold(1); A.talk = (p.animal.call(now(), false) || 0.6) * 0.8; }
+          H.pop = 0.6;
+        });
       }
       return;
     }
@@ -5261,7 +5545,9 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
       if (!S.bubble || !tapOk('bubble', 2)) { return; }
       S.bubble.pop = 1;
       if (A.mode === 'sleep') { return; }
-      A.talk = sayHello(p, false);
+      var hd = playHello(p);
+      if (!hd && room()) { hold(1); hd = p.animal.call(now(), false) || 0.6; }
+      A.talk = hd;
       return;
     }
     if (key.indexOf('prop:') === 0) {
@@ -5569,16 +5855,22 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
       });
       lg.setAttribute('transform', 'translate(' + f2(r.x - w * 0.45) + ',' + f2(r.y - 60 - 80 * u) + ') scale(' + f2(0.3 + 0.5 * u) + ')');
     });
-    var d1 = narrate('Granny’s old satchel! She flew all over the world.');
-    later(Math.max(1.4, d1), function () {
+    later(0.9, function () {
+    talk([
+      { who: 'hoot', text: 'What’s this? It’s Granny’s old satchel!' },
+      { who: 'hoot', text: 'Granny was a postal owl too. She flew all over the world.' },
+      { who: 'hoot', text: 'And these are her postcards, from all the places she went.' }
+    ], function () {
       // the letter comes to the front
       SND.sparkle();
       tween(0.6, function (k) {
         var u = easeOut(k);
         lg.setAttribute('transform', 'translate(' + f2(lerp(r.x - w * 0.45, 500 - w * 0.9 * 0.6, u)) + ',' + f2(lerp(r.y - 140, SH * 0.3, u)) + ') scale(' + f2(lerp(0.8, 1.35, u)) + ')');
       });
-      var d2 = narrate('Her postcards… and a letter she never delivered.');
-      later(Math.max(1.6, d2 + 0.3), function () {
+      talk([
+        { who: 'hoot', text: 'And a letter. It’s still sealed! Granny never delivered it.' },
+        { who: 'hoot', text: 'There’s a paw print for a stamp, and a penguin drawn on the front. How strange!' }
+      ], function () {
         removeLater(cards, 0.5);
         saved.prologue = true;
         saved.pieces |= (1 << HOME_PIECE);
@@ -5597,10 +5889,16 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
           SND.chime();
           var g = S.home.board;
           if (g) { g.setAttribute('opacity', '0'); tween(0.6, function (k) { g.setAttribute('opacity', f2(k)); }); }
-          var d3 = narrate('Where was Granny when she sent this one?');
-          later(d3, function () { S.busy = false; });
+          var c0 = CHAPTERS[0];
+          talk([
+            { who: 'hoot', text: 'I’ll take Granny’s satchel with me. Maybe her friends can tell me about the letter.' },
+            { who: 'hoot', text: 'Here’s the first postcard. I can just read Granny’s writing…' },
+            { who: 'card', text: c0.clue },
+            { who: 'hoot', text: 'Where could that be? I’ll fly out and look!' }
+          ], function () { S.busy = false; });
         });
       });
+    });
     });
   }
 
@@ -5680,9 +5978,29 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
       return;
     }
     if (!saved.prologue || S.busy) { return; }
-    if (key === 'goal' && tapOk('goal', 1)) { showHomeZoom('goal'); narrate(goalLine()); return; }
-    if (key === 'letter' && tapOk('letter', 1.5)) { showHomeZoom('letter'); narrate('Who wrote this letter? And who is it for?'); return; }
-    if (key === 'map' && tapOk('map', 2)) { S.hoot.pop = 1; narrate('Granny’s old map. So many pieces missing!'); }
+    if (key === 'goal' && tapOk('goal', 1)) { showHomeZoom('goal'); talk(goalLines(), closeHomeZoom); return; }
+    if (key === 'letter' && tapOk('letter', 1.5)) { showHomeZoom('letter'); talk(letterLines(), closeHomeZoom); return; }
+    if (key === 'map' && tapOk('map', 2)) { S.hoot.pop = 1; talk(mapLines()); }
+  }
+  function closeHomeZoom() {
+    if (S && S.zoomed) { var z = S.zoomed; S.zoomed = null; if (z.parentNode) { z.parentNode.removeChild(z); } }
+  }
+  // What Hoot has worked out about the letter so far.
+  function letterLines() {
+    var out = [{ who: 'hoot', text: 'Granny’s letter. It’s still sealed, so I mustn’t open it.' }];
+    var told = (saved.ch > 0 || saved.chState === 'done') ? Math.min(CHAPTERS.length, saved.ch + (saved.chState === 'done' ? 1 : 0)) : 0;
+    for (var i = 0; i < told; i++) {
+      var m = CHAPTERS[i].clueLetter;
+      if (m) { out.push({ who: 'hoot', text: m }); }
+    }
+    if (out.length === 1) { out.push({ who: 'hoot', text: 'A paw print for a stamp, and a penguin on the front. Who could it be from?' }); }
+    return out;
+  }
+  function mapLines() {
+    var n = 0;
+    for (var i = 0; i < 8; i++) { if (saved.pieces & (1 << i)) { n += 1; } }
+    if (n >= 8) { return [{ who: 'hoot', text: 'Granny’s map is whole again! Her journey ends in the cold sea, far in the south.' }]; }
+    return [{ who: 'hoot', text: 'Granny’s old map. I’ve found ' + n + ' of the 8 pieces.' }];
   }
 
   // ==================================================================
@@ -5699,6 +6017,7 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
   }
   function tick(dt) {
     clock += dt;
+    dlgFrame(dt);
     // A resize event can be missed (a phone's address bar, a pane opening),
     // so the size is checked every frame as well.
     if ((window.innerWidth !== VW || window.innerHeight !== VH) && !resizeTimer) { onResize(); }
@@ -5732,6 +6051,7 @@ n:{"canada":3,"usa":4,"kenya":13,"greenland":22,"brazil":29,"peru":31,"france":4
 
   decodeWorld();
   buildLandMask();
+  PLACES.forEach(function (p) { if (p.animal && !p.animal.name) { p.animal.name = ANIMAL_NAMES[p.id] || p.name; } });
   // anything in the save that no longer means anything is dropped
   if (!BYID[saved.here]) { saved.here = 'leeds'; }
   saved.bag = saved.bag.filter(function (k) { return !!ITEMS[k]; });
