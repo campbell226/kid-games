@@ -49,6 +49,15 @@
   #dlg-more { flex: none; align-self: flex-end; font-size: 0.8em; color: #d9434e; visibility: hidden; animation: dlgbob 0.8s ease-in-out infinite; }
   @keyframes dlgbob { 50% { transform: translateY(4px); } }
   @media (prefers-reduced-motion: reduce) { #dlg-more { animation: none; } }
+  /* While Hoot explains something at the bottom of the screen, his box goes to the top. */
+  #dlg.top { top: max(14px, env(safe-area-inset-top)); bottom: auto; }
+  /* The spotlight on whatever is being explained. */
+  #spot { position: fixed; left: 0; top: 0; right: 0; bottom: 0; z-index: 18; pointer-events: none; }
+  #spot[hidden] { display: none; }
+  #spot svg { width: 100%; height: 100%; display: block; }
+  .spot-ring { animation: spotring 1.1s ease-in-out infinite; }
+  @keyframes spotring { 50% { stroke-width: 9px; stroke-opacity: 0.55; } }
+  @media (prefers-reduced-motion: reduce) { .spot-ring { animation: none; } }
 </style>
 </head>
 <body>
@@ -206,6 +215,7 @@
   <div id="dlg-body"><div id="dlg-name"></div><div id="dlg-text"></div></div>
   <div id="dlg-more">&#9660;</div>
 </div>
+<div id="spot" hidden><svg aria-hidden="true"><path class="spot-dim" fill="#05081a" fill-opacity="0.55" fill-rule="evenodd"/><rect class="spot-ring" fill="none" stroke="#ffd34a" stroke-width="5"/></svg></div>
 
 <script>
 // Natural Earth 1:110m countries (public domain), via world-atlas@2.0.2,
@@ -302,7 +312,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
       v: {}, miles: 0, here: 'leeds',
       puff: 5, cap: 2, bag: [], seen: {}, held: {},
       prologue: false, ch: 0, chState: 'find', given: [], stars: false,
-      dev: {}, routes: [], pieces: 0
+      dev: {}, routes: [], pieces: 0, told: {}
     };
   }
   var saved = freshSave();
@@ -335,6 +345,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     saved.stars = o.stars === true;
     saved.routes = strs(o.routes);
     saved.pieces = int(o.pieces, 0, 255, 0);
+    saved.told = obj(o.told);
   })();
   function persist() {
     try { window.localStorage.setItem(SAVE_KEY, JSON.stringify(saved)); } catch (e) { /* as above */ }
@@ -800,6 +811,113 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
   }
   dlg.box.addEventListener('pointerdown', dlgTap);
   dlg.catcher.addEventListener('pointerdown', dlgTap);
+
+  // ------------------------------------------------------------------
+  // First times. The first time each thing matters, Hoot stops and says
+  // what it is and what it's for, with it ringed and the rest dimmed. A
+  // lesson is a list of steps, each a thing to ring (an element, or none)
+  // and what Hoot says about it. Each is given once; the save remembers.
+  // ------------------------------------------------------------------
+  var spot = { box: $('spot'), dim: null, ring: null, at: null, busy: false };
+  spot.dim = spot.box.querySelector('.spot-dim');
+  spot.ring = spot.box.querySelector('.spot-ring');
+  function spotOn(at) {
+    spot.at = at || null;
+    if (!spot.at) { spot.box.hidden = true; dlg.box.classList.remove('top'); return; }
+    spot.box.hidden = false;
+    spotFrame();
+  }
+  // follows the thing as it moves, and keeps Hoot's box out of its way
+  function spotFrame() {
+    if (!spot.at || spot.box.hidden) { return; }
+    var el2 = typeof spot.at === 'function' ? spot.at() : spot.at;
+    if (!el2 || !el2.getBoundingClientRect) { return; }
+    var r = el2.getBoundingClientRect(), W = window.innerWidth, H = window.innerHeight, pad = 12;
+    if (!r.width && !r.height) { return; }
+    var x = Math.max(4, r.left - pad), y = Math.max(4, r.top - pad), w = Math.min(W - 4, r.right + pad) - x, h = Math.min(H - 4, r.bottom + pad) - y, rr = Math.min(22, w / 2, h / 2);
+    spot.box.querySelector('svg').setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    setAttr(spot.dim, 'd', 'M0 0 H' + W + ' V' + H + ' H0 Z M' + f2(x + rr) + ' ' + f2(y) + ' H' + f2(x + w - rr) + ' Q' + f2(x + w) + ' ' + f2(y) + ' ' + f2(x + w) + ' ' + f2(y + rr)
+      + ' V' + f2(y + h - rr) + ' Q' + f2(x + w) + ' ' + f2(y + h) + ' ' + f2(x + w - rr) + ' ' + f2(y + h) + ' H' + f2(x + rr) + ' Q' + f2(x) + ' ' + f2(y + h) + ' ' + f2(x) + ' ' + f2(y + h - rr)
+      + ' V' + f2(y + rr) + ' Q' + f2(x) + ' ' + f2(y) + ' ' + f2(x + rr) + ' ' + f2(y) + ' Z');
+    ['x', 'y', 'width', 'height', 'rx'].forEach(function (k, i) { setAttr(spot.ring, k, f2([x, y, w, h, rr][i])); });
+    var low = y + h / 2 > H * 0.5;
+    if (low !== dlg.box.classList.contains('top')) { dlg.box.classList.toggle('top', low); }
+  }
+  // steps: [{ at, lines }]; done runs afterwards, given or not
+  function teach(key, steps, done) {
+    if (saved.told[key] || spot.busy) { if (done) { done(); } return false; }
+    saved.told[key] = 1;
+    persist();
+    explain(steps, done);
+    return true;
+  }
+  function explain(steps, done) {
+    spot.busy = true;
+    var i = 0;
+    (function next() {
+      if (i >= steps.length) { spotOn(null); spot.busy = false; if (done) { done(); } return; }
+      var st = steps[i++];
+      spotOn(st.at);
+      talk(st.lines.map(function (t) { return { who: 'hoot', text: t }; }), next);
+    })();
+  }
+
+  // What each thing on the globe is for, said the first time Hoot is out on
+  // it, and again whenever the feathers or the satchel are tapped.
+  function feathersLines() {
+    return ['These are my feathers. Each one can carry me a thousand miles.', 'Flying uses them up. But whenever I land somewhere, I get them all back.'];
+  }
+  function bagLines() {
+    return ['This is my satchel. It has ' + ['no', 'one', 'two', 'three', 'four'][saved.cap] + ' pockets, so I can carry ' + ['nothing', 'one thing', 'two things', 'three things', 'four things'][saved.cap] + ' at a time.'];
+  }
+  function globeLessons() {
+    if (mode !== 'globe' || modeT < 0.8 || !saved.prologue || dlg.cur || spot.busy || fl) { return; }
+    if (!saved.told.globe) {
+      teach('globe', [
+        { at: hud.feathers, lines: feathersLines() },
+        { at: hud.bag, lines: bagLines() },
+        hud.goal ? { at: hud.goal, lines: ['And this is Granny’s postcard. Tap it whenever I need to read her clue again.'] } : null,
+        { at: null, lines: ['Tap a place to see how far it is. Tap it again to fly there!'] }
+      ].filter(Boolean));
+      return;
+    }
+    if (saved.told.trip) { starLessons(); }
+    if (sel && !saved.told.trip && previewReady()) {
+      var cost = tripCost(here, sel), short = cost > saved.puff;
+      if (short) { saidTooFar = true; }
+      teach('trip', [
+        { at: $('pvpips'), lines: ['Each feather on the line is a thousand miles. This trip needs ' + cost + '.'] },
+        { at: hud.feathers, lines: short
+          ? ['But I’ve only got ' + saved.puff + ' feathers, so I’d run out of puff on the way.', 'I’ll have to stop somewhere nearer first, and get my puff back.']
+          : ['I’ve got ' + saved.puff + ' feathers, so I can make it. Tap the place again to go!'] }
+      ]);
+    }
+  }
+  function starLessons() {
+    if (!starsLesson || !sel || !previewReady() || dlg.cur || spot.busy) { return; }
+    starsLesson = false;
+    teach('stars', [{ at: $('pvpips'), lines: ['It’s dark, so I can steer by the stars. Each feather takes me fifteen hundred miles instead of a thousand!'] }]);
+  }
+  function previewReady() { var g = $('pvpips'); return g && !g.hasAttribute('display') && g.getBoundingClientRect().width > 0; }
+
+  // In a scene: the baskets, giving, makers and wishes, each explained the
+  // first time it comes up, once the hellos and the story are done.
+  function sceneLessons() {
+    if (!S || S.place.home || !S.ready || S.busy || S.card || dlg.cur || spot.busy || !saved.prologue || S.phase !== 'landed') { return; }
+    var p = S.place, want = needAt(p.id), made = madeAt(p.id), lesson = null;
+    if (!saved.told.wish && want && S.thought) {
+      lesson = ['wish', [{ at: S.thought.g, lines: ['The bubble shows what my friend needs. If I don’t know where to find it, I can tap my friend and ask.'] }]];
+    } else if (!saved.told.maker && made && S.thought) {
+      lesson = ['maker', [{ at: S.thought.g, lines: ['This friend can make ' + itemName(made) + '. The bubble shows what goes in, and what comes out.', 'If I bring those things, my friend will make ' + itemName(made) + ' for me to carry.'] }]];
+    } else if (!saved.told.basket && S.piles.length) {
+      lesson = ['basket', [{ at: S.piles[0].g, lines: ['That basket has ' + itemName(S.piles[0].item) + ' in it. Things from here are free to take.', 'If I tap the basket, one goes into my satchel.'] }]];
+    } else if (!saved.told.give && saved.bag.length && (want || made) && shud.g) {
+      lesson = ['give', [{ at: shud.g, lines: ['To give my friend something from my satchel, I tap it.'] }]];
+    }
+    if (!lesson) { return; }
+    S.busy = true;
+    teach(lesson[0], lesson[1], function () { if (S) { S.busy = false; } });
+  }
 
   // ------------------------------------------------------------------
   // The world map: Natural Earth's 1:110m countries, public domain, baked
@@ -1296,7 +1414,13 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     var s = 'rotate(' + f2(deg) + ' ' + px + ' ' + py + ')';
     for (var i = 0; i < nodes.length; i++) { nodes[i].setAttribute('transform', s); }
   }
-  function setAll(nodes, s) { for (var i = 0; i < nodes.length; i++) { nodes[i].setAttribute('transform', s); } }
+  // Attributes are only written when they change: rewriting the same value
+  // every frame still makes some phones repaint, and the repaint flickers.
+  function setAttr(n, k, v) {
+    var c = n._attr || (n._attr = {});
+    if (c[k] !== v) { c[k] = v; n.setAttribute(k, v); }
+  }
+  function setAll(nodes, s) { for (var i = 0; i < nodes.length; i++) { setAttr(nodes[i], 'transform', s); } }
 
   function poseHoot(H, dt) {
     H.T += dt;
@@ -1327,7 +1451,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     var sq = Math.sin(H.squash * Math.PI) * calm;
     var sx = (1 + H.pop * 0.12) * (1 + sq * 0.1), sy = (1 + H.pop * 0.12) * (1 - sq * 0.14);
     setAll(H.all, 'translate(' + f2(shake) + ',' + f2(bob) + ') rotate(' + f2(H.lean + no) + ' 0 -30) scale(' + f2(sx) + ',' + f2(sy) + ')');
-    H.g.setAttribute('transform', 'translate(' + f2(H.x) + ',' + f2(H.y) + ') scale(' + f2(H.s) + ')');
+    setAttr(H.g, 'transform', 'translate(' + f2(H.x) + ',' + f2(H.y) + ') scale(' + f2(H.s) + ')');
     H.g.setAttribute('opacity', f2(H.op));
   }
 
@@ -4642,12 +4766,14 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
       place: 'japan', need: ['towel'], piece: 6, mood: 'cold',
       clue: 'Dear Hoot, the monkeys here have hot baths in the snow, under a mountain with a white top! Love, Granny',
       lines: {
-        match: [['hoot', 'This is it! This is where Granny’s postcard came from!'], ['a', 'Is that Granny Hoot’s old satchel? My grandma knew her!']],
+        match: [['hoot', 'Hello! I’m Hoot. My granny sent this postcard from here, long ago. She carried the post, like me.'],
+          ['a', 'That’s our hot spring, in the picture! My grandma used to tell me about an owl who came here in a snowstorm, with a satchel full of letters.'],
+          ['hoot', 'That must have been my granny!']],
         ask: [['a', 'Brrr! I get so cold when I climb out of the hot spring. I wish I had a towel.']],
         thanks: [['a', 'A towel! It’s so soft. Thank you, Hoot!']],
-        tell: [['a', 'Long ago, Granny got caught in a snowstorm here. My grandma kept her warm in the hot spring until it stopped.']],
-        give: [['a', 'Granny gave my grandma this to keep safe. I think it should be yours now.'], ['hoot', 'A piece of Granny’s map!']],
-        mystery: [['a', 'Granny said she was carrying a very special letter, to somewhere very far away.']]
+        tell: [['a', 'Long ago, your granny got caught in a snowstorm here. My grandma kept her warm in the hot spring until it stopped.']],
+        give: [['a', 'Your granny gave my grandma this to keep safe. I think it should be yours now.'], ['hoot', 'A piece of Granny’s map!']],
+        mystery: [['a', 'Your granny said she was carrying a very special letter, to somewhere very far away.']]
       },
       clueLetter: 'Granny told the snow monkey’s grandma the letter was very special, and going somewhere very far away.',
       flash: function () {
@@ -4668,13 +4794,14 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
       place: 'nepal', need: ['bamboo'], piece: 5, mood: 'sad', reward: { puff: 2 },
       clue: 'Dear Hoot, I’m staying under the tallest mountain in the whole world. Geese fly right over the top of it! Love, Granny',
       lines: {
-        match: [['hoot', 'The tallest mountain in the world! This is the place on Granny’s postcard!'], ['a', 'Granny Hoot’s satchel! My grandma told me all about her.']],
+        match: [['hoot', 'Hello! I’m Hoot. My granny sent this postcard from here, a long time ago. Did anyone here meet her?'],
+          ['a', 'That’s our mountain, in the picture! My grandma always talked about an owl who went flying with the geese.']],
         ask: [['a', 'I’m so hungry. Red pandas love bamboo, but none grows up here in the snow. It comes from China.']],
         thanks: [['a', 'Bamboo! Crunchy, munchy bamboo! Thank you, Hoot!']],
-        tell: [['a', 'Granny stayed here for a whole week, long ago. Every morning she went up with the geese, to learn how they ride the wind.']],
-        give: [['a', 'Granny left this with my grandma, to keep safe.'], ['hoot', 'Another piece of Granny’s map!']],
+        tell: [['a', 'Your granny stayed here for a whole week, long ago. Every morning she went up with the geese, to learn how they ride the wind.']],
+        give: [['a', 'Your granny left this with my grandma, to keep safe.'], ['hoot', 'Another piece of Granny’s map!']],
         reward: [['a', 'Watch the geese, Hoot. Spread your wings wide, like them, and let the wind carry you.'], ['hoot', 'I’m soaring! Now I can fly two feathers further.']],
-        mystery: [['a', 'Granny said the letter came from the very top of the world. Not the top of a mountain: the top of the whole Earth, where the sea is frozen.']]
+        mystery: [['a', 'Your granny said the letter came from the very top of the world. Not the top of a mountain: the top of the whole Earth, where the sea is frozen.']]
       },
       clueLetter: 'It came from the very top of the world, where the sea is frozen.',
       flash: function () {
@@ -4687,12 +4814,13 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
       place: 'kenya', need: ['scarf', 'honey'], piece: 4, mood: 'sad',
       clue: 'Dear Hoot, the animals here have the longest necks you ever saw. They eat the leaves from the tops of the trees! Love, Granny',
       lines: {
-        match: [['hoot', 'Long necks and tall trees! This is the place on Granny’s postcard!'], ['a', 'Hello, Hoot. Ahem! Excuse me. My grandma knew Granny Hoot.']],
+        match: [['hoot', 'Hello! I’m Hoot. My granny sent this postcard from here, long ago. She was a postal owl.'],
+          ['a', 'Ahem! Excuse me, my throat is sore. A postal owl? My grandma told me about one, who got lost in a dust storm.']],
         ask: [['a', 'I’ve got a sore throat, and my neck is so long it gets cold all the way down! I’d love a warm scarf, and some honey for my throat.']],
         thanks: [['a', 'A tartan scarf, and honey! My throat feels better already. Thank you, Hoot!']],
-        tell: [['a', 'Granny got lost in a dust storm here once. My grandma stretched her neck up high, spotted her, and showed her the way out.']],
-        give: [['a', 'Granny gave my grandma this before she flew on.'], ['hoot', 'Another piece of Granny’s map!']],
-        mystery: [['a', 'Granny said the letter was written by someone big and white and furry, with enormous paws.']]
+        tell: [['a', 'Your granny got lost in a dust storm here once. My grandma stretched her neck up high, spotted her, and showed her the way out.']],
+        give: [['a', 'Your granny gave my grandma this before she flew on.'], ['hoot', 'Another piece of Granny’s map!']],
+        mystery: [['a', 'Your granny said the letter was written by someone big and white and furry, with enormous paws.']]
       },
       clueLetter: 'It was written by someone big, white and furry, with enormous paws.',
       flash: function () {
@@ -4704,12 +4832,13 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
       place: 'brazil', need: ['umbrella'], piece: 2, mood: 'sad',
       clue: 'Dear Hoot, it rains here every single day, in a jungle as big as a country. The birds have big, bright beaks! Love, Granny',
       lines: {
-        match: [['hoot', 'Rain, rain, rain! And a bird with a big bright beak. This is it!'], ['a', 'Granny Hoot’s satchel! My grandma talked about her all the time.']],
+        match: [['hoot', 'Hello! I’m Hoot. My granny sent this postcard from this rainforest, long ago.'],
+          ['a', 'An owl, out in all this rain? My grandma used to sing a song about one!']],
         ask: [['a', 'It rains every single day here, and my feathers never get dry. If only I had an umbrella!']],
         thanks: [['a', 'An umbrella! Now I can stay dry in the rain. Thank you, Hoot!']],
-        tell: [['a', 'Granny sheltered from a great storm here, under my grandma’s biggest leaf. They sang songs together until the rain stopped.']],
-        give: [['a', 'And Granny left this behind. It’s been waiting for you.'], ['hoot', 'Another piece of Granny’s map!']],
-        mystery: [['a', 'Granny said the letter was for some black-and-white birds who can’t fly, but swim like fish.']]
+        tell: [['a', 'Your granny sheltered from a great storm here, under my grandma’s biggest leaf. They sang songs together until the rain stopped.']],
+        give: [['a', 'And your granny left this behind. It’s been waiting for you.'], ['hoot', 'Another piece of Granny’s map!']],
+        mystery: [['a', 'Your granny said the letter was for some black-and-white birds who can’t fly, but swim like fish.']]
       },
       clueLetter: 'It’s for some black-and-white birds who can’t fly, but swim like fish.',
       flash: function () {
@@ -4722,13 +4851,14 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
       place: 'peru', need: ['wool', 'cotton'], piece: 1, reward: { cap: 3 },
       clue: 'Dear Hoot, I’m high in the mountains, among old stone ruins in the clouds. My woolly friend hums while she knits! Love, Granny',
       lines: {
-        match: [['hoot', 'Old stone ruins, high in the mountains. This is the place!'], ['a', 'Mmmm! Granny Hoot’s satchel! My grandma knitted that satchel for her, you know.']],
-        ask: [['a', 'I’d love to knit you a bigger satchel, like my grandma did for Granny. I need the softest wool from the sheep in New Zealand, and cotton from Egypt for the lining.']],
+        match: [['hoot', 'Hello! I’m Hoot. My granny sent this postcard from here, long ago. She carried the post, like me.'],
+          ['a', 'Mmmm! An owl with a satchel full of letters? My grandma told me she knitted one a brand new satchel!']],
+        ask: [['a', 'I’d love to knit you a bigger satchel, like my grandma did for your granny. I need the softest wool from the sheep in New Zealand, and cotton from Egypt for the lining.']],
         thanks: [['a', 'Wool and cotton! Now watch me knit…']],
-        tell: [['a', 'Granny’s old satchel was always too full of letters. So my grandma knitted her a bigger one, and off she flew.']],
-        give: [['a', 'Granny left this with us, too.'], ['hoot', 'Another piece of Granny’s map!']],
+        tell: [['a', 'Your granny’s old satchel was always too full of letters. So my grandma knitted her a bigger one, and off she flew.']],
+        give: [['a', 'Your granny left this with us, too.'], ['hoot', 'Another piece of Granny’s map!']],
         reward: [['a', 'And here’s your new satchel, Hoot!'], ['hoot', 'It has three pockets! Now I can carry three things at once.']],
-        mystery: [['a', 'When Granny left here, she said she was flying south. As far south as anyone can go.']]
+        mystery: [['a', 'When your granny left here, she said she was flying south. As far south as anyone can go.']]
       },
       clueLetter: 'Granny was flying south, as far south as anyone can go.',
       flash: function () { return flashOf('peru', { extra: '<g transform="translate(232,206)"><path d="M-10 -40 L-2 0 M14 -40 L6 0" stroke="#6a5a48" stroke-width="3" stroke-linecap="round"/><rect x="-16" y="-12" width="30" height="20" rx="4" fill="#a87a4a"/><path d="M-14 -6 h26 M-14 0 h26" stroke="#8a5a32" stroke-width="2"/></g>' }); }
@@ -4737,12 +4867,13 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
       place: 'nz', need: ['kiwifruit'], piece: 7, mood: 'sad',
       clue: 'Dear Hoot, there are more sheep than people here! And a little brown bird who can’t fly comes out at night to sniff for worms. Love, Granny',
       lines: {
-        match: [['hoot', 'Sheep everywhere, and a little bird who can’t fly. This is it!'], ['a', 'Granny Hoot’s satchel! My grandma was her friend.']],
+        match: [['hoot', 'Hello! I’m Hoot. My granny sent this postcard from here, long ago.'],
+          ['a', 'An owl? My grandma met one, when she was little! They used to sit up together at night, under the stars.']],
         ask: [['a', 'Everyone thinks kiwi fruit come from here, because they’re named after us. But they first came from China! I’ve never even tasted one.']],
         thanks: [['a', 'A kiwi fruit! It’s brown and fuzzy, just like me! Thank you, Hoot!']],
-        tell: [['a', 'This is where Granny set off on her longest flight ever. South, over the cold, grey sea.']],
+        tell: [['a', 'This is where your granny set off on her longest flight ever. South, over the cold, grey sea.']],
         give: [['a', 'She gave my grandma this before she went.'], ['hoot', 'Another piece of Granny’s map!']],
-        mystery: [['a', 'But it was too far, Hoot. Granny ran out of puff over the sea, and a whale carried her all the way back here.'], ['hoot', 'So that’s why the letter never got there.']]
+        mystery: [['a', 'But it was too far, Hoot. Your granny ran out of puff over the sea, and a whale carried her all the way back here.'], ['hoot', 'So that’s why the letter never got there.']]
       },
       clueLetter: 'Granny ran out of puff over the cold sea, and a whale carried her back. The letter never got there.',
       flash: function () {
@@ -4757,11 +4888,12 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
       place: 'hawaii', need: ['ice', 'vanilla'], piece: 0, mood: 'sad', reward: { stars: true },
       clue: 'Dear Hoot, I’m on a warm island in the middle of the biggest ocean, under a smoking volcano. Aloha! Love, Granny',
       lines: {
-        match: [['hoot', 'A warm island under a smoking volcano. Aloha! This is it!'], ['a', 'Aloha, Hoot! That’s Granny Hoot’s satchel. My grandma met her right here, on this beach.']],
+        match: [['hoot', 'Aloha! I’m Hoot. My granny sent this postcard from this island, long ago.'],
+          ['a', 'Aloha, Hoot! An owl, all the way out here? My grandma met one, right here on this beach. Nobody believed her!']],
         ask: [['a', 'The sand is so hot today! I’d love some ice cream. I need ice from Antarctica, and vanilla from Madagascar, to make it.']],
         thanks: [['a', 'Ice, and vanilla! Vanilla ice cream! Thank you, Hoot!']],
-        tell: [['a', 'Long ago, my grandma swam beside the great canoes that sailed across this ocean. Their sailors steered by the stars, all night long. She taught Granny how.']],
-        give: [['a', 'Granny left this with my grandma.'], ['hoot', 'The last piece of Granny’s map!']],
+        tell: [['a', 'Long ago, my grandma swam beside the great canoes that sailed across this ocean. Their sailors steered by the stars, all night long. She taught your granny how.']],
+        give: [['a', 'Your granny left this with my grandma.'], ['hoot', 'The last piece of Granny’s map!']],
         reward: [['a', 'Now I’ll teach you, Hoot. Watch the stars, and you’ll always find your way.'], ['hoot', 'Star-steering! When I set off at night, every feather takes me further.']],
         mystery: [['a', 'Do you know, Hoot? Polar bears live at the top of the world, and penguins at the bottom. They’ve never met!'],
           ['hoot', 'Big, white and furry, with enormous paws… The letter is from a polar bear, to the penguins!'],
@@ -4783,8 +4915,9 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
       clue: 'Granny’s letter has a polar bear’s paw print for a stamp. I’ll take it to the polar bears, at the top of the world!',
       lines: {
         notHere: [['hoot', 'No polar bears here. They live at the very top of the world.']],
-        match: [['hoot', 'The top of the world! Excuse me, Polar bear. Do you know this paw print?'], ['a', 'That’s my grandma’s paw print! She wrote that letter, long, long ago.']],
-        tell: [['a', 'My grandma always wondered about the black-and-white birds at the bottom of the world. She wrote to them, and Granny Hoot promised to take her letter.'], ['a', 'But it was too far, and the letter never got there.']],
+        match: [['hoot', 'Hello! I’m Hoot. My granny left this letter, and never delivered it. Do you know whose paw print this is?'],
+          ['a', 'Let me see… That’s my grandma’s paw print! She signed all her letters with it. She wrote this one long, long ago.']],
+        tell: [['a', 'My grandma always wondered about the black-and-white birds at the bottom of the world. She wrote to them, and your granny promised to take her letter.'], ['a', 'But it was too far, and the letter never got there.']],
         give: [['a', 'Will you take it, Hoot? You can fly further than any owl there has ever been.'], ['hoot', 'I will! All the way to the bottom of the world.']],
         next: [['hoot', 'Antarctica is the furthest place there is. I’ll need to plan this flight very carefully.']]
       },
@@ -4811,7 +4944,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
         ask: [['a', 'Hoot, you’re back! Did the letter get there? Are the penguins real?']],
         thanks: [['a', 'A letter from the penguins! They’re real! They really are!'],
           ['a', '“Dear polar bear, we are real, and so are you! Let’s write to each other for ever. Love from the penguins.”']],
-        tell: [['a', 'Thank you, Hoot. You finished Granny’s journey.']],
+        tell: [['a', 'Thank you, Hoot. You finished your granny’s journey.']],
         give: [['hoot', 'I couldn’t have done it without all my friends, all round the world.']]
       }
     }
@@ -5156,7 +5289,11 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
 
   function sizeLayer(n) { n.style.width = VW + 'px'; n.style.height = VH + 'px'; }
 
-  function layout() {
+  var laidOut = '';
+  function layout(force) {
+    var key = window.innerWidth + 'x' + window.innerHeight;
+    if (key === laidOut && !force) { return; }
+    laidOut = key;
     VW = Math.max(1, window.innerWidth); VH = Math.max(1, window.innerHeight);
     dpr = Math.min(2, window.devicePixelRatio || 1);
     [space, gcv, over, scene].forEach(sizeLayer);
@@ -5294,9 +5431,10 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     clear(g);
     if (!saved.prologue) { return; }
     var m = 14, gap = 8, b = bagArt(saved.cap, SLOT_PX, saved.bag, gap);
-    var bg = el('g', { transform: 'translate(' + m + ',' + f2(VH - m - b.h) + ')' }, g);
+    var bg = el('g', { 'data-hit': 'bag', transform: 'translate(' + m + ',' + f2(VH - m - b.h) + ')' }, g);
     bg.innerHTML = b.art;
-    hud.feathers = el('g', { transform: 'translate(' + f2(m + b.w + 18) + ',' + f2(VH - m - 6) + ')' }, g);
+    hud.bag = bg;
+    hud.feathers = el('g', { 'data-hit': 'feathers', transform: 'translate(' + f2(m + b.w + 18) + ',' + f2(VH - m - 6) + ')' }, g);
     var gw = Math.min(150, VW * 0.3), gh2 = gw * 0.7, art = goalArt(gw, gh2);
     hud.goal = null;
     if (art) {
@@ -5317,7 +5455,8 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
       if (i >= saved.puff) { s += '<g transform="translate(' + x + ',0)">' + featherArt('none', '#a8b0c8', true) + '</g>'; }
       else { s += '<g transform="translate(' + x + ',0)">' + featherArt(i < cost ? '#ffd34a' : '#f2e2c4', i < cost ? '#b07a10' : '#a87b55') + '</g>'; }
     }
-    hud.feathers.innerHTML = s;
+    // a clear patch behind, so a finger anywhere on the row counts
+    hud.feathers.innerHTML = '<rect class="hit" x="-16" y="-44" width="' + (n * 21 + 12) + '" height="56"/>' + s;
   }
   function showGoalZoom(on) {
     var z = $('cluezoom');
@@ -5373,7 +5512,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
   var fe = null;           // a ride home on a sea creature's back, after running out of puff
   var splash = null;       // where Hoot came down in the sea
   var pointArrow = null;   // which way a puzzled friend pointed: { from, to }
-  var saidTooFar = false, saidStars = false;
+  var saidTooFar = false, saidStars = false, starsLesson = false;
   var MAX_TURN = 150;   // degrees a second; a finger can't spin the world faster
 
   // Taps are rationed: each target has a cooldown, and no more than four
@@ -5428,7 +5567,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
       goal.lon = mid[1]; goal.lat = clamp(mid[0], -62, 62);
     }
     var short = tripCost(here, id) > saved.puff;
-    if (starry(here) && !saidStars) { saidStars = true; talk({ who: 'hoot', text: 'It’s dark, so I can steer by the stars. Every feather will take me further!' }); }
+    if (starry(here)) { saidStars = true; starsLesson = true; }
     setGear(gh, 'sweat', short);
     if (short) {
       gh.shiver = 0.6;
@@ -5502,7 +5641,9 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
   function puffedOut() {
     var P = slerp(fl.a, fl.b, fl.runAt), flown = fl.miles * fl.runAt, N = nearestPlace(P, fl.to.id);
     var b = vec(N.lat, N.lon), ang = angBetween(P, b), miles = Math.round(ang * EARTH_MILES);
-    talk({ who: 'hoot', text: 'Oh no! I’m all puffed out!' });
+    if (!teach('puffout', [{ at: hud.feathers, lines: ['Oh no! I’m all puffed out!', 'I tried to fly further than my feathers could carry me. Next time I’ll count them before I set off!'] }])) {
+      talk({ who: 'hoot', text: 'Oh no! I’m all puffed out!' });
+    }
     tone({ f: 900, f2: 280, d: 0.8, type: 'triangle', g: 0.08, a: 0.02, s: 0.2 });
     if (isLand(P)) {
       fl = {
@@ -5652,6 +5793,8 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
       if (tapOk('goal', 1)) { showGoalZoom(true); talk(goalLines(), function () { showGoalZoom(false); }); }
       return;
     }
+    if (d.hit === 'feathers' && !spot.busy) { if (tapOk('feathers', 1)) { explain([{ at: hud.feathers, lines: feathersLines() }]); } return; }
+    if (d.hit === 'bag' && !spot.busy) { if (tapOk('bag', 1)) { explain([{ at: hud.bag, lines: bagLines() }]); } return; }
     globeTap(d.x0, d.y0);
   }
   over.addEventListener('pointerup', function (e) { endDrag(e, false); });
@@ -6050,8 +6193,8 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     var p = S.place, e = sunElev(p.lat, p.lon), H = hourAngle(p.lon);
     S.elev = e;
     var cols = skyCols(e, p);
-    $('sc-s0').setAttribute('stop-color', cols[0]);
-    $('sc-s1').setAttribute('stop-color', cols[1]);
+    setAttr($('sc-s0'), 'stop-color', cols[0]);
+    setAttr($('sc-s1'), 'stop-color', cols[1]);
     var n = smooth((2 - e) / 12);
     if (Math.abs(n - S.nightV) > 0.004) {
       S.nightV = n;
@@ -6059,18 +6202,18 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
       scene.style.setProperty('--nc', (n * 0.72).toFixed(3));
       scene.style.setProperty('--d', (1 - n).toFixed(3));
     }
-    $('sc-stars').setAttribute('opacity', f2(smooth((-3 - e) / 8)));
+    setAttr($('sc-stars'), 'opacity', f2(smooth((-3 - e) / 8)));
     var hy = p.home ? SH * 0.5 : stage.hy, south = p.lat < 0 ? -1 : 1;
     var sun = $('sc-sun'), moon = $('sc-moon');
     var sx = 500 + Math.sin(H * D2R) * 380 * south, sy = hy - clamp(e / 60, -0.3, 1) * (hy - 70);
-    sun.setAttribute('transform', 'translate(' + f2(sx) + ',' + f2(sy) + ')');
-    sun.setAttribute('opacity', e > -4 ? '1' : '0');
+    setAttr(sun, 'transform', 'translate(' + f2(sx) + ',' + f2(sy) + ')');
+    setAttr(sun, 'opacity', e > -4 ? '1' : '0');
     var me = moonElev(p.lat, p.lon);
     var mx = 500 + Math.sin((H + 180) * D2R) * 380 * south, my = hy - clamp(me / 60, -0.3, 1) * (hy - 70);
-    moon.setAttribute('transform', 'translate(' + f2(mx) + ',' + f2(my) + ')');
-    moon.setAttribute('opacity', me > -4 ? f2(0.25 + 0.75 * n) : '0');
+    setAttr(moon, 'transform', 'translate(' + f2(mx) + ',' + f2(my) + ')');
+    setAttr(moon, 'opacity', me > -4 ? f2(0.25 + 0.75 * n) : '0');
     var warm = Math.exp(-(e - 1) * (e - 1) / 20) * 0.15;
-    $('sc-warm').setAttribute('opacity', f2(p.home ? 0 : warm));
+    setAttr($('sc-warm'), 'opacity', f2(p.home ? 0 : warm));
   }
 
   // ------------------------------------------------------------------
@@ -6217,9 +6360,9 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
       setAll(pt.eyes, 'translate(' + pv.eyes[0] + ',' + pv.eyes[1] + ') scale(1,' + f2(Math.max(0.08, P.eyes)) + ') translate(' + (-pv.eyes[0]) + ',' + (-pv.eyes[1]) + ')');
     }
     var f = A.face, fs = (f >= 0 ? 1 : -1) * Math.max(0.05, Math.abs(f));
-    A.flip.setAttribute('transform', 'scale(' + f2(fs) + ',1)');
-    A.bob.setAttribute('transform', 'translate(' + f2(P.bx) + ',' + f2(P.by) + ') rotate(' + f2(P.br) + ' ' + f2(P.bcx) + ' ' + f2(P.bcy) + ') scale(' + f2(P.bsx) + ',' + f2(P.bsy) + ')');
-    A.node.setAttribute('transform', 'translate(' + f2(A.x) + ',' + f2(A.y) + ') scale(' + f2(A.s) + ')');
+    setAttr(A.flip, 'transform', 'scale(' + f2(fs) + ',1)');
+    setAttr(A.bob, 'transform', 'translate(' + f2(P.bx) + ',' + f2(P.by) + ') rotate(' + f2(P.br) + ' ' + f2(P.bcx) + ' ' + f2(P.bcy) + ') scale(' + f2(P.bsx) + ',' + f2(P.bsy) + ')');
+    setAttr(A.node, 'transform', 'translate(' + f2(A.x) + ',' + f2(A.y) + ') scale(' + f2(A.s) + ')');
   }
 
   // ------------------------------------------------------------------
@@ -6346,7 +6489,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     b.t += dt;
     var k = reduced ? 1 : easeOut(b.t / 0.25), pop = 1 + (b.pop || 0) * 0.08;
     b.pop = Math.max(0, (b.pop || 0) - dt * 4);
-    b.g.setAttribute('transform', 'translate(' + f2(b.x) + ',' + f2(b.y) + ') scale(' + f2(k * pop) + ')');
+    setAttr(b.g, 'transform', 'translate(' + f2(b.x) + ',' + f2(b.y) + ') scale(' + f2(k * pop) + ')');
   }
 
   // ------------------------------------------------------------------
@@ -6433,9 +6576,9 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
   }
   // The animal's own thoughts: a friend's wish, or a maker's recipe.
   function showThoughts() {
-    var g = $('sc-thought');
+    var g = $('sc-thought'), was = S && S.thought;
     clear(g);
-    S.thought = null;
+    if (S) { S.thought = null; }
     if (!S || !S.animal || !saved.prologue) { return; }
     var p = S.place, want = needAt(p.id), made = madeAt(p.id), art = '', w = 0;
     if (want) { art = thoughtArt(want); w = 90; }
@@ -6447,14 +6590,14 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     var b = bubbleSpot(), x = clamp(b.x + 40, stage.x0 + 20, stage.x1 - w - 20), y = Math.max(stage.y0 + 110, b.y - 52);
     var tg = el('g', {}, g);
     tg.innerHTML = art;
-    S.thought = { g: tg, x: x, y: y, t: 0 };
+    S.thought = { g: tg, x: x, y: y, t: was && was.art === art ? was.t : 0, art: art };
   }
   function thoughtFrame(dt) {
     var T = S.thought;
     if (!T) { return; }
     T.t += dt;
     var k = reduced ? 1 : easeOut(T.t / 0.3), bob = reduced ? 0 : Math.sin(T.t * 2) * 3;
-    T.g.setAttribute('transform', 'translate(' + f2(T.x) + ',' + f2(T.y + bob) + ') scale(' + f2(k) + ')');
+    setAttr(T.g, 'transform', 'translate(' + f2(T.x) + ',' + f2(T.y + bob) + ') scale(' + f2(k) + ')');
   }
   // The point on an animal things are handed to.
   function handPoint() {
@@ -6719,8 +6862,9 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
       });
     });
   }
-  // Found it: the card comes back to life, the friend knows the satchel,
-  // and its trouble shows.
+  // Found it: the card comes back to life, Hoot asks about Granny, the
+  // friend knows its own home in the picture and remembers its
+  // grandmother's stories, and its trouble shows.
   function matchStory(c) {
     var H = S.hoot, A = S.animal, p = S.place, w = Math.min(420, SH * 0.5), h = w * 0.7;
     var x = (1000 - w) / 2, y = Math.max(16, (stage.hy - h) * 0.4);
@@ -7061,14 +7205,15 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
       // weather manners
       if (p.climate === 'cold' && S.time > S.nextShiver) { S.nextShiver = S.time + 6 + Math.random() * 4; H.shiver = 0.6; }
       if (p.climate === 'hot' && e > 2 && S.time > S.nextFan) { S.nextFan = S.time + 7 + Math.random() * 4; H.fan = 1.1; }
-      // once hellos are done, the story has its turn
+      // once hellos are done, the story has its turn, and then any lessons
       if (S.ready && !S.storyStarted) { S.storyStarted = true; arrivalStory(); }
+      else if (S.storyStarted) { sceneLessons(); }
     }
     // a full satchel waits a few seconds to be told what to put back
     if (S.swap && S.time > S.swap.until) { S.swap = null; }
     if (shud.g) {
       var wig = S.swap && !reduced ? Math.sin(S.time * 18) * 2.5 : 0;
-      shud.g.setAttribute('transform', 'translate(' + f2(shud.x0) + ',' + f2(shud.y0) + ') rotate(' + f2(wig) + ')');
+      setAttr(shud.g, 'transform', 'translate(' + f2(shud.x0) + ',' + f2(shud.y0) + ') rotate(' + f2(wig) + ')');
     }
     if (S.phase === 'landed' || S.phase === 'leave') {
       var hot = p.climate === 'hot' && e > 2;
@@ -7666,6 +7811,8 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
   function tick(dt) {
     clock += dt;
     dlgFrame(dt);
+    spotFrame();
+    globeLessons();
     // A resize event can be missed (a phone's address bar, a pane opening),
     // so the size is checked every frame as well.
     if ((window.innerWidth !== VW || window.innerHeight !== VH) && !resizeTimer) { onResize(); }
