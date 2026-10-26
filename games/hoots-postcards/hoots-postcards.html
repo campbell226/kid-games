@@ -21,6 +21,7 @@
   }
   canvas, svg.layer { position: fixed; left: 0; top: 0; display: block; width: 100vw; height: 100vh; }
   #scene { opacity: 0; visibility: hidden; }
+  #wxcv { pointer-events: none; opacity: 0; }
   text { font-family: ui-rounded, "Arial Rounded MT Bold", "Baloo 2", "Comic Sans MS", system-ui, sans-serif; font-weight: 700; }
   /* Every scene is drawn twice, by day and by night, and the night copy
      fades in over the top as the sun goes down. */
@@ -150,6 +151,7 @@
   <g id="ghoot"></g>
   <g id="counter" opacity="0"></g>
   <g id="ovhud"></g>
+  <g id="think" pointer-events="none"></g>
   <g id="cluezoom" display="none"></g>
 </svg>
 
@@ -207,8 +209,10 @@
   <g id="sc-hud"></g>
   <g id="sc-ui"></g>
   <g id="sc-fly"></g>
+  <g id="sc-think" pointer-events="none"></g>
 </svg>
 
+<canvas id="wxcv"></canvas>
 <div id="dlgcatch" hidden></div>
 <div id="dlg" hidden>
   <div id="dlg-face"></div>
@@ -380,12 +384,12 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
 
   // ------------------------------------------------------------------
   // The sun. Its tilt is today's, so the seasons are real: in winter the
-  // Arctic stays dark and Antarctica stays light. But a day passes in three
+  // Arctic stays dark and Antarctica stays light. But a day passes in ten
   // minutes, starting from the real time, so the night sweeps round the
   // globe and nowhere is stuck in it because the children always play at
-  // teatime in Leeds.
+  // teatime in Leeds. (Three minutes was tried first: too hurried.)
   // ------------------------------------------------------------------
-  var DAY_SECONDS = 180;
+  var DAY_SECONDS = 600;
   var T0 = new Date();
   var DOY = Math.floor((Date.UTC(T0.getUTCFullYear(), T0.getUTCMonth(), T0.getUTCDate())
     - Date.UTC(T0.getUTCFullYear(), 0, 0)) / 86400000);
@@ -813,6 +817,125 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
   dlg.catcher.addEventListener('pointerdown', dlgTap);
 
   // ------------------------------------------------------------------
+  // Hoot thinking aloud: the next thing he's trying to do, in a little
+  // bubble by him that doesn't stop play and fades after a few seconds.
+  // He thinks it when nothing has been tapped for a while, and when he
+  // lands somewhere that's no help with what he's doing.
+  // ------------------------------------------------------------------
+  var think = { g: null, t: 0, dur: 0, idle: 0, globe: false };
+  var SEEK = {
+    japan: 'where monkeys have hot baths in the snow', nepal: 'under the tallest mountain in the world',
+    kenya: 'where the animals have the longest necks', brazil: 'in a rainy jungle, where the birds have big bright beaks',
+    peru: 'with old stone ruins, high in the mountains', nz: 'where there are more sheep than people',
+    hawaii: 'on a warm island, under a smoking volcano'
+  };
+  function nextStep() {
+    var c = chapter(), bag = saved.bag;
+    if (!saved.prologue || !c) { return ''; }
+    if (storyDone()) {
+      if (bag.indexOf('letter') >= 0) { return 'I’m taking the polar bears’ letter to the penguins, at the bottom of the world.'; }
+      if (bag.indexOf('reply') >= 0) { return 'I’m taking the penguins’ letter to the polar bears, at the top of the world.'; }
+      return 'I wonder if the polar bears have another letter for the penguins?';
+    }
+    if (saved.chState === 'find') {
+      if (c.card === 'letter') { return 'I need to find the polar bears, at the top of the world, and show them Granny’s letter.'; }
+      return 'I’m looking for the place on Granny’s postcard, ' + (SEEK[c.place] || 'somewhere far away') + '.';
+    }
+    var left = needAt(c.place) || [];
+    if (!left.length) { return ''; }
+    var k = left[0], it = ITEMS[k], who = 'the ' + whoIs(c.place) + ' in ' + inName(c.place), full = bag.length >= saved.cap;
+    var room = full ? ' My satchel’s full, so I’ll have to put something back.' : '';
+    var one = /^an? /.test(itemName(k)) ? 'one' : 'some';
+    if (left.length > 1 && left.every(function (x) { return bag.indexOf(x) >= 0; })) {
+      return here === c.place && mode === 'scene' ? 'I can give ' + andList(left.map(itemName)) + ' to the ' + whoIs(c.place) + ' now, from my satchel.' : 'I’ve got ' + andList(left.map(itemName)) + '. Now I need to take them to ' + who + '.';
+    }
+    if (bag.indexOf(k) >= 0) {
+      return here === c.place && mode === 'scene' ? 'I can give ' + itemName(k) + ' to the ' + whoIs(c.place) + ' now, from my satchel.' : 'I’ve got ' + itemName(k) + '. Now I need to take it to ' + who + '.';
+    }
+    if (it.made) {
+      var held = saved.held[it.from] || [], missing = it.made.filter(function (i) { return bag.indexOf(i) < 0 && held.indexOf(i) < 0; });
+      var maker = 'the ' + whoIs(it.from) + ' in ' + inName(it.from);
+      if (!missing.length) { return 'I’ve got what ' + maker + ' needs to make ' + itemName(k) + '. I’ll take it there.'; }
+      var m = missing[0], src = ITEMS[m].from;
+      if (src === here && mode === 'scene') { return capFirst(maker) + ' can make ' + itemName(k) + ' for ' + who + '. There’s ' + itemName(m) + ' in the basket here!' + room; }
+      return capFirst(maker) + ' can make ' + itemName(k) + ' for ' + who + '. First I need ' + itemName(m) + ', from ' + inName(src) + '.' + room;
+    }
+    if (it.from === here && mode === 'scene') { return capFirst(who) + ' needs ' + itemName(k) + ', and there’s ' + one + ' in the basket here!' + room; }
+    if (it.from) { return capFirst(who) + ' needs ' + itemName(k) + '. I can find it in ' + inName(it.from) + '.' + room; }
+    return capFirst(who) + ' needs ' + itemName(k) + '.';
+  }
+  // Somewhere that has nothing to do with the next steps, while there are
+  // next steps to take.
+  function offTopic(id) {
+    var c = chapter();
+    if (!saved.prologue || !c || BYID[id].home || saved.chState === 'find') { return false; }
+    if (storyDone()) { return id !== 'arctic' && id !== 'antarctica'; }
+    var ok = {};
+    ok[c.place] = 1;
+    (needAt(c.place) || []).forEach(function (k) {
+      var it = ITEMS[k];
+      if (it.from) { ok[it.from] = 1; }
+      (it.made || []).forEach(function (i) { if (ITEMS[i].from) { ok[ITEMS[i].from] = 1; } });
+    });
+    return !ok[id];
+  }
+  function thinkHide() {
+    if (think.g && think.g.parentNode) { think.g.parentNode.removeChild(think.g); }
+    think.g = null;
+  }
+  function thinkSay(text) {
+    thinkHide();
+    if (!text) { return; }
+    var globe = mode === 'globe', host = globe ? $('think') : $('sc-think');
+    if (!globe && (!S || !S.hoot)) { return; }
+    // sizes are in screen pixels on the globe, in the scene's own units in a scene
+    var u = globe ? 1 : 1000 / VW, W = globe ? VW : 1000, Hh = globe ? VH : SH;
+    var fs = 17 * u, lines = wrapText(text, VW < 520 ? 24 : 34), lh = fs * 1.28, pad = fs * 0.75;
+    var w = Math.max.apply(null, lines.map(function (l) { return l.length; })) * fs * 0.53 + pad * 2, h = lines.length * lh + pad * 1.4;
+    var at = globe ? { x: gh.x, y: gh.y - 46 * gh.s } : toView(S.hoot.x, S.hoot.y - 150);
+    // in a scene, to Hoot's left if there's room (the friend and its hello
+    // are to his right); otherwise above him, and clear of the hello bubble
+    var left = !globe && at.x - 60 * u - w > Math.max(10 * u, stage.tx + 0.02 * stage.s);
+    var right = !left && at.x + 24 * u + w < W - 10 * u;
+    var x = left ? at.x - 60 * u - w : (right ? at.x + 24 * u : at.x - 24 * u - w), y = clamp(at.y - h - 22 * u, 10 * u, Hh - h - 10 * u);
+    if (left) { y = clamp(at.y - h * 0.4, 10 * u, Hh - h - 10 * u); }
+    x = clamp(x, 10 * u, W - w - 10 * u);
+    if (!globe && !left && S.bubble) {
+      var b = S.bubble, bx0 = stage.tx + (b.x - b.w / 2) * stage.s, by0 = stage.ty + (b.y - b.h / 2) * stage.s, bx1 = bx0 + b.w * stage.s, by1 = by0 + (b.h + 30) * stage.s;
+      if (x < bx1 && x + w > bx0 && y < by1 && y + h > by0) { y = Math.max(10 * u, by0 - h - 14 * u); }
+    }
+    var tx = left ? x + w - 10 * u : (right ? x + 10 * u : x + w - 10 * u);
+    var sv = '<rect x="' + f2(x) + '" y="' + f2(y) + '" width="' + f2(w) + '" height="' + f2(h) + '" rx="' + f2(Math.min(h / 2, 22 * u)) + '" fill="#ffffff" stroke="#d8d2c4" stroke-width="' + f2(2 * u) + '"/>'
+      + '<circle cx="' + f2(tx) + '" cy="' + f2(y + h + 8 * u) + '" r="' + f2(6 * u) + '" fill="#ffffff" stroke="#d8d2c4" stroke-width="' + f2(1.5 * u) + '"/>'
+      + '<circle cx="' + f2(tx + (right ? -8 : 8) * u) + '" cy="' + f2(y + h + 20 * u) + '" r="' + f2(3.5 * u) + '" fill="#ffffff" stroke="#d8d2c4" stroke-width="' + f2(1.2 * u) + '"/>';
+    lines.forEach(function (l, i) {
+      sv += '<text x="' + f2(x + pad) + '" y="' + f2(y + pad * 0.7 + lh * (i + 0.78)) + '" font-size="' + f2(fs) + '" fill="#3b3350">' + l + '</text>';
+    });
+    think.g = el('g', { opacity: 0 }, host);
+    think.g.innerHTML = sv;
+    think.t = 0; think.dur = 3 + text.length * 0.06; think.globe = globe;
+  }
+  function thinkFrame(dt) {
+    var calm = !dlg.cur && !spot.busy && saved.prologue;
+    if (think.g) {
+      think.t += dt;
+      var gone = think.globe ? mode !== 'globe' : (mode !== 'scene' || !S);
+      if (gone || dlg.cur || think.t > think.dur) { thinkHide(); }
+      else { setAttr(think.g, 'opacity', f2(Math.min(1, think.t / 0.3, (think.dur - think.t) / 0.5))); }
+      return;
+    }
+    if (!calm) { think.idle = Math.min(think.idle, 0); return; }
+    var still = false;
+    if (mode === 'globe' && !sel && !drag && !fl) { still = true; }
+    if (mode === 'scene' && S && !S.place.home && S.ready && !S.busy && S.phase === 'landed') { still = true; }
+    if (!still) { return; }
+    think.idle += dt;
+    if (think.idle > (mode === 'globe' ? 8 : 10)) { think.idle = -25; thinkSay(nextStep()); }
+  }
+  // any touch at all: Hoot stops thinking aloud, and the wait starts again
+  document.addEventListener('pointerdown', function () { think.idle = Math.min(think.idle, 0); thinkHide(); }, true);
+
+  // ------------------------------------------------------------------
   // First times. The first time each thing matters, Hoot stops and says
   // what it is and what it's for, with it ringed and the rest dimmed. A
   // lesson is a list of steps, each a thing to ring (an element, or none)
@@ -1192,7 +1315,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     }
     if (!gl) { cpu = gcv.getContext('2d'); }
     // A bigger map only where the screen and the card can use it.
-    texW = gl ? ((glp.maxTex >= 4096 && GR * dpr > 520) ? 4096 : 2048) : 1024;
+    texW = gl ? (glp.maxTex >= 4096 ? 4096 : 2048) : 1024;
     refreshWorld();
   }
   function refreshWorld() {
@@ -2133,7 +2256,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
       S.steamT -= dt;
       if (S.steamT <= 0) {
         S.steamT = 0.3;
-        spawn({ kind: 'dot', r: 16, fill: 'url(#sc-soft)', op: 0.5, x: 480 + Math.random() * 260, y: 522, vx: (Math.random() - 0.5) * 10, vy: -24, life: 2.6, grow: 1.1, sway: 8, fadeIn: 0.8 });
+        steamPuff(480 + Math.random() * 260, 522);
       }
     },
     props: [
@@ -5297,6 +5420,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     VW = Math.max(1, window.innerWidth); VH = Math.max(1, window.innerHeight);
     dpr = Math.min(2, window.devicePixelRatio || 1);
     [space, gcv, over, scene].forEach(sizeLayer);
+    sizeWx();
     gcv.width = Math.round(VW * dpr); gcv.height = Math.round(VH * dpr);
     GC = { x: VW / 2, y: VH * 0.53 };
     GR = Math.max(60, Math.min(VW * 0.45, VH * 0.41));
@@ -5514,6 +5638,9 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
   var pointArrow = null;   // which way a puzzled friend pointed: { from, to }
   var saidTooFar = false, saidStars = false, starsLesson = false;
   var MAX_TURN = 150;   // degrees a second; a finger can't spin the world faster
+  // How far in the globe is zoomed: to fit a trip that's been picked, or
+  // as far as two fingers have pinched it. Capped both ways.
+  var cam = { z: 1, goal: 1, user: 1 }, ZMAX = 4, lastR = 100, selT = 0, selAt = null;
 
   // Taps are rationed: each target has a cooldown, and no more than four
   // taps a second count for anything at all.
@@ -5557,15 +5684,15 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     if (!id) { return; }
     gh.pop = 0.6;
     SND.pop(0.9);
-    // a trip that's mostly round the back of the globe (over the pole, say)
-    // would squash all its feather stops into a sliver, so the globe turns
-    // to show it
-    var a = vec(BYID[here].lat, BYID[here].lon), b = vec(BYID[id].lat, BYID[id].lon), seen = 0;
-    for (var i = 0; i <= 20; i++) { if (project(slerp(a, b, i / 20), GR).z > 0.15) { seen += 1; } }
-    if (seen < 16) {
-      var mid = latlon(norm(slerp(a, b, 0.5)));
-      goal.lon = mid[1]; goal.lat = clamp(mid[0], -62, 62);
-    }
+    // the globe turns to the middle of the trip and zooms in until the trip
+    // fills the screen, so its feather stops are big enough to count
+    var a = vec(BYID[here].lat, BYID[here].lon), b = vec(BYID[id].lat, BYID[id].lon);
+    var mid = latlon(norm(slerp(a, b, 0.5)));
+    goal.lon = mid[1]; goal.lat = clamp(mid[0], -62, 62);
+    var c = vec(goal.lat, goal.lon), far = Math.max(angBetween(c, a), angBetween(c, b));
+    var room = Math.min(VW * 0.4, VH * 0.32);
+    cam.goal = far > 1.3 ? 1 : clamp(room / (GR * Math.sin(far)), 1, ZMAX);
+    selT = performance.now();
     var short = tripCost(here, id) > saved.puff;
     if (starry(here)) { saidStars = true; starsLesson = true; }
     setGear(gh, 'sweat', short);
@@ -5735,7 +5862,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
   }
 
   function globeTap(x, y) {
-    var R = GR, best = null, bd = 1e9;
+    var R = lastR, best = null, bd = 1e9;
     // the place under the finger, or Hoot himself
     markers.forEach(function (m) {
       if (m.z < 0.12) { return; }
@@ -5758,6 +5885,12 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
       if (tapOk('space', 1)) { SND.hoot(); gh.pop = 1; gh.hootT = 0.95; }
       return;
     }
+    // while the globe is still turning to a trip just picked, a second tap
+    // where the first one was means go; anywhere else, it waits
+    if (sel && performance.now() - selT < 900 && best.id !== sel) {
+      if (selAt && Math.abs(x - selAt.x) < 70 && Math.abs(y - selAt.y) < 70) { best = BYID[sel]; } else { return; }
+    }
+    selAt = { x: x, y: y };
     if (!tapOk('globe', 0.4)) { return; }
     // Tap a place once to see the trip, again to go. Hoot's own place
     // takes him in.
@@ -5766,20 +5899,36 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     else { select(best.id); }
   }
 
+  var pts = {}, pinch = null;
+  function twoPts() { var k = Object.keys(pts); return k.length >= 2 ? [pts[k[0]], pts[k[1]]] : null; }
   over.addEventListener('pointerdown', function (e) {
     unlock();
+    pts[e.pointerId] = { x: e.clientX, y: e.clientY };
+    var two = twoPts();
+    if (two && mode === 'globe') {
+      // a second finger: a pinch, and the first is no longer a tap or a turn
+      pinch = { d0: Math.max(20, Math.hypot(two[0].x - two[1].x, two[0].y - two[1].y)), z0: cam.z };
+      if (drag) { drag.moved = true; drag.pinched = true; goal.lon = view.lon; goal.lat = view.lat; }
+      return;
+    }
     if (mode !== 'globe' || drag) { return; }
     var t = e.target, h = (t && t.closest) ? t.closest('[data-hit]') : null;
     drag = { id: e.pointerId, x0: e.clientX, y0: e.clientY, t0: performance.now(), moved: false, lon0: view.lon, lat0: view.lat, hit: h ? h.getAttribute('data-hit') : null };
     try { over.setPointerCapture(e.pointerId); } catch (err) { /* not every browser */ }
   });
   over.addEventListener('pointermove', function (e) {
-    if (!drag || drag.id !== e.pointerId) { return; }
+    if (pts[e.pointerId]) { pts[e.pointerId] = { x: e.clientX, y: e.clientY }; }
+    var two = pinch && twoPts();
+    if (two) {
+      cam.user = cam.goal = clamp(pinch.z0 * Math.hypot(two[0].x - two[1].x, two[0].y - two[1].y) / pinch.d0, 1, ZMAX);
+      return;
+    }
+    if (!drag || drag.id !== e.pointerId || drag.pinched) { return; }
     var dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
     if (!drag.moved && dx * dx + dy * dy > 100) { drag.moved = true; }
     if (drag.moved && !drag.hit) {
-      goal.lon = wrap180(drag.lon0 - dx / GR * R2D);
-      goal.lat = clamp(drag.lat0 + dy / GR * R2D, -62, 62);
+      goal.lon = wrap180(drag.lon0 - dx / (GR * cam.z) * R2D);
+      goal.lat = clamp(drag.lat0 + dy / (GR * cam.z) * R2D, -62, 62);
     }
   });
   function endDrag(e, cancelled) {
@@ -5797,8 +5946,12 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     if (d.hit === 'bag' && !spot.busy) { if (tapOk('bag', 1)) { explain([{ at: hud.bag, lines: bagLines() }]); } return; }
     globeTap(d.x0, d.y0);
   }
-  over.addEventListener('pointerup', function (e) { endDrag(e, false); });
-  over.addEventListener('pointercancel', function (e) { endDrag(e, true); });
+  function liftPt(e) { delete pts[e.pointerId]; if (pinch && !twoPts()) { pinch = null; } }
+  over.addEventListener('pointerup', function (e) { liftPt(e); endDrag(e, false); });
+  over.addEventListener('pointercancel', function (e) { liftPt(e); endDrag(e, true); });
+  // a finger lifted anywhere else still counts as lifted
+  window.addEventListener('pointerup', liftPt, true);
+  window.addEventListener('pointercancel', liftPt, true);
   over.addEventListener('contextmenu', function (e) { e.preventDefault(); });
 
   // Places close together (Leeds, Scotland and France, say) would sit on
@@ -6070,7 +6223,10 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     counterA = clamp(counterA + (showCounter ? dt * 5 : -dt * 3), 0, 1);
     counterG.setAttribute('opacity', f2(counterA));
     VR = viewRows(view.lon, view.lat);
-    var R = GR * (1 + 4 * zoom);
+    if (mode === 'globe' && !sel && !pinch) { cam.goal = cam.user; }
+    cam.z += (cam.goal - cam.z) * (1 - Math.exp(-dt * (pinch ? 30 : 4)));
+    var R = GR * cam.z * (1 + 4 * zoom);
+    lastR = R;
     drawGlobe(R);
     var mA = clamp(1 - zoom * 2.5, 0, 1);
     routesFrame(R, mA);
@@ -6094,7 +6250,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
 
   function buildScene(p) {
     S = {
-      place: p, time: 0, q: [], phase: 'pre', phaseT: 0, hoot: null, animal: null, props: [], parts: [], wx: [],
+      place: p, time: 0, q: [], phase: 'pre', phaseT: 0, hoot: null, animal: null, props: [], parts: [], wx: [], steam: [],
       bubble: null, greeted: false, ready: false, nightV: -1, elev: 0, raining: false, rainT: 0, card: null,
       sleepyHello: false, lookAt: null, nextShiver: 4, nextFan: 3, nextZ: 0, home: null, lampOn: true,
       tw: [], busy: false, piles: [], thought: null, swap: null, storyStarted: false, hinted: false
@@ -6103,7 +6259,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     if (saved.prologue && !p.home && !saved.seen[p.id]) { saved.seen[p.id] = true; persist(); }
     var defs = p.defs ? p.defs() : '';
     $('sc-defs').innerHTML = defs ? (dayify(defs) + nightDefs(defs)) : '';
-    ['sc-back', 'sc-ground', 'sc-dev', 'sc-props', 'sc-piles', 'sc-animal', 'sc-hoot', 'sc-front', 'sc-glow', 'sc-parts', 'sc-bubble', 'sc-thought', 'sc-ui', 'sc-fly', 'sc-skyfx', 'sc-home'].forEach(function (id) { clear($(id)); });
+    ['sc-back', 'sc-ground', 'sc-dev', 'sc-props', 'sc-piles', 'sc-animal', 'sc-hoot', 'sc-front', 'sc-glow', 'sc-parts', 'sc-bubble', 'sc-thought', 'sc-ui', 'sc-fly', 'sc-skyfx', 'sc-home', 'sc-think'].forEach(function (id) { clear($(id)); });
     if (p.home) {
       $('sc-stage').setAttribute('display', 'none');
       $('sc-home').removeAttribute('display');
@@ -6192,11 +6348,14 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
   function skyFrame() {
     var p = S.place, e = sunElev(p.lat, p.lon), H = hourAngle(p.lon);
     S.elev = e;
-    var cols = skyCols(e, p);
+    // the sky's colour and the fade to night move in small steps, not every
+    // frame: each change repaints the whole scene
+    var eq = Math.round(e / 0.4) * 0.4;
+    var cols = skyCols(eq, p);
     setAttr($('sc-s0'), 'stop-color', cols[0]);
     setAttr($('sc-s1'), 'stop-color', cols[1]);
-    var n = smooth((2 - e) / 12);
-    if (Math.abs(n - S.nightV) > 0.004) {
+    var n = smooth((2 - eq) / 12);
+    if (Math.abs(n - S.nightV) > 0.02 || (n !== S.nightV && (n === 0 || n === 1))) {
       S.nightV = n;
       scene.style.setProperty('--n', n.toFixed(3));
       scene.style.setProperty('--nc', (n * 0.72).toFixed(3));
@@ -6212,7 +6371,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     var mx = 500 + Math.sin((H + 180) * D2R) * 380 * south, my = hy - clamp(me / 60, -0.3, 1) * (hy - 70);
     setAttr(moon, 'transform', 'translate(' + f2(mx) + ',' + f2(my) + ')');
     setAttr(moon, 'opacity', me > -4 ? f2(0.25 + 0.75 * n) : '0');
-    var warm = Math.exp(-(e - 1) * (e - 1) / 20) * 0.15;
+    var warm = Math.round(Math.exp(-(eq - 1) * (eq - 1) / 20) * 0.15 * 50) / 50;
     setAttr($('sc-warm'), 'opacity', f2(p.home ? 0 : warm));
   }
 
@@ -6420,42 +6579,80 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
   }
 
   // Weather that fills the view: snow, rain and falling leaves, recycled.
+  // ------------------------------------------------------------------
+  // Weather, and the hot spring's steam, are drawn on a canvas of their
+  // own laid over the scene, not in the scene's drawing. Forty snowflakes
+  // moving inside it made a phone redraw the whole scene every frame, and
+  // it couldn't keep up: everything flickered, the satchel included.
+  // ------------------------------------------------------------------
+  var wxcv = $('wxcv'), wxc = wxcv.getContext('2d'), wxShown = '', LEAF = [[0, -7], [2, -2], [7, -3], [4, 1], [6, 6], [0, 3], [-6, 6], [-4, 1], [-7, -3], [-2, -2]];
+  function sizeWx() { wxcv.width = Math.round(VW * dpr); wxcv.height = Math.round(VH * dpr); sizeLayer(wxcv); }
   function resetWeather() {
-    if (!S || !S.place.weather) { return; }
-    S.wx.forEach(function (w) { if (w.n.parentNode) { w.n.parentNode.removeChild(w.n); } });
+    if (!S) { return; }
     S.wx = [];
-    if (reduced) { return; }
-    var kind = S.place.weather, n = kind === 'rain' ? 46 : (kind === 'snow' ? 40 : 10), g = $('sc-front');
+    if (!S.place.weather || reduced) { return; }
+    var kind = S.place.weather, n = kind === 'rain' ? 46 : (kind === 'snow' ? 40 : 10);
     for (var i = 0; i < n; i++) {
       var w = { x: lerp(stage.x0, stage.x1, Math.random()), y: lerp(stage.y0, stage.y1, Math.random()), ph: Math.random() * 6 };
-      if (kind === 'rain') {
-        w.n = el('path', { d: 'M0 0 L-4 22', stroke: '#cfe6ff', 'stroke-width': 2.2, 'stroke-linecap': 'round', opacity: 0 }, g);
-        w.v = 700 + Math.random() * 200;
-      } else if (kind === 'snow') {
-        w.n = el('circle', { r: 2 + Math.random() * 3.5, fill: '#ffffff', opacity: 0.9 }, g);
-        w.v = 30 + Math.random() * 40;
-      } else {
-        w.n = el('path', { d: 'M0 -7 L2 -2 L7 -3 L4 1 L6 6 L0 3 L-6 6 L-4 1 L-7 -3 L-2 -2 Z', fill: ['#d8332c', '#ef8a2a', '#f2c033'][i % 3] }, g);
-        w.v = 40 + Math.random() * 30;
-      }
+      if (kind === 'rain') { w.v = 700 + Math.random() * 200; }
+      else if (kind === 'snow') { w.r = 2 + Math.random() * 3.5; w.v = 30 + Math.random() * 40; }
+      else { w.c = ['#d8332c', '#ef8a2a', '#f2c033'][i % 3]; w.v = 40 + Math.random() * 30; }
       S.wx.push(w);
     }
   }
+  // a puff of steam off the hot spring
+  function steamPuff(x, y) { if (S && S.steam.length < 20) { S.steam.push({ x: x, y: y, vx: (Math.random() - 0.5) * 10, vy: -24, age: 0, ph: Math.random() * 6 }); } }
   function weatherFrame(dt) {
-    var kind = S.place.weather;
-    if (!kind || !S.wx.length) { return; }
-    var show = kind !== 'rain' || S.raining, span = stage.y1 - stage.y0;
-    for (var i = 0; i < S.wx.length; i++) {
+    var kind = S.place.weather, span = stage.y1 - stage.y0, i;
+    for (i = 0; i < S.wx.length; i++) {
       var w = S.wx[i];
       w.y += w.v * dt;
       w.ph += dt;
-      var sway = kind === 'rain' ? -w.v * 0.18 * dt : Math.sin(w.ph * 1.3) * 22 * dt;
-      w.x += sway;
+      w.x += kind === 'rain' ? -w.v * 0.18 * dt : Math.sin(w.ph * 1.3) * 22 * dt;
       if (w.y > stage.y1) { w.y -= span + 20; w.x = lerp(stage.x0, stage.x1, Math.random()); }
       if (w.x < stage.x0 - 20) { w.x = stage.x1; }
-      var rot = kind === 'leaves' ? ' rotate(' + f2(w.ph * 90) + ')' : '';
-      w.n.setAttribute('transform', 'translate(' + f2(w.x) + ',' + f2(w.y) + ')' + rot);
-      if (kind === 'rain') { w.n.setAttribute('opacity', show ? '0.7' : '0'); }
+    }
+    for (i = S.steam.length - 1; i >= 0; i--) {
+      var q = S.steam[i];
+      q.age += dt;
+      if (q.age > 2.6) { S.steam.splice(i, 1); continue; }
+      q.x += (q.vx + Math.sin(q.age * 3 + q.ph) * 8) * dt;
+      q.y += q.vy * dt;
+    }
+    wxDraw();
+  }
+  function wxDraw() {
+    wxc.setTransform(1, 0, 0, 1, 0, 0);
+    wxc.clearRect(0, 0, wxcv.width, wxcv.height);
+    if (!S || S.place.home) { return; }
+    var k = VW / 1000 * dpr, kind = S.place.weather, i;
+    wxc.setTransform(k * stage.s, 0, 0, k * stage.s, k * stage.tx, k * stage.ty);
+    if (kind === 'snow') {
+      wxc.fillStyle = 'rgba(255,255,255,0.9)';
+      wxc.beginPath();
+      S.wx.forEach(function (w) { wxc.moveTo(w.x + w.r, w.y); wxc.arc(w.x, w.y, w.r, 0, TAU); });
+      wxc.fill();
+    } else if (kind === 'rain' && S.raining) {
+      wxc.strokeStyle = 'rgba(207,230,255,0.7)'; wxc.lineWidth = 2.2; wxc.lineCap = 'round';
+      wxc.beginPath();
+      S.wx.forEach(function (w) { wxc.moveTo(w.x, w.y); wxc.lineTo(w.x - 4, w.y + 22); });
+      wxc.stroke();
+    } else if (kind === 'leaves') {
+      S.wx.forEach(function (w) {
+        var a = w.ph * 90 * D2R, ca = Math.cos(a), sa = Math.sin(a);
+        wxc.fillStyle = w.c;
+        wxc.beginPath();
+        LEAF.forEach(function (p, j) { var x = w.x + p[0] * ca - p[1] * sa, y = w.y + p[0] * sa + p[1] * ca; if (j) { wxc.lineTo(x, y); } else { wxc.moveTo(x, y); } });
+        wxc.fill();
+      });
+    }
+    for (i = 0; i < S.steam.length; i++) {
+      var q = S.steam[i], r = 16 * (1 + 1.1 * q.age), op = 0.5 * Math.min(1, q.age / 0.8) * Math.min(1, (2.6 - q.age) / 0.5);
+      var g = wxc.createRadialGradient(q.x, q.y, 0, q.x, q.y, r);
+      g.addColorStop(0, 'rgba(255,255,255,' + f2(0.9 * op) + ')');
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      wxc.fillStyle = g;
+      wxc.beginPath(); wxc.arc(q.x, q.y, r, 0, TAU); wxc.fill();
     }
   }
 
@@ -6830,6 +7027,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     var p = S.place, c = chapter();
     showThoughts();
     if (!saved.prologue || !c || p.home) { return; }
+    if (offTopic(p.id)) { think.idle = 8; }
     if (storyDone()) { postArrival(); return; }
     if (saved.chState === 'find') {
       if (c.place === p.id) { matchStory(c); } else { compareStory(c); }
@@ -7830,6 +8028,9 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
       }
     }
     scene.style.opacity = f2(sceneA);
+    var wa = S && !S.place.home ? f2(sceneA) : '0';
+    if (wa !== wxShown) { wxShown = wa; wxcv.style.opacity = wa; if (wa === '0') { wxc.setTransform(1, 0, 0, 1, 0, 0); wxc.clearRect(0, 0, wxcv.width, wxcv.height); } }
+    thinkFrame(dt);
   }
 
   document.addEventListener('visibilitychange', function () {
