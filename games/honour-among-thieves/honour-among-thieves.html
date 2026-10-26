@@ -615,11 +615,13 @@
     // The drone: low and minor, and barely moving.
     var dl = AC.createBiquadFilter();
     dl.type = 'lowpass';
-    dl.frequency.setValueAtTime(240, t);
+    dl.frequency.setValueAtTime(300, t);
     dl.Q.setValueAtTime(0.7, t);
     var dg = AC.createGain();
-    dg.gain.setValueAtTime(0.055, t);
-    [[55, 'sawtooth', 0.5], [55.35, 'sawtooth', 0.4], [82.4, 'triangle', 0.45], [130.8, 'sine', 0.22]].forEach(function (v) {
+    dg.gain.setValueAtTime(0.06, t);
+    // The bottom of it is lost on a phone's speaker, so there's a little
+    // higher up too, where a phone can still say something.
+    [[55, 'sawtooth', 0.5], [55.35, 'sawtooth', 0.4], [82.4, 'triangle', 0.45], [130.8, 'sine', 0.22], [164.8, 'sine', 0.16]].forEach(function (v) {
       var o = AC.createOscillator(), g = AC.createGain();
       o.type = v[1];
       o.frequency.setValueAtTime(v[0], t);
@@ -804,7 +806,7 @@
   function slam() {
     if (!can()) { return; }
     var t = AC.currentTime + 0.01;
-    thud(t, 0.45, 1.1);
+    thud(t, 0.3, 1.1);
     var g = AC.createGain(); g.gain.value = 1; out(g, 0.6, 0.8);
     metal(t + 0.02, 900, 0.05, g);
   }
@@ -3178,11 +3180,13 @@
           resolve();
           return;
         }
-        var parts = act.split(':');
+        var parts = act.split(':'), keep = panelEl.scrollTop;
         if (parts[0] === 't') { choice = parts[1]; if (choice === 'none') { target = null; } }
         if (parts[0] === 'p') { target = parts[1]; }
         blip(260);
         showPanel(html(), 'desk', handler);
+        // Picking a trick brings up the faces to pick from: show them.
+        panelEl.scrollTop = parts[0] === 't' && choice !== 'none' ? panelEl.scrollHeight : keep;
       }
       showPanel(html(), 'desk', handler);
     });
@@ -3667,6 +3671,7 @@
       ['moll', 'That’s a month each, easy. But the Governor reckons you’re the gang that pinched the Squire’s silver, too.'],
       ['moll', 'Only he can’t prove it. Not unless one of you snitches.'],
       ['moll', 'So every night he’ll have you up to his room, one at a time, and make you an offer.'],
+      ['moll', 'Keep mum (that’s keep your mouth shut) or snitch on your mates.'],
       function () { return dealPanel(a.look, b.look); },
       ['moll', 'If you both keep mum, he can only do you for the goose: *one month* each.'],
       ['moll', 'If one of you snitches and the other keeps mum, the snitch gets off with *nothing*... and the other one gets *three months*!'],
@@ -3678,6 +3683,7 @@
     if (S.gov.kind === 'human') { L.push(['moll', 'And mind ' + S.gov.name + ', the Governor. Whispers lies, that one. Offers bribes. Makes threats.']); }
     if (S.gov.kind === 'crafty') { L.push(['moll', 'And watch the Governor. He plays dirty.']); }
     if (humans().length > 1 || S.gov.kind === 'human') { L.push(['moll', 'When it’s your turn upstairs, everyone else looks away. No peeking!']); }
+    if (humans().length > 1) { L.push(['moll', 'Talk it over first, if you like. Then off you go.']); }
     await talk(L);
   }
 
@@ -3780,6 +3786,7 @@
       ['moll', 'Nabbed with the Bishop’s goose, I hear, ' + you.name + '. Feathers on your sleeve, gravy on your chin.'],
       ['moll', 'Now, the Governor’s got a little game he plays with everyone in here.'],
       ['moll', 'He puts you in with somebody. Every night he has you both upstairs, one at a time, and asks you to snitch on each other.'],
+      ['moll', 'You can keep mum (that’s keep your mouth shut) or you can snitch.'],
       function () { return dealPanel(you.look, other); },
       ['moll', 'Both keep mum: *one month* each. Both snitch: *two months* each.'],
       ['moll', 'But if one snitches and the other keeps mum, the snitch gets *nothing*, and the other one gets *three*!'],
