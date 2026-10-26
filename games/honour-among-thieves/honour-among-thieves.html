@@ -816,9 +816,13 @@
     for (var i = 0; i < 7; i++) { metal(t + i * rand(0.05, 0.1), rand(3000, 5200), rand(0.02, 0.04), g); }
   }
 
+  var lastStep = 0;
   function step() {
     if (!can()) { return; }
-    var t = AC.currentTime + 0.005, s = noiseSrc(t, 0.08), lp = AC.createBiquadFilter(), g = AC.createGain();
+    var t = AC.currentTime + 0.005;
+    if (t - lastStep < 0.09) { return; }
+    lastStep = t;
+    var s = noiseSrc(t, 0.08), lp = AC.createBiquadFilter(), g = AC.createGain();
     lp.type = 'lowpass'; lp.frequency.setValueAtTime(rand(220, 320), t);
     env(g, t, 0.004, 0.14, 0.08);
     s.connect(lp); lp.connect(g); out(g, 0.8, 0.5);
@@ -1598,7 +1602,7 @@
     }
 
     LAY = {
-      n: n, W: W, H: H, upx: upx, portrait: portrait, fs: fs,
+      n: n, W: W, H: H, upx: upx, portrait: portrait, fs: fs, vw: vw, vh: vh,
       floorY: floorY, backY: backY, s: s, bs: bs, backK: bs / s,
       mollX: mollX, mollY: mollY,
       doorX0: doorX0, doorX1: doorX0 + doorW, doorW: doorW, doorH: 330 * (portrait ? bs : s),
@@ -1654,6 +1658,14 @@
       parts.push('<rect x="' + f1(wx - fr * 1.4) + '" y="' + f1(wy + wH + fr * 0.6) + '" width="' + f1(wW + fr * 2.8) + '" height="' + f1(fr * 1.1) + '" fill="#4b4d45"/>');
       CL.beam.innerHTML = '<polygon points="' + f1(wx) + ',' + f1(wy + wH) + ' ' + f1(wx + wW) + ',' + f1(wy + wH) + ' '
         + f1(wx + wW + (fy - wy) * 0.42) + ',' + f1(fy + 40 * s) + ' ' + f1(wx + (fy - wy) * 0.26) + ',' + f1(fy + 40 * s) + '" fill="url(#hat-beam)"/>';
+    }
+
+    // Upright there's wall to spare, so the deal is chalked up on it for
+    // everyone to see: you down the side, them along the top.
+    if (LAY.portrait) {
+      var ct = win ? win.y + win.h + 46 : H * 0.08;
+      var cb = LAY.mollY - 288 * LAY.bs * 0.95 - 34;
+      if (cb - ct > 200) { parts.push(wallDeal(500, ct, Math.min(760, (cb - ct) * 1.8), Math.min(cb - ct, 440))); }
     }
 
     // old scratches left by whoever was here before
@@ -1722,6 +1734,30 @@
 
     CL.vig.innerHTML = '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="url(#hat-vig)" pointer-events="none"/>';
     drawRat();
+  }
+
+  function wallDeal(cx, top, w, h) {
+    var x0 = cx - w / 2, c0 = w * 0.26, cw = (w - c0) / 2, r0 = h * 0.34, rh = (h - r0) / 2;
+    var ch = '#e9e4d4', s = '<g opacity="0.8" font-family="Georgia, serif" font-weight="700" fill="' + ch + '">';
+    s += '<path d="M ' + f1(x0 + c0) + ' ' + f1(top + r0 * 0.45) + ' L ' + f1(x0 + c0) + ' ' + f1(top + h) + ' M ' + f1(x0 + c0 + cw) + ' ' + f1(top + r0 * 0.45) + ' L ' + f1(x0 + c0 + cw) + ' ' + f1(top + h)
+      + ' M ' + f1(x0 + c0 * 0.15) + ' ' + f1(top + r0) + ' L ' + f1(x0 + w) + ' ' + f1(top + r0) + ' M ' + f1(x0 + c0 * 0.15) + ' ' + f1(top + r0 + rh) + ' L ' + f1(x0 + w) + ' ' + f1(top + r0 + rh)
+      + '" stroke="' + ch + '" stroke-width="4" stroke-linecap="round" fill="none"/>';
+    var fsz = Math.min(rh * 0.55, cw * 0.27), lsz = Math.min(fsz * 0.6, r0 * 0.28), ic = Math.min(r0 * 0.62, rh * 0.8) / 124;
+    s += '<text x="' + f1(x0 + c0 + cw) + '" y="' + f1(top + lsz) + '" font-size="' + f1(lsz) + '" text-anchor="middle" font-style="italic">them</text>';
+    s += '<text x="' + f1(x0 + c0 * 0.5) + '" y="' + f1(top + r0 - lsz * 0.4) + '" font-size="' + f1(lsz) + '" text-anchor="middle" font-style="italic">you</text>';
+    [['C', 0], ['D', 1]].forEach(function (k) {
+      s += '<g transform="translate(' + f1(x0 + c0 + cw * (k[1] + 0.5)) + ',' + f1(top + r0 * 0.64) + ') scale(' + f1(ic) + ')">' + (k[0] === 'C' ? iconMum() : iconSnitch()) + '</g>';
+      s += '<g transform="translate(' + f1(x0 + c0 * 0.55) + ',' + f1(top + r0 + rh * (k[1] + 0.5)) + ') scale(' + f1(ic) + ')">' + (k[0] === 'C' ? iconMum() : iconSnitch()) + '</g>';
+    });
+    var cells = [[1, 1], [3, 0], [0, 3], [2, 2]];
+    cells.forEach(function (c, i) {
+      var col = i % 2, row = Math.floor(i / 2);
+      var mx = x0 + c0 + cw * (col + 0.5), my = top + r0 + rh * (row + 0.5) + fsz * 0.35;
+      var you = c[0] === 0 ? '#b6e69a' : (c[0] === 3 ? '#ff9d88' : ch);
+      s += '<text x="' + f1(mx - cw * 0.17) + '" y="' + f1(my) + '" font-size="' + f1(fsz) + '" text-anchor="middle" fill="' + you + '">' + c[0] + '</text>';
+      s += '<text x="' + f1(mx + cw * 0.17) + '" y="' + f1(my) + '" font-size="' + f1(fsz * 0.8) + '" text-anchor="middle" opacity="0.75">' + c[1] + '</text>';
+    });
+    return s + '</g>';
   }
 
   function oldTally(x, y, h, groups) {
@@ -2158,10 +2194,14 @@
     }
   }
 
-  var lastFrame = 0;
+  // A page can start before it knows its own size (a web view still
+  // being laid out, a tab opened in the background) and a resize event
+  // isn't always sent, so look for ourselves every half second or so.
+  var lastFrame = 0, sizeCheck = 0;
   function frame(now) {
     var dt = lastFrame ? Math.min(0.05, (now - lastFrame) / 1000) : 0.016;
     lastFrame = now;
+    if (++sizeCheck % 30 === 0 && (window.innerWidth !== LAY.vw || window.innerHeight !== LAY.vh) && window.innerWidth > 0) { layout(); }
     for (var i = 0; i < FIGS.length; i++) {
       var f = FIGS[i];
       if (f.scene === SCENE) { updateFig(f, dt); }
@@ -2715,7 +2755,7 @@
         if (lastThem === 'D') { return 'You snitched on me… I still won’t snitch on you, though. I couldn’t.'; }
         return n === 0 ? 'I’ll keep mum, I promise. I always keep mum.' : pick(['I don’t like snitching. It’s not nice.', 'Keep mum, eh? It’s nicer that way.']);
       case 'nell':
-        return n === 0 ? 'I’ll keep mum for you, sweetheart. Cross my heart.' : pick(['Course I kept mum. Must be a mistake in his book.', 'Trust me, ducky. Tonight I’ll keep mum. Promise.', 'Don’t look at me like that. Tonight’s different.']);
+        return n === 0 ? 'I’ll keep mum for you tonight. Cross my heart.' : pick(['Course I kept mum. Must be a mistake in his book.', 'Trust me, ducky. Tonight I’ll keep mum. Promise.', 'Don’t look at me like that. Tonight’s different.']);
       case 'jack':
         if (n === 0) { return 'Keep mum for me and I’ll keep mum for you. Simple as that.'; }
         return lastThem === 'D' ? 'You snitched on me last night. So you know what’s coming.' : 'You kept mum for me last night. I won’t forget it.';
@@ -2725,10 +2765,27 @@
       case 'meg':
         return pick(['Heads or tails? Heads or tails?!', 'I might keep mum. I might not! Ha!', 'Even I don’t know what I’ll do! Ha ha!', 'The penny decides, my lovely. Always the penny.']);
       case 'sid':
-        if (n === 0) { return 'Trust me, friend. We’re going to get on famously.'; }
+        if (n === 0) { return 'Trust me, friend. I always look after my friends.'; }
         return crossed ? 'No hard feelings, eh? Let’s play fair from now on.' : 'You’re a good sort. Too good, some might say.';
     }
     return '';
+  }
+
+  // ...and what they say when the truth comes out. Keyed by what happened
+  // to them: both kept mum, they got away with it, they got stung, or
+  // both snitched. Some never happen: Sam never snitches, Nell always does.
+  var QUIPS = {
+    sam: { cc: ['We both kept mum! That’s nice.'], lost: ['Oh... That wasn’t very nice.', 'Three months... oh dear.'] },
+    nell: { won: ['Ha! Never trust a Nell, sweetheart.', 'Told you I’d keep mum. I lied.'], dd: ['Well, well. Look who’s learning.'] },
+    jack: { cc: ['Good. That’s how it should be.'], won: ['You had that coming.'], lost: ['So that’s how it is. Right.'], dd: ['You snitch, I snitch. Fair’s fair.'] },
+    grim: { cc: ['Hmph. Good.'], won: ['I warned you.'], lost: ['That’s it. Never again. NEVER.'], dd: ['Snitch away. I’ll snitch right back. For ever.'] },
+    meg: { cc: ['Heads! Ha ha!'], won: ['Tails! Whoops! Ha ha!'], lost: ['Ooh, you rotter! Ha!'], dd: ['Tails and tails! Ha ha ha!'] },
+    sid: { cc: ['There. Friends after all.'], won: ['Nothing personal, friend. Just testing.', 'Too easy.'], lost: ['Ah. You’ve got teeth. Good.'], dd: ['Fair enough. You’ve got teeth.'] }
+  };
+  function quip(p, me, them) {
+    var k = me === 'C' ? (them === 'C' ? 'cc' : 'lost') : (them === 'C' ? 'won' : 'dd');
+    var set = QUIPS[p.strat] && QUIPS[p.strat][k];
+    return set ? pick(set) : null;
   }
 
   // --- reading a player's style --------------------------------------------
@@ -2995,6 +3052,8 @@
       L.push(one ? one.name + '’s in the next room. I’m asking them the very same thing.' : 'The others are being asked about you, right now, one by one.');
       L.push(one ? 'Snitch on ' + one.name + ', and I’ll see you right. Keep mum, and... well. That depends what ' + one.name + ' says about *you*.'
         : 'Snitch on them, and I’ll see you right. Keep mum, and... well. That depends what they say about *you*.');
+    } else if (os.some(function (q) { return !S.mv[p.id][q.id].length; })) {
+      L.push(one ? 'New cellmate, ' + p.name + '? ' + one.name + '. Let’s see how long you two stay friends.' : 'Some new faces down there, ' + p.name + '. Let’s see how long you all stay friends.');
     } else {
       var by = os.filter(function (q) { return lastMove(q, p) === 'D'; }), on = os.filter(function (q) { return lastMove(p, q) === 'D'; });
       var opts = ['Back again, ' + p.name + '? Let’s see if you’ve learned anything.',
@@ -3181,6 +3240,13 @@
     riser(fb.x, fb.y - 400 * s, '+' + q.db, q.db === 0 ? '#b6e69a' : (q.db >= 3 ? '#ff9d88' : '#f3e7b6'));
     await Promise.all([countTo(q.a, (q.a.shown || 0) + q.da), countTo(q.b, (q.b.shown || 0) + q.db)]);
     await say(null, outcomeLine(q));
+    // A computer cellmate has something to say about it: always on your
+    // own, now and then with friends so a big cell doesn't drag.
+    var ai = [[q.a, q.ma, q.mb], [q.b, q.mb, q.ma]].filter(function (x) { return !x[0].human && quip(x[0], x[1], x[2]); });
+    if (ai.length && (S.mode === 'story' || Math.random() < 0.4)) {
+      var w = pick(ai);
+      await say(w[0], quip(w[0], w[1], w[2]));
+    }
     clearBubbles();
   }
 
@@ -3423,7 +3489,7 @@
   function titlePanel() {
     var sv = loadSave();
     var h = '<div style="text-align:center"><h1>Honour Among Thieves</h1>'
-      + '<p class="sub">Grimstone Gaol. Every night the Governor has you upstairs, alone, and asks you to snitch on your mates.</p>'
+      + '<p class="sub">Grimstone Gaol. Every night the Governor has you upstairs, alone, and asks you to snitch on your mates. A game about the prisoner’s dilemma.</p>'
       + '<div class="btns" style="flex-direction:column;align-items:stretch;max-width:440px;margin:10px auto 0">'
       + (sv ? '<button class="btn" data-act="resume">Carry on: night ' + sv.night + (sv.mode === 'story' ? ', on your own' : ', with friends') + '</button>' : '')
       + '<button class="btn" data-act="friends">With friends: pass the phone</button>'
@@ -3645,7 +3711,7 @@
   var STORY = { look: 'ned', name: 'Ned' };
   var MATE_HELLO = {
     sam: 'H-hello. I’m Sam. I’m only in for borrowing a loaf. I’d never snitch on anybody. Never ever.',
-    nell: 'Name’s Nell. I’ll keep mum for you, sweetheart. You can count on me.',
+    nell: 'Name’s Nell. Don’t you fret, sweetheart. I’ve never snitched on anybody in my life.',
     jack: 'Jack. I treat folk the way they treat me. That’s all you need to know.',
     grim: 'Grimshaw. I’ll keep mum for you as long as you keep mum for me. But cross me once... just once...',
     meg: 'Meg! Mad Meg, they call me. Can’t think why! Ha ha ha!',
@@ -3770,7 +3836,7 @@
     switch (st.mate) {
       case 'sam':
         L.push(['moll', 'That was Soft Sam. He never snitches. Not ever, whatever you do to him.']);
-        L.push(['moll', d ? 'And you snitched on him ' + times(d) + '. Each time you saved yourself a month, and poor Sam got three. Easy pickings... but it ain’t pretty, is it?'
+        L.push(['moll', d ? 'And you snitched on him ' + times(d) + '. ' + (d === 1 ? 'That night' : 'Each time') + ' you saved yourself a month, and poor Sam got three. Easy pickings... but it ain’t pretty, is it?'
           : 'And you never snitched on him once. Good for you.']);
         L.push(['moll', 'Being soft is lovely with folk who are soft back. But there’s sharks in here.']);
         break;
