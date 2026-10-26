@@ -387,9 +387,12 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
   // Arctic stays dark and Antarctica stays light. But a day passes in ten
   // minutes, starting from the real time, so the night sweeps round the
   // globe and nowhere is stuck in it because the children always play at
-  // teatime in Leeds. (Three minutes was tried first: too hurried.)
+  // teatime in Leeds. (Three minutes was tried first: too hurried.) In a
+  // place, though, the same clock runs six times slower, an hour a day,
+  // so the moon doesn't race across the sky while you watch; the globe and
+  // the place always agree on the time, because it's one clock.
   // ------------------------------------------------------------------
-  var DAY_SECONDS = 600;
+  var DAY_SECONDS = 600, SCENE_DAY_SECONDS = 3600;
   var T0 = new Date();
   var DOY = Math.floor((Date.UTC(T0.getUTCFullYear(), T0.getUTCMonth(), T0.getUTCDate())
     - Date.UTC(T0.getUTCFullYear(), 0, 0)) / 86400000);
@@ -8007,7 +8010,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     tick(dt);
   }
   function tick(dt) {
-    clock += dt;
+    clock += dt * (mode === 'scene' ? DAY_SECONDS / SCENE_DAY_SECONDS : 1);
     dlgFrame(dt);
     spotFrame();
     globeLessons();
