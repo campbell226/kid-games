@@ -1303,9 +1303,35 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     gl.uniform1i(glp.uT, 0);
     return true;
   }
-  function initGlobe() {
+  // If the phone's graphics give out, the WebGL globe is lost with them.
+  // Rather than leave a hole in space, it starts again on a fresh canvas:
+  // with WebGL once more, and if that goes too within the minute, with the
+  // slower drawing that doesn't need the graphics chip at all.
+  var glLosses = 0, glLostAt = -1e9;
+  function watchGl(c) {
+    c.addEventListener('webglcontextlost', function (e) {
+      e.preventDefault();
+      var t = performance.now();
+      glLosses = t - glLostAt < 60000 ? glLosses + 1 : 1;
+      glLostAt = t;
+      gl = null; cpu = null;
+      setTimeout(function () { freshGlobe(glLosses > 1); }, 400);
+    });
+  }
+  function freshGlobe(noGl) {
+    var fresh = document.createElement('canvas');
+    fresh.id = 'globe';
+    gcv.parentNode.replaceChild(fresh, gcv);
+    gcv = fresh;
+    sizeLayer(gcv);
+    gcv.width = Math.round(VW * dpr); gcv.height = Math.round(VH * dpr);
+    initGlobe(noGl);
+  }
+  function initGlobe(noGl) {
     var attrs = { alpha: true, premultipliedAlpha: true, antialias: false };
-    try { gl = gcv.getContext('webgl', attrs) || gcv.getContext('experimental-webgl', attrs); } catch (e) { gl = null; }
+    gl = null;
+    if (!noGl) { try { gl = gcv.getContext('webgl', attrs) || gcv.getContext('experimental-webgl', attrs); } catch (e) { gl = null; } }
+    if (gl) { watchGl(gcv); }
     if (gl && !setupGL()) {
       // A canvas that has given out a WebGL context can't give a 2D one.
       gl = null;
@@ -1317,8 +1343,11 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
       gcv.width = Math.round(VW * dpr); gcv.height = Math.round(VH * dpr);
     }
     if (!gl) { cpu = gcv.getContext('2d'); }
-    // A bigger map only where the screen and the card can use it.
-    texW = gl ? (glp.maxTex >= 4096 ? 4096 : 2048) : 1024;
+    // The bigger map only on a big screen without touch. On a phone or a
+    // tablet it was some 40 MB of graphics memory held all the time, and
+    // a phone's graphics are easily overwhelmed (see the Arctic, below).
+    var touch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+    texW = gl ? ((glp.maxTex >= 4096 && GR * dpr > 520 && !touch) ? 4096 : 2048) : 1024;
     refreshWorld();
   }
   function refreshWorld() {
@@ -1371,6 +1400,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
   }
 
   function drawGlobe(R) {
+    if (!gl && !cpu) { return; }
     var S3 = sunVec();
     if (gl) {
       gl.viewport(0, 0, gcv.width, gcv.height);
@@ -3290,12 +3320,15 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
       }
       return s + '</g></g>';
     },
-    setup: function (S) { S.aur = list($('sc-skyfx'), '.q-aur'); S.boost = 0; },
+    setup: function (S) { S.aur = list($('sc-skyfx'), '.q-aur'); S.boost = 0; S.aurOn = -1; },
+    // The curtains used to sway and swell every frame. On the Pixel that
+    // meant redrawing four huge see-through shapes sixty times a second,
+    // and its graphics gave out: the whole screen went white. Now they
+    // hold still and are drawn once; a tap brightens them for a moment.
     frame: function (S, dt) {
       S.boost = Math.max(0, S.boost - dt * 0.4);
-      var t = S.time, w = reduced ? 0 : 1;
-      setAll(S.aur, 'translate(' + f2(Math.sin(t * 0.3) * 30 * w) + ',' + f2(Math.sin(t * 0.5) * 6 * w) + ') scale(1,' + f2(1 + Math.sin(t * 0.7) * 0.06 * w + S.boost * 0.25) + ')');
-      S.aur.forEach(function (n) { n.setAttribute('opacity', f2(0.75 + S.boost * 0.25)); });
+      var on = S.boost > 0 ? 1 : 0;
+      if (on !== S.aurOn) { S.aurOn = on; S.aur.forEach(function (n) { setAttr(n, 'opacity', on ? '1' : '0.75'); }); }
     },
     // the northern lights brighten and dance, with a shimmer
     skyTap: function (S, quiet) {
@@ -5641,6 +5674,19 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
   var pointArrow = null;   // which way a puzzled friend pointed: { from, to }
   var saidTooFar = false, saidStars = false, starsLesson = false;
   var MAX_TURN = 150;   // degrees a second; a finger can't spin the world faster
+  // The globe turns only as far as keeps Hoot in sight, however far in
+  // it's zoomed, so the world is explored from where he is: she can see
+  // what's near him, and has to fly to see further.
+  function hootReach(z) {
+    var room = Math.min(VW / 2 - 40, VH * 0.42 - 50);
+    return Math.min(62 * D2R, Math.asin(clamp(room / (GR * z), 0.05, 1)));
+  }
+  function keepHoot(o, z) {
+    var h = vec(BYID[here].lat, BYID[here].lon), v = vec(o.lat, o.lon), a = angBetween(h, v), m = hootReach(z);
+    if (a <= m) { return; }
+    var ll = latlon(norm(slerp(h, v, m / a)));
+    o.lon = ll[1]; o.lat = clamp(ll[0], -62, 62);
+  }
   // How far in the globe is zoomed: to fit a trip that's been picked, or
   // as far as two fingers have pinched it. Capped both ways.
   var cam = { z: 1, goal: 1, user: 1 }, ZMAX = 4, lastR = 100, selT = 0, selAt = null;
@@ -5694,7 +5740,11 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     goal.lon = mid[1]; goal.lat = clamp(mid[0], -62, 62);
     var c = vec(goal.lat, goal.lon), far = Math.max(angBetween(c, a), angBetween(c, b));
     var room = Math.min(VW * 0.4, VH * 0.32);
-    cam.goal = far > 1.3 ? 1 : clamp(room / (GR * Math.sin(far)), 1, ZMAX);
+    var z = far > 1.3 ? 1 : clamp(room / (GR * Math.sin(far)), 1, ZMAX);
+    // not so far in that Hoot would drop out of sight
+    while (z > 1 && angBetween(c, a) > hootReach(z)) { z = Math.max(1, z - 0.1); }
+    cam.goal = z;
+    keepHoot(goal, z);
     selT = performance.now();
     var short = tripCost(here, id) > saved.puff;
     if (starry(here)) { saidStars = true; starsLesson = true; }
@@ -6195,6 +6245,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
   function globeFrame(dt) {
     modeT += dt;
     if (mode === 'globe') {
+      keepHoot(goal, Math.max(cam.z, cam.goal));
       steerView(dt, MAX_TURN, drag ? 14 : 8);
     } else if (mode === 'fly') {
       flyFrame(dt);
@@ -6364,16 +6415,16 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
       scene.style.setProperty('--nc', (n * 0.72).toFixed(3));
       scene.style.setProperty('--d', (1 - n).toFixed(3));
     }
-    setAttr($('sc-stars'), 'opacity', f2(smooth((-3 - e) / 8)));
+    setAttr($('sc-stars'), 'opacity', f2(Math.round(smooth((-3 - eq) / 8) * 20) / 20));
     var hy = p.home ? SH * 0.5 : stage.hy, south = p.lat < 0 ? -1 : 1;
     var sun = $('sc-sun'), moon = $('sc-moon');
     var sx = 500 + Math.sin(H * D2R) * 380 * south, sy = hy - clamp(e / 60, -0.3, 1) * (hy - 70);
-    setAttr(sun, 'transform', 'translate(' + f2(sx) + ',' + f2(sy) + ')');
+    setAttr(sun, 'transform', 'translate(' + Math.round(sx) + ',' + Math.round(sy) + ')');
     setAttr(sun, 'opacity', e > -4 ? '1' : '0');
     var me = moonElev(p.lat, p.lon);
     var mx = 500 + Math.sin((H + 180) * D2R) * 380 * south, my = hy - clamp(me / 60, -0.3, 1) * (hy - 70);
-    setAttr(moon, 'transform', 'translate(' + f2(mx) + ',' + f2(my) + ')');
-    setAttr(moon, 'opacity', me > -4 ? f2(0.25 + 0.75 * n) : '0');
+    setAttr(moon, 'transform', 'translate(' + Math.round(mx) + ',' + Math.round(my) + ')');
+    setAttr(moon, 'opacity', me > -4 ? f2(Math.round((0.25 + 0.75 * n) * 20) / 20) : '0');
     var warm = Math.round(Math.exp(-(eq - 1) * (eq - 1) / 20) * 0.15 * 50) / 50;
     setAttr($('sc-warm'), 'opacity', f2(p.home ? 0 : warm));
   }
