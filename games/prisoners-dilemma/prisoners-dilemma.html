@@ -88,14 +88,16 @@
     padding: 2px 12px; border-radius: 8px;
     white-space: nowrap;
   }
-  #speech.noface .who, #speech.noface .face { display: none; }
-  #speech .face {
+  #speech.noface .who, #speech.noface > .face { display: none; }
+  /* Only the frame: the drawing inside it has a .face of its own (the
+     eyes and mouth), and this transform once lifted those off the head. */
+  #speech > .face {
     position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
     width: var(--facew); height: var(--facew);
     border-radius: 10px; background: #2c2620; border: 3px solid var(--edge);
     overflow: hidden;
   }
-  #speech .face svg { width: 100%; height: 100%; display: block; }
+  #speech > .face svg { width: 100%; height: 100%; display: block; }
   #speech .more {
     position: absolute; right: 14px; bottom: 10px; width: 0; height: 0;
     border-left: 10px solid transparent; border-right: 10px solid transparent;
@@ -229,7 +231,8 @@
   .choice svg { width: 36px; height: 36px; }
 
   /* Chalk on the wall: what has been found out so far. Each line pairs a
-     choice with the months it brought, so it reads without a "you". */
+     choice with the days and the dinner it brought, so it reads without
+     a "you". */
   .deal {
     display: flex; flex-direction: column; gap: 8px;
     background: #2b2f28; border: 6px solid #5b3b22; border-radius: 10px;
@@ -245,6 +248,7 @@
   .deal .num { font-size: 1.5em; font-weight: 700; line-height: 1; min-width: 0.7em; text-align: center; }
   .deal .best { color: #b6e69a; } .deal .worst { color: #ff9d88; }
   .deal svg.ic { width: 36px; height: 36px; }
+  .deal svg.bw { width: 26px; height: 26px; }
   .deal .more { font-style: italic; opacity: 0.7; text-align: center; font-size: 0.9em; }
 
   #curtain {
@@ -958,6 +962,42 @@
     s.connect(bp); bp.connect(g); out(g, 1, 0.3);
   }
 
+  // Dinner: a ladle of stew landing in a wooden bowl, and the spoon.
+  function slop() {
+    if (!can()) { return; }
+    var t = AC.currentTime + 0.01, s = noiseSrc(t, 0.3), lp = AC.createBiquadFilter(), g = AC.createGain();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(1400, t);
+    lp.frequency.exponentialRampToValueAtTime(260, t + 0.22);
+    lp.Q.value = 6;
+    env(g, t, 0.01, 0.16, 0.26);
+    s.connect(lp); lp.connect(g); out(g, 0.9, 0.4);
+    var gg = AC.createGain(); gg.gain.value = 1; out(gg, 0.5, 0.4);
+    metal(t + 0.3, 2400, 0.03, gg);
+  }
+
+  // ...and an empty belly, for anybody who doesn't get any.
+  function rumble() {
+    if (!can()) { return; }
+    var t = AC.currentTime + 0.02, o = AC.createOscillator(), g = AC.createGain(), lp = AC.createBiquadFilter();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(70, t);
+    o.frequency.linearRampToValueAtTime(95, t + 0.25);
+    o.frequency.linearRampToValueAtTime(62, t + 0.55);
+    o.frequency.linearRampToValueAtTime(88, t + 0.8);
+    lp.type = 'lowpass'; lp.frequency.setValueAtTime(380, t); lp.Q.value = 3;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.12, t + 0.1);
+    g.gain.setValueAtTime(0.1, t + 0.6);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+    // the wobble that makes it a tummy and not an engine
+    var lfo = AC.createOscillator(), lg = AC.createGain();
+    lfo.frequency.setValueAtTime(11, t); lg.gain.setValueAtTime(0.06, t);
+    lfo.connect(lg); lg.connect(g.gain);
+    o.connect(lp); lp.connect(g); out(g, 1, 0.3);
+    o.start(t); o.stop(t + 0.95); lfo.start(t); lfo.stop(t + 0.95);
+  }
+
   function setSound(on) {
     soundOn = on;
     store(SOUND_KEY, on ? 'on' : 'off');
@@ -1319,7 +1359,9 @@
     shrug:  [35, 65, 35, 65],
     knit:   [-14, -60, -14, -60],
     hold:   [8, 6, 25, -30],
-    desk:   [-6, -70, -6, -70]
+    desk:   [-6, -70, -6, -70],
+    bowl:   [8, -48, 8, -48],
+    offer:  [70, -10, 25, -30]
   };
 
   var FIGS = [];
@@ -1372,11 +1414,30 @@
         + '<path d="M -12 58 L 12 58 M -12 68 L 12 68 M 0 48 L 0 78" stroke="#2a2018" stroke-width="2"/>';
       arms[1].fg.appendChild(lan);
     }
+    // The turnkey's dinner pot hangs from his other hand, when it's time.
+    var pot = null;
+    if (L.keys) {
+      pot = el('g', { style: 'display:none' });
+      pot.innerHTML = '<path d="M -18 58 Q 0 30 18 58" stroke="#2a2018" stroke-width="3.5" fill="none"/>'
+        + '<path d="M 8 56 L 22 24" stroke="#7a5a38" stroke-width="5" stroke-linecap="round"/>'
+        + '<path d="M -23 56 L 23 56 L 19 86 Q 0 94 -19 86 Z" fill="#2e2c29"/>'
+        + '<rect x="-25" y="52" width="50" height="7" rx="3.5" fill="#46433e"/>'
+        + '<ellipse cx="0" cy="55" rx="20" ry="3" fill="#8a6a3a"/>';
+      arms[0].fg.appendChild(pot);
+    }
     var knit = null;
     if (L.seated) {
       knit = el('g');
       upper.appendChild(knit);
     }
+    // A bowl of something hot, held in both hands, for anybody not named.
+    var bowl = el('g', { style: 'display:none' });
+    bowl.innerHTML = '<path d="M -10 -110 q -7 -9 0 -18 q 7 -9 0 -18 M 9 -112 q -7 -9 0 -18 q 7 -9 0 -18" stroke="#efe9d8" stroke-width="4" fill="none" stroke-linecap="round" opacity="0.55"/>'
+      + '<ellipse cx="0" cy="-96" rx="31" ry="8" fill="#4a3020"/>'
+      + '<ellipse cx="0" cy="-96" rx="26" ry="5" fill="#a07c46"/>'
+      + '<path d="M -31 -96 Q -29 -68 0 -66 Q 29 -68 31 -96 Q 0 -88 -31 -96 Z" fill="#7a5232"/>'
+      + '<path d="M -24 -84 Q 0 -78 24 -84" stroke="#5e3e24" stroke-width="3" fill="none"/>';
+    upper.appendChild(bowl);
 
     var head = el('g');
     head.innerHTML = headParts(L, L.rest || 'neutral');
@@ -1384,9 +1445,10 @@
 
     var f = {
       id: id, L: L, root: root, body: body, upper: upper, head: head, legs: legs, arms: arms, knit: knit, stool: stool, shadow: shadow,
+      pot: pot, bowl: bowl,
       x: 0, y: 0, s: 1, op: 1, shown: true,
       expr: L.rest || 'neutral', face: null, eyes: null, pup: null, mouth: null, tm: null,
-      look: 0, lookT: 0, tilt: 0,
+      look: 0, lookT: 0, tilt: 0, no: 0,
       pose: opts.pose || (L.seated ? 'knit' : (L.lantern ? 'hold' : 'rest')),
       walking: false, path: null, seg: null, total: 1, wt: 1, wdur: 1, legPhase: 0, onArrive: null,
       bounce: 0, shake: 0, slump: 0, slumpT: 0, talking: false, talkT: 0,
@@ -1450,6 +1512,7 @@
     f.slump += (f.slumpT - f.slump) * Math.min(1, dt * 5);
     f.bounce = Math.max(0, f.bounce - dt * 2.6);
     f.shake = Math.max(0, f.shake - dt * 1.6);
+    f.no = Math.max(0, f.no - dt * 1.4);
     f.breathe += dt * 1.6;
 
     if (f.persp) { f.s = scaleAt(f.y) * f.persp; }
@@ -1483,9 +1546,11 @@
       setAttr(f, a.fg, 'fore' + i, 'translate(0,44) rotate(' + f1(-a.sg * a.e) + ')');
     });
 
-    var hx = f.look * 5;
-    setAttr(f, f.head, 'head', 'translate(' + f1(hx) + ',' + f1(f.slump * 7) + ') rotate(' + f1(f.look * 3 + f.tilt) + ' 0 -170)');
-    if (f.pup) { setAttr(f, f.pup, 'pup', 'translate(' + f1(f.look * 4.5) + ',0)'); }
+    // Shaking the head for "no": a few quick turns either way.
+    var no = f.no > 0 && !reduced ? Math.sin(f.breathe * 9) * f.no : 0;
+    var hx = f.look * 5 + no * 6;
+    setAttr(f, f.head, 'head', 'translate(' + f1(hx) + ',' + f1(f.slump * 7) + ') rotate(' + f1(f.look * 3 + f.tilt + no * 4) + ' 0 -170)');
+    if (f.pup) { setAttr(f, f.pup, 'pup', 'translate(' + f1(f.look * 4.5 + no * 4) + ',0)'); }
 
     f.blink -= dt;
     if (f.blink <= 0) { f.blink = rand(2.2, 6); f.blinkV = 0; }
@@ -1506,10 +1571,10 @@
     }
   }
 
-  // Moll's stocking grows a little every night she sits there.
-  function drawKnitting(f, nights) {
+  // Moll's stocking grows a little with every questioning she sits through.
+  function drawKnitting(f, rounds) {
     if (!f.knit) { return; }
-    var len = clamp(14 + nights * 5, 14, 70);
+    var len = clamp(14 + rounds * 5, 14, 70);
     f.knit.innerHTML = '<rect x="-12" y="-96" width="24" height="' + len + '" rx="7" fill="#8d8a84"/>'
       + '<path d="M -12 ' + (-96 + len * 0.33) + ' L 12 ' + (-96 + len * 0.33) + ' M -12 ' + (-96 + len * 0.66) + ' L 12 ' + (-96 + len * 0.66) + '" stroke="#77736c" stroke-width="2"/>'
       + '<path d="M -30 -112 L 22 -88 M 30 -112 L -22 -88" stroke="#c9b27a" stroke-width="3.5" stroke-linecap="round"/>';
@@ -1619,13 +1684,14 @@
     } else {
       // Sideways, everyone stands in one row, Moll at one end and the
       // door at the other, with room over the heads for the tally marks
-      // and for a speech bubble when the night is revealed.
-      var sH = (floorY - 120) / 322, sW = 960 / (n * 165 + 310);
+      // and for a speech bubble when the names come out. A gap is left
+      // inside the door for the turnkey to step into while folk go past.
+      var sH = (floorY - 120) / 322, sW = 960 / (n * 165 + 400);
       s = clamp(Math.min(sH, sW), 0.32, 1.7);
       bs = s * 0.92;
       backY = floorY - 44 * s;
       doorW = 150 * s; doorX0 = 992 - doorW;
-      var left = 22 + 152 * s + 8, right = doorX0 - 8;
+      var left = 22 + 152 * s + 8, right = doorX0 - 8 - 92 * s;
       slotW = (right - left) / n;
       for (i = 0; i < n; i++) { xs.push(left + slotW * (i + 0.5)); }
       mollX = 22 + 76 * s; mollY = floorY;
@@ -1768,27 +1834,40 @@
     drawRat();
   }
 
+  // A bowl in chalk: steaming for a dinner, struck through for none.
+  function chalkBowl(fed, col) {
+    return '<path d="M -34 -4 Q -32 30 0 32 Q 32 30 34 -4 Z" fill="none" stroke="' + col + '" stroke-width="6" stroke-linejoin="round"/>'
+      + '<path d="M -41 -4 L 41 -4" stroke="' + col + '" stroke-width="6" stroke-linecap="round"/>'
+      + (fed ? '<path d="M -12 -14 q -7 -9 0 -18 q 7 -9 0 -18 M 12 -14 q -7 -9 0 -18 q 7 -9 0 -18" stroke="' + col + '" stroke-width="5" fill="none" stroke-linecap="round"/>'
+        : '<path d="M -38 -40 L 38 40" stroke="#ff9d88" stroke-width="7" stroke-linecap="round"/>');
+  }
+  function bowlSVG(fed) {
+    return '<svg class="bw" viewBox="-46 -54 92 92" aria-hidden="true">' + chalkBowl(fed, '#ece8da') + '</svg>';
+  }
+
   // What Moll has worked out, in chalk on the wall over the door: a line
-  // for each kind of night once it has happened, each choice beside the
-  // months it brought. Upright only; sideways there's no wall to spare and
-  // the board button shows the same thing.
+  // for each way a questioning can go once it has happened, each choice
+  // beside the days and the dinner it brought. Upright only; sideways
+  // there's no wall to spare and the board button shows the same thing.
   function drawChalk() {
     var g = CL.chalk;
     clear(g);
     var c = LAY.chalk;
     if (!c || !S || !S.inGame || !S.found) { return; }
     var rh = c.h / 3, x0 = c.cx - c.w / 2, ch = '#e9e4d4';
-    var fsz = rh * 0.5, ic = rh * 0.62 / 124, lsz = Math.min(rh * 0.26, 44);
+    var fsz = rh * 0.5, ic = rh * 0.62 / 124, lsz = Math.min(rh * 0.26, 44), bk = rh * 0.5 / 92;
     var s = '<g opacity="0.82" font-family="' + SERIF + '" font-weight="700" fill="' + ch + '">';
     FOUND_ROWS.forEach(function (r, i) {
       if (!S.found[r[0]]) { return; }
       var cy = c.top + rh * (i + 0.5);
       var col = function (n) { return n <= 0 ? '#b6e69a' : (n >= 3 ? '#ff9d88' : ch); };
-      s += '<g transform="translate(' + f1(x0 + c.w * 0.07) + ',' + f1(cy) + ') scale(' + f1(ic) + ')">' + (r[1] === 'C' ? iconMum() : iconSnitch()) + '</g>';
-      s += '<text x="' + f1(x0 + c.w * 0.17) + '" y="' + f1(cy + fsz * 0.35) + '" font-size="' + f1(fsz) + '" fill="' + col(r[2]) + '">' + r[2] + '</text>';
-      s += '<text x="' + f1(x0 + c.w * 0.27) + '" y="' + f1(cy + lsz * 0.35) + '" font-size="' + f1(lsz) + '" font-style="italic" opacity="0.7">and</text>';
+      s += '<g transform="translate(' + f1(x0 + c.w * 0.06) + ',' + f1(cy) + ') scale(' + f1(ic) + ')">' + (r[1] === 'C' ? iconMum() : iconSnitch()) + '</g>';
+      s += '<text x="' + f1(x0 + c.w * 0.13) + '" y="' + f1(cy + fsz * 0.35) + '" font-size="' + f1(fsz) + '" fill="' + col(r[2]) + '">' + r[2] + '</text>';
+      s += '<g transform="translate(' + f1(x0 + c.w * 0.23) + ',' + f1(cy + rh * 0.04) + ') scale(' + f1(bk) + ')">' + chalkBowl(r[6], ch) + '</g>';
+      s += '<text x="' + f1(x0 + c.w * 0.29) + '" y="' + f1(cy + lsz * 0.35) + '" font-size="' + f1(lsz) + '" font-style="italic" opacity="0.7">and</text>';
       s += '<g transform="translate(' + f1(x0 + c.w * 0.43) + ',' + f1(cy) + ') scale(' + f1(-ic) + ',' + f1(ic) + ')">' + (r[3] === 'C' ? iconMum() : iconSnitch()) + '</g>';
-      s += '<text x="' + f1(x0 + c.w * 0.53) + '" y="' + f1(cy + fsz * 0.35) + '" font-size="' + f1(fsz) + '" fill="' + col(r[4]) + '">' + r[4] + '</text>';
+      s += '<text x="' + f1(x0 + c.w * 0.50) + '" y="' + f1(cy + fsz * 0.35) + '" font-size="' + f1(fsz) + '" fill="' + col(r[4]) + '">' + r[4] + '</text>';
+      s += '<g transform="translate(' + f1(x0 + c.w * 0.60) + ',' + f1(cy + rh * 0.04) + ') scale(' + f1(bk) + ')">' + chalkBowl(r[7], ch) + '</g>';
       s += '<text x="' + f1(x0 + c.w) + '" y="' + f1(cy + lsz * 0.35) + '" font-size="' + f1(lsz) + '" font-style="italic" text-anchor="end" opacity="0.8">' + r[5] + '</text>';
       if (i > 0) {
         s += '<path d="M ' + f1(x0) + ' ' + f1(c.top + rh * i) + ' L ' + f1(x0 + c.w) + ' ' + f1(c.top + rh * i) + '" stroke="' + ch + '" stroke-width="3" stroke-dasharray="10 8" opacity="0.4"/>';
@@ -2057,7 +2136,7 @@
       d.push('<rect x="' + f1(dx0) + '" y="' + f1(dy0) + '" width="' + f1(dw) + '" height="' + f1(dhh) + '" rx="6" fill="#3d2412" stroke="#2a180b" stroke-width="4"/>');
       d.push('<circle cx="' + f1(dx0 + dw / 2) + '" cy="' + f1(dy0 + dhh / 2) + '" r="' + f1(7 * gs) + '" fill="#b08a3a"/>');
     }
-    // the ledger, open at tonight's page
+    // the ledger, open at today's page
     var lw = 170 * gs, lx = gx - lw / 2, ly = deskTop + 2 * gs;
     d.push('<path d="M ' + f1(lx) + ' ' + f1(ly + 14 * gs) + ' L ' + f1(lx + lw) + ' ' + f1(ly + 14 * gs) + ' L ' + f1(lx + lw - 16 * gs) + ' ' + f1(ly - 10 * gs) + ' L ' + f1(lx + 16 * gs) + ' ' + f1(ly - 10 * gs) + ' Z" fill="#efe4c8" stroke="#8b6c45" stroke-width="2"/>');
     d.push('<path d="M ' + f1(gx) + ' ' + f1(ly - 10 * gs) + ' L ' + f1(gx) + ' ' + f1(ly + 14 * gs) + '" stroke="#8b6c45" stroke-width="2"/>');
@@ -2107,9 +2186,9 @@
       FIG.moll.x = LAY.mollX; FIG.moll.y = LAY.mollY;
       if (FIG.moll.stool) { FIG.moll.stool.style.display = LAY.portrait ? 'none' : ''; }
       FIG.moll.shadow.style.display = LAY.portrait ? 'none' : '';
-      drawKnitting(FIG.moll, S && S.night ? S.night : 1);
+      drawKnitting(FIG.moll, S && S.round ? S.round : 1);
     }
-    if (FIG.key && !FIG.key.walking) { FIG.key.x = LAY.doorCx; FIG.key.y = LAY.backY + 12 * LAY.bs; }
+    if (FIG.key && !FIG.key.walking) { var ka = asideSpot(); FIG.key.x = ka.x; FIG.key.y = ka.y; }
     if (S && S.prisoners) {
       S.prisoners.forEach(function (p, i) {
         var f = FIG[p.id];
@@ -2156,14 +2235,22 @@
       + (kind === 'C' ? iconMum() : iconSnitch()) + '</g></svg>';
   }
 
+  // An empty bowl, for a bubble over somebody who isn't getting dinner.
+  function iconHungry() {
+    return '<path d="M -40 -2 Q -38 34 0 36 Q 38 34 40 -2 Z" fill="#8a5c36" stroke="#3a2614" stroke-width="5" stroke-linejoin="round"/>'
+      + '<ellipse cx="0" cy="-2" rx="40" ry="11" fill="#3a2614"/><ellipse cx="0" cy="-1" rx="33" ry="7" fill="#24170d"/>'
+      + '<path d="M 22 -10 L 46 -42" stroke="#9c9a92" stroke-width="7" stroke-linecap="round"/><ellipse cx="49" cy="-46" rx="8" ry="11" fill="#b4b2aa" transform="rotate(36 49 -46)"/>';
+  }
+
   function bubble(f, kind, dir) {
     // Upright there's wall to spare, so the bubbles can be bigger.
     var g = el('g'), s = f.s * (LAY.portrait ? 1.2 : 1.05);
     var bx = f.x - dir * 8 * f.s, by = Math.max(f.y - 372 * f.s - (LAY.portrait ? 50 : 0), 74 * s * 0.85);
-    var col = kind === 'C' ? '#4f7a45' : '#a3402f';
+    var col = kind === 'C' ? '#4f7a45' : (kind === 'H' ? '#6b4a2b' : '#a3402f');
+    var icon = kind === 'C' ? iconMum() : (kind === 'H' ? iconHungry() : iconSnitch());
     g.innerHTML = '<g transform="scale(' + (dir < 0 ? -1 : 1) + ',1)">'
       + '<path d="M -62 -54 Q -62 -70 -46 -70 L 46 -70 Q 62 -70 62 -54 L 62 34 Q 62 50 46 50 L -6 50 L -30 76 L -26 50 L -46 50 Q -62 50 -62 34 Z" fill="#fbf4e2" stroke="' + col + '" stroke-width="7"/>'
-      + '</g><g transform="translate(0,-10) scale(0.92,0.92)">' + '<g transform="scale(' + (dir < 0 ? -1 : 1) + ',1)">' + (kind === 'C' ? iconMum() : iconSnitch()) + '</g></g>';
+      + '</g><g transform="translate(0,-10) scale(0.92,0.92)">' + '<g transform="scale(' + (dir < 0 ? -1 : 1) + ',1)">' + icon + '</g></g>';
     CL.fx.appendChild(g);
     var item = { g: g, t: 0, kind: 'pop', x: bx, y: by, s: s * 0.85 };
     FX.push(item);
@@ -2239,6 +2326,18 @@
     var dt = lastFrame ? Math.min(0.05, (now - lastFrame) / 1000) : 0.016;
     lastFrame = now;
     if (++sizeCheck % 30 === 0 && (window.innerWidth !== LAY.vw || window.innerHeight !== LAY.vh) && window.innerWidth > 0) { layout(); }
+    // Standing aside, the turnkey keeps an eye on whoever's going past.
+    var kf = FIG.key;
+    if (kf && kf.watch && !kf.walking && SCENE === 'cell') {
+      var near = null, nd = 1e9;
+      for (var j = 0; j < FIGS.length; j++) {
+        var w = FIGS[j];
+        if (w === kf || !w.walking || w.scene !== 'cell' || w.op < 0.3) { continue; }
+        var d = Math.abs(w.x - kf.x) + Math.abs(w.y - kf.y);
+        if (d < nd) { nd = d; near = w; }
+      }
+      if (near) { kf.lookT = clamp((near.x - kf.x) / 80, -1, 1); }
+    }
     for (var i = 0; i < FIGS.length; i++) {
       var f = FIGS[i];
       if (f.scene === SCENE) { updateFig(f, dt); }
@@ -2464,12 +2563,17 @@
     });
   }
 
-  var MOON = '<svg viewBox="0 0 100 100" aria-hidden="true"><path d="M 64 10 A 42 42 0 1 0 90 72 A 34 34 0 1 1 64 10 Z" fill="#ece8da"/></svg>';
-  function nightCard(title, sub, toll) {
+  // The Governor's quill, for the next question in his ledger; the judge's
+  // gavel, for the end of it all.
+  var QUILL = '<svg viewBox="0 0 100 100" aria-hidden="true"><path d="M 82 6 Q 40 18 26 64 L 21 80 L 31 69 Q 66 52 82 6 Z" fill="#ece8da"/>'
+    + '<path d="M 77 12 Q 48 32 24 77" stroke="#8a8270" stroke-width="2.5" fill="none"/><path d="M 12 92 L 25 75" stroke="#ece8da" stroke-width="4.5" stroke-linecap="round"/></svg>';
+  var GAVEL = '<svg viewBox="0 0 100 100" aria-hidden="true"><g transform="rotate(-35 50 50)"><rect x="22" y="22" width="56" height="24" rx="6" fill="#ece8da"/><rect x="28" y="19" width="8" height="30" rx="3" fill="#cfc8b2"/><rect x="64" y="19" width="8" height="30" rx="3" fill="#cfc8b2"/><rect x="46" y="44" width="9" height="46" rx="4" fill="#ece8da"/></g>'
+    + '<rect x="18" y="84" width="64" height="9" rx="3" fill="#cfc8b2"/></svg>';
+  function roundCard(title, sub, toll, icon) {
     var my = RUN;
     return new Promise(function (resolve, reject) {
       hideSpeech(); hideBar(); hidePanel();
-      cardEl.innerHTML = MOON + '<div class="n">' + esc(title) + '</div>' + (sub ? '<div class="s">' + esc(sub) + '</div>' : '');
+      cardEl.innerHTML = (icon || QUILL) + '<div class="n">' + esc(title) + '</div>' + (sub ? '<div class="s">' + esc(sub) + '</div>' : '');
       cardEl.classList.add('show');
       bell(!toll);
       var done = false;
@@ -2506,12 +2610,13 @@
   $('b-sound').addEventListener('click', function () { initAudio(); setSound(!soundOn); });
 
   // --- what Moll has chalked up ---------------------------------------------
-  // One line for each kind of night that has happened so far, each choice
-  // beside the months it brought. Nothing is there before it has happened.
+  // One line for each way a questioning has gone so far, each choice
+  // beside the days it brought and whether there was dinner after.
+  // Nothing is there before it has happened.
   var FOUND_ROWS = [
-    ['cc', 'C', 1, 'C', 1, 'both kept mum'],
-    ['cd', 'D', 0, 'C', 3, 'one named'],
-    ['dd', 'D', 2, 'D', 2, 'both named']
+    ['cc', 'C', 1, 'C', 1, 'both kept mum', true, true],
+    ['cd', 'D', 0, 'C', 3, 'one named', true, false],
+    ['dd', 'D', 2, 'D', 2, 'both named', false, false]
   ];
   function foundHTML(found) {
     function cls(n) { return n <= 0 ? 'best' : (n >= 3 ? 'worst' : ''); }
@@ -2519,9 +2624,9 @@
     FOUND_ROWS.forEach(function (r) {
       if (!found[r[0]]) { return; }
       n++;
-      h += '<div class="fr"><span class="m">' + iconSVG(r[1]) + '<span class="num ' + cls(r[2]) + '">' + r[2] + '</span></span>'
+      h += '<div class="fr"><span class="m">' + iconSVG(r[1]) + '<span class="num ' + cls(r[2]) + '">' + r[2] + '</span>' + bowlSVG(r[6]) + '</span>'
         + '<span class="vs">and</span>'
-        + '<span class="m">' + iconSVG(r[3], true) + '<span class="num ' + cls(r[4]) + '">' + r[4] + '</span></span>'
+        + '<span class="m">' + iconSVG(r[3], true) + '<span class="num ' + cls(r[4]) + '">' + r[4] + '</span>' + bowlSVG(r[7]) + '</span>'
         + '<span class="lab">' + r[5] + '</span></div>';
     });
     if (n < FOUND_ROWS.length) { h += '<div class="more">' + (n ? 'And more to find out, maybe.' : 'Nothing chalked up yet.') + '</div>'; }
@@ -2552,24 +2657,29 @@
   // ------------------------------------------------------------------
   // The rules.
   //
-  // Every night, for every pair of prisoners:
-  //   both keep mum         one month each
+  // Every questioning, for every pair of prisoners:
+  //   both keep mum         one day each
   //   one snitches          the snitch none, the other three
-  //   both snitch           two months each
-  // Whatever the other does, snitching saves a month. And when both do
-  // what saves them a month, both lose one. That is the whole dilemma.
+  //   both snitch           two days each
+  // Whatever the other does, snitching saves a day. And when both do
+  // what saves them a day, both lose one. That is the whole dilemma.
   // ('C' and 'D' are the textbook's cooperate and defect.)
+  //
+  // And whoever is named by anybody goes without dinner, straight away.
+  // Naming never costs a prisoner their own dinner, so it changes nothing
+  // about which choice looks better; it only makes the trap bite sooner:
+  // two who name each other both go hungry, as well as the extra day.
   //
   // Nobody in the game ever says so. The Governor only makes his offer,
   // from his side of the desk, and the prisoners find out the rest the
   // way prisoners would: by what happens to them.
   // ------------------------------------------------------------------
-  function months(me, them) { return me === 'C' ? (them === 'C' ? 1 : 3) : (them === 'C' ? 0 : 2); }
+  function sentence(me, them) { return me === 'C' ? (them === 'C' ? 1 : 3) : (them === 'C' ? 0 : 2); }
 
   // Why anybody can name anybody: the whole town was in the crowd that
-  // broke into the Bishop's kitchens on his feast day, and every night
-  // the Governor asks about another thing that went on. Each one is its
-  // own charge, so the months pile up a night at a time.
+  // broke into the Bishop's kitchens on his feast day, and the Governor
+  // asks about one thing that went on after another. Each one is its own
+  // charge, so the days pile up a questioning at a time.
   var MISDEEDS = [
     ['the kitchen door', 'Who smashed down the Bishop’s kitchen door?'],
     ['the roast goose', 'Who ran off with the Bishop’s roast goose?'],
@@ -2607,9 +2717,11 @@
   function andList(names) {
     return names.length < 2 ? names.join('') : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
   }
+  function plural(n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); }
+  function missedText(n) { return n ? plural(n, 'dinner') + ' missed' : 'no dinners missed'; }
 
   // How the computer's cellmates make up their minds: from what they did,
-  // and what was done to them, night by night.
+  // and what was done to them, one questioning after another.
   var STRATS = {
     sam: function () { return 'C'; },
     nell: function () { return 'D'; },
@@ -2626,23 +2738,26 @@
   };
   var RULES = {
     sam: 'never snitches, whatever you do',
-    nell: 'snitches every single night, and swears she won’t',
-    jack: 'keeps mum the first night, then does whatever you did the night before',
+    nell: 'snitches every single time, and swears she won’t',
+    jack: 'keeps mum the first time, then does whatever you did the time before',
     grim: 'keeps mum until you snitch once, then snitches for ever',
     meg: 'tosses a coin',
-    sid: 'snitches the first night to test you, then plays fair if you hit back'
+    sid: 'snitches the first time to test you, then plays fair if you hit back'
   };
 
   var S = null;
 
+  // v3: days and dinners, where v2 had months and nights. A v2 save is
+  // simply not offered.
   function freshState(mode) {
-    return { v: 2, mode: mode, night: 1, prisoners: [], mv: {}, log: [], seen: {}, found: {}, inGame: true };
+    return { v: 3, mode: mode, round: 1, prisoners: [], mv: {}, log: [], seen: {}, found: {}, inGame: true };
   }
   function addPrisoner(p) {
     S.mv[p.id] = S.mv[p.id] || {};
     S.prisoners.forEach(function (q) { S.mv[p.id][q.id] = []; S.mv[q.id][p.id] = []; });
-    p.months = p.months || 0;
-    p.shown = p.months;
+    p.days = p.days || 0;
+    p.missed = p.missed || 0;
+    p.shown = p.days;
     S.prisoners.push(p);
   }
   function others(p) { return S.prisoners.filter(function (q) { return q !== p; }); }
@@ -2650,19 +2765,22 @@
   function humans() { return S.prisoners.filter(function (p) { return p.human; }); }
 
   function aiChoose(p) {
-    var mv = S.tonight.moves[p.id] = {};
+    var mv = S.now.moves[p.id] = {};
     others(p).forEach(function (q) { mv[q.id] = STRATS[p.strat](S.mv[p.id][q.id], S.mv[q.id][p.id]); });
   }
 
-  // Work out the night: who did what to whom, and what it costs.
-  function resolveNight() {
-    var P = S.prisoners, mv = S.tonight.moves, tr = S.tonight.trick || null;
-    var res = { pairs: [], delta: {}, trick: tr, sweetTook: false, threatHit: 0 };
+  // Work out a questioning: who did what to whom, what it costs in days,
+  // and who goes without dinner for it.
+  function resolveRound() {
+    var P = S.prisoners, mv = S.now.moves, tr = S.now.trick || null;
+    var res = { pairs: [], delta: {}, named: {}, trick: tr, sweetTook: false, threatHit: 0 };
     P.forEach(function (p) { res.delta[p.id] = 0; });
     for (var i = 0; i < P.length; i++) {
       for (var j = i + 1; j < P.length; j++) {
         var a = P[i], b = P[j], ma = mv[a.id][b.id], mb = mv[b.id][a.id];
-        var da = months(ma, mb), db = months(mb, ma), xa = 0, xb = 0;
+        var da = sentence(ma, mb), db = sentence(mb, ma), xa = 0, xb = 0;
+        if (mb === 'D') { res.named[a.id] = true; }
+        if (ma === 'D') { res.named[b.id] = true; }
         if (tr && tr.type === 'threat') {
           if (tr.target === a.id && ma === 'C' && mb === 'D') { xa = 1; }
           if (tr.target === b.id && mb === 'C' && ma === 'D') { xb = 1; }
@@ -2675,26 +2793,30 @@
         S.mv[b.id][a.id].push(mb);
       }
     }
-    P.forEach(function (p) { p.months += res.delta[p.id]; });
+    P.forEach(function (p) {
+      p.days += res.delta[p.id];
+      if (res.named[p.id]) { p.missed = (p.missed || 0) + 1; }
+    });
     if (tr && tr.type === 'sweet') {
       var t = byId(tr.target);
       if (t) {
         var any = others(t).some(function (q) { return mv[t.id][q.id] === 'D'; });
-        if (any) { res.sweetTook = true; t.months = Math.max(0, t.months - 1); }
+        if (any) { res.sweetTook = true; t.days = Math.max(0, t.days - 1); }
       }
     }
-    S.log.push({ night: S.night, moves: JSON.parse(JSON.stringify(mv)), trick: tr });
+    S.log.push({ round: S.round, moves: JSON.parse(JSON.stringify(mv)), trick: tr });
     return res;
   }
 
-  function totalMonths() { var t = 0; S.prisoners.forEach(function (p) { t += p.months; }); return t; }
+  function totalDays() { var t = 0; S.prisoners.forEach(function (p) { t += p.days; }); return t; }
+  function totalMissed() { var t = 0; S.prisoners.forEach(function (p) { t += p.missed || 0; }); return t; }
 
-  // --- saving between nights ---------------------------------------------
+  // --- saving between questionings ------------------------------------------
   function save() {
     if (!S) { return; }
     try {
       var c = JSON.parse(JSON.stringify(S));
-      delete c.tonight;
+      delete c.now;
       store(SAVE_KEY, JSON.stringify(c));
     } catch (e) {}
   }
@@ -2703,7 +2825,7 @@
     if (!raw) { return null; }
     try {
       var s = JSON.parse(raw);
-      if (s && s.v === 2 && s.prisoners && s.prisoners.length) { return s; }
+      if (s && s.v === 3 && s.prisoners && s.prisoners.length) { return s; }
     } catch (e) {}
     return null;
   }
@@ -2711,11 +2833,12 @@
 
   // --- what Moll works out, and when --------------------------------------
   //
-  // Moll never explains the rules. Each kind of night (both keep mum, one
-  // names the other, both name each other) is chalked up on the wall the
-  // first time it happens, in her words, about the two people it happened
-  // to. Only when all three are up does she reason out the trap, and only
-  // after that the long game: tomorrow, and the judge nobody can see coming.
+  // Moll never explains the rules. Each way a questioning can go (both
+  // keep mum, one names the other, both name each other) is chalked up on
+  // the wall the first time it happens, in her words, about the two people
+  // it happened to. Only when all three are up does she reason out the
+  // trap, and only after that the long game: next time, and the judge
+  // nobody can see coming.
   //
   // Everything is said with names. "They" and "your pal" were too easy to
   // misread with three or four in a cell.
@@ -2726,18 +2849,21 @@
   function outcomeKind(q) { return q.ma === q.mb ? (q.ma === 'C' ? 'cc' : 'dd') : 'cd'; }
   function foundAll() { return !!(S.found.cc && S.found.cd && S.found.dd); }
 
+  // Being named loses a dinner whoever does the naming, so with three or
+  // more in the cell Moll can't promise a pair who kept mum their dinners:
+  // somebody else may have named one of them.
   function discoveryLines(q) {
     var k = outcomeKind(q), a = q.a.name, b = q.b.name;
     if (k === 'cc') {
-      return [['moll', 'So ' + a + ' and ' + b + ' both kept mum, and all the Governor could give either of them was *one month*. For being in the crowd, and no more.'],
-        ['moll', 'I’ll chalk that up, so nobody forgets it.']];
+      return [['moll', 'So ' + a + ' and ' + b + ' both kept mum, and all the Governor could give either of them was *one day*. For being in the crowd, and no more.'],
+        ['moll', (S.prisoners.length > 2 ? 'And neither one cost the other a dinner.' : 'And nobody named either of them, so it’s dinner for both.') + ' I’ll chalk that up, so nobody forgets it.']];
     }
     if (k === 'dd') {
-      return [['moll', a + ' and ' + b + ' named each other, and got *two months* apiece.'],
-        ['moll', 'Named, the both of them, but the Governor took a month off each for being helpful. Up on the wall that goes.']];
+      return [['moll', a + ' and ' + b + ' named each other, and got *two days* apiece. And no dinner for either of them.'],
+        ['moll', 'Named, the both of them, but the Governor took a day off each for being helpful. Up on the wall that goes.']];
     }
     var sn = q.ma === 'D' ? q.a : q.b, vic = q.ma === 'D' ? q.b : q.a;
-    return [['moll', sn.name + ' named ' + vic.name + ', and the Governor let ' + sn.name + ' off. Nothing at all. But ' + vic.name + ' got *three months*.'],
+    return [['moll', sn.name + ' named ' + vic.name + ', and the Governor let ' + sn.name + ' off. Nothing at all. But ' + vic.name + ' got *three days*, and no dinner.'],
       ['moll', 'So the Governor keeps his word, and somebody else pays for it. I’ll chalk that up too.']];
   }
 
@@ -2756,17 +2882,17 @@
       var you = x.id === 'you';
       return [
         ['moll', 'That’s the lot, then: three ways it can go, all up on the wall. Now here’s the rotten bit.'],
-        ['moll', 'Suppose ' + Y + ' keeps mum. If ' + X + ' name' + (you ? '' : 's') + ' ' + Y + ', ' + X + ' get' + (you ? '' : 's') + ' *nothing* instead of a month. Naming’s better.'],
-        ['moll', 'Suppose ' + Y + ' names ' + X + '. If ' + X + ' name' + (you ? '' : 's') + ' ' + Y + ' back, ' + X + ' get' + (you ? '' : 's') + ' *two* months instead of three. Naming’s better again!'],
-        ['moll', 'Whatever ' + Y + ' does, ' + X + ' save' + (you ? '' : 's') + ' a month by naming ' + Y + '. And ' + Y + ' is sat there doing the very same sum about ' + (you ? 'you' : X) + '.'],
-        ['moll', 'So ' + X + ' and ' + Y + ' name each other, and get two months apiece, when keeping mum would have got ' + (you ? 'the pair of you' : X + ' and ' + Y) + ' one month each.'],
+        ['moll', 'Suppose ' + Y + ' keeps mum. If ' + X + ' name' + (you ? '' : 's') + ' ' + Y + ', ' + X + ' get' + (you ? '' : 's') + ' *nothing* instead of a day. Naming’s better.'],
+        ['moll', 'Suppose ' + Y + ' names ' + X + '. If ' + X + ' name' + (you ? '' : 's') + ' ' + Y + ' back, ' + X + ' get' + (you ? '' : 's') + ' *two* days instead of three. Naming’s better again!'],
+        ['moll', (you ? 'And your' : 'And ' + X + '’s') + ' dinner? That’s up to ' + Y + ', whatever ' + X + ' do' + (you ? '' : 'es') + '. So whatever ' + Y + ' does, ' + X + ' save' + (you ? '' : 's') + ' a day by naming ' + Y + '. And ' + Y + ' is sat there doing the very same sum about ' + X + '.'],
+        ['moll', 'So ' + X + ' and ' + Y + ' name each other: two days apiece, and no dinner for either. Keeping mum would have got ' + (you ? 'the pair of you' : X + ' and ' + Y) + ' one day each, and a dinner each.'],
         ['moll', 'There’s the trap, ' + duck() + '. ' + Xc + ' and ' + Y + ', each doing what’s best for number one, and both worse off for it.']
       ];
     },
     multi: function () {
       var n = S.prisoners.length;
       return [
-        ['moll', 'And with ' + n + ' of you, every one of you has to trust every other one.'],
+        ['moll', 'And with ' + (['', '', 'two', 'three', 'four'][n] || n) + ' of you, every one of you has to trust every other one.'],
         ['moll', 'One snitch can turn the whole cell sour.']
       ];
     },
@@ -2780,8 +2906,8 @@
     future: function () {
       var xy = pairForTalk(), x = xy[0], y = xy[1], you = x.id === 'you';
       return [
-        ['moll', 'Mind, nobody’s going home tomorrow. ' + NameOf(x) + ' and ' + y.name + ' will be up those stairs again, and the night after that.'],
-        ['moll', 'Whatever ' + nameOf(x) + ' do' + (you ? '' : 'es') + ' to ' + y.name + ' tonight, ' + y.name + ' will remember tomorrow. A snitch saves a month now. What will it cost later?']
+        ['moll', 'Mind, nobody’s going home yet. ' + NameOf(x) + ' and ' + y.name + ' will be up those stairs again, and again after that.'],
+        ['moll', 'Whatever ' + nameOf(x) + ' do' + (you ? '' : 'es') + ' to ' + y.name + ' this time, ' + y.name + ' will remember next time. A snitch saves a day now. What will it cost later?']
       ];
     },
     talk: function () {
@@ -2794,46 +2920,46 @@
       var xy = pairForTalk(), x = xy[0], y = xy[1], X = nameOf(x);
       return [
         ['moll', 'Ever wondered why nobody says when the judge is coming?'],
-        ['moll', 'If ' + X + ' knew tonight was the last night, ' + X + ' would snitch. Why not? There’d be no tomorrow to pay for it.'],
-        ['moll', y.name + ' would know that, so ' + y.name + ' would snitch the night before. And knowing that, ' + X + ' would snitch the night before that...'],
-        ['moll', 'All the way back to the very first night! Not knowing when it ends is what keeps folk honest.']
+        ['moll', 'If ' + X + ' knew which was the last time up those stairs, ' + X + ' would snitch that time. Why not? There’d be no next time to pay for it.'],
+        ['moll', y.name + ' would know that, so ' + y.name + ' would snitch the time before. And knowing that, ' + X + ' would snitch the time before that...'],
+        ['moll', 'All the way back to the very first time! Not knowing when it ends is what keeps folk honest.']
       ];
     },
     tft: function (x, y) {
       return [
-        ['moll', 'Did you see that? ' + y.name + ' snitched on ' + x.name + ' last night, so tonight ' + x.name + ' snitched right back on ' + y.name + '. *Tit for tat!*'],
+        ['moll', 'Did you see that? ' + y.name + ' snitched on ' + x.name + ' last time, so this time ' + x.name + ' snitched right back on ' + y.name + '. *Tit for tat!*'],
         ['moll', 'Snitch on me and I’ll snitch on you. Some say that’s the fairest way there is.']
       ];
     },
     forgive: function (x, y) {
       return [
-        ['moll', 'Now there’s something. ' + y.name + ' snitched on ' + x.name + ' last night... and tonight ' + x.name + ' kept mum about ' + y.name + ' anyway.'],
+        ['moll', 'Now there’s something. ' + y.name + ' snitched on ' + x.name + ' last time... and this time ' + x.name + ' kept mum about ' + y.name + ' anyway.'],
         ['moll', 'Forgiving’s risky. But somebody’s got to stop a feud before it starts.']
       ];
     },
     mug: function (x, y) {
       return [
-        ['moll', y.name + ' has snitched on ' + x.name + ' two nights running, and ' + x.name + ' keeps on keeping mum about ' + y.name + '.'],
+        ['moll', y.name + ' has snitched on ' + x.name + ' twice running, and ' + x.name + ' keeps on keeping mum about ' + y.name + '.'],
         ['moll', 'That ain’t kindness, ' + x.name + ', that’s being a *mug*. Being nice is good. Being a doormat ain’t.']
       ];
     },
     feud: function (x, y) {
       return [
-        ['moll', x.name + ' and ' + y.name + ' are at it like cats in a sack: two nights of snitching on each other.'],
-        ['moll', 'Two months each, every night. ' + x.name + ' and ' + y.name + ' are both losing. Somebody’s got to keep mum first, and hope the other one notices.']
+        ['moll', x.name + ' and ' + y.name + ' are at it like cats in a sack: snitching on each other twice running.'],
+        ['moll', 'Two days each and no dinner, every time. ' + x.name + ' and ' + y.name + ' are both losing. Somebody’s got to keep mum first, and hope the other one notices.']
       ];
     },
     trust: function (x, y) {
       return [
-        ['moll', 'Three nights of ' + x.name + ' and ' + y.name + ' keeping mum about each other. Lovely.'],
+        ['moll', 'Three times running, ' + x.name + ' and ' + y.name + ' have kept mum about each other. Lovely.'],
         ['moll', 'That’s how trust works in here. Slow to build. Quick to break.']
       ];
     }
   };
 
-  // What happened tonight that's worth a word? Looks at each prisoner's
-  // choice about each other one, against the nights before.
-  function eventsTonight() {
+  // What happened this time that's worth a word? Looks at each prisoner's
+  // choice about each other one, against the times before.
+  function eventsNow() {
     var ev = [];
     S.prisoners.forEach(function (x) {
       others(x).forEach(function (y) {
@@ -2859,10 +2985,10 @@
         if (lastThem === 'D') { return 'You snitched on me… I still won’t snitch on you, though. I couldn’t.'; }
         return n === 0 ? 'I’ll keep mum, I promise. I always keep mum.' : pick(['I don’t like snitching. Snitching isn’t nice.', 'Keep mum, eh? Keeping mum is nicer.']);
       case 'nell':
-        return n === 0 ? 'I’ll keep mum for you tonight. Cross my heart.' : pick(['Course I kept mum. Must be a mistake in the Governor’s book.', 'Trust me, ducky. Tonight I’ll keep mum. Promise.', 'Don’t look at me like that. Tonight’s different.']);
+        return n === 0 ? 'I’ll keep mum for you. Cross my heart.' : pick(['Course I kept mum. Must be a mistake in the Governor’s book.', 'Trust me, ducky. This time I’ll keep mum. Promise.', 'Don’t look at me like that. This time’s different.']);
       case 'jack':
         if (n === 0) { return 'Keep mum for me and I’ll keep mum for you. Simple as that.'; }
-        return lastThem === 'D' ? 'You snitched on me last night. So you know what’s coming.' : 'You kept mum for me last night. I won’t forget it.';
+        return lastThem === 'D' ? 'You snitched on me last time. So you know what’s coming.' : 'You kept mum for me last time. I won’t forget it.';
       case 'grim':
         if (crossed) { return theirs.indexOf('D') === n - 1 ? 'You crossed me. I’ll never trust you again. Never.' : 'Don’t bother talking to me.'; }
         return pick(['Keep mum for me and I’ll keep mum for you. Till the end of time.', 'We’re square, you and me. Let’s keep it that way.']);
@@ -2879,7 +3005,7 @@
   // to them: both kept mum, they got away with it, they got stung, or
   // both snitched. Some never happen: Sam never snitches, Nell always does.
   var QUIPS = {
-    sam: { cc: ['We both kept mum! How nice.'], lost: ['Oh... You named me. That wasn’t very nice.', 'Three months... oh dear.'] },
+    sam: { cc: ['We both kept mum! How nice.'], lost: ['Oh... You named me. That wasn’t very nice.', 'Three days, and no dinner... oh dear.'] },
     nell: { won: ['Ha! Never trust a Nell, sweetheart.', 'Told you I’d keep mum. I lied.'], dd: ['Well, well. Look who’s learning.'] },
     jack: { cc: ['Good. Mum’s the word.'], won: ['You had that coming.'], lost: ['So you named me. Right.'], dd: ['You snitch, I snitch. Fair’s fair.'] },
     grim: { cc: ['Hmph. Good.'], won: ['I warned you.'], lost: ['You named me. Never again. NEVER.'], dd: ['Snitch away. I’ll snitch right back. For ever.'] },
@@ -2927,7 +3053,7 @@
       case 'loyal': return N + ' never snitched once. Loyal as a dog. Mind, dogs get kicked.';
       case 'rotter': return N + ' snitched every single time. Nobody in here will share a crust with ' + (you ? 'you' : name) + ' now.';
       case 'tft': return N + ' played tit for tat: kind till crossed, quick to hit back, quick to forgive. The canniest way there is.';
-      case 'sneak': return N + ' liked snitching on folk who’d kept mum. Sneaky. It pays for a night or two.';
+      case 'sneak': return N + ' liked snitching on folk who’d kept mum. Sneaky. It pays, once or twice.';
       case 'grudger': return N + ' held grudges. Cross ' + (you ? 'you' : name) + ' once and that was that.';
       case 'kind': return N + ' kept mum nearly always, and only snitched now and then.';
       case 'mixed': return N + ' ' + w + ' a bit of everything. Hard to read, and that cuts both ways.';
@@ -2941,18 +3067,18 @@
     for (var k = 0; k < n; k++) {
       var ca = STRATS[a](ha, hb), cb = STRATS[b](hb, ha);
       ha.push(ca); hb.push(cb);
-      ma += months(ca, cb); mb += months(cb, ca);
+      ma += sentence(ca, cb); mb += sentence(cb, ca);
     }
     return [ma, mb];
   }
-  function tournament(nights) {
+  function tournament(rounds) {
     var tot = {};
     MATES.forEach(function (a) { tot[a] = 0; });
     for (var i = 0; i < MATES.length; i++) {
       for (var j = i; j < MATES.length; j++) {
         var a = MATES[i], b = MATES[j], reps = (a === 'meg' || b === 'meg') ? 80 : 1, sa = 0, sb = 0;
         for (var r = 0; r < reps; r++) {
-          var m = playMatch(a, b, nights);
+          var m = playMatch(a, b, rounds);
           sa += m[0]; sb += m[1];
         }
         tot[a] += sa / reps;
@@ -2991,6 +3117,7 @@
     setPose(f, L.rest === 'cross' ? 'cross' : 'rest');
     f.shake = 0;
     f.lookT = 0;
+    f.bowl.style.display = 'none';
   }
   function setupCell() {
     dropAllPrisoners();
@@ -3002,7 +3129,7 @@
     LAY.n = S.mode === 'story' ? 2 : S.prisoners.length;
     layout();
     showScene('cell');
-    drawKnitting(FIG.moll, S.night);
+    drawKnitting(FIG.moll, S.round);
   }
 
   var hurry = false;
@@ -3010,8 +3137,12 @@
   // The way across the cell: in front of everybody when they stand in a
   // row, behind the front row when the cell is deep.
   function lane() { return LAY.portrait ? LAY.backY + (LAY.floorY - LAY.backY) * 0.3 : LAY.floorY + 6 * LAY.s; }
-  // He keeps to the doorway, so nobody has to walk through him.
-  function keySpot() { return { x: LAY.doorCx, y: LAY.backY + 12 * LAY.s }; }
+  // He steps aside, just inside the door on the cell side, so nobody has
+  // to walk through him on the way in or out.
+  function asideSpot() {
+    var k = LAY.portrait ? LAY.bs : LAY.s;
+    return { x: LAY.doorX0 - 54 * k, y: LAY.backY + 22 * k };
+  }
 
   async function walking(promises) {
     tapper.classList.add('show');
@@ -3028,19 +3159,29 @@
     return walk(f, pts, speed || walkSpeed());
   }
 
-  // The turnkey comes in with his lantern and stands aside by the door.
-  async function keyIn() {
-    var k = FIG.key, sp = keySpot();
-    k.shown = true; k.op = 0;
+  // The turnkey comes in with his lantern (and the dinner pot, when it's
+  // time) and steps aside, then watches whoever goes past.
+  async function keyIn(withPot) {
+    var k = FIG.key, a = asideSpot();
+    k.shown = true; k.op = 0; k.watch = false;
     k.x = LAY.doorCx; k.y = LAY.backY - 2;
+    k.pot.style.display = withPot ? '' : 'none';
     await setDoor(1);
-    await walking([walkTo(k, [{ x: sp.x, y: sp.y, op: 1 }], 50 * LAY.s)]);
+    await walking([walkTo(k, [{ x: LAY.doorCx, y: LAY.backY + 10, op: 1 }], 50 * LAY.s)]);
+    await walking([walkTo(k, [{ x: LAY.doorCx, y: a.y }, { x: a.x, y: a.y }], walkSpeed() * 0.6)]);
     k.lookT = -1;
+    k.watch = true;
   }
+  // Out the way everybody goes: across to the door, then through it.
   async function keyOut() {
-    var k = FIG.key;
+    var k = FIG.key, pts = [];
+    k.watch = false;
+    if (Math.abs(k.x - LAY.doorCx) > 2) { pts.push({ x: LAY.doorCx, y: k.y }); }
+    if (k.y > LAY.backY + 12) { pts.push({ x: LAY.doorCx, y: LAY.backY + 10 }); }
+    if (pts.length) { await walking([walkTo(k, pts, walkSpeed() * 0.6)]); }
     await walking([walkTo(k, [{ x: LAY.doorCx, y: LAY.backY - 2, op: 0 }], 50 * LAY.s)]);
     k.shown = false;
+    k.pot.style.display = 'none';
     await setDoor(0);
   }
 
@@ -3076,7 +3217,9 @@
     await fade(1);
   }
 
-  async function walkIn(list, keyHere) {
+  // Back from upstairs. With stay, the turnkey waits by the door until
+  // he has said his piece.
+  async function walkIn(list, keyHere, stay) {
     hurry = false;
     var ps = [];
     (list || S.prisoners).forEach(function (p) {
@@ -3093,17 +3236,68 @@
       if (!hurry && !reduced) { await sleep(420); }
     }
     await walking(ps);
-    await keyOut();
+    if (!stay) { await keyOut(); }
     hurry = false;
   }
 
+  // Dinner, straight after the names come out. The turnkey brings the pot
+  // along the row, nearest the door first, and anybody who was named gets
+  // a shake of the head instead.
+  async function serveDinner(res) {
+    var k = FIG.key, hungry = 0;
+    hurry = false;
+    clearBubbles();
+    S.prisoners.forEach(restFace);
+    await keyIn(true);
+    k.watch = false;
+    if (!S.seen.dinner) {
+      S.seen.dinner = 1;
+      await say('key', 'Dinner! Such as it is.');
+      hideSpeech();
+    }
+    var order = S.prisoners.slice().sort(function (a, b) { return FIG[b.id].x - FIG[a.id].x; });
+    for (var i = 0; i < order.length; i++) {
+      var p = order[i], f = FIG[p.id];
+      var stop = { x: f.x + Math.min(LAY.slotW * 0.45, 92 * f.s), y: lane() };
+      await walking([walkTo(k, [{ x: k.x, y: lane() }, stop], walkSpeed() * 0.8)]);
+      k.lookT = -1; f.lookT = 1;
+      if (res.named[p.id]) {
+        hungry++;
+        setExpr(k, 'cross'); k.no = 1;
+        setExpr(f, 'sad'); setPose(f, 'wring');
+        bubble(f, 'H', 1);
+        rumble();
+        if (!S.seen.hungry) {
+          S.seen.hungry = 1;
+          await say('key', 'Not you, ' + p.name + '. You were named. Bishop’s orders.');
+          hideSpeech();
+        } else if (!reduced) { await sleep(750); }
+      } else {
+        setPose(k, 'offer');
+        slop();
+        if (!reduced) { await sleep(280); }
+        f.bowl.style.display = '';
+        setPose(f, 'bowl'); setExpr(f, 'happy');
+        if (!reduced) { await sleep(450); }
+        setPose(k, 'hold');
+      }
+      setExpr(k, 'neutral');
+    }
+    await keyOut();
+    if (hungry && !S.seen.hungryMoll) {
+      S.seen.hungryMoll = 1;
+      await say('moll', 'Named means hungry. The Bishop’s little joke: eat his dinner, and you can do without your own.');
+    }
+  }
+
   // ------------------------------------------------------------------
-  // A night, from talk to tally.
+  // A questioning, from talk to dinner.
   // ------------------------------------------------------------------
   async function talkTime() {
     showScene('cell');
+    clearBubbles();
     S.prisoners.forEach(restFace);
-    if (S.night === 2 && !S.seen.talk) {
+    if (S.round === 2 && !S.seen.talk) {
       S.seen.talk = 1;
       await talk(LESSONS.talk());
     }
@@ -3118,7 +3312,7 @@
 
   async function interrogations() {
     await walkOut();
-    S.tonight = { moves: {}, trick: null };
+    S.now = { moves: {}, trick: null };
     var hs = humans(), gh = S.gov.kind === 'human', many = hs.length + (gh ? 1 : 0) >= 2;
     showScene('room');
     setExpr(GOV, 'smirk');
@@ -3154,7 +3348,7 @@
   function govLines(p) {
     var os = others(p), L = [], one = os.length === 1 ? os[0] : null;
     var names = andList(os.map(function (q) { return q.name; }));
-    var md = misdeed(S.night);
+    var md = misdeed(S.round);
     if (!S.seen['met-' + p.id]) {
       S.seen['met-' + p.id] = 1;
       L.push('Ah. ' + p.name + '. Sit down, sit down.');
@@ -3162,6 +3356,7 @@
       L.push(names + (one ? ' is' : ' are') + ' being asked the very same question, down the corridor.');
       L.push('Name ' + (one ? one.name : 'whoever did it') + ', and I’ll let you off this one. Keep quiet, and you take your share along with the rest of the rabble.');
       L.push('And if ' + (one ? one.name : 'somebody') + ' names *you*, ' + p.name + '... well. The Bishop will want an example made.');
+      L.push('Oh, and the Bishop’s orders: whoever gets named goes without dinner. A thief who ate the Bishop’s dinner can do without one.');
     } else if (os.some(function (q) { return !S.mv[p.id][q.id].length; })) {
       L.push((one ? 'New cellmate, ' + p.name + '? ' + one.name + '. Was ' + one.name + ' at the feast? Everybody was.' : 'Some new faces down there, ' + p.name + '. Everybody was at the feast.'));
       L.push('Now then. ' + md[1]);
@@ -3170,19 +3365,22 @@
       var by = os.filter(function (q) { return lastMove(q, p) === 'D'; }), on = os.filter(function (q) { return lastMove(p, q) === 'D'; });
       var opts = ['The Bishop wants a name, ' + p.name + ', and I mean to give him one.',
         'Just between us, ' + p.name + '... nobody need ever know who told me.'];
-      if (by.length) { opts.push(by[0].name + ' named you last night, you know. I’d want my own back, if I were you.'); }
-      if (on.length) { opts.push('You were very helpful last night, ' + p.name + '. The Bishop was most pleased.'); }
+      if (by.length) {
+        opts.push(by[0].name + ' named you last time, you know. I’d want my own back, if I were you.');
+        opts.push('Hungry, ' + p.name + '? You’ve ' + by[0].name + ' to thank for that.');
+      }
+      if (on.length) { opts.push('You were very helpful last time, ' + p.name + '. The Bishop was most pleased.'); }
       if (!by.length && !on.length) { opts.push('Still keeping mum, ' + p.name + '? The Bishop won’t wait for ever.'); }
       L.push(pick(opts));
     }
-    var tr = S.tonight.trick;
+    var tr = S.now.trick;
     if (tr && tr.target === p.id) {
       if (tr.type === 'whisper') {
         L.push(one ? 'Between you and me, ' + p.name + '... ' + one.name + ' has already named you. Sang like a canary. So why keep mum about ' + one.name + '?'
           : 'Between you and me, ' + p.name + '... ' + names + ' have already named you. Every one. So why keep mum?');
       }
-      if (tr.type === 'sweet') { L.push('Tell you what, ' + p.name + '. Name somebody tonight, and I’ll scratch a month *off* your wall. Can’t say fairer than that.'); }
-      if (tr.type === 'threat') { L.push('And mark this, ' + p.name + '. Keep mum, and if ' + (one ? one.name : 'anybody') + ' names you, I’ll add an *extra* month. For wasting my time.'); }
+      if (tr.type === 'sweet') { L.push('Tell you what, ' + p.name + '. Name somebody this time, and I’ll scratch a day *off* your wall. Can’t say fairer than that.'); }
+      if (tr.type === 'threat') { L.push('And mark this, ' + p.name + '. Keep mum, and if ' + (one ? one.name : 'anybody') + ' names you, I’ll add an *extra* day. For wasting my time.'); }
     }
     return L;
   }
@@ -3193,7 +3391,7 @@
     var lines = govLines(p);
     for (var i = 0; i < lines.length; i++) { await say('gov', lines[i]); }
     var picks = await choicePanel(p);
-    S.tonight.moves[p.id] = picks;
+    S.now.moves[p.id] = picks;
     var any = Object.keys(picks).some(function (k) { return picks[k] === 'D'; });
     setExpr(GOV, any ? 'grin' : 'cross');
     await say('gov', any ? pick(['Very sensible. The Bishop will be pleased. Take ' + p.name + ' down!', 'There, that wasn’t so hard. Take ' + p.name + ' away!'])
@@ -3204,13 +3402,13 @@
   function choicePanel(p) {
     var my = RUN;
     return new Promise(function (resolve, reject) {
-      var os = others(p), picks = {}, tr = S.tonight.trick;
+      var os = others(p), picks = {}, tr = S.now.trick;
       var mods = tr && tr.target === p.id ? { sweet: tr.type === 'sweet', threat: tr.type === 'threat' } : {};
       var armedAt = Date.now() + 350;
       function html() {
-        var h = '<h2>' + esc(misdeed(S.night)[1]) + '</h2><p class="sub">' + esc(p.name) + ', keep mum or name names?</p>';
-        if (mods.sweet) { h += '<p class="sub">The Governor’s offer: name anybody tonight, and a month comes off ' + esc(p.name) + '’s wall.</p>'; }
-        if (mods.threat) { h += '<p class="sub">The Governor’s threat: if ' + esc(p.name) + ' keeps mum and gets named, an extra month.</p>'; }
+        var h = '<h2>' + esc(misdeed(S.round)[1]) + '</h2><p class="sub">' + esc(p.name) + ', keep mum or name names?</p>';
+        if (mods.sweet) { h += '<p class="sub">The Governor’s offer: name anybody this time, and a day comes off ' + esc(p.name) + '’s wall.</p>'; }
+        if (mods.threat) { h += '<p class="sub">The Governor’s threat: if ' + esc(p.name) + ' keeps mum and gets named, an extra day.</p>'; }
         os.forEach(function (q) {
           var c = picks[q.id];
           h += '<div class="row"><div class="who"><span class="face64">' + headSVG(q.look) + '</span><span class="nm">' + esc(q.name) + '</span></div><div class="opts">'
@@ -3254,8 +3452,8 @@
   var TRICKS = [
     { k: 'none', name: 'Just ask', what: 'Ask every prisoner straight, and see what happens.' },
     { k: 'whisper', name: 'Whisper', what: 'Tell one prisoner that everybody else has already named that prisoner.' },
-    { k: 'sweet', name: 'Sweetener', what: 'Promise one prisoner a month off for naming somebody.' },
-    { k: 'threat', name: 'Threat', what: 'Warn one prisoner: keep mum and get named, and it’s an extra month.' }
+    { k: 'sweet', name: 'Sweetener', what: 'Promise one prisoner a day off for naming somebody.' },
+    { k: 'threat', name: 'Threat', what: 'Warn one prisoner: keep mum and get named, and it’s an extra day.' }
   ];
 
   function governorTurn() {
@@ -3264,8 +3462,8 @@
       var choice = 'none', target = null;
       var armedAt = Date.now() + 350;
       function html() {
-        var h = '<h2>' + esc(S.gov.name) + ': tonight’s trick</h2>'
-          + '<p class="sub">Months handed out so far: <b>' + totalMonths() + '</b>. The more, the better for you.</p>';
+        var h = '<h2>' + esc(S.gov.name) + ': which trick this time?</h2>'
+          + '<p class="sub">Days handed out so far: <b>' + totalDays() + '</b>. The more, the better for you.</p>';
         TRICKS.forEach(function (t) {
           h += '<div class="row"><button class="btn' + (choice === t.k ? ' on' : ' quiet') + '" data-act="t:' + t.k + '" style="min-width:9.5em;justify-content:flex-start">' + TRICK_ICONS[t.k] + '<span>' + t.name + '</span></button><span class="sub">' + t.what + '</span></div>';
         });
@@ -3284,7 +3482,7 @@
         if (Date.now() < armedAt) { return; }
         if (act === 'done') {
           if (choice !== 'none' && !target) { return; }
-          S.tonight.trick = choice === 'none' ? null : { type: choice, target: target };
+          S.now.trick = choice === 'none' ? null : { type: choice, target: target };
           hidePanel();
           if (my !== RUN) { reject(ABORT); return; }
           resolve();
@@ -3303,9 +3501,9 @@
   }
 
   function craftyTrick() {
-    if (S.night < 2 || Math.random() < 0.5) { return; }
+    if (S.round < 2 || Math.random() < 0.5) { return; }
     var hs = humans(), pool = hs.length ? hs : S.prisoners;
-    S.tonight.trick = { type: pick(['whisper', 'sweet', 'threat']), target: pick(pool).id };
+    S.now.trick = { type: pick(['whisper', 'sweet', 'threat']), target: pick(pool).id };
   }
 
   // --- the reveal --------------------------------------------------------
@@ -3324,21 +3522,21 @@
   }
 
   function outcomeLine(q) {
-    var a = '*' + q.a.name + '*', b = '*' + q.b.name + '*', md = misdeed(S.night)[0];
-    if (q.ma === 'C' && q.mb === 'C') { return a + ' and ' + b + ' both kept mum about ' + md + '. One month each.'; }
-    if (q.ma === 'D' && q.mb === 'D') { return a + ' and ' + b + ' named each other for ' + md + '. Two months each.'; }
+    var a = '*' + q.a.name + '*', b = '*' + q.b.name + '*', md = misdeed(S.round)[0];
+    if (q.ma === 'C' && q.mb === 'C') { return a + ' and ' + b + ' both kept mum about ' + md + '. One day each.'; }
+    if (q.ma === 'D' && q.mb === 'D') { return a + ' and ' + b + ' named each other for ' + md + '. Two days each, and no dinner.'; }
     var sn = q.ma === 'D' ? q.a : q.b, vic = q.ma === 'D' ? q.b : q.a, extra = q.ma === 'D' ? q.xb : q.xa;
-    return '*' + sn.name + '* named *' + vic.name + '* for ' + md + '! ' + sn.name + ' is let off. Three months for ' + vic.name
-      + (extra ? ', and one more for the Governor’s threat.' : '.');
+    return '*' + sn.name + '* named *' + vic.name + '* for ' + md + '! ' + sn.name + ' is let off. Three days for ' + vic.name
+      + (extra ? ', one more for the Governor’s threat, and no dinner.' : ', and no dinner.');
   }
 
-  // The first time a kind of night happens, Moll says what it came to and
-  // chalks it on the wall. A night bent by one of the Governor's tricks
+  // The first time a questioning goes a new way, Moll says what it came to
+  // and chalks it on the wall. One bent by one of the Governor's tricks
   // doesn't count: it wouldn't show the usual way of things.
   async function discover(q) {
     var k = outcomeKind(q);
     if (S.found[k] || q.xa || q.xb) { return; }
-    S.found[k] = S.night;
+    S.found[k] = S.round;
     var L = discoveryLines(q);
     await say(L[0][0], L[0][1]);
     scratch();
@@ -3380,7 +3578,7 @@
     clearBubbles();
   }
 
-  async function revealNight(res) {
+  async function revealRound(res) {
     showScene('cell');
     S.prisoners.forEach(function (p) {
       var f = FIG[p.id];
@@ -3390,21 +3588,24 @@
     });
     hideSpeech();
     await fade(0);
-    await walkIn();
+    await walkIn(null, false, true);
     if (!S.seen.govReveal) {
       S.seen.govReveal = 1;
       await say('key', 'The Governor’s sent his ledger down. Here’s who named who.');
+      hideSpeech();
     }
+    await keyOut();
     for (var i = 0; i < res.pairs.length; i++) { await revealPair(res.pairs[i], res.pairs.length > 1); }
     S.prisoners.forEach(function (p) { FIG[p.id].dim = false; });
     await revealTrick(res);
     for (var j = 0; j < S.prisoners.length; j++) {
       var p = S.prisoners[j];
-      if (p.shown !== p.months) { await countTo(p, p.months); }
+      if (p.shown !== p.days) { await countTo(p, p.days); }
     }
     if (res.pairs.length > 1) {
-      await say(null, 'Tonight: ' + S.prisoners.map(function (p) { return '*' + p.name + '* +' + res.delta[p.id]; }).join(', ') + '.');
+      await say(null, 'This time: ' + S.prisoners.map(function (p) { return '*' + p.name + '* +' + res.delta[p.id]; }).join(', ') + '.');
     }
+    await serveDinner(res);
   }
 
   async function revealTrick(res) {
@@ -3412,7 +3613,7 @@
     if (!tr) { return; }
     var t = byId(tr.target);
     if (!t) { return; }
-    var os = others(t), one = os.length === 1 ? os[0] : null, mv = S.tonight.moves;
+    var os = others(t), one = os.length === 1 ? os[0] : null, mv = S.now.moves;
     var L = [];
     if (tr.type === 'whisper') {
       var did = os.filter(function (q) { return mv[q.id][t.id] === 'D'; }).length;
@@ -3421,45 +3622,45 @@
         : (did === os.length ? 'As it happens, the Governor was right. But the Governor couldn’t have known. He was guessing.' : 'Some had named ' + t.name + ' and some hadn’t. The Governor was only guessing.')]);
       if (!S.seen.trick_whisper) { S.seen.trick_whisper = 1; L.push(['moll', 'Never trust the Governor, ' + duck() + '. The Governor wants names, and will say anything to get them.']); }
     } else if (tr.type === 'sweet') {
-      L.push([null, 'Upstairs, the Governor had offered *' + t.name + '* a month off for naming somebody.']);
-      L.push([null, res.sweetTook ? t.name + ' named somebody, so one month comes off ' + t.name + '’s wall.' : t.name + ' didn’t take the bait.']);
+      L.push([null, 'Upstairs, the Governor had offered *' + t.name + '* a day off for naming somebody.']);
+      L.push([null, res.sweetTook ? t.name + ' named somebody, so one day comes off ' + t.name + '’s wall.' : t.name + ' didn’t take the bait.']);
       if (!S.seen.trick_sweet) {
         S.seen.trick_sweet = 1;
         L.push(['moll', 'Sweetening the pot, that’s called. The Governor can’t make anybody snitch... but he can make snitching pay.']);
         L.push(['moll', 'Change what folk get, and you change what folk do.']);
       }
     } else if (tr.type === 'threat') {
-      L.push([null, 'Upstairs, the Governor had threatened *' + t.name + '* with an extra month for keeping mum and getting named.']);
-      L.push([null, res.threatHit ? t.name + ' was named, so the extra month stands.' : 'It didn’t come to that.']);
+      L.push([null, 'Upstairs, the Governor had threatened *' + t.name + '* with an extra day for keeping mum and getting named.']);
+      L.push([null, res.threatHit ? t.name + ' was named, so the extra day stands.' : 'It didn’t come to that.']);
       if (!S.seen.trick_threat) { S.seen.trick_threat = 1; L.push(['moll', 'Same trick, other end: making keeping mum more dangerous than snitching.']); }
     }
     for (var i = 0; i < L.length; i++) {
       await say(L[i][0], L[i][1]);
-      if (i === 1 && tr.type === 'sweet' && res.sweetTook) { await countTo(t, t.months); }
+      if (i === 1 && tr.type === 'sweet' && res.sweetTook) { await countTo(t, t.days); }
     }
   }
 
-  // After the reveal, at most one big thought a night. The trap only once
-  // the wall is full; tomorrow only the night after that; the judge only
-  // after tomorrow. In between, Moll remarks on what people actually did.
+  // After dinner, at most one big thought each time. The trap only once
+  // the wall is full; next time only the time after that; the judge only
+  // after next time. In between, Moll remarks on what people actually did.
   async function lessonsAfter() {
     var L = [];
     if (foundAll() && !S.seen.logic) {
-      S.seen.logic = S.night;
+      S.seen.logic = S.round;
       L = L.concat(LESSONS.logic());
       if (S.prisoners.length > 2) { L = L.concat(LESSONS.multi()); }
-    } else if (!foundAll() && S.night >= 4 && !S.seen.wonder) {
-      S.seen.wonder = S.night;
+    } else if (!foundAll() && S.round >= 4 && !S.seen.wonder) {
+      S.seen.wonder = S.round;
       L = L.concat(LESSONS.wonder());
-    } else if (S.seen.logic && S.seen.logic < S.night && !S.seen.future) {
-      S.seen.future = S.night;
+    } else if (S.seen.logic && S.seen.logic < S.round && !S.seen.future) {
+      S.seen.future = S.round;
       L = L.concat(LESSONS.future());
-    } else if (S.seen.future && S.seen.future < S.night && S.night >= 4 && !S.seen.end) {
-      S.seen.end = S.night;
+    } else if (S.seen.future && S.seen.future < S.round && S.round >= 4 && !S.seen.end) {
+      S.seen.end = S.round;
       L = L.concat(LESSONS.end());
     }
     if (!L.length) {
-      var ev = eventsTonight(), order = ['tft', 'mug', 'forgive', 'feud', 'trust'];
+      var ev = eventsNow(), order = ['tft', 'mug', 'forgive', 'feud', 'trust'];
       for (var k = 0; k < order.length; k++) {
         if (S.seen[order[k]]) { continue; }
         var e = null;
@@ -3473,8 +3674,8 @@
   // --- the end of it ------------------------------------------------------
   function judgeComes() {
     var lng = S.len === 'long', minN = lng ? 7 : 4, chance = lng ? 0.2 : 0.3, cap = lng ? 20 : 12;
-    if (S.night >= cap) { return true; }
-    if (S.night < minN) { return false; }
+    if (S.round >= cap) { return true; }
+    if (S.round < minN) { return false; }
     return Math.random() < chance;
   }
 
@@ -3497,17 +3698,18 @@
 
   async function assizes() {
     store(DONE_KEY, '1');
-    await nightCard('The Assizes', 'The judge has come', true);
+    await roundCard('The Assizes', 'The judge has come', true, GAVEL);
     showScene('cell');
+    clearBubbles();
     S.prisoners.forEach(restFace);
     await say('key', 'On your feet! The judge is here.');
     await say('moll', closingRemark(mumShare()));
-    var sorted = S.prisoners.slice().sort(function (a, b) { return a.months - b.months; });
-    var best = sorted[0].months, worst = sorted[sorted.length - 1].months;
+    var sorted = S.prisoners.slice().sort(function (a, b) { return a.days - b.days; });
+    var best = sorted[0].days, worst = sorted[sorted.length - 1].days;
     S.prisoners.forEach(function (p) {
       var f = FIG[p.id];
-      if (p.months === best) { setExpr(f, 'laugh'); setPose(f, 'cheer'); f.bounce = 1; }
-      else if (p.months === worst) { setExpr(f, 'glum'); setPose(f, 'wring'); }
+      if (p.days === best) { setExpr(f, 'laugh'); setPose(f, 'cheer'); f.bounce = 1; }
+      else if (p.days === worst) { setExpr(f, 'glum'); setPose(f, 'wring'); }
     });
     await resultsFriends(sorted);
   }
@@ -3515,22 +3717,24 @@
   function resultsFriends(sorted) {
     var my = RUN;
     return new Promise(function (resolve, reject) {
-      var n = S.prisoners.length, pairs = n * (n - 1) / 2, nights = S.night;
-      var best = sorted[0].months, firsts = sorted.filter(function (p) { return p.months === best; });
+      var n = S.prisoners.length, pairs = n * (n - 1) / 2, rounds = S.round;
+      var best = sorted[0].days, firsts = sorted.filter(function (p) { return p.days === best; });
       var h = '<h1>The Assizes</h1><table class="res">';
       sorted.forEach(function (p) {
         var line = p.human ? styleLine(styleOf(p.id), p.name, false)
           : p.name + ' was the computer: ' + LOOKS[p.look].name + ', who ' + RULES[p.strat] + '.';
-        h += '<tr><td style="width:48px"><span class="face40">' + headSVG(p.look, p.months === best ? 'laugh' : null) + '</span></td>'
+        h += '<tr><td style="width:48px"><span class="face40">' + headSVG(p.look, p.days === best ? 'laugh' : null) + '</span></td>'
           + '<td><b>' + esc(p.name) + '</b><br><span class="sub">' + esc(line) + '</span></td>'
-          + '<td class="n">' + p.months + ' month' + (p.months === 1 ? '' : 's') + '</td></tr>';
+          + '<td class="n">' + plural(p.days, 'day') + '<br><span class="sub">' + missedText(p.missed) + '</span></td></tr>';
       });
       h += '</table>';
       h += '<p>First out of the door: <b>' + firsts.map(function (p) { return esc(p.name); }).join(' and ') + '</b>' + (firsts.length > 1 ? ', together!' : '!') + '</p>';
-      h += '<p>Altogether you served <b>' + totalMonths() + '</b> months in ' + nights + ' night' + (nights === 1 ? '' : 's') + '. Everybody keeping mum every night would have come to <b>' + (nights * pairs * 2) + '</b>. Everybody snitching every night: <b>' + (nights * pairs * 4) + '</b>.</p>';
+      h += '<p>Altogether, in ' + plural(rounds, 'questioning') + ', you got <b>' + plural(totalDays(), 'day') + '</b> and went without <b>' + plural(totalMissed(), 'dinner') + '</b>.'
+        + ' Everybody keeping mum every time would have come to <b>' + plural(rounds * pairs * 2, 'day') + '</b>, and not one dinner missed.'
+        + ' Everybody snitching every time: <b>' + plural(rounds * pairs * 4, 'day') + '</b>, and <b>' + plural(rounds * n, 'dinner') + '</b> missed.</p>';
       if (S.gov.kind === 'human') {
         var gn = /^(the )?governor$/i.test(S.gov.name) ? 'The Governor' : esc(S.gov.name) + ', the Governor,';
-        h += '<p>' + gn + ' handed out <b>' + totalMonths() + '</b> months. That was the Governor’s score: the more, the better.</p>';
+        h += '<p>' + gn + ' handed out <b>' + plural(totalDays(), 'day') + '</b>. That was the Governor’s score: the more, the better.</p>';
       }
       h += '<div class="btns"><button class="btn" data-act="notes">What was all that about?</button><button class="btn quiet" data-act="again">Play again</button><button class="btn quiet" data-act="menu">Menu</button></div>';
       showPanel(h, '', function (act) {
@@ -3568,7 +3772,7 @@
   function anyFound() { return !!(S && S.inGame && S.found && (S.found.cc || S.found.cd || S.found.dd)); }
   function openBoard() {
     showOver('<h2>What Moll has chalked up</h2>' + foundHTML(S && S.found ? S.found : {})
-      + '<p class="sub">Months in gaol, by what each of a pair said about the other.</p>'
+      + '<p class="sub">Days in gaol, and dinner or none, by what each of a pair said about the other.</p>'
       + '<div class="btns"><button class="btn" data-act="close">Back</button></div>');
   }
   function showBoardButton() { $('b-deal').classList.toggle('hide', !anyFound()); }
@@ -3576,7 +3780,7 @@
 
   $('b-menu').addEventListener('click', function () {
     initAudio();
-    showOver('<h2>Leave this game?</h2><p>It’s saved at the start of tonight, so you can carry on from the menu.</p>'
+    showOver('<h2>Leave this game?</h2><p>It’s saved at the start of this questioning, so you can carry on from the menu.</p>'
       + '<div class="btns"><button class="btn quiet" data-act="close">Stay</button><button class="btn" data-act="leave">Leave</button></div>',
       function (act) { if (act === 'leave') { closeOver(); begin(menu); } });
   });
@@ -3585,7 +3789,7 @@
   // The front door: the title, and setting up a game.
   // ------------------------------------------------------------------
   async function menu() {
-    S = { prisoners: [], inGame: false, night: 1, mv: {}, seen: {} };
+    S = { prisoners: [], inGame: false, round: 1, mv: {}, seen: {} };
     $('b-menu').classList.add('hide');
     closeOver();
     fadeEl.classList.remove('on');
@@ -3608,7 +3812,7 @@
     var h = '<div style="text-align:center"><h1>Prisoner’s Dilemma</h1>'
       + '<p class="sub">Grimstone Gaol, the morning after the Bishop’s feast. Half the town is locked up, and the Bishop wants names.</p>'
       + '<div class="btns" style="flex-direction:column;align-items:stretch;max-width:440px;margin:10px auto 0">'
-      + (sv ? '<button class="btn" data-act="resume">Carry on: night ' + sv.night + (sv.mode === 'story' ? ', on your own' : ', with friends') + '</button>' : '')
+      + (sv ? '<button class="btn" data-act="resume">Carry on: ' + esc(misdeed(sv.round)[0]) + (sv.mode === 'story' ? ', on your own' : ', with friends') + '</button>' : '')
       + '<button class="btn" data-act="friends">With friends: pass the phone</button>'
       + '<button class="btn" data-act="story">On your own</button>'
       // Not until somebody has been through it: finding it out is the point.
@@ -3665,7 +3869,7 @@
       var GOVD = {
         plain: 'The Governor just asks.',
         crafty: 'The Governor plays dirty tricks.',
-        human: 'A player is the Governor, with whispers, bribes and threats, and wants as many months handed out as possible.'
+        human: 'A player is the Governor, with whispers, bribes and threats, and wants as many days handed out as possible.'
       };
       function html() {
         tidy();
@@ -3685,7 +3889,7 @@
           h += '<div class="row"><span class="face64">' + headSVG('gov') + '</span><input type="text" maxlength="14" data-gov="1" value="' + esc(SETUP.govName) + '" aria-label="Governor’s name"></div>';
         }
         h += '<div class="row" style="flex-wrap:wrap"><b style="flex:1 1 6em">How long?</b>' + seg([['short', 'Short'], ['long', 'Long']], SETUP.len, 'len:') + '</div>'
-          + '<p class="sub">Nobody knows which night the judge will come. Short is about 6 nights, long about 11.</p>'
+          + '<p class="sub">Nobody knows when the judge will come. Short is about 6 questionings, long about 11.</p>'
           + '<div class="btns"><button class="btn quiet" data-act="back">Back</button><button class="btn" data-act="go">Lock them up!</button></div>';
         return h;
       }
@@ -3766,7 +3970,7 @@
     S = sv;
     S.inGame = true;
     S.found = S.found || {};
-    S.prisoners.forEach(function (p) { p.shown = p.months; });
+    S.prisoners.forEach(function (p) { p.shown = p.days; });
     if (S.mode === 'story') { await storyGame(true); } else { await friendsGame(true); }
   }
 
@@ -3775,7 +3979,7 @@
     // about what anything costs: that is for finding out.
     if (introDone) {
       await say('moll', 'More of you? The Bishop must have had the whole town rounded up.');
-      await say('moll', 'Scratch your months on the wall as you get them, my ducks, so nobody can cheat you.');
+      await say('moll', 'Scratch your days on the wall as you get them, my ducks, so nobody can cheat you.');
       return;
     }
     introDone = true;
@@ -3785,10 +3989,10 @@
       ['moll', 'I’m Old Moll. Been in here forty year, give or take. Mind the rats, my ducks. And mind the bucket.'],
       ['moll', 'Quite a night, by all accounts. The Bishop’s feast day, his kitchen door smashed in, and the whole town helping itself to his dinner.'],
       ['moll', 'Goose, pudding, the lot. And now the Bishop wants to know who did what.'],
-      ['moll', 'So the Governor will have each of you upstairs, one at a time, every night, and ask you for names.'],
+      ['moll', 'So the Governor will have each of you upstairs, one at a time, and ask you for names. Again and again, one thing after another.'],
       ['moll', 'Some folk keep mum (that’s keep their mouths shut). Some folk snitch. We’ll see which sort you are.'],
-      ['moll', 'Scratch your months on the wall as you get them, so nobody can cheat you.'],
-      ['moll', 'And nobody knows when the judge will come to sort you all out. Could be next week. Could be next month. So you’d best get used to each other.']
+      ['moll', 'Scratch your days on the wall as you get them, so nobody can cheat you.'],
+      ['moll', 'And nobody knows when the judge will come to sort you all out. Could be today. Could be next week. So you’d best get used to each other.']
     ];
     if (S.gov.kind !== 'plain') { L.push(['moll', 'And mind the Governor. He has his ways.']); }
     if (humans().length > 1 || S.gov.kind === 'human') { L.push(['moll', 'Whoever goes upstairs goes alone, and everybody else looks away. No peeking!']); }
@@ -3801,19 +4005,19 @@
     setupCell();
     await fade(0);
     if (!resumed) { await introFriends(); }
-    else { await say('moll', 'Back again, ' + duck() + '? Night ' + S.night + ', then.'); }
+    else { await say('moll', 'Back again, ' + duck() + '? Where were we... ' + misdeed(S.round)[0] + '.'); }
     for (;;) {
       save();
-      await nightCard('Night ' + S.night, capital(misdeed(S.night)[0]));
+      await roundCard(capital(misdeed(S.round)[0]));
       await talkTime();
       await interrogations();
-      var res = resolveNight();
-      await revealNight(res);
+      var res = resolveRound();
+      await revealRound(res);
       var over = judgeComes();
       if (over) { break; }
       await lessonsAfter(res);
-      S.night++;
-      drawKnitting(FIG.moll, S.night);
+      S.round++;
+      drawKnitting(FIG.moll, S.round);
     }
     clearSave();
     await assizes();
@@ -3893,10 +4097,10 @@
       ['moll', 'Grimstone Gaol’s never been so full. Half the town got dragged in after last night.'],
       ['moll', 'I’m Old Moll. Been in here forty year, give or take. Mind the rats, my duck. And mind the bucket.'],
       ['moll', 'Nabbed at the Bishop’s feast, I hear, ' + you.name + '. Gravy on your chin.'],
-      ['moll', 'The Bishop wants to know who did what, so the Governor will have you upstairs every night and ask you for names.'],
+      ['moll', 'The Bishop wants to know who did what, so the Governor will have you upstairs and ask you for names. Again and again, one thing after another.'],
       ['moll', 'Some folk keep mum (that’s keep their mouths shut). Some folk snitch. We’ll see which sort you are.'],
       ['moll', 'With the place this full, you’ll share with all sorts before the judge comes. Some nice, some nasty. Watch every one of them.'],
-      ['moll', 'And scratch your months on the wall as you get them, so nobody can cheat you.']
+      ['moll', 'And scratch your days on the wall as you get them, so nobody can cheat you.']
     ]);
   }
 
@@ -3904,7 +4108,7 @@
     var mate = { id: 'm' + S.story.i, look: id, name: LOOKS[id].short, human: false, strat: id };
     addPrisoner(mate);
     S.story.left = randInt(3, 5);
-    S.story.stretch = { mate: id, mateId: mate.id, nights: 0, you: 0, them: 0 };
+    S.story.stretch = { mate: id, mateId: mate.id, rounds: 0, you: 0, them: 0, youMissed: 0, themMissed: 0 };
     var f = ensureFig(mate);
     f.away = true; f.op = 0; f.x = LAY.doorCx; f.y = LAY.backY;
     restFace(mate);
@@ -3927,6 +4131,7 @@
     await say('key', mate.name + '! Out. You’re moving to another ward.');
     hideSpeech();
     var f = FIG[mate.id];
+    restFace(mate);
     await walking([walkTo(f, exitPath(f))]);
     await keyOut();
     dropFig(mate.id);
@@ -3951,45 +4156,50 @@
     switch (st.mate) {
       case 'sam':
         L.push(['moll', 'That was Soft Sam. He never snitches. Not ever, whatever you do to him.']);
-        L.push(['moll', d ? 'And you snitched on him ' + times(d) + '. ' + (d === 1 ? 'That night' : 'Each time') + ' you saved yourself a month, and poor Sam got three. Easy pickings... but picking on Sam ain’t pretty, is it?'
+        L.push(['moll', d ? 'And you snitched on him ' + times(d) + '. ' + (d === 1 ? 'That time' : 'Each time') + ' you saved yourself a day, and poor Sam got three, and no dinner. Easy pickings... but picking on Sam ain’t pretty, is it?'
           : 'And you never snitched on him once. Good for you.']);
         L.push(['moll', 'Being soft is lovely with folk who are soft back. But there’s sharks in here.']);
         break;
       case 'nell':
-        L.push(['moll', 'That was Nasty Nell. She snitches every single night, whatever you do. And she promised you she wouldn’t, didn’t she?']);
-        L.push(['moll', c >= 2 ? 'Keeping mum for Nell just gets you three months a time.' : 'You twigged her quick. With Nell, snitching back is all you can do.']);
+        L.push(['moll', 'That was Nasty Nell. She snitches every single time, whatever you do. And she promised you she wouldn’t, didn’t she?']);
+        L.push(['moll', c >= 2 ? 'Keeping mum for Nell just gets you three days a time, and no dinner.' : 'You twigged her quick. With Nell, snitching back is all you can do.']);
         L.push(['moll', 'Talk’s cheap, my duck. Watch what folk *do*.']);
         break;
       case 'jack':
-        L.push(['moll', 'That was Honest Jack. The first night, he keeps mum. After that, he does whatever you did to him the night before.']);
-        L.push(['moll', d ? 'When you snitched, Jack snitched right back the next night. Nothing personal. *Tit for tat.*'
-          : 'You kept mum, so Jack kept mum. One month a night, the pair of you. Lovely.']);
+        L.push(['moll', 'That was Honest Jack. The first time, he keeps mum. After that, he does whatever you did to him the time before.']);
+        L.push(['moll', d ? 'When you snitched, Jack snitched right back the next time. Nothing personal. *Tit for tat.*'
+          : 'You kept mum, so Jack kept mum. One day a time, the pair of you, and dinner every time. Lovely.']);
         break;
       case 'grim':
-        L.push(['moll', 'That was Grim Grimshaw. He keeps mum... until the first time you snitch on him. Then he snitches on you every night, for ever.']);
+        L.push(['moll', 'That was Grim Grimshaw. He keeps mum... until the first time you snitch on him. Then he snitches on you every time, for ever.']);
         L.push(['moll', d ? 'You found out the hard way. Grimshaw never forgives. Not once.' : 'You never crossed him, so you never saw his teeth.']);
         break;
       case 'meg':
-        L.push(['moll', 'That was Mad Meg. She tosses a penny every night! Heads, she keeps mum. Tails, she snitches.']);
+        L.push(['moll', 'That was Mad Meg. She tosses a penny every time! Heads, she keeps mum. Tails, she snitches.']);
         L.push(['moll', 'You can’t build trust with somebody who doesn’t care what you do. Best you can do is look after yourself.']);
         break;
       case 'sid':
-        L.push(['moll', 'That was Sly Sid. He snitches the very first night, just to test you.']);
+        L.push(['moll', 'That was Sly Sid. He snitches the very first time, just to test you.']);
         L.push(['moll', d ? 'You hit back, so he said sorry and played fair after that. He only picks on mugs.'
-          : 'You never hit back... so he took you for a mug, and snitched on you every other night.']);
+          : 'You never hit back... so he took you for a mug, and snitched on you every other time.']);
         break;
     }
-    L.push([null, 'With ' + LOOKS[st.mate].short + ': ' + st.nights + ' night' + (st.nights === 1 ? '' : 's') + '. You got *' + st.you + '* month' + (st.you === 1 ? '' : 's') + ', ' + LOOKS[st.mate].short + ' got *' + st.them + '*.']);
+    var mn = LOOKS[st.mate].short;
+    var missed = function (n) { return n ? 'missed *' + plural(n, 'dinner') + '*' : 'never missed a dinner'; };
+    L.push([null, 'With ' + mn + ': ' + plural(st.rounds, 'questioning') + '. You got *' + plural(st.you, 'day') + '* and ' + missed(st.youMissed) + '. '
+      + mn + ' got *' + plural(st.them, 'day') + '* and ' + missed(st.themMissed) + '.']);
     return L;
   }
 
   function trackStretch(res) {
     var st = S.story.stretch, q = res.pairs[0];
     if (!st || !q) { return; }
-    var youA = q.a.id === 'you';
-    st.nights++;
+    var youA = q.a.id === 'you', mate = youA ? q.b : q.a;
+    st.rounds++;
     st.you += youA ? q.da : q.db;
     st.them += youA ? q.db : q.da;
+    if (res.named.you) { st.youMissed++; }
+    if (res.named[mate.id]) { st.themMissed++; }
   }
 
   async function storyGame(resumed) {
@@ -3997,21 +4207,21 @@
     setupCell();
     await fade(0);
     if (!resumed) { await introStory(); }
-    else { await say('moll', 'Back again, my duck? Night ' + S.night + ', then.'); }
+    else { await say('moll', 'Back again, my duck? Where were we... ' + misdeed(S.round)[0] + '.'); }
     while (S.story.i < MATES.length) {
       if (S.story.left === null) { await mateArrives(MATES[S.story.i]); }
       while (S.story.left > 0) {
         save();
-        await nightCard('Night ' + S.night, capital(misdeed(S.night)[0]));
+        await roundCard(capital(misdeed(S.round)[0]));
         await talkTime();
         await interrogations();
-        var res = resolveNight();
+        var res = resolveRound();
         trackStretch(res);
-        await revealNight(res);
+        await revealRound(res);
         await lessonsAfter(res);
         S.story.left--;
-        S.night++;
-        drawKnitting(FIG.moll, S.night);
+        S.round++;
+        drawKnitting(FIG.moll, S.round);
       }
       await mateLeaves();
     }
@@ -4020,10 +4230,11 @@
   }
 
   async function storyEnd() {
-    S.night--;
+    S.round--;
     store(DONE_KEY, '1');
-    await nightCard('The Assizes', 'The judge has come', true);
+    await roundCard('The Assizes', 'The judge has come', true, GAVEL);
     showScene('cell');
+    clearBubbles();
     S.prisoners.forEach(restFace);
     await say('key', 'On your feet! The judge is here.');
     await say('moll', 'Well, my duck. That’s your time up. Let’s see how you did.');
@@ -4035,9 +4246,9 @@
   function storyResults() {
     var my = RUN, you = S.prisoners[0];
     return new Promise(function (resolve, reject) {
-      var nights = 0;
-      S.story.done.forEach(function (st) { nights += st.nights; });
-      var h = '<h1>The Assizes</h1><p>You served <b>' + you.months + '</b> months in ' + nights + ' nights.</p><table class="res">';
+      var rounds = 0;
+      S.story.done.forEach(function (st) { rounds += st.rounds; });
+      var h = '<h1>The Assizes</h1><p>In ' + plural(rounds, 'questioning') + ', you got <b>' + plural(you.days, 'day') + '</b> and went without <b>' + plural(you.missed || 0, 'dinner') + '</b>.</p><table class="res">';
       S.story.done.forEach(function (st) {
         h += '<tr><td style="width:48px"><span class="face40">' + headSVG(st.mate) + '</span></td>'
           + '<td><b>' + esc(LOOKS[st.mate].name) + '</b><br><span class="sub">' + esc(RULES[st.mate]) + '</span></td>'
@@ -4059,7 +4270,7 @@
     return new Promise(function (resolve, reject) {
       var max = 0;
       order.forEach(function (id) { max = Math.max(max, tot[id]); });
-      var h = '<h2>Moll’s reckoning</h2><p class="sub">Every sort sharing a cell with every other sort, and with one of its own, twenty nights at a time. Months served, all added up. Fewest is best off.</p><div class="bars">';
+      var h = '<h2>Moll’s reckoning</h2><p class="sub">Every sort sharing a cell with every other sort, and with one of its own, twenty questionings at a time. Days, all added up. Fewest is best off.</p><div class="bars">';
       order.forEach(function (id, i) {
         h += '<div class="bar' + (i === 0 ? ' win' : '') + '"><span class="face40">' + headSVG(id, i === 0 ? 'grin' : null) + '</span>'
           + '<span class="lab">' + esc(LOOKS[id].name) + '</span><span class="track"><span class="fill" data-w="' + (tot[id] / max * 100).toFixed(1) + '" style="display:block"></span></span>'
@@ -4083,8 +4294,8 @@
   async function greatTally() {
     await talk([
       ['moll', 'I’ve watched every sort come through that door, forty year. Sams and Nells, Jacks and Megs, Grimshaws and Sids.'],
-      ['moll', 'And I’ve kept count. Say every sort shared a cell with every other sort, twenty nights at a time, and with one of its own sort too.'],
-      ['moll', 'Add up all the months each sort would serve. Here’s how it comes out.']
+      ['moll', 'And I’ve kept count. Say every sort shared a cell with every other sort, twenty questionings at a time, and with one of its own sort too.'],
+      ['moll', 'Add up all the days each sort would get. Here’s how it comes out.']
     ]);
     var tot = tournament(20), order = MATES.slice().sort(function (a, b) { return tot[a] - tot[b]; });
     await tallyPanel(tot, order);
@@ -4092,7 +4303,7 @@
     if (win === 'jack') {
       await talk([
         ['moll', 'Honest Jack comes out best. And here’s the funny thing.'],
-        ['moll', 'Jack never once served fewer months than the cellmate he was sharing with. Not once! He never beat anybody.'],
+        ['moll', 'Jack never once got fewer days than the cellmate he was sharing with. Not once! He never beat anybody.'],
         ['moll', 'Jack just never got taken for a mug, and never started a fight. Over a long stretch, with all sorts, Jack’s way comes out best.']
       ]);
     } else {
@@ -4121,13 +4332,14 @@
   function notesPanel(onClose) {
     var h = '<div class="notes"><div class="btns" style="justify-content:flex-end;margin:0"><button class="btn quiet" data-act="close">Close</button></div>'
       + '<h1>What was all that about?</h1>'
-      + '<p>This game is named after a famous puzzle, <b>the prisoner’s dilemma</b>. A dilemma is a choice where every answer has a catch. In the game, Moll and the prisoners work the puzzle out for themselves, a night at a time. Here it is all at once.</p>'
+      + '<p>This game is named after a famous puzzle, <b>the prisoner’s dilemma</b>. A dilemma is a choice where every answer has a catch. In the game, Moll and the prisoners work the puzzle out for themselves, one questioning at a time. Here it is all at once.</p>'
 
       + '<h3>The puzzle</h3>'
-      + '<p>Two prisoners are questioned separately, and each is made the same offer. Each prisoner can keep mum about the other, or name the other. Moll’s chalk, all filled in, in months:</p>'
+      + '<p>Two prisoners are questioned separately, and each is made the same offer. Each prisoner can keep mum about the other, or name the other. Moll’s chalk, all filled in, in days, with a bowl for dinner:</p>'
       + foundHTML({ cc: 1, cd: 1, dd: 1 })
       + '<p>Whatever the other prisoner does, naming gets a better result: none instead of one, or two instead of three. But if <i>both</i> prisoners name each other, both end up with two, when both keeping mum would have got each of them one.</p>'
       + '<p>So the clever choice for each prisoner is the wrong choice for the pair. Looking after number one leaves both worse off, one sensible-looking step at a time.</p>'
+      + '<p>Dinner doesn’t change the puzzle. A prisoner’s own dinner depends only on what the <i>other</i> prisoner says, so it can’t make naming any less tempting. What it does is make the trap hurt straight away: two prisoners who name each other both go hungry, as well as getting the extra day.</p>'
 
       + '<h3>Where it came from</h3>'
       + '<p>Two mathematicians, Merrill Flood and Melvin Dresher, came up with it in 1950 at the RAND Corporation, an American research organisation working on the Cold War. Their colleague Albert Tucker told it as a story about two prisoners questioned in separate rooms, and the name stuck.</p>'
@@ -4137,8 +4349,8 @@
       + '<p>When everybody is doing the best they can, given what everybody else is doing, and nobody can do better by changing on their own, that is a <b>Nash equilibrium</b>, after the mathematician John Nash (the film <i>A Beautiful Mind</i> is about him). In the prisoner’s dilemma, the Nash equilibrium is both snitching. It is steady, and it is bad for both of you.</p>'
 
       + '<h3>Again and again</h3>'
-      + '<p>Play just once, and snitching is hard to argue with. But play night after night with the same people, and what you do tonight changes what the others do tomorrow. This is the <b>repeated</b> (or <b>iterated</b>) prisoner’s dilemma, and the idea that tomorrow matters is sometimes called <b>the shadow of the future</b>.</p>'
-      + '<p>That is why the judge’s arrival is kept secret. If everyone knew which night was the last, snitching that night would be safe. Then snitching the night before would be safe too, and the night before that, until the whole thing unravels back to the start. Not knowing when it ends keeps it alive.</p>'
+      + '<p>Play just once, and snitching is hard to argue with. But play again and again with the same people, and what you do this time changes what the others do next time. This is the <b>repeated</b> (or <b>iterated</b>) prisoner’s dilemma, and the idea that next time matters is sometimes called <b>the shadow of the future</b>.</p>'
+      + '<p>That is why the judge’s arrival is kept secret. If everyone knew which questioning was the last, snitching that time would be safe. Then snitching the time before would be safe too, and the time before that, until the whole thing unravels back to the start. Not knowing when it ends keeps it alive.</p>'
       + '<p>Talking does not change the deal. Anybody can promise to keep mum, and nothing makes anybody keep the promise. Game theorists call promises that cost nothing <b>cheap talk</b>.</p>'
 
       + '<h3>The tournament</h3>'
