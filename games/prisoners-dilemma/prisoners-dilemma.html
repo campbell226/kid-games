@@ -1741,8 +1741,10 @@
       var wx = win.x, wy = win.y, wW = win.w, wH = win.h, fr = Math.max(8, wW * 0.08);
       parts.push('<rect x="' + f1(wx - fr) + '" y="' + f1(wy - fr) + '" width="' + f1(wW + fr * 2) + '" height="' + f1(wH + fr * 2) + '" rx="' + f1(fr) + '" fill="#1d1e1a"/>');
       parts.push('<rect x="' + f1(wx) + '" y="' + f1(wy) + '" width="' + f1(wW) + '" height="' + f1(wH) + '" fill="url(#hat-night)"/>');
-      parts.push('<circle cx="' + f1(wx + wW * 0.68) + '" cy="' + f1(wy + wH * 0.32) + '" r="' + f1(wW * 0.15) + '" fill="#e9e6d2"/>');
-      parts.push('<circle cx="' + f1(wx + wW * 0.64) + '" cy="' + f1(wy + wH * 0.3) + '" r="' + f1(wW * 0.03) + '" fill="#cfcab4"/><circle cx="' + f1(wx + wW * 0.72) + '" cy="' + f1(wy + wH * 0.37) + '" r="' + f1(wW * 0.022) + '" fill="#cfcab4"/>');
+      // The moon sits in the upper left of the window, so the light it
+      // throws comes in from the left and falls down and to the right.
+      parts.push('<circle cx="' + f1(wx + wW * 0.32) + '" cy="' + f1(wy + wH * 0.32) + '" r="' + f1(wW * 0.15) + '" fill="#e9e6d2"/>');
+      parts.push('<circle cx="' + f1(wx + wW * 0.28) + '" cy="' + f1(wy + wH * 0.3) + '" r="' + f1(wW * 0.03) + '" fill="#cfcab4"/><circle cx="' + f1(wx + wW * 0.36) + '" cy="' + f1(wy + wH * 0.37) + '" r="' + f1(wW * 0.022) + '" fill="#cfcab4"/>');
       for (i = 0; i < 6; i++) {
         parts.push('<circle cx="' + f1(wx + R() * wW) + '" cy="' + f1(wy + R() * wH * 0.8) + '" r="' + f1(1 + R() * 1.6) + '" fill="#fff" opacity="0.7"/>');
       }
@@ -1753,8 +1755,11 @@
       }
       parts.push('<rect x="' + f1(wx - 2) + '" y="' + f1(wy + wH * 0.5 - bw / 2) + '" width="' + f1(wW + 4) + '" height="' + f1(bw) + '" fill="#121210"/>');
       parts.push('<rect x="' + f1(wx - fr * 1.4) + '" y="' + f1(wy + wH + fr * 0.6) + '" width="' + f1(wW + fr * 2.8) + '" height="' + f1(fr * 1.1) + '" fill="#4b4d45"/>');
+      // moonlight is parallel, so the shaft is a slanted slab the width of
+      // the window, not a fan
+      var bd = (fy + 40 * s - wy - wH) * 0.34;
       CL.beam.innerHTML = '<polygon points="' + f1(wx) + ',' + f1(wy + wH) + ' ' + f1(wx + wW) + ',' + f1(wy + wH) + ' '
-        + f1(wx + wW + (fy - wy) * 0.42) + ',' + f1(fy + 40 * s) + ' ' + f1(wx + (fy - wy) * 0.26) + ',' + f1(fy + 40 * s) + '" fill="url(#hat-beam)"/>';
+        + f1(wx + wW + bd) + ',' + f1(fy + 40 * s) + ' ' + f1(wx + bd) + ',' + f1(fy + 40 * s) + '" fill="url(#hat-beam)"/>';
     }
 
     // Upright there's wall to spare, so what Moll works out goes up on it
