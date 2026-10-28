@@ -297,6 +297,14 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     });
   }
 
+  // The graphics chip is spared work no one can see: the globe is drawn
+  // again only when it has changed, and while a place fills the screen the
+  // globe and space underneath it aren't drawn at all. The second whiteout
+  // on the Pixel (graphics 'device lost' again) came after twenty minutes
+  // of drawing everything sixty times a second, on a phone that was hot,
+  // charging and already being slowed down to cool it. ?lite=0 on the
+  // address puts the old way back, to compare the two.
+  var LITE = !/[?&]lite=0\b/.test(window.location.search);
   var reduceQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
   var reduced = reduceQuery.matches;
   if (reduceQuery.addEventListener) {
@@ -1227,7 +1235,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
   // the map there, and lights it by the sun. Where WebGL is missing the
   // same sums run on the CPU at lower resolution.
   // ------------------------------------------------------------------
-  var gcv = $('globe'), gl = null, glp = null, cpu = null, texCanvas = null, texData = null, texW = 2048;
+  var gcv = $('globe'), gl = null, glp = null, cpu = null, texCanvas = null, texData = null, texW = 2048, worldVer = 0;
   var VW = 1, VH = 1, dpr = 1, GC = { x: 0, y: 0 }, GR = 100;
   var VR = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
   var quad = new Float32Array(12), mat = new Float32Array(9);
@@ -1351,6 +1359,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     refreshWorld();
   }
   function refreshWorld() {
+    worldVer += 1;
     texCanvas = paintWorld(texW);
     if (gl) {
       gl.activeTexture(gl.TEXTURE0);
@@ -1399,8 +1408,24 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
       x * VR[0][2] + y * VR[1][2] + z * VR[2][2]];
   }
 
+  // What the globe was last drawn with. If nothing has moved further than a
+  // fraction of a pixel, and the sun no further than a tenth of a degree
+  // (about six times a second, as the day goes by), the canvas keeps the
+  // picture it has.
+  var drawnAs = '', drawnBy = null;
+  function globeKey(R) {
+    var k = [gcv.width, gcv.height, worldVer, Math.round(R * dpr * 4), Math.round(GC.x * dpr * 4), Math.round(GC.y * dpr * 4),
+      Math.round(sunLon() * 10)];
+    for (var i = 0; i < 3; i++) { for (var j = 0; j < 3; j++) { k.push(Math.round(VR[i][j] * 1e5)); } }
+    return k.join(',');
+  }
   function drawGlobe(R) {
     if (!gl && !cpu) { return; }
+    if (LITE) {
+      var key = globeKey(R);
+      if (key === drawnAs && drawnBy === (gl || cpu)) { return; }
+      drawnAs = key; drawnBy = gl || cpu;
+    }
     var S3 = sunVec();
     if (gl) {
       gl.viewport(0, 0, gcv.width, gcv.height);
@@ -8082,13 +8107,27 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
       }
     }
     scene.style.opacity = f2(sceneA);
+    hideUnder(LITE && mode === 'scene' && sceneA >= 1);
     var wa = S && !S.place.home ? f2(sceneA) : '0';
     if (wa !== wxShown) { wxShown = wa; wxcv.style.opacity = wa; if (wa === '0') { wxc.setTransform(1, 0, 0, 1, 0, 0); wxc.clearRect(0, 0, wxcv.width, wxcv.height); } }
     thinkFrame(dt);
   }
 
+  // A place's sky covers the whole screen, so the globe, space and the
+  // globe's markings underneath it are hidden while it's up, rather than
+  // drawn every frame for nothing. They're back the moment it fades.
+  var underHidden = false, underGcv = null;
+  function hideUnder(hide) {
+    if (hide === underHidden && underGcv === gcv) { return; }
+    underHidden = hide; underGcv = gcv;
+    var v = hide ? 'hidden' : '';
+    space.style.visibility = v; gcv.style.visibility = v; over.style.visibility = v;
+  }
+
   document.addEventListener('visibilitychange', function () {
     if (!document.hidden && AC && AC.state === 'suspended') { try { AC.resume(); } catch (e) { /* later */ } }
+    // back from the background, the globe is drawn afresh once
+    if (!document.hidden) { drawnAs = ''; }
   });
   var resizeTimer = 0;
   function onResize() {
