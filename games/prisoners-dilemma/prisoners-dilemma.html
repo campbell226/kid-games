@@ -3204,7 +3204,7 @@
     await keyIn();
     if (!S.seen.keyIntro) {
       S.seen.keyIntro = 1;
-      await say('key', S.mode === 'story' ? 'Up you get, the pair of you. The Governor wants a word.' : 'Up you get, the lot of you. The Governor wants a word.');
+      await say('key', S.prisoners.length > 2 ? 'Up you get, the lot of you. The Governor wants a word.' : 'Up you get, the pair of you. The Governor wants a word.');
       hideSpeech();
     } else { keys(); }
     var order = (list || S.prisoners).slice().sort(function (a, b) { return slotOf(b) - slotOf(a); });
@@ -3831,13 +3831,12 @@
     });
   }
 
+  // With friends is two players, always, and the Governor is the third
+  // person if there is one. The computer plays cellmates only in "On your own".
   var SETUP = {
-    n: 2,
     seats: [
-      { human: true, look: 'ned', name: 'Ned' },
-      { human: true, look: 'bess', name: 'Bess' },
-      { human: false, look: 'jack', name: '' },
-      { human: false, look: 'nell', name: '' }
+      { look: 'ned', name: 'Ned' },
+      { look: 'bess', name: 'Bess' }
     ],
     gov: 'plain', govName: 'Governor', len: 'short'
   };
@@ -3845,24 +3844,23 @@
   function setupPanel() {
     var my = RUN;
     return new Promise(function (resolve, reject) {
-      function taken(human, except) {
-        return SETUP.seats.slice(0, SETUP.n).filter(function (s, i) { return i !== except && s.human === human; }).map(function (s) { return s.look; });
+      function taken(except) {
+        return SETUP.seats.filter(function (s, i) { return i !== except; }).map(function (s) { return s.look; });
       }
       function freeLook(i, from) {
-        var st = SETUP.seats[i], list = st.human ? AVATARS : MATES, used = taken(st.human, i);
-        var k = list.indexOf(from);
-        for (var t = 1; t <= list.length; t++) {
-          var c = list[(k + t + list.length) % list.length];
+        var used = taken(i), k = AVATARS.indexOf(from);
+        for (var t = 1; t <= AVATARS.length; t++) {
+          var c = AVATARS[(k + t + AVATARS.length) % AVATARS.length];
           if (used.indexOf(c) < 0) { return c; }
         }
-        return list[0];
+        return AVATARS[0];
       }
       function tidy() {
-        for (var i = 0; i < SETUP.n; i++) {
-          var st = SETUP.seats[i], list = st.human ? AVATARS : MATES;
-          if (list.indexOf(st.look) < 0 || taken(st.human, i).indexOf(st.look) >= 0) {
-            st.look = freeLook(i, list[list.length - 1]);
-            if (st.human) { st.name = LOOKS[st.look].name; }
+        for (var i = 0; i < SETUP.seats.length; i++) {
+          var st = SETUP.seats[i];
+          if (AVATARS.indexOf(st.look) < 0 || taken(i).indexOf(st.look) >= 0) {
+            st.look = freeLook(i, AVATARS[AVATARS.length - 1]);
+            st.name = LOOKS[st.look].name;
           }
         }
       }
@@ -3874,21 +3872,17 @@
       var GOVD = {
         plain: 'The Governor just asks.',
         crafty: 'The Governor plays dirty tricks.',
-        human: 'A player is the Governor, with whispers, bribes and threats, and wants as many days handed out as possible.'
+        human: 'A third player is the Governor, with whispers, bribes and threats, and wants as many days handed out as possible.'
       };
       function html() {
         tidy();
-        var h = '<h2>Who’s in the cell?</h2>'
-          + '<div class="row"><b style="flex:1">Prisoners</b>' + seg([[2, '2'], [3, '3'], [4, '4']], SETUP.n, 'n:') + '</div>';
-        for (var i = 0; i < SETUP.n; i++) {
+        var h = '<h2>Who’s in the cell?</h2>';
+        for (var i = 0; i < SETUP.seats.length; i++) {
           var st = SETUP.seats[i];
           h += '<div class="row" style="flex-wrap:wrap"><button class="facebtn" data-act="face:' + i + '" aria-label="Change face">' + headSVG(st.look) + '</button>'
-            + '<div style="flex:1 1 8em;min-width:0">'
-            + (st.human ? '<input type="text" maxlength="14" data-seat="' + i + '" value="' + esc(st.name) + '" aria-label="Name">'
-              : '<b>' + esc(LOOKS[st.look].name) + '</b><br><span class="sub">Played by the computer.</span>')
-            + '</div>' + seg([['h', 'Player'], ['c', 'Computer']], st.human ? 'h' : 'c', 'kind:' + i + ':') + '</div>';
+            + '<div style="flex:1 1 8em;min-width:0"><input type="text" maxlength="14" data-seat="' + i + '" value="' + esc(st.name) + '" aria-label="Name"></div></div>';
         }
-        h += '<div class="row" style="flex-wrap:wrap"><b style="flex:1 1 6em">The Governor</b>' + seg([['plain', 'Computer'], ['crafty', 'Crafty'], ['human', 'A player']], SETUP.gov, 'gov:') + '</div>'
+        h += '<div class="row" style="flex-wrap:wrap"><b style="flex:1 1 6em">The Governor</b>' + seg([['plain', 'Computer'], ['crafty', 'Crafty'], ['human', 'A third player']], SETUP.gov, 'gov:') + '</div>'
           + '<p class="sub">' + GOVD[SETUP.gov] + '</p>';
         if (SETUP.gov === 'human') {
           h += '<div class="row"><span class="face64">' + headSVG('gov') + '</span><input type="text" maxlength="14" data-gov="1" value="' + esc(SETUP.govName) + '" aria-label="Governor’s name"></div>';
@@ -3906,20 +3900,10 @@
       function handler(act) {
         var parts = act.split(':');
         blip(280);
-        if (parts[0] === 'n') { SETUP.n = +parts[1]; redraw(); return; }
         if (parts[0] === 'face') {
           var i = +parts[1], st = SETUP.seats[i], old = st.look;
           st.look = freeLook(i, st.look);
-          if (st.human && (!st.name || st.name === LOOKS[old].name)) { st.name = LOOKS[st.look].name; }
-          redraw(); return;
-        }
-        if (parts[0] === 'kind') {
-          var j = +parts[1], s2 = SETUP.seats[j], want = parts[2] === 'h';
-          if (s2.human !== want) {
-            s2.human = want;
-            s2.look = freeLook(j, (want ? AVATARS : MATES)[0]);
-            if (want) { s2.name = LOOKS[s2.look].name; }
-          }
+          if (!st.name || st.name === LOOKS[old].name) { st.name = LOOKS[st.look].name; }
           redraw(); return;
         }
         if (parts[0] === 'gov') { SETUP.gov = parts[1]; redraw(); return; }
@@ -3949,11 +3933,8 @@
     S = freshState('friends');
     S.len = SETUP.len;
     S.gov = { kind: SETUP.gov, name: cleanName(SETUP.govName, 'Governor') };
-    SETUP.seats.slice(0, SETUP.n).forEach(function (st, i) {
-      addPrisoner({
-        id: 'p' + i, look: st.look, human: st.human, strat: st.human ? null : st.look,
-        name: st.human ? cleanName(st.name, LOOKS[st.look].name) : LOOKS[st.look].short
-      });
+    SETUP.seats.forEach(function (st, i) {
+      addPrisoner({ id: 'p' + i, look: st.look, human: true, strat: null, name: cleanName(st.name, LOOKS[st.look].name) });
     });
   }
 
