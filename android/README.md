@@ -18,6 +18,15 @@ bar, no links out to anywhere else, and none of Chrome's toasts.
   reinstall.** A game that hasn't synced yet is fetched from the live site.
 - Back goes from a game to the home screen, and does nothing on the home
   screen itself.
+- If the web view's GPU dies under it, the app starts itself again, at most
+  once a minute (`GpuWatch.kt`). On the Pixel 6a the web view sometimes loses
+  its Vulkan device just as the app comes back to the front, and the screen
+  stays white with the page still running behind it. The page can't see
+  that, but Chromium logs it on every frame, so the app watches its own log.
+  A stand-in screen (`Restart.kt`) holds the app's place while the process
+  is replaced, so a pinned app stays pinned, and it comes back on the page it
+  was showing. A game's progress survives, except anything saved in the last
+  few seconds before the restart.
 - Opening the app offers to pin it (Android's screen pinning). To unpin, hold
   Back and Overview together. With gesture navigation, swipe up and hold.
   Turn on *Ask for PIN before unpinning* under Settings → Security → App

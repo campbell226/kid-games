@@ -38,6 +38,7 @@ class MainActivity : Activity() {
     private lateinit var web: WebView
     private lateinit var site: Site
     private lateinit var bridge: Bridge
+    private lateinit var gpu: GpuWatch
 
     // A game's request for full screen. Bridge takes full screen away from
     // the games altogether, so this is only reached on a web view too old for
@@ -56,6 +57,8 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Sync.prepare(this)
+        gpu = GpuWatch(this) { web.url }
+        gpu.start()
         site = Site(this)
         volumeControlStream = AudioManager.STREAM_MUSIC
         if (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0) {
@@ -90,7 +93,9 @@ class MainActivity : Activity() {
         setContentView(root)
 
         claimBack()
-        web.loadUrl(Site.HOME)
+        // After GpuWatch has started the app again, back where it was.
+        val page = GpuWatch.takePage(this)?.takeIf { Site.isOurs(Uri.parse(it)) }
+        web.loadUrl(page ?: Site.HOME)
     }
 
     private fun makeWeb() = WebView(this).apply {
@@ -254,6 +259,7 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         web.onResume()
+        gpu.inFront(true)
         Sync.maybeRun(this)
         if (!askedToPin) {
             askedToPin = true
@@ -262,6 +268,7 @@ class MainActivity : Activity() {
     }
 
     override fun onPause() {
+        gpu.inFront(false)
         web.onPause()
         super.onPause()
     }
@@ -276,6 +283,7 @@ class MainActivity : Activity() {
 
     override fun onDestroy() {
         bridge.shutdown()
+        gpu.stop()
         web.destroy()
         super.onDestroy()
     }

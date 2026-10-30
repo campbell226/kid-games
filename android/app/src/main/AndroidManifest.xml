@@ -39,6 +39,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Stands in for a moment while GpuWatch replaces the app's
+             process, so it lives in a process of its own. -->
+        <activity
+            android:name=".Restart"
+            android:exported="false"
+            android:process=":restart" />
     </application>
 
 </manifest>

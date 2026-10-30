@@ -115,6 +115,11 @@ whatever main has changed since. So:
   lock itself, under the standard browser names, because the web view has
   none that work. A game uses them exactly as it would in Chrome, and still
   needs its fallback for a browser that lacks them.
+- A white screen that never clears (the "whiteout") is the web view losing
+  its GPU, usually just as the app comes back to the front. It is not the
+  game's doing and a game can neither see it nor fix it: the app restarts
+  itself when it happens (`GpuWatch.kt`). Traced on 30 October 2026, after
+  the game had been blamed twice.
 
 ## Secrets
 
