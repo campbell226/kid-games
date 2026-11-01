@@ -65,6 +65,12 @@ is the condition of using them. The originals are on Commons, linked
 from there. The phone's own text-to-speech was tried for these and
 dropped: the hellos it read were more annoying than useful.
 
+Chess Quest's "Classic" pieces are Cburnett's set from Wikimedia Commons
+(CC BY-SA 3.0), embedded in the page; its `CREDITS.md` has to stay beside
+it. The other three piece styles (Friends, Blocks, Shadows) are drawn in
+the page. It speaks piece names with the device's speech synthesis only,
+no recordings, and falls back to each piece's synthesised tune.
+
 ## Maps
 
 Hoot's Postcards carries its own world: Natural Earth's 1:110m countries
