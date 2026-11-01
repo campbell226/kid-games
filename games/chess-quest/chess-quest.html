@@ -1538,7 +1538,38 @@ function boardRound(c, coords) {
   mode(true);
   Bd.reset(c.look, { coords: coords });
 }
+// ---------- tour: the names are told, one by one, before anyone is asked ----------
+ROUNDS.tour = function (c, st) {
+  var kind = st.kind, k = 0, seq = [], chipF = null, chipR = null, i;
+  boardRound(c, true);
+  if (kind === 'sq') { seq = shuffle([sqIdx('e4'), sqIdx('b6'), sqIdx('g2'), sqIdx('d7'), sqIdx('a1'), sqIdx('h8')]).slice(0, 5); }
+  else { for (i = 0; i < 8; i++) { seq.push(i); } }
+  if (kind !== 'rank') { chipF = h('div', 'chip f', $('prompt'), 'a'); }
+  if (kind !== 'file') { chipR = h('div', 'chip r', $('prompt'), '1'); }
+  function unpulse() { var n = $('bCo').children, j; for (j = 0; j < n.length; j++) { n[j].setAttribute('class', ''); } }
+  function show(n) {
+    var f, r;
+    Bd.clearMarks(); unpulse();
+    if (kind === 'file') { f = n; Bd.line('line', f); Bd.pulseAxis(f, null); chipF.textContent = FILES.charAt(f); sayFile(FILES.charAt(f)); }
+    else if (kind === 'rank') { r = n; Bd.line('line', null, r); Bd.pulseAxis(null, r); chipR.textContent = '' + (r + 1); sayRank(r + 1); }
+    else { f = n % 8; r = Math.floor(n / 8); Bd.line('line', f); Bd.line('line', null, r); Bd.mark(n, 'green'); Bd.pulseAxis(f, r); chipF.textContent = FILES.charAt(f); chipR.textContent = '' + (r + 1); saySquare(n); }
+    SFX.tap(); owl('talk', 800);
+  }
+  function step() {
+    if (k >= seq.length) { Bd.clearMarks(); unpulse(); c.win(900); return; }
+    show(seq[k]); k++;
+    later(step, kind === 'sq' ? 2400 : 1300);
+  }
+  later(step, 700);
+  // touching the board while it talks just tells you the name
+  Bd.setTap(function (n) {
+    var f = n % 8, r = Math.floor(n / 8);
+    Bd.flash(n, 'green'); Bd.label(n, sqName(n)); saySquare(n);
+  });
+  c.solve = function () { c.win(100); };
+};
 ROUNDS.square = function (c, st) {
+  if (st.tour && c.i === 0) { ROUNDS.tour(c, st); return; }
   var kind = st.kind, f = rnd(8), r = rnd(8), target = f + 8 * r;
   var sayIt;
   boardRound(c, true);
@@ -2167,9 +2198,9 @@ ROUNDS.finale = function (c) {
 // =====================================================================
 WORLDS = [
   { bg: '#3a8a58', emblem: ['k', 'q', 'r'] },
-  { bg: '#3b6cb3', emblem: ['b', 'n'] },
   { bg: '#8a58b3', emblem: ['r', 'b', 'q', 'k', 'n', 'p'] },
   { bg: '#b3563c', emblem: ['q', 'p'] },
+  { bg: '#3b6cb3', emblem: ['b', 'n'] },
   { bg: '#a8812f', emblem: ['p', 'p', 'p'] },
   { bg: '#b33f5d', emblem: ['k'] },
   { bg: '#2d7f86', emblem: ['k', 'q'] }
@@ -2182,7 +2213,7 @@ function S(world, id, type, n, icon, more) {
 }
 function moveStage(t) {
   var plan = ['demo', 'free', 'free', 'free', 'star1', 'star2', 'star2'];
-  S(2, 'move-' + t, 'moves', 7, { t: t }, { piece: t, plan: plan });
+  S(1, 'move-' + t, 'moves', 7, { t: t }, { piece: t, plan: plan });
 }
 
 // 0: who is who
@@ -2192,19 +2223,19 @@ S(0, 'find4', 'find', 6, { t: 'n' }, { choices: 4, mix: true });
 S(0, 'name', 'name', 6, { t: 'b' }, { options: 3 });
 S(0, 'match', 'match', 4, { g: 'pair' }, { pairs: 3 });
 S(0, 'odd', 'odd', 6, { g: 'odd' }, { hard: true });
-// 1: the board
-S(1, 'files', 'square', 6, { g: 'files' }, { kind: 'file' });
-S(1, 'ranks', 'square', 6, { g: 'ranks' }, { kind: 'rank' });
-S(1, 'squares', 'square', 8, { g: 'sq' }, { kind: 'sq' });
-// 2: how they move
+// 1: how they move
 ['r', 'b', 'q', 'k', 'n'].forEach(moveStage);
-S(2, 'move-p', 'moves', 7, { t: 'p' }, { piece: 'p', plan: ['demo', 'free', 'free', 'free', 'star1', 'star2', 'star2'] });
-S(2, 'move-mix', 'moves', 6, { g: 'who' }, { piece: '*', plan: ['star1', 'star2', 'star2', 'star2', 'star2', 'star2'] });
-// 3: taking
-S(3, 'take', 'take', 6, { g: 'take' }, { plan: [{ t: 'r', k: 1, d: 0 }, { t: 'b', k: 1, d: 1 }, { t: 'q', k: 2, d: 1 }, { t: 'n', k: 2, d: 2 }, { t: 'k', k: 1, d: 2 }, { t: '*', k: 2, d: 2 }] });
-S(3, 'blocked', 'blocked', 6, { g: 'block' }, { plan: ['r', 'b', 'q', 'n', 'r', 'q'] });
-S(3, 'pawn-take', 'pawnTake', 6, { t: 'p' }, { plan: [{ l: 1 }, { r: 1 }, { both: 1 }, { ahead: 1, l: 1 }, { ahead: 1, both: 1 }, { ahead: 1, far: 1, r: 1 }] });
-S(3, 'who', 'who', 6, { g: 'who' });
+S(1, 'move-p', 'moves', 7, { t: 'p' }, { piece: 'p', plan: ['demo', 'free', 'free', 'free', 'star1', 'star2', 'star2'] });
+S(1, 'move-mix', 'moves', 6, { g: 'who' }, { piece: '*', plan: ['star1', 'star2', 'star2', 'star2', 'star2', 'star2'] });
+// 2: taking
+S(2, 'take', 'take', 6, { g: 'take' }, { plan: [{ t: 'r', k: 1, d: 0 }, { t: 'b', k: 1, d: 1 }, { t: 'q', k: 2, d: 1 }, { t: 'n', k: 2, d: 2 }, { t: 'k', k: 1, d: 2 }, { t: '*', k: 2, d: 2 }] });
+S(2, 'blocked', 'blocked', 6, { g: 'block' }, { plan: ['r', 'b', 'q', 'n', 'r', 'q'] });
+S(2, 'pawn-take', 'pawnTake', 6, { t: 'p' }, { plan: [{ l: 1 }, { r: 1 }, { both: 1 }, { ahead: 1, l: 1 }, { ahead: 1, both: 1 }, { ahead: 1, far: 1, r: 1 }] });
+S(2, 'who', 'who', 6, { g: 'who' });
+// 3: the board, named once the pieces have been about on it
+S(3, 'files', 'square', 7, { g: 'files' }, { kind: 'file', tour: true });
+S(3, 'ranks', 'square', 7, { g: 'ranks' }, { kind: 'rank', tour: true });
+S(3, 'squares', 'square', 9, { g: 'sq' }, { kind: 'sq', tour: true });
 // 4: getting ready to play
 S(4, 'orient', 'orient', 3, { g: 'rot' });
 S(4, 'set-pawns', 'setup', 2, { g: 'tray' }, { plan: [{ place: ['wp'], ghost: true }, { place: ['bp'], ghost: false, pre: { w: 'p' } }] });
