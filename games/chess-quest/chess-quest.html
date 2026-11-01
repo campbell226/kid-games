@@ -88,6 +88,7 @@
   @media (orientation: portrait) { #play.nobd #panel { flex-direction: column; min-height: 0; } #play.nobd #owlBox { width: clamp(70px, 11vh, 120px); } }
 
   .word { font-size: clamp(30px, 8vmin, 72px); font-weight: 800; letter-spacing: 0.02em; text-shadow: 0 3px 0 rgba(0,0,0,0.25); }
+  .word.ask { font-size: clamp(24px, 5.5vmin, 46px); }
   .chip { min-width: clamp(54px, 10vmin, 90px); height: clamp(54px, 10vmin, 90px); padding: 0 12px; border-radius: 22px; display: inline-flex; align-items: center; justify-content: center; font-size: clamp(34px, 7.5vmin, 64px); font-weight: 800; box-shadow: 0 5px 0 rgba(0,0,0,0.25); }
   .chip.f { background: #4aa3ff; } .chip.r { background: #ff9b3d; } .chip.x { background: #fff7e6; color: #3a3560; }
   .say { width: clamp(54px, 10vmin, 84px); height: clamp(54px, 10vmin, 84px); border-radius: 50%; background: #fff7e6; box-shadow: 0 5px 0 rgba(0,0,0,0.25); display: inline-flex; align-items: center; justify-content: center; }
@@ -147,14 +148,14 @@
   .shk { animation: shake .4s; }
 
   /* owl */
-  #owl .o-all { transform-box: fill-box; transform-origin: 50% 100%; }
-  #owl .o-wl, #owl .o-wr { transform-box: fill-box; transform-origin: 50% 10%; }
-  #owl .o-blink { transform: scaleY(0); transform-box: fill-box; transform-origin: 50% 0%; animation: oBlink 4.5s infinite; }
-  #owl.cheer .o-all { animation: oHop .55s ease-in-out 2; }
-  #owl.cheer .o-wl { animation: oFlapL .28s ease-in-out 4; } #owl.cheer .o-wr { animation: oFlapR .28s ease-in-out 4; }
-  #owl.oops .o-all { animation: oTilt .9s ease-in-out; }
-  #owl.talk .o-beak { animation: oTalk .22s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 0%; }
-  #owl.idle .o-all { animation: oIdle 3.2s ease-in-out infinite; }
+  .o-all { transform-box: fill-box; transform-origin: 50% 100%; }
+  .o-wl, .o-wr { transform-box: fill-box; transform-origin: 50% 10%; }
+  .o-blink { transform: scaleY(0); transform-box: fill-box; transform-origin: 50% 0%; animation: oBlink 4.5s infinite; }
+  svg.cheer .o-all { animation: oHop .55s ease-in-out 2; }
+  svg.cheer .o-wl { animation: oFlapL .28s ease-in-out 4; } svg.cheer .o-wr { animation: oFlapR .28s ease-in-out 4; }
+  svg.oops .o-all { animation: oTilt .9s ease-in-out; }
+  svg.talk .o-beak { animation: oTalk .22s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 0%; }
+  svg.idle .o-all { animation: oIdle 3.2s ease-in-out infinite; }
   @keyframes oBlink { 0%,92%,100% { transform: scaleY(0); } 95% { transform: scaleY(1); } }
   @keyframes oHop { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-16%); } }
   @keyframes oFlapL { 0%,100% { transform: rotate(0); } 50% { transform: rotate(28deg); } }
@@ -1460,6 +1461,7 @@ ROUNDS.match = function (c, st) {
   var colA = c.i % 2 ? 'b' : 'w', colB = c.i % 2 ? 'w' : 'b', left = [], right = [];
   var cols, ca, cb;
   mode(false);
+  h('div', 'word ask', $('prompt'), 'Find the pairs'); c.say = function () { say('Find the pairs'); }; later(c.say, 500);
   h('div', 'chip x', $('prompt'), '<svg viewBox="0 0 80 40" width="80" height="40"><circle cx="18" cy="20" r="11" fill="#4aa3ff"/><circle cx="62" cy="20" r="11" fill="#ff9b3d"/><path d="M29 20 H51" stroke="#3a3560" stroke-width="5" stroke-linecap="round" stroke-dasharray="1 9"/></svg>');
   fitCards(2 * k, 190, 2);
   cols = $('choices'); cols.className = '';
@@ -1512,6 +1514,7 @@ ROUNDS.odd = function (c, st) {
   if (st.hard && c.i >= 2) { pr = pick(CONFUSED); a = pr[0]; o = pr[1]; if (Math.random() < 0.5) { a = pr[1]; o = pr[0]; } }
   else { a = pick(allTypes()); o = pick(allTypes().filter(function (x) { return x !== a; })); }
   c.idleMs = 6000;
+  h('div', 'word ask', $('prompt'), 'Which one is different?'); c.say = function () { say('Which one is different?'); }; later(c.say, 500);
   h('div', 'chip x', $('prompt'), '<svg viewBox="0 0 140 40" width="140" height="40"><circle cx="18" cy="20" r="12" fill="#c9d1e6"/><circle cx="52" cy="20" r="12" fill="#c9d1e6"/><circle cx="86" cy="20" r="12" fill="#c9d1e6"/><circle cx="122" cy="20" r="13" fill="#ff9b3d" stroke="#ffd24d" stroke-width="4"/></svg>');
   fitCards(4, 240);
   order = shuffle([0, 1, 2, 3]);
