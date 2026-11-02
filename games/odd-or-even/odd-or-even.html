@@ -659,7 +659,21 @@
     for (i = parts.length - 1; i >= 0; i--) {
       p = parts[i];
       p.life += dt;
-      if (p.life >= p.max) { parts.splice(i, 1); continue; }
+      if (p.life >= p.max || (p.balloon && p.y < -90)) { parts.splice(i, 1); continue; }
+      if (p.balloon) {
+        p.x += (p.vx + Math.sin(p.life * 2 + p.rot) * 30) * dt;
+        p.y += p.vy * dt;
+        var bx = p.x * k, by = p.y * k, br = p.r * k;
+        fxc.globalAlpha = 1;
+        fxc.strokeStyle = 'rgba(255,255,255,0.8)'; fxc.lineWidth = 2 * k;
+        fxc.beginPath(); fxc.moveTo(bx, by + br * 1.2); fxc.quadraticCurveTo(bx - br * 0.4, by + br * 2.2, bx, by + br * 3.2); fxc.stroke();
+        fxc.fillStyle = p.c;
+        fxc.beginPath(); fxc.ellipse(bx, by, br * 0.82, br, 0, 0, 6.3); fxc.fill();
+        fxc.beginPath(); fxc.moveTo(bx, by + br * 0.95); fxc.lineTo(bx - br * 0.18, by + br * 1.3); fxc.lineTo(bx + br * 0.18, by + br * 1.3); fxc.fill();
+        fxc.fillStyle = 'rgba(255,255,255,0.45)';
+        fxc.beginPath(); fxc.ellipse(bx - br * 0.3, by - br * 0.35, br * 0.16, br * 0.3, 0.5, 0, 6.3); fxc.fill();
+        continue;
+      }
       p.vy += 420 * dt;
       p.x += p.vx * dt; p.y += p.vy * dt;
       p.rot += dt * 3;
@@ -747,7 +761,7 @@
   // ------------------------------------------------------------------
   // Interface: the sign, the stars, the parent pips and the two buttons.
   // ------------------------------------------------------------------
-  var STAR_GOAL = 8;
+  var STAR_GOAL = 10;
   var stage = 1, stars = 0;
 
   function starPoints(r) {
@@ -941,17 +955,18 @@
   var MARCH = 560, WALK = 230, EXIT = 760;
 
   function showSign(n) {
-    // The last digit is the big one and the rest sit small beside it, so
-    // the digit that decides the answer is the one she looks at.
+    // The last digit is a different colour from the rest, so it is the one
+    // she looks at; it is not told which button it belongs to until she
+    // has answered.
     clear(ui.signText);
     var s = String(n), head = s.slice(0, -1);
     ui.signHead = null;
     if (head) {
-      ui.signHead = el('tspan', { 'font-size': 64, fill: '#9aa3c4' });
+      ui.signHead = el('tspan', { 'font-size': 112, fill: '#26305e' });
       ui.signHead.textContent = head;
       ui.signText.appendChild(ui.signHead);
     }
-    ui.signLast = el('tspan', { 'font-size': 126, fill: '#26305e' });
+    ui.signLast = el('tspan', { 'font-size': 112, fill: '#8a4fd6' });
     ui.signLast.textContent = s.slice(-1);
     ui.signText.appendChild(ui.signLast);
     animate(0.4, function (p) {
@@ -1111,16 +1126,16 @@
     return ix;
   }
 
-  // The answer, in the colour of its button. Everything but the last
-  // digit fades, because nothing but the last digit matters.
+  // The answer, in the colour of its button, and the last digit swells
+  // like a balloon. Everything else fades, because nothing but the last
+  // digit matters.
   function lightDigit(kind) {
     ui.signLast.setAttribute('fill', kind === 'even' ? '#1f9a94' : '#e8741a');
     if (ui.signHead) {
       animate(0.5, function (p) { ui.signHead.setAttribute('opacity', (1 - 0.7 * p).toFixed(2)); });
     }
-    animate(0.5, function (p) {
-      var k = 1 + Math.sin(p * Math.PI) * 0.1;
-      ui.sign.setAttribute('transform', 'translate(' + ui.signCx + ',' + ui.signCy + ') scale(' + k.toFixed(3) + ')');
+    animate(0.55, function (p) {
+      ui.signLast.setAttribute('font-size', (112 + 26 * easeOutBack(p)).toFixed(1));
     });
   }
 
@@ -1330,13 +1345,6 @@
     });
 
     var tD = tL + 1.5, celebrate = correct && stars >= STAR_GOAL;
-    if (celebrate) {
-      afterR(tL + 0.4, function () {
-        sndCheer(); rain(80);
-        round.animals.forEach(function (a, i) { afterR(i * 0.04, function () { hop(a, false); }); });
-      });
-      tD += 1.4;
-    }
     afterR(tD, function () { exitRound(celebrate); });
   }
 
@@ -1364,11 +1372,108 @@
       far = Math.max(far, a.x - a.tx);
     });
     if (celebrate) {
-      if (stage < 3) { setStage(stage + 1); } else { stars = 0; paintStars(); }
+      // The stars stay lit for the party and empty at the end of it.
+      if (stage < 3) { stage++; saveStage(); queue = []; paintPips(); }
+      stars = 0;
     }
+    afterR((reduced ? 0 : far / EXIT) + 0.35, function () {
+      if (celebrate) { startParty(); return; }
+      ui.sign.setAttribute('opacity', 1);
+      startRound();
+    });
+  }
+
+  // ------------------------------------------------------------------
+  // The party: ten right answers and every kind of animal turns up in a
+  // paper hat, plays a tune with its own voice, and the sky fills with
+  // balloons. Then the stars empty and it starts again.
+  // ------------------------------------------------------------------
+  var HAT_TOP = { frog: -132, cow: -188, bird: -182, cat: -194, dog: -186, mouse: -172 };
+  var HAT_COL = ['#ff6b86', '#ffd24d', '#6fd1ff', '#8be16a', '#c79bff', '#ffaa4d'];
+  var TUNE = [3, 5, 4, 6, 5, 4, 3, 2];
+
+  function addHat(a, col) {
+    var g = el('g', { transform: 'translate(0,' + (HAT_TOP[a.spec.id] + 8) + ') rotate(-8)' });
+    g.appendChild(el('path', { d: 'M -24 0 L 0 -62 L 24 0 Z', fill: col, stroke: '#ffffff', 'stroke-width': 3, 'stroke-linejoin': 'round' }));
+    g.appendChild(el('path', { d: 'M -14 -26 L 14 -26 M -19 -12 L 19 -12', stroke: '#ffffff', 'stroke-width': 5, 'stroke-linecap': 'round', opacity: 0.75 }));
+    g.appendChild(el('circle', { cx: 0, cy: -64, r: 8, fill: '#ffffff' }));
+    a.body.appendChild(g);
+  }
+
+  function startParty() {
+    rid++;
+    clear(gBlocks); clear(gBubbles); clear(gAnimals); clear(gTops);
+    round = { id: rid, n: 0, phase: 'party', answered: true, animals: [], blocks: [], hearts: [], pairsInfo: [] };
+    var N = SPECS.length, availW = L.fx1 - L.fx0, availH = L.fy1 - L.fy0, i;
+    var s = Math.min(1, availW / (N * 1.3 * AW), availH / (AH * 1.3));
+    var slot = availW / N, cx = (L.fx0 + L.fx1) / 2, y = L.fy0 + (availH + AH * s) / 2;
+    var order = shuffle([0, 1, 2, 3, 4, 5]);
+    var shift = L.W - (cx - (N - 1) * slot / 2) + AW * s;
+    for (i = 0; i < N; i++) {
+      var sl = { k: i, x: cx + (i - (N - 1) / 2) * slot, y: y, s: s, paired: false, pair: -1 };
+      sl.px = sl.x;
+      var a = makeAnimal(SPECS[order[i]], sl, reduced ? 0 : shift);
+      a.index = i;
+      addHat(a, HAT_COL[i]);
+      round.animals.push(a);
+      updateAnimal(a, 0);
+    }
+    afterR(0.3, function () {
+      round.animals.forEach(function (a) {
+        a.speed = reduced ? 1e6 : MARCH;
+        a.tx = a.slot.x;
+      });
+    });
+
+    var tIn = (reduced ? 0 : shift / MARCH) + 0.6, steps = 16, beat = 0.4;
+    afterR(tIn, function () {
+      sndCheer(); rain(70);
+      round.animals.forEach(function (a) { a.lookT = 0; });
+      for (var b = 0; b < 12; b++) { afterR(b * 0.45, balloon); }
+      afterR(3, function () { rain(60); });
+      ui.starEls.forEach(function (st, k) { afterR(0.1 + k * 0.1, function () { popStar(k); }); });
+      animate(steps * beat, function (p) {
+        if (reduced) { return; }
+        round.animals.forEach(function (a, k) {
+          a.leanT = Math.sin(p * steps * beat * 5 + k) * 6;
+        });
+      });
+      for (var q = 0; q < steps; q++) {
+        (function (q) {
+          afterR(0.4 + q * beat, function () {
+            var a = round.animals[q % N];
+            hop(a, false);
+            if (AC) {
+              var d = VOICES[a.spec.voice](now(), mtof(pentMidi(a.spec.base, TUNE[q % TUNE.length])), beat * 0.9);
+              a.mouthT = Math.max(0.15, d);
+            }
+            burst(a.x, a.y - AH * a.s * 0.9, 5, 110, 60);
+          });
+        })(q);
+      }
+      afterR(0.4 + steps * beat + 0.4, endParty);
+    });
+  }
+
+  function endParty() {
+    paintStars();
+    var far = 0;
+    round.animals.forEach(function (a) {
+      a.speed = reduced ? 1e6 : EXIT; a.tx = -AW * a.s * 2; a.leanT = 0; a.lookT = -1;
+      far = Math.max(far, a.x - a.tx);
+    });
     afterR((reduced ? 0 : far / EXIT) + 0.35, function () {
       ui.sign.setAttribute('opacity', 1);
       startRound();
+    });
+  }
+
+  function balloon() {
+    if (reduced || parts.length > 150) { return; }
+    parts.push({
+      balloon: true, x: 40 + Math.random() * (L.W - 80), y: L.H + 50,
+      vx: (Math.random() - 0.5) * 20, vy: -(110 + Math.random() * 90), life: 0, max: 9,
+      r: 26 + Math.random() * 10, c: COLOURS[Math.floor(Math.random() * COLOURS.length)], rot: Math.random() * 6
     });
   }
 
