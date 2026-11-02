@@ -1,0 +1,1578 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#16294a">
+<title>Inside Me</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #16294a;
+    overflow: hidden;
+    touch-action: none;
+    overscroll-behavior: none;
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  }
+  #stage { position: fixed; left: 0; top: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #fx { position: fixed; left: 0; top: 0; pointer-events: none; }
+
+  /* ---- layers: what shows, and what can be touched ---- */
+  #stage .skf { fill: var(--skin); }
+  #stage .sko { stroke: var(--skino); }
+  #stage .sks { stroke: var(--skin); }
+  #stage .skd { fill: var(--skind); }
+  #stage .hrf { fill: var(--hair); }
+  #stage .hrs { stroke: var(--hair); }
+
+  #stage .sk { opacity: 0.26; pointer-events: none; transition: opacity .45s; }
+  #stage.L-body .sk { opacity: 1; pointer-events: auto; }
+
+  #stage .cl, #stage .bh, #stage .bn, #stage .og {
+    opacity: 0; visibility: hidden; pointer-events: none;
+    transition: opacity .4s, visibility 0s .4s;
+  }
+  #stage.L-body .cl, #stage.L-body .bh,
+  #stage.L-bones .bn, #stage.L-organs .og {
+    opacity: 1; visibility: visible; pointer-events: auto;
+    transition: opacity .4s, visibility 0s;
+  }
+  #stage .ground, #stage .bgSky { opacity: 0; transition: opacity .5s; }
+  #stage.L-body .ground, #stage.L-body .bgSky { opacity: 1; }
+  #stage .xglow { opacity: 0.9; transition: opacity .5s; }
+  #stage.L-body .xglow { opacity: 0; }
+  .hit { fill: #fff; fill-opacity: 0; }
+  .hitl { fill: none; stroke: #fff; stroke-opacity: 0; }
+
+  /* unplaced pieces in the puzzle are outlines */
+  #stage .sil :not(.ln):not(.hitl) {
+    fill: rgba(255,255,255,0.14); stroke: rgba(255,255,255,0.55);
+    stroke-width: 2; stroke-dasharray: 6 5;
+  }
+  #stage .sil .ln { fill: none; stroke: rgba(255,255,255,0.3); }
+  #stage .sil .dt { display: none; }
+  #stage .sil .hitl { stroke-opacity: 0; fill: none; }
+  #stage .sil.hint { animation: hint 1.1s ease-in-out infinite; }
+  #stage .sil.hint :not(.ln):not(.hitl) { fill: rgba(255,230,120,0.38); }
+  #stage .sil.hint .ln { stroke: rgba(255,230,120,0.7); }
+  @keyframes hint { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
+  .ring { animation: ringfade 1.2s ease-out forwards; }
+  @keyframes ringfade { 0% { opacity: 1; } 100% { opacity: 0; } }
+  .pc { cursor: grab; }
+
+  /* ---- buttons ---- */
+  .btn {
+    position: fixed; padding: 0; border: 0; border-radius: 18px;
+    background: rgba(255,255,255,0.9); box-shadow: 0 2px 7px rgba(0,0,0,0.28);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: transform .15s, background .2s;
+    -webkit-tap-highlight-color: transparent; z-index: 5;
+  }
+  .btn svg { width: 72%; height: 72%; display: block; }
+  .btn.on { background: #ffd54a; transform: scale(1.1); }
+  .btn.small { border-radius: 14px; }
+  .btn.dim { opacity: 0.55; }
+
+  #card {
+    position: fixed; display: none; align-items: center; gap: 14px;
+    background: rgba(255,255,255,0.95); border-radius: 24px; padding: 12px 16px;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.25); z-index: 4; color: #22305a;
+    overflow: hidden;
+  }
+  #cardIcon { flex: none; display: flex; align-items: center; justify-content: center; }
+  #cardIcon svg { width: 100%; height: 100%; display: block; }
+  #cardText { min-width: 0; }
+  #cardName { font-weight: 800; line-height: 1.05; }
+  #cardAlt { font-style: italic; opacity: 0.65; margin-top: 3px; }
+  #cardFact { margin-top: 6px; line-height: 1.25; opacity: 0.85; }
+  #cardCount {
+    flex: none; margin-left: auto; min-width: 1.7em; height: 1.7em; border-radius: 50%;
+    background: #ffd54a; color: #4b3a00; font-weight: 800; display: none;
+    align-items: center; justify-content: center; padding: 0 .3em;
+  }
+  #dots { position: fixed; display: none; align-items: center; justify-content: center; gap: 12px; z-index: 4; }
+  .dot {
+    width: 44px; height: 44px; border-radius: 50%; border: 4px solid #fff; padding: 0;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3); cursor: pointer; transition: transform .15s;
+  }
+  .dot.on { transform: scale(1.25); border-color: #ffd54a; }
+  #tip {
+    position: fixed; display: none; padding: 6px 16px; border-radius: 999px; z-index: 4;
+    background: rgba(255,255,255,0.93); color: #22305a; font-weight: 800;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25); pointer-events: none;
+  }
+  #again { display: none; width: 96px; height: 96px; border-radius: 50%; background: #ffd54a; z-index: 6; }
+  #again svg { width: 60%; height: 60%; }
+  #again.pulse { animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .btn, .dot, #stage .sk, #stage .cl, #stage .bh, #stage .bn, #stage .og,
+    #stage .ground, #stage .bgSky, #stage .xglow { transition: none !important; }
+    #stage .sil.hint, #again.pulse { animation: none !important; }
+    .ring { animation: none !important; opacity: 0.8; }
+  }
+</style>
+</head>
+<body>
+<script>
+// Full screen on the first touch, and a way back if it is off.
+// (Same arrangement as the other games: see animal-band.html for why.)
+(function () {
+  var el = document.documentElement;
+  var go = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (!go) { return; }
+  var EVENTS = ['pointerup', 'touchend', 'click', 'mousedown'];
+  var asking = false, done = false, btn = null, i;
+
+  function isFull() {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement);
+  }
+
+  function request() {
+    if (asking || isFull()) { return; }
+    asking = true;
+    try {
+      var p = go.call(el);
+      if (p && p.then) { p.then(function () { asking = false; }, function () { asking = false; }); }
+      else { setTimeout(function () { asking = false; }, 500); }
+    } catch (e) { asking = false; }
+  }
+
+  function stopAuto() {
+    done = true;
+    for (var k = 0; k < EVENTS.length; k++) {
+      document.removeEventListener(EVENTS[k], autoTry, true);
+    }
+  }
+
+  function autoTry() {
+    if (done) { return; }
+    if (isFull()) { stopAuto(); sync(); return; }
+    request();
+  }
+
+  function sync() {
+    var want = !isFull();
+    if (want && !btn && document.body) {
+      btn = document.createElement('button');
+      btn.setAttribute('aria-label', 'Full screen');
+      btn.style.cssText = 'position:fixed;top:5px;left:50%;transform:translateX(-50%);'
+        + 'z-index:30;width:46px;height:46px;padding:0;line-height:0;border:0;'
+        + 'border-radius:14px;background:rgba(255,255,255,0.68);cursor:pointer;'
+        + 'box-shadow:0 1px 5px rgba(0,0,0,0.22);-webkit-tap-highlight-color:transparent;';
+      btn.innerHTML = '<svg width="46" height="46" viewBox="0 0 46 46" aria-hidden="true">'
+        + '<g fill="none" stroke="#40563a" stroke-width="3.4" stroke-linecap="round"'
+        + ' stroke-linejoin="round">'
+        + '<path d="M19 14 H14 V19 M27 14 H32 V19 M19 32 H14 V27 M27 32 H32 V27"/>'
+        + '</g></svg>';
+      btn.addEventListener('click', function (e) { e.stopPropagation(); request(); });
+      document.body.appendChild(btn);
+    }
+    if (btn) { btn.style.display = want ? 'block' : 'none'; }
+  }
+
+  document.addEventListener('fullscreenchange', function () {
+    if (isFull()) { stopAuto(); }
+    sync();
+  });
+  document.addEventListener('webkitfullscreenchange', function () {
+    if (isFull()) { stopAuto(); }
+    sync();
+  });
+  for (i = 0; i < EVENTS.length; i++) {
+    document.addEventListener(EVENTS[i], autoTry, true);
+  }
+  sync();
+})();
+</script>
+
+<svg id="stage" xmlns="http://www.w3.org/2000/svg" aria-label="Inside Me"></svg>
+<canvas id="fx"></canvas>
+<div id="card">
+  <div id="cardIcon"></div>
+  <div id="cardText"><div id="cardName"></div><div id="cardAlt"></div><div id="cardFact"></div></div>
+  <div id="cardCount"></div>
+</div>
+<div id="dots"></div>
+<div id="tip"></div>
+<button class="btn" id="again" aria-label="Again"></button>
+
+<script>
+(function () {
+  'use strict';
+
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  var stage = document.getElementById('stage');
+
+  function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+  function f(n) { return Math.round(n * 100) / 100; }
+  function el(tag, attrs, parent) {
+    var n = document.createElementNS(SVGNS, tag);
+    if (attrs) { for (var k in attrs) { n.setAttribute(k, attrs[k]); } }
+    if (parent) { parent.appendChild(n); }
+    return n;
+  }
+  function clear(n) { while (n.firstChild) { n.removeChild(n.firstChild); } }
+  function shuffle(a) {
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1)), t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+  function store(k, v) {
+    try {
+      if (v === undefined) { return window.localStorage.getItem('insideme.' + k); }
+      window.localStorage.setItem('insideme.' + k, v);
+    } catch (e) { /* private window or data: page */ }
+    return null;
+  }
+
+  var reduceQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+  var reduced = reduceQuery.matches;
+  if (reduceQuery.addEventListener) {
+    reduceQuery.addEventListener('change', function (e) { reduced = e.matches; });
+  }
+
+  // ------------------------------------------------------------------
+  // Sound. Everything is synthesised, so the game is never silent and
+  // never waits on a download. Names are spoken by the device's own
+  // speech if it has any.
+  // ------------------------------------------------------------------
+  var AC = null, master = null, noiseBuf = null;
+  var muted = store('muted') === '1';
+  var factsOn = store('facts') === '1';
+  var sfxLast = {}, sfxTimes = [];
+
+  function ensureAudio() {
+    if (AC) { if (AC.state === 'suspended') { AC.resume(); } return; }
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) { return; }
+    try { AC = new Ctx(); } catch (e) { AC = null; return; }
+    var comp = AC.createDynamicsCompressor();
+    comp.threshold.setValueAtTime(-16, AC.currentTime);
+    comp.ratio.setValueAtTime(6, AC.currentTime);
+    master = AC.createGain();
+    master.gain.setValueAtTime(0.5, AC.currentTime);
+    master.connect(comp);
+    comp.connect(AC.destination);
+    var n = Math.floor(AC.sampleRate * 0.5);
+    noiseBuf = AC.createBuffer(1, n, AC.sampleRate);
+    var d = noiseBuf.getChannelData(0);
+    for (var i = 0; i < n; i++) { d[i] = Math.random() * 2 - 1; }
+    if (AC.state === 'suspended') { AC.resume(); }
+  }
+
+  function tone(freq, dur, o) {
+    o = o || {};
+    var t = AC.currentTime + (o.at || 0);
+    var os = AC.createOscillator(), g = AC.createGain();
+    os.type = o.type || 'sine';
+    os.frequency.setValueAtTime(freq, t);
+    if (o.to) { os.frequency.exponentialRampToValueAtTime(o.to, t + dur); }
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(o.vol || 0.4, t + Math.min(0.012, dur / 3));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    if (o.lp) {
+      var lp = AC.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = o.lp;
+      os.connect(lp); lp.connect(g);
+    } else { os.connect(g); }
+    g.connect(master);
+    os.start(t); os.stop(t + dur + 0.05);
+  }
+
+  function noise(dur, o) {
+    o = o || {};
+    var t = AC.currentTime + (o.at || 0);
+    var s = AC.createBufferSource(), bp = AC.createBiquadFilter(), g = AC.createGain();
+    s.buffer = noiseBuf; s.loop = true;
+    bp.type = 'bandpass';
+    bp.frequency.setValueAtTime(o.f || 1000, t);
+    if (o.to) { bp.frequency.exponentialRampToValueAtTime(o.to, t + dur); }
+    bp.Q.value = o.q || 1;
+    var atk = Math.min(o.atk || 0.006, dur * 0.6);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(o.vol || 0.4, t + atk);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(bp); bp.connect(g); g.connect(master);
+    s.start(t); s.stop(t + dur + 0.05);
+  }
+
+  var PENT = [0, 2, 4, 7, 9];
+  function pent(i) { return 392 * Math.pow(2, (PENT[i % 5] + 12 * Math.floor(i / 5)) / 12); }
+
+  var SFX = {
+    thump: function () {
+      for (var i = 0; i < 3; i++) {
+        tone(110, 0.2, { to: 42, vol: 0.9, at: i * 0.8 });
+        tone(95, 0.16, { to: 40, vol: 0.6, at: i * 0.8 + 0.2 });
+      }
+    },
+    breath: function () {
+      for (var i = 0; i < 2; i++) { noise(1.2, { f: 500, to: 1500, q: 0.6, vol: 0.32, atk: 0.55, at: i * 1.4 }); }
+    },
+    gurgle: function () {
+      for (var i = 0; i < 4; i++) {
+        noise(0.25, { f: 300 + Math.random() * 300, to: 150, q: 6, vol: 0.5, at: i * 0.22 });
+        tone(90 + Math.random() * 50, 0.22, { type: 'triangle', vol: 0.25, at: i * 0.22, to: 60 });
+      }
+    },
+    clack: function () { noise(0.05, { f: 2600, q: 2, vol: 0.6 }); tone(900, 0.06, { type: 'triangle', to: 500, vol: 0.3 }); },
+    chatter: function () {
+      for (var i = 0; i < 6; i++) {
+        noise(0.04, { f: 2400, q: 2, vol: 0.5, at: i * 0.1 });
+        tone(800, 0.05, { type: 'triangle', to: 450, vol: 0.25, at: i * 0.1 });
+      }
+    },
+    think: function () { tone(660, 0.25, { vol: 0.2 }); tone(880, 0.25, { vol: 0.2, at: 0.12 }); tone(1320, 0.4, { vol: 0.18, at: 0.26 }); },
+    whoosh: function () { noise(0.9, { f: 400, to: 2200, q: 0.7, vol: 0.35, atk: 0.3 }); },
+    gulp: function () { tone(220, 0.12, { to: 90, vol: 0.5 }); tone(200, 0.14, { to: 80, vol: 0.5, at: 0.18 }); },
+    blop: function () { tone(300, 0.12, { to: 600, vol: 0.4 }); tone(260, 0.12, { to: 520, vol: 0.3, at: 0.22 }); },
+    drip: function () { tone(1000, 0.1, { to: 500, vol: 0.35 }); tone(1000, 0.1, { to: 520, vol: 0.2, at: 0.3 }); },
+    blink: function () { tone(1500, 0.03, { vol: 0.15 }); tone(1300, 0.03, { vol: 0.12, at: 0.24 }); },
+    wiggle: function () { for (var i = 0; i < 5; i++) { tone(700 + (i % 2) * 220, 0.06, { vol: 0.18, at: i * 0.08 }); } },
+    sniff: function () { noise(0.2, { f: 3200, to: 1500, q: 2, vol: 0.4 }); noise(0.2, { f: 3200, to: 1500, q: 2, vol: 0.35, at: 0.3 }); },
+    ahh: function () { tone(210, 0.8, { type: 'sawtooth', vol: 0.22, lp: 900, to: 190 }); },
+    giggle: function () { for (var i = 0; i < 7; i++) { tone(620 + Math.random() * 220, 0.07, { type: 'triangle', to: 900, vol: 0.2, at: i * 0.085 }); } },
+    swish: function () { noise(0.28, { f: 700, to: 2600, q: 0.8, vol: 0.3, atk: 0.1 }); },
+    boop: function () { tone(520, 0.14, { to: 380, vol: 0.35 }); },
+    tap: function () { tone(160, 0.07, { to: 90, vol: 0.5 }); tone(160, 0.07, { to: 90, vol: 0.45, at: 0.17 }); },
+    boing: function () { tone(300, 0.28, { to: 150, vol: 0.3 }); tone(160, 0.2, { to: 280, vol: 0.25, at: 0.2 }); },
+    layer: function () { noise(0.4, { f: 300, to: 2400, q: 0.8, vol: 0.28, atk: 0.2 }); },
+    pick: function () { tone(520, 0.08, { vol: 0.25 }); }
+  };
+
+  function sfx(name, arg) {
+    if (!AC || muted) { return; }
+    var now = performance.now();
+    if (sfxLast[name] && now - sfxLast[name] < 130) { return; }
+    sfxTimes = sfxTimes.filter(function (t) { return now - t < 1000; });
+    if (sfxTimes.length > 12) { return; }
+    sfxLast[name] = now; sfxTimes.push(now);
+    try {
+      if (name === 'place') {
+        tone(pent(arg), 0.35, { type: 'triangle', vol: 0.4 });
+        tone(pent(arg + 2), 0.45, { type: 'triangle', vol: 0.3, at: 0.1 });
+      } else if (name === 'tada') {
+        for (var i = 0; i < 8; i++) { tone(pent(i + 2), 0.45, { type: 'triangle', vol: 0.32, at: i * 0.11 }); }
+        tone(pent(10), 1.0, { type: 'sine', vol: 0.3, at: 0.9 });
+      } else if (SFX[name]) { SFX[name](); }
+    } catch (e) { /* audio is a bonus */ }
+  }
+
+  var speechOk = 'speechSynthesis' in window && typeof window.SpeechSynthesisUtterance === 'function';
+  var spT = 0, spTimer = null, spText = '', spVoice = null;
+  function pickVoice() {
+    if (spVoice) { return spVoice; }
+    try {
+      var vs = window.speechSynthesis.getVoices() || [];
+      for (var i = 0; i < vs.length; i++) { if (/en[-_]GB/i.test(vs[i].lang)) { spVoice = vs[i]; break; } }
+    } catch (e) { /* none */ }
+    return spVoice;
+  }
+  function say(text) {
+    if (muted || !speechOk) { return; }
+    spText = text;
+    var wait = Math.max(0, 650 - (Date.now() - spT));
+    if (spTimer) { clearTimeout(spTimer); }
+    spTimer = setTimeout(function () {
+      spTimer = null; spT = Date.now();
+      try {
+        window.speechSynthesis.cancel();
+        var u = new window.SpeechSynthesisUtterance(spText);
+        u.lang = 'en-GB'; u.rate = 0.9; u.pitch = 1.05;
+        var v = pickVoice(); if (v) { u.voice = v; }
+        window.speechSynthesis.speak(u);
+      } catch (e) { /* no speech here */ }
+    }, wait);
+  }
+
+  // ------------------------------------------------------------------
+  // The scene. Body coordinates are 400 wide by about 800 tall, centred
+  // on x = 200. The figure faces us, so "L" is the left of the screen.
+  // ------------------------------------------------------------------
+  var BONE = '#f4ecd6', BONE_D = '#bba983', SHIRT = '#3ba7e0', SHORTS = '#3b4a8c';
+  var SKINS = [
+    { s: '#f7d3b5', o: '#d9a37f', d: '#e9b592', h: '#6b4423' },
+    { s: '#efc09a', o: '#c98f66', d: '#dca37c', h: '#c4601d' },
+    { s: '#d9a273', o: '#a9714a', d: '#c58a5c', h: '#2c1c12' },
+    { s: '#a8704a', o: '#7c4a2c', d: '#955d3a', h: '#17100c' },
+    { s: '#f4cfa6', o: '#d49e6c', d: '#e4b387', h: '#e2c066' }
+  ];
+  var skinIdx = parseInt(store('skin'), 10);
+  if (!(skinIdx >= 0 && skinIdx < SKINS.length)) { skinIdx = 0; }
+
+  function setSkin(i) {
+    skinIdx = i; store('skin', String(i));
+    var k = SKINS[i];
+    stage.style.setProperty('--skin', k.s);
+    stage.style.setProperty('--skino', k.o);
+    stage.style.setProperty('--skind', k.d);
+    stage.style.setProperty('--hair', k.h);
+  }
+
+  var defs = el('defs', null, stage);
+  var clipRect = el('rect', { x: 0, y: 0, width: 10, height: 10 }, el('clipPath', { id: 'areaClip' }, defs));
+  function grad(id, kind, attrs, stops) {
+    var g = el(kind, attrs, defs); g.setAttribute('id', id);
+    stops.forEach(function (s) { el('stop', { offset: s[0], 'stop-color': s[1], 'stop-opacity': s[2] === undefined ? 1 : s[2] }, g); });
+  }
+  grad('gSky', 'linearGradient', { x1: 0, y1: 0, x2: 0, y2: 1 }, [[0, '#7fcdf2'], [1, '#def4fd']]);
+  grad('gXray', 'linearGradient', { x1: 0, y1: 0, x2: 0, y2: 1 }, [[0, '#122244'], [1, '#1c4468']]);
+  grad('gGlow', 'radialGradient', { cx: 0.5, cy: 0.5, r: 0.5 }, [[0, '#6fd6ff', 0.35], [1, '#6fd6ff', 0]]);
+  grad('gGrass', 'linearGradient', { x1: 0, y1: 0, x2: 0, y2: 1 }, [[0, '#7cc86a'], [1, '#4d9c45']]);
+
+  el('rect', { id: 'bgX', x: 0, y: 0, width: 10, height: 10, fill: 'url(#gXray)' }, stage);
+  var bgSky = el('g', { 'class': 'bgSky' }, stage);
+  var skyRect = el('rect', { x: 0, y: 0, width: 10, height: 10, fill: 'url(#gSky)' }, bgSky);
+  var sun = el('circle', { r: 34, fill: '#ffe27a' }, bgSky);
+  var cloudA = el('g', { fill: '#fff', opacity: 0.85 }, bgSky);
+  var cloudB = el('g', { fill: '#fff', opacity: 0.85 }, bgSky);
+  [cloudA, cloudB].forEach(function (c) {
+    el('ellipse', { cx: 0, cy: 0, rx: 48, ry: 17 }, c);
+    el('ellipse', { cx: -14, cy: -12, rx: 24, ry: 17 }, c);
+    el('ellipse', { cx: 16, cy: -9, rx: 20, ry: 14 }, c);
+  });
+
+  var world = el('g', { 'clip-path': 'url(#areaClip)' }, stage);
+  var bodyG = el('g', { id: 'bodyG' }, world);
+  el('circle', { 'class': 'xglow', cx: 200, cy: 400, r: 230, fill: 'url(#gGlow)' }, bodyG);
+  var ground = el('g', { 'class': 'ground' }, bodyG);
+  el('rect', { x: -3000, y: 770, width: 6400, height: 2000, fill: 'url(#gGrass)' }, ground);
+  el('ellipse', { cx: 200, cy: 792, rx: 150, ry: 13, fill: 'rgba(0,0,0,0.16)' }, ground);
+
+  var trayG = el('g', {}, stage);
+  var dragG = el('g', {}, stage);
+  var ringHost = null;
+
+  // ---- joints: one group each, so a bent elbow takes its hand along ----
+  var M = {};
+  function joint(parent, name) {
+    var g = el('g', {}, parent);
+    var j = { g: g };
+    j.sk = el('g', { 'class': 'sk' }, g);
+    j.cl = el('g', { 'class': 'cl' }, g);
+    j.bn = el('g', { 'class': 'bn' }, g);
+    j.og = el('g', { 'class': 'og' }, g);
+    j.bh = el('g', { 'class': 'bh' }, g);
+    M[name] = j;
+    return j;
+  }
+  function side(s) { return s ? 'R' : 'L'; }
+  function jn(name, s) { return M[name + side(s)]; }
+
+  function limb(parent, x1, y1, x2, y2, w, id, s) {
+    var d = 'M' + x1 + ' ' + y1 + 'L' + x2 + ' ' + y2;
+    el('path', { d: d, 'class': 'sko', fill: 'none', 'stroke-width': w + 6, 'stroke-linecap': 'round' }, parent);
+    return el('path', { d: d, 'class': 'sks', fill: 'none', 'stroke-width': w, 'stroke-linecap': 'round', 'data-id': id, 'data-side': s }, parent);
+  }
+  function hit(parent, cx, cy, r, id, s) {
+    return el('circle', { 'class': 'hit', cx: cx, cy: cy, r: r, 'data-id': id, 'data-side': s || 0 }, parent);
+  }
+
+  var PIV = { arm: [128, 228], fore: [98, 342], hand: [90, 434], thigh: [166, 496], shin: [160, 626], foot: [157, 744] };
+  function pivot(name, s) { return (s ? 400 - PIV[name][0] : PIV[name][0]) + ' ' + PIV[name][1]; }
+
+  // legs go first so everything else stands in front of them
+  function buildLeg(s) {
+    function X(x) { return s ? 400 - x : x; }
+    var T = joint(bodyG, 'thigh' + side(s));
+    limb(T.sk, X(166), 496, X(160), 626, 58, 'legs', s);
+    var S = joint(T.g, 'shin' + side(s));
+    limb(S.sk, X(160), 626, X(157), 742, 46, 'legs', s);
+    hit(S.bh, X(160), 628, 27, 'knee', s);
+    var F = joint(S.g, 'foot' + side(s));
+    el('ellipse', { 'class': 'skf', cx: X(146), cy: 766, rx: 34, ry: 17, stroke: 'none', 'data-id': 'feet', 'data-side': s }, F.sk);
+    el('ellipse', { cx: X(146), cy: 769, rx: 41, ry: 19, fill: '#fff', 'data-id': 'feet', 'data-side': s }, F.cl);
+    el('ellipse', { cx: X(146), cy: 763, rx: 40, ry: 18, fill: '#e5484d', 'data-id': 'feet', 'data-side': s }, F.cl);
+    el('path', { d: 'M' + X(130) + ' 760Q' + X(146) + ' 752 ' + X(162) + ' 760', stroke: '#fff', 'stroke-width': 4, fill: 'none', 'stroke-linecap': 'round' }, F.cl);
+  }
+  buildLeg(0); buildLeg(1);
+
+  // ---- torso ----
+  var T0 = joint(bodyG, 'torso');
+  el('rect', { 'class': 'skf sko', x: 178, y: 156, width: 44, height: 58, rx: 14, 'stroke-width': 3, 'data-id': 'neck' }, T0.sk);
+  el('path', { 'class': 'skf sko', 'stroke-width': 3, d: 'M128 214Q200 190 272 214L290 340Q288 450 272 510L128 510Q112 450 110 340Z' }, T0.sk);
+  el('path', { 'data-id': 'tummy', fill: SHIRT, d: 'M126 212Q200 188 274 212L288 330L286 414Q200 428 114 414L112 330Z' }, T0.cl);
+  el('path', { 'class': 'skf', d: 'M172 200Q200 232 228 200Q200 192 172 200Z' }, T0.cl);
+  el('path', { 'data-id': 'tummy', fill: SHORTS, d: 'M112 408Q200 424 288 408L292 522L206 526L200 486L194 526L108 522Z' }, T0.cl);
+  el('path', { d: 'M114 414Q200 430 286 414', stroke: '#2b3770', 'stroke-width': 5, fill: 'none' }, T0.cl);
+  el('path', { 'data-id': 'tummy', d: 'M200 270L207 286L224 287L211 298L216 314L200 305L184 314L189 298L176 287L193 286Z', fill: '#fff', opacity: 0.95 }, T0.cl);
+  el('circle', { cx: 200, cy: 384, r: 3.5, fill: '#2a86b8', opacity: 0.5 }, T0.cl);
+
+  // ---- arms ----
+  function buildArm(s) {
+    function X(x) { return s ? 400 - x : x; }
+    var A = joint(bodyG, 'arm' + side(s));
+    limb(A.sk, X(128), 228, X(98), 342, 40, 'arm', s);
+    el('path', { d: 'M' + X(128) + ' 228L' + X(116) + ' 278', stroke: SHIRT, 'stroke-width': 52, 'stroke-linecap': 'round', fill: 'none', 'data-id': 'arm', 'data-side': s }, A.cl);
+    hit(A.bh, X(128), 228, 26, 'shoulders', s);
+    var F = joint(A.g, 'fore' + side(s));
+    limb(F.sk, X(98), 342, X(90), 432, 34, 'arm', s);
+    hit(F.bh, X(98), 342, 22, 'elbow', s);
+    var H = joint(F.g, 'hand' + side(s));
+    el('ellipse', { 'class': 'skf sko', cx: X(88), cy: 458, rx: 19, ry: 25, 'stroke-width': 3, 'data-id': 'hand', 'data-side': s }, H.sk);
+    el('ellipse', { 'class': 'skf sko', cx: X(107), cy: 448, rx: 8, ry: 14, 'stroke-width': 3, transform: 'rotate(' + (s ? -22 : 22) + ' ' + X(107) + ' 448)', 'data-id': 'hand', 'data-side': s }, H.sk);
+    [-8, 0, 8].forEach(function (dx) {
+      el('path', { d: 'M' + X(88 + dx) + ' 466L' + X(88 + dx) + ' 478', stroke: '#000', 'stroke-opacity': 0.18, 'stroke-width': 2, 'stroke-linecap': 'round' }, H.sk);
+    });
+    hit(H.bh, X(90), 456, 28, 'hand', s);
+  }
+  buildArm(0); buildArm(1);
+
+  // ---- head ----
+  var HD = joint(bodyG, 'head');
+  var earG = [], eyeLid = [], eyePupil = [], mouthSt = {}, noseG, hairN, mouthHit;
+  [0, 1].forEach(function (s) {
+    function X(x) { return s ? 400 - x : x; }
+    var g = el('g', {}, HD.sk);
+    el('ellipse', { 'class': 'skf sko', cx: X(131), cy: 108, rx: 14, ry: 20, 'stroke-width': 3, 'data-id': 'ears', 'data-side': s }, g);
+    el('ellipse', { 'class': 'skd', cx: X(131), cy: 109, rx: 6, ry: 11 }, g);
+    earG[s] = g;
+  });
+  el('ellipse', { 'class': 'skf sko', cx: 200, cy: 105, rx: 70, ry: 76, 'stroke-width': 3, 'data-id': 'head' }, HD.sk);
+
+  hairN = el('path', { 'class': 'hrf', 'data-id': 'hair', d: 'M126 110C114 50 158 18 202 20C248 20 288 52 274 110C264 78 246 58 216 54C198 76 160 72 142 84C134 92 130 102 126 110Z' }, HD.cl);
+  el('ellipse', { cx: 154, cy: 140, rx: 15, ry: 9, fill: '#ff8fa3', opacity: 0.35 }, HD.cl);
+  el('ellipse', { cx: 246, cy: 140, rx: 15, ry: 9, fill: '#ff8fa3', opacity: 0.35 }, HD.cl);
+  [0, 1].forEach(function (s) {
+    function X(x) { return s ? 400 - x : x; }
+    var ex = X(172), ey = 110;
+    el('ellipse', { cx: ex, cy: ey, rx: 15, ry: 17, fill: '#fff', stroke: '#3b2a1f', 'stroke-width': 2, 'data-id': 'eyes', 'data-side': s }, HD.cl);
+    var pg = el('g', {}, HD.cl);
+    el('circle', { cx: ex, cy: ey, r: 9, fill: '#4a3424' }, pg);
+    el('circle', { cx: ex, cy: ey, r: 4.4, fill: '#16100c' }, pg);
+    el('circle', { cx: ex - 3.5, cy: ey - 4, r: 2.8, fill: '#fff' }, pg);
+    eyePupil[s] = pg;
+    var lid = el('ellipse', { 'class': 'skf', cx: ex, cy: ey, rx: 16, ry: 18.5 }, HD.cl);
+    lid.__cx = ex; lid.__top = ey - 18.5;
+    eyeLid[s] = lid;
+    el('path', { 'class': 'hrs', d: 'M' + (ex - 14) + ' ' + (ey - 26) + 'Q' + ex + ' ' + (ey - 34) + ' ' + (ex + 14) + ' ' + (ey - 25), fill: 'none', 'stroke-width': 5, 'stroke-linecap': 'round' }, HD.cl);
+    hit(HD.bh, ex, ey, 26, 'eyes', s);
+  });
+  noseG = el('g', {}, HD.cl);
+  el('ellipse', { 'class': 'skd', cx: 200, cy: 130, rx: 8, ry: 6 }, noseG);
+  hit(HD.bh, 200, 130, 20, 'nose');
+
+  var mouthG = el('g', {}, HD.cl);
+  mouthSt.smile = el('path', { d: 'M174 152Q200 176 226 152', stroke: '#8b3a3a', 'stroke-width': 5, fill: 'none', 'stroke-linecap': 'round' }, mouthG);
+  mouthSt.ahh = el('g', { display: 'none' }, mouthG);
+  el('ellipse', { cx: 200, cy: 160, rx: 17, ry: 21, fill: '#7a2030' }, mouthSt.ahh);
+  el('ellipse', { cx: 200, cy: 172, rx: 10, ry: 7, fill: '#e56b7f' }, mouthSt.ahh);
+  mouthSt.laugh = el('g', { display: 'none' }, mouthG);
+  el('path', { d: 'M170 148Q200 152 230 148Q228 186 200 188Q172 186 170 148Z', fill: '#7a2030' }, mouthSt.laugh);
+  el('path', { d: 'M176 150L224 150L222 160L178 160Z', fill: '#fff' }, mouthSt.laugh);
+  el('ellipse', { cx: 200, cy: 178, rx: 14, ry: 8, fill: '#e56b7f' }, mouthSt.laugh);
+  hit(HD.bh, 200, 160, 30, 'mouth');
+
+  // ------------------------------------------------------------------
+  // Bones and organs. Each is drawn from left-hand coordinates; a pair is
+  // drawn once and mirrored. The same drawing makes the puzzle piece, the
+  // body part and the little picture on the card.
+  // ------------------------------------------------------------------
+  var ITEMS = {}, ORDER = { bones: [], organs: [] };
+  function item(layer, id, o) {
+    o.id = id; o.layer = layer; o.placed = true; o.nodes = [];
+    ITEMS[id] = o; ORDER[layer].push(id);
+    return o;
+  }
+
+  function ln(p, d, w, extra) {
+    var a = { d: d, fill: 'none', stroke: BONE_D, 'stroke-width': w + 3.2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'class': 'ln' };
+    el('path', a, p);
+    a.stroke = BONE; a['stroke-width'] = w;
+    var n = el('path', a, p);
+    if (extra) { for (var k in extra) { n.setAttribute(k, extra[k]); } }
+    return n;
+  }
+  function bshape(p, tag, attrs) {
+    attrs.fill = attrs.fill || BONE; attrs.stroke = BONE_D; attrs['stroke-width'] = 2.2;
+    return el(tag, attrs, p);
+  }
+  function longBone(p, x1, y1, x2, y2, w) {
+    var dx = x2 - x1, dy = y2 - y1, len = Math.sqrt(dx * dx + dy * dy), nx = -dy / len, ny = dx / len;
+    ln(p, 'M' + x1 + ' ' + y1 + 'L' + x2 + ' ' + y2, w);
+    [[x1, y1], [x2, y2]].forEach(function (e) {
+      [-1, 1].forEach(function (sg) {
+        bshape(p, 'circle', { cx: f(e[0] + nx * sg * w * 0.42), cy: f(e[1] + ny * sg * w * 0.42), r: f(w * 0.62) });
+      });
+    });
+  }
+  function hitLine(p, d, w) { el('path', { d: d, 'class': 'hitl', 'stroke-width': w, 'stroke-linecap': 'round' }, p); }
+  function dark(p, tag, attrs) { attrs['class'] = 'dt'; return el(tag, attrs, p); }
+
+  // ---------- bones ----------
+  item('bones', 'spine', {
+    n: 'Spine', alt: 'Vertebrae', f: 'Your spine is a stack of small bones that lets you bend.',
+    mount: 'torso', c: [200, 310], act: 'rattle', snd: 'clack', count: 33,
+    draw: function (p) {
+      for (var i = 0; i < 17; i++) {
+        var w = 15 + i * 0.95;
+        bshape(p, 'rect', { x: f(200 - w / 2), y: 172 + i * 16.5, width: f(w), height: 12.5, rx: 4 });
+      }
+      bshape(p, 'path', { d: 'M184 452L216 452L207 490L193 490Z' });
+    }
+  });
+  item('bones', 'pelvis', {
+    n: 'Pelvis', f: 'Your pelvis holds up your body and joins your legs to it.',
+    mount: 'torso', c: [200, 478], act: 'rattle', snd: 'clack',
+    draw: function (p) {
+      bshape(p, 'path', { d: 'M128 436C112 468 134 506 176 512L200 484L224 512C266 506 288 468 272 436C252 450 226 454 200 454C174 454 148 450 128 436Z' });
+      dark(p, 'ellipse', { cx: 170, cy: 490, rx: 10, ry: 12, fill: '#4a4132' });
+      dark(p, 'ellipse', { cx: 230, cy: 490, rx: 10, ry: 12, fill: '#4a4132' });
+    }
+  });
+  item('bones', 'ribs', {
+    n: 'Ribs', alt: 'Rib cage', f: 'Your ribs make a cage that guards your heart and lungs.',
+    mount: 'torso', c: [200, 300], act: 'rattle', snd: 'clack', count: 24,
+    draw: function (p) {
+      [-1, 1].forEach(function (sg) {
+        for (var i = 0; i < 12; i++) {
+          var y0 = 224 + i * 13.5;
+          var hw = 30 + 46 * Math.sin(Math.PI * (i + 1) / 13.5);
+          var ex = i < 7 ? 14 : hw * 0.5;
+          var d = 'M' + (200 + sg * 4) + ' ' + f(y0) +
+            'C' + f(200 + sg * hw * 0.8) + ' ' + f(y0 - 8) + ' ' + f(200 + sg * hw * 1.05) + ' ' + f(y0 + 10) + ' ' + f(200 + sg * hw * 0.75) + ' ' + f(y0 + 26) +
+            'S' + f(200 + sg * hw * 0.35) + ' ' + f(y0 + 30) + ' ' + f(200 + sg * ex) + ' ' + f(y0 + 28);
+          ln(p, d, 5.5);
+        }
+      });
+    }
+  });
+  item('bones', 'sternum', {
+    n: 'Breastbone', alt: 'Sternum', f: 'Your breastbone joins your ribs together at the front.',
+    mount: 'torso', c: [200, 268], act: 'rattle', snd: 'clack',
+    draw: function (p) {
+      bshape(p, 'rect', { x: 188, y: 222, width: 24, height: 84, rx: 11 });
+      bshape(p, 'path', { d: 'M193 304L207 304L200 322Z' });
+    }
+  });
+  item('bones', 'clavicle', {
+    n: 'Collarbone', alt: 'Clavicle', f: 'Your collarbones hold your shoulders out wide.',
+    mount: 'torso', pair: true, c: [160, 216], act: 'rattle', snd: 'clack', count: 2,
+    draw: function (p) { ln(p, 'M192 228C176 208 150 206 126 218', 8); }
+  });
+  item('bones', 'skull', {
+    n: 'Skull', f: 'Your skull is a hard helmet for your brain.',
+    mount: 'head', c: [200, 92], act: 'rattle', snd: 'clack',
+    draw: function (p) {
+      bshape(p, 'path', { d: 'M146 96C146 50 170 34 200 34C230 34 254 50 254 96C254 118 246 128 240 138L232 150L168 150L160 138C154 128 146 118 146 96Z' });
+      dark(p, 'ellipse', { cx: 180, cy: 100, rx: 14, ry: 16, fill: '#3a3226' });
+      dark(p, 'ellipse', { cx: 220, cy: 100, rx: 14, ry: 16, fill: '#3a3226' });
+      dark(p, 'path', { d: 'M200 114L192 134L208 134Z', fill: '#3a3226' });
+      dark(p, 'path', { d: 'M174 140L226 140M182 140L182 150M191 140L191 150M200 140L200 150M209 140L209 150M218 140L218 150', stroke: BONE_D, 'stroke-width': 2, fill: '#fff' });
+    }
+  });
+  item('bones', 'jaw', {
+    n: 'Jaw', alt: 'Mandible', f: 'Your jaw is the only bone in your head that moves.',
+    mount: 'head', c: [200, 168], act: 'chatter', snd: 'chatter',
+    draw: function (p) {
+      bshape(p, 'path', { d: 'M168 146L232 146C234 176 218 188 200 188C182 188 166 176 168 146Z' });
+      dark(p, 'path', { d: 'M174 146L226 146L226 156L174 156Z', fill: '#fff', stroke: BONE_D, 'stroke-width': 1.5 });
+    }
+  });
+  item('bones', 'humerus', {
+    n: 'Upper arm bone', alt: 'Humerus', f: 'The humerus is the bone in your upper arm.',
+    mount: 'arm', limb: true, pair: true, c: [113, 286], act: 'rattle', snd: 'clack', move: 'arm', count: 2,
+    draw: function (p) { longBone(p, 128, 238, 99, 334, 13); }
+  });
+  item('bones', 'forearm', {
+    n: 'Forearm bones', alt: 'Radius and ulna', f: 'Two bones in your forearm let your hand twist.',
+    mount: 'fore', limb: true, pair: true, c: [94, 390], act: 'rattle', snd: 'clack', move: 'elbow', count: 4,
+    draw: function (p) { longBone(p, 101, 350, 97, 428, 8); longBone(p, 93, 350, 85, 430, 8); }
+  });
+  item('bones', 'handbones', {
+    n: 'Hand bones', f: 'Each hand has 27 bones.',
+    mount: 'hand', limb: true, pair: true, c: [89, 462], act: 'rattle', snd: 'clack', move: 'hand', count: 54,
+    draw: function (p) {
+      [[86, 441, 5], [94, 441, 5.5], [90, 448, 5]].forEach(function (c) { bshape(p, 'circle', { cx: c[0], cy: c[1], r: c[2] }); });
+      [-26, -13, 0, 13, 26, 62].forEach(function (a, i) {
+        var r = a * Math.PI / 180, sx = Math.sin(r), cy = Math.cos(r);
+        var len = i === 5 ? [10, 9] : [15, 12, 9];
+        var bx = i === 5 ? 96 : 90, by = i === 5 ? 446 : 452, d = 'M' + bx + ' ' + by, x = bx, y = by, pts = [];
+        len.forEach(function (l) { x += sx * l; y += cy * l; pts.push([x, y]); d += 'L' + f(x) + ' ' + f(y); });
+        ln(p, d, 4.5);
+        pts.forEach(function (q) { bshape(p, 'circle', { cx: f(q[0]), cy: f(q[1]), r: 3.2 }); });
+      });
+    }
+  });
+  item('bones', 'femur', {
+    n: 'Thigh bone', alt: 'Femur', f: 'Your thigh bone is the longest, strongest bone you have.',
+    mount: 'thigh', limb: true, pair: true, c: [164, 560], act: 'rattle', snd: 'clack', move: 'legs', count: 2,
+    draw: function (p) { longBone(p, 166, 502, 162, 620, 16); }
+  });
+  item('bones', 'kneecap', {
+    n: 'Kneecap', alt: 'Patella', f: 'Your kneecap guards your knee joint.',
+    mount: 'shin', limb: true, pair: true, c: [160, 632], act: 'rattle', snd: 'clack', move: 'knee', count: 2,
+    draw: function (p) { bshape(p, 'path', { d: 'M147 626C147 618 173 618 173 626C173 640 166 648 160 648C154 648 147 640 147 626Z' }); }
+  });
+  item('bones', 'tibia', {
+    n: 'Shin bone', alt: 'Tibia', f: 'The tibia carries your weight, with the thin fibula beside it.',
+    mount: 'shin', limb: true, pair: true, c: [153, 694], act: 'rattle', snd: 'clack', move: 'knee', count: 4,
+    draw: function (p) { longBone(p, 160, 654, 157, 736, 12); longBone(p, 145, 654, 143, 734, 6); }
+  });
+  item('bones', 'footbones', {
+    n: 'Foot bones', f: 'Each foot has 26 bones.',
+    mount: 'foot', limb: true, pair: true, c: [135, 764], act: 'rattle', snd: 'clack', move: 'foot', count: 52,
+    draw: function (p) {
+      [[154, 750, 7], [147, 757, 6.5], [159, 758, 6]].forEach(function (c) { bshape(p, 'circle', { cx: c[0], cy: c[1], r: c[2] }); });
+      [[108, 768], [111, 774], [117, 780], [127, 784], [139, 786]].forEach(function (e) {
+        ln(p, 'M148 762L' + e[0] + ' ' + e[1], 5.5);
+        bshape(p, 'circle', { cx: e[0], cy: e[1], r: 3.4 });
+      });
+    }
+  });
+
+  // ---------- organs ----------
+  function bean(p, fill) {
+    el('path', { d: 'M2 -22C16 -20 20 -2 14 12C10 24 -4 26 -8 16C-6 10 -6 4 -10 -2C-14 -12 -8 -22 2 -22Z', fill: fill, stroke: '#6e2432', 'stroke-width': 2 }, p);
+    el('path', { d: 'M-4 -12C-8 -2 -2 6 0 14', fill: 'none', stroke: '#fff', 'stroke-opacity': 0.3, 'stroke-width': 3, 'stroke-linecap': 'round', 'class': 'dt' }, p);
+  }
+  item('organs', 'kidneys', {
+    n: 'Kidneys', f: 'Your kidneys clean your blood and make wee.',
+    mount: 'torso', c: [200, 392], act: 'squeeze', snd: 'blop', count: 2,
+    draw: function (p) {
+      var a = el('g', { transform: 'translate(138 392) rotate(14)' }, p); bean(a, '#9a3d4e');
+      var b = el('g', { transform: 'translate(262 392) scale(-1 1) rotate(14)' }, p); bean(b, '#9a3d4e');
+    }
+  });
+  item('organs', 'large', {
+    n: 'Large intestine', alt: 'Colon', f: 'The large intestine soaks up water from leftovers.',
+    mount: 'torso', c: [200, 420], act: 'wriggle', snd: 'gurgle',
+    draw: function (p) {
+      var d = 'M168 466L158 466L158 380L242 380L242 466L232 466C226 474 212 462 206 470';
+      ln(p, d, 17).setAttribute('stroke', '#e0b04c');
+      p.lastChild.previousSibling.setAttribute('stroke', '#a87a1f');
+      el('path', { d: d, fill: 'none', stroke: '#fff', 'stroke-opacity': 0.4, 'stroke-width': 17, 'stroke-dasharray': '2 11', 'class': 'ln dt' }, p);
+      hitLine(p, d, 30);
+    }
+  });
+  item('organs', 'small', {
+    n: 'Small intestine', f: 'The small intestine takes the goodness from your food.',
+    mount: 'torso', c: [200, 424], act: 'wriggle', snd: 'gurgle',
+    draw: function (p) {
+      var d = 'M178 398Q200 388 224 398Q234 408 216 412Q190 416 178 412Q166 420 184 426Q210 430 226 428Q238 438 218 442Q196 446 180 442Q168 450 188 454Q210 456 224 452';
+      ln(p, d, 11);
+      p.lastChild.setAttribute('stroke', '#f27f9a'); p.lastChild.previousSibling.setAttribute('stroke', '#a8405c');
+      hitLine(p, d, 24);
+    }
+  });
+  item('organs', 'bladder', {
+    n: 'Bladder', f: 'Your bladder holds wee until you go to the toilet.',
+    mount: 'torso', c: [200, 488], act: 'fill', snd: 'drip',
+    draw: function (p) {
+      el('path', { d: 'M200 470C216 470 220 484 218 494C216 504 208 508 200 508C192 508 184 504 182 494C180 484 184 470 200 470Z', fill: '#f2d96b', stroke: '#a08a1f', 'stroke-width': 2 }, p);
+      el('path', { 'class': 'dt', d: 'M192 482Q190 492 194 498', fill: 'none', stroke: '#fff', 'stroke-opacity': 0.6, 'stroke-width': 3, 'stroke-linecap': 'round' }, p);
+    }
+  });
+  item('organs', 'liver', {
+    n: 'Liver', f: 'Your liver cleans your blood and helps with your food.',
+    mount: 'torso', c: [170, 356], act: 'wobble', snd: 'blop',
+    draw: function (p) {
+      el('path', { d: 'M120 340C150 328 190 332 218 342C226 354 218 374 200 378C170 382 140 368 120 340Z', fill: '#a8523a', stroke: '#5f2a1b', 'stroke-width': 2 }, p);
+      el('path', { 'class': 'dt', d: 'M132 346C156 340 184 342 206 350', fill: 'none', stroke: '#fff', 'stroke-opacity': 0.25, 'stroke-width': 4, 'stroke-linecap': 'round' }, p);
+    }
+  });
+  item('organs', 'stomach', {
+    n: 'Stomach', f: 'Your stomach mashes food into a soup.',
+    mount: 'torso', c: [244, 364], act: 'squish', snd: 'gurgle',
+    draw: function (p) {
+      el('path', { d: 'M222 340C250 330 274 346 268 374C264 396 236 400 224 388C216 380 226 376 232 376C244 374 248 362 238 356C228 352 220 350 222 340Z', fill: '#f0a56f', stroke: '#a85b2a', 'stroke-width': 2 }, p);
+      el('path', { 'class': 'dt', d: 'M250 346C262 350 264 362 260 372', fill: 'none', stroke: '#fff', 'stroke-opacity': 0.4, 'stroke-width': 4, 'stroke-linecap': 'round' }, p);
+    }
+  });
+  item('organs', 'foodpipe', {
+    n: 'Food pipe', alt: 'Oesophagus', f: 'Food slides down this tube to your stomach.',
+    mount: 'torso', c: [214, 262], act: 'swallow', snd: 'gulp',
+    draw: function (p) {
+      var d = 'M206 172L206 236Q210 280 226 310Q232 326 232 346';
+      ln(p, d, 9);
+      p.lastChild.setAttribute('stroke', '#e07c7c'); p.lastChild.previousSibling.setAttribute('stroke', '#a64343');
+      hitLine(p, d, 26);
+    }
+  });
+  item('organs', 'windpipe', {
+    n: 'Windpipe', alt: 'Trachea', f: 'Air goes down your windpipe to your lungs.',
+    mount: 'torso', c: [200, 214], act: 'air', snd: 'whoosh',
+    draw: function (p) {
+      var d = 'M194 168L194 236M194 236L170 264M194 236L218 262';
+      ln(p, d, 12);
+      p.lastChild.setAttribute('stroke', '#9cc3d6'); p.lastChild.previousSibling.setAttribute('stroke', '#5f8aa3');
+      el('path', { 'class': 'ln dt', d: 'M194 172L194 232', fill: 'none', stroke: '#fff', 'stroke-opacity': 0.55, 'stroke-width': 12, 'stroke-dasharray': '2.5 6' }, p);
+      hitLine(p, d, 28);
+    }
+  });
+  item('organs', 'lungs', {
+    n: 'Lungs', f: 'Your lungs take air in and put oxygen into your blood.',
+    mount: 'torso', c: [200, 275], act: 'breathe', snd: 'breath', count: 2,
+    draw: function (p) {
+      var lung = 'M192 228C170 218 138 232 132 270C126 305 134 334 158 332C180 330 190 314 192 292Z';
+      [0, 1].forEach(function (s) {
+        var g = el('g', s ? { transform: 'translate(400 0) scale(-1 1)' } : {}, p);
+        el('path', { d: lung, fill: '#f1a3b8', stroke: '#a8506a', 'stroke-width': 2.2 }, g);
+        el('path', { 'class': 'dt', d: 'M186 246L160 272M160 272L150 298M160 272L172 302', fill: 'none', stroke: '#c97088', 'stroke-width': 3, 'stroke-linecap': 'round' }, g);
+      });
+    }
+  });
+  item('organs', 'heart', {
+    n: 'Heart', f: 'Your heart is a muscle that pumps blood all round your body.',
+    mount: 'torso', c: [214, 292], act: 'beat', snd: 'thump',
+    draw: function (p) {
+      var g = el('g', { transform: 'translate(214 292) rotate(-12) scale(1.45)' }, p);
+      el('path', { 'class': 'dt', d: 'M-4 -17Q-6 -33 8 -32', fill: 'none', stroke: '#b62d3f', 'stroke-width': 7, 'stroke-linecap': 'round' }, g);
+      el('path', { 'class': 'dt', d: 'M9 -17Q16 -30 25 -26', fill: 'none', stroke: '#4a74c9', 'stroke-width': 7, 'stroke-linecap': 'round' }, g);
+      el('path', { d: 'M0 22C-26 4 -26 -20 -8 -20C-2 -20 0 -14 0 -10C0 -14 4 -20 10 -20C28 -20 28 4 0 22Z', fill: '#d9364f', stroke: '#7f1426', 'stroke-width': 2 }, g);
+      el('path', { 'class': 'dt', d: 'M-15 -8C-17 -14 -12 -16 -9 -14', fill: 'none', stroke: '#fff', 'stroke-opacity': 0.5, 'stroke-width': 3, 'stroke-linecap': 'round' }, g);
+    }
+  });
+  item('organs', 'brain', {
+    n: 'Brain', f: 'Your brain thinks, remembers and controls your body.',
+    mount: 'head', c: [200, 72], act: 'think', snd: 'think',
+    draw: function (p) {
+      el('path', { d: 'M200 44C175 36 150 46 148 66C140 78 150 98 172 100C182 108 196 106 200 100C204 106 218 108 228 100C250 98 260 78 252 66C250 46 225 36 200 44Z', fill: '#f3a6c0', stroke: '#a8506a', 'stroke-width': 2.4 }, p);
+      el('path', { 'class': 'dt', d: 'M200 46L200 100M166 56C176 60 178 70 170 74M232 56C224 60 222 70 230 74M160 84C170 82 178 88 176 96M240 84C230 82 222 88 224 96M184 70C190 76 192 84 188 90M216 70C210 76 208 84 212 90', fill: 'none', stroke: '#c9708f', 'stroke-width': 3, 'stroke-linecap': 'round' }, p);
+    }
+  });
+
+  // mount every item into the figure
+  function drawPiece(parent, it) {
+    var g = el('g', {}, parent);
+    (it.pair ? [0, 1] : [0]).forEach(function (s) {
+      var h = s ? el('g', { transform: 'translate(400 0) scale(-1 1)' }, g) : g;
+      it.draw(h);
+    });
+    return g;
+  }
+  function mountAll() {
+    Object.keys(ITEMS).forEach(function (id) {
+      var it = ITEMS[id];
+      (it.pair ? [0, 1] : [0]).forEach(function (s) {
+        var j = it.limb ? jn(it.mount, s) : M[it.mount];
+        var host = it.layer === 'bones' ? j.bn : j.og;
+        var node = el('g', { 'data-id': id, 'data-side': s }, host);
+        var inner = s ? el('g', { transform: 'translate(400 0) scale(-1 1)' }, node) : node;
+        it.draw(inner);
+        node.__c = [s ? 400 - it.c[0] : it.c[0], it.c[1]];
+        it.nodes.push(node);
+      });
+    });
+  }
+  mountAll();
+
+  // measure every drawing once, for pieces and for the card picture
+  (function () {
+    var meas = el('g', { visibility: 'hidden' }, stage);
+    Object.keys(ITEMS).forEach(function (id) {
+      var it = ITEMS[id], g = drawPiece(meas, it), b = g.getBBox();
+      it.bb = { x: b.x, y: b.y, w: Math.max(b.width, 1), h: Math.max(b.height, 1) };
+      it.mid = [it.pair ? 200 : it.c[0], it.c[1]];
+      clear(g); meas.removeChild(g);
+    });
+    stage.removeChild(meas);
+  })();
+
+  // ------------------------------------------------------------------
+  // Things you can tap on the outside
+  // ------------------------------------------------------------------
+  var PARTS = {
+    hair:      { n: 'Hair', f: 'Hair keeps your head warm.', snd: 'swish', dur: 900 },
+    head:      { n: 'Head', f: 'Your head holds your brain, eyes, ears, nose and mouth.', snd: 'boop', dur: 1200 },
+    eyes:      { n: 'Eyes', f: 'Your eyes catch light so you can see.', snd: 'blink', dur: 1700, count: 2 },
+    ears:      { n: 'Ears', f: 'Your ears catch sounds and help you balance.', snd: 'wiggle', dur: 1100, count: 2 },
+    nose:      { n: 'Nose', f: 'Your nose helps you smell and taste.', snd: 'sniff', dur: 900 },
+    mouth:     { n: 'Mouth', f: 'Your mouth is for eating, talking and smiling.', snd: 'ahh', dur: 1200 },
+    neck:      { n: 'Neck', f: 'Your neck holds your head up and lets it turn.', snd: 'boop', dur: 1300 },
+    shoulders: { n: 'Shoulders', f: 'Shoulders let your arms swing all the way round.', snd: 'swish', dur: 800, count: 2 },
+    arm:       { n: 'Arm', f: 'Your arms can reach, lift and wave.', snd: 'swish', dur: 1900, count: 2 },
+    elbow:     { n: 'Elbow', f: 'Your elbow is where your arm bends.', snd: 'boop', dur: 1400, count: 2 },
+    hand:      { n: 'Hand', f: 'Each hand has five fingers.', snd: 'wiggle', dur: 1500, count: 2 },
+    tummy:     { n: 'Tummy', f: 'Your tummy holds your stomach and intestines.', snd: 'giggle', dur: 1500 },
+    legs:      { n: 'Leg', f: 'Strong legs help you run and jump.', snd: 'swish', dur: 1400, count: 2 },
+    knee:      { n: 'Knee', f: 'Your knees bend so you can sit and kneel.', snd: 'boop', dur: 1300, count: 2 },
+    feet:      { n: 'Foot', f: 'Your feet carry you everywhere.', snd: 'tap', dur: 1300, count: 2 }
+  };
+  function info(id) { return PARTS[id] || ITEMS[id]; }
+
+  // ------------------------------------------------------------------
+  // Movement. Each frame the pose starts from rest and every running
+  // motion adds to it, so nothing can get stuck bent.
+  // ------------------------------------------------------------------
+  function env(p) { return Math.sin(Math.PI * p); }
+  function sm(p) { return p <= 0 ? 0 : p >= 1 ? 1 : p * p * (3 - 2 * p); }
+  function seg(p, a, b) { return sm((p - a) / (b - a)); }
+  function hold(p, a, b, c, d) { return seg(p, a, b) * (1 - seg(p, c, d)); }
+  function pulse(ph) {
+    if (ph < 0.2) { return Math.sin(Math.PI * ph / 0.2); }
+    if (ph >= 0.28 && ph < 0.46) { return 0.7 * Math.sin(Math.PI * (ph - 0.28) / 0.18); }
+    return 0;
+  }
+
+  function newPose() {
+    return { arm: [0, 0], fore: [0, 0], hand: [0, 0], thigh: [0, 0], shin: [0, 0], foot: [0, 0],
+      head: 0, shrug: 0, ear: [0, 0], lid: 0, nose: 0, hair: 0, bx: 0, by: 0, bounce: 0, mouth: 'smile', lookX: 0 };
+  }
+
+  var MOT = {
+    blink: function (P, p) { P.lid = env(p); },
+    hair: function (P, p) { P.hair = Math.sin(p * Math.PI * 6) * 6 * (1 - p); },
+    head: function (P, p) { P.head = Math.sin(p * Math.PI * 4) * 9; },
+    eyes: function (P, p) {
+      P.lid = p < 0.45 ? Math.abs(Math.sin(p / 0.45 * Math.PI * 2)) : 0;
+      P.lookX = p > 0.5 ? Math.sin((p - 0.5) / 0.5 * Math.PI * 2) : 0;
+    },
+    ears: function (P, p) { var a = Math.sin(p * Math.PI * 8) * 14 * (1 - p); P.ear[0] = a; P.ear[1] = a; },
+    nose: function (P, p) { P.nose = Math.abs(Math.sin(p * Math.PI * 3)) * 0.3; },
+    mouth: function (P, p) { P.mouth = p < 0.9 ? 'ahh' : 'smile'; },
+    neck: function (P, p) { P.head = Math.sin(p * Math.PI * 2) * 14; },
+    shoulders: function (P, p) { P.shrug = hold(p, 0, 0.25, 0.7, 1) * 18; },
+    arm: function (P, p, s) {
+      var up = hold(p, 0, 0.2, 0.8, 1);
+      P.arm[s] = 125 * up; P.fore[s] = Math.sin(p * Math.PI * 6) * 24 * up;
+    },
+    elbow: function (P, p, s) { P.fore[s] = -125 * hold(p, 0, 0.3, 0.7, 1); P.arm[s] = 25 * hold(p, 0, 0.3, 0.7, 1); },
+    hand: function (P, p, s) {
+      var up = hold(p, 0, 0.2, 0.85, 1);
+      P.arm[s] = 40 * up; P.fore[s] = -50 * up; P.hand[s] = Math.sin(p * Math.PI * 8) * 30 * up;
+    },
+    tummy: function (P, p) {
+      var w = Math.sin(p * Math.PI * 10) * (1 - p);
+      P.bx = w * 0.05; P.by = -w * 0.03; P.bounce = w * 3; P.mouth = 'laugh';
+    },
+    legs: function (P, p, s) { var up = hold(p, 0, 0.25, 0.75, 1); P.thigh[s] = 38 * up; P.shin[s] = Math.sin(p * Math.PI * 4) * 20 * up; },
+    knee: function (P, p, s) { P.shin[s] = 55 * Math.abs(Math.sin(p * Math.PI * 2)); },
+    foot: function (P, p, s) { P.foot[s] = Math.sin(p * Math.PI * 6) * 28 * (1 - p * 0.3); }
+  };
+  MOT.feet = MOT.foot;
+
+  var FX = {
+    beat:    function (p) { var s = 1 + 0.24 * pulse((p * 3) % 1); return [0, 0, 0, s, s]; },
+    breathe: function (p) { var b = env(p) * (0.5 - 0.5 * Math.cos(p * Math.PI * 4)); return [0, 0, 0, 1 + 0.16 * b, 1 + 0.1 * b]; },
+    squish:  function (p) { var w = Math.sin(p * Math.PI * 8) * (1 - p) * 0.14; return [0, 0, 0, 1 + w, 1 - w * 0.9]; },
+    wobble:  function (p) { var w = (1 - p); return [0, 0, Math.sin(p * Math.PI * 8) * w * 7, 1, 1 + Math.sin(p * Math.PI * 8 + 1) * w * 0.06]; },
+    think:   function (p) { var s = 1 + 0.1 * Math.pow(Math.sin(p * Math.PI * 3), 2); return [0, 0, Math.sin(p * Math.PI * 4) * 3 * (1 - p), s, s]; },
+    wriggle: function (p) { var w = Math.sin(p * Math.PI * 10) * (1 - p) * 0.08; return [0, 0, Math.sin(p * Math.PI * 6) * (1 - p) * 3, 1 + w, 1 - w]; },
+    squeeze: function (p) { var w = Math.abs(Math.sin(p * Math.PI * 4)) * 0.14 * env(p) * 1.4; return [0, 0, 0, 1 - w, 1 + w * 0.8]; },
+    fill:    function (p) { var s = 1 + 0.3 * env(p); return [0, 0, 0, s, s]; },
+    air:     function (p) { var w = Math.sin(p * Math.PI * 4) * env(p) * 0.1; return [0, 0, 0, 1 + w, 1 + w * 0.8]; },
+    swallow: function (p) { var e = env(p); return [0, e * 3, 0, 1 - 0.2 * e, 1 + 0.06 * e]; },
+    rattle:  function (p) { var w = 1 - p; return [Math.sin(p * Math.PI * 30) * 3 * w, 0, Math.sin(p * Math.PI * 22) * 5 * w, 1, 1]; },
+    chatter: function (p) { return [0, Math.abs(Math.sin(p * Math.PI * 5)) * 17, 0, 1, 1]; },
+    pop:     function (p) { var s = 1 + 0.35 * env(p) * (1 - p); return [0, 0, 0, s, s]; }
+  };
+  var FXDUR = { beat: 2400, breathe: 2800, squish: 1300, wobble: 1200, think: 1500, wriggle: 1500,
+    squeeze: 1400, fill: 1400, air: 1300, swallow: 1100, rattle: 650, chatter: 700, pop: 450 };
+
+  var motions = [], tweens = [], prevTF = {};
+  var nextBlink = 0, hello = 0;
+  var look = { x: 0, y: 0, tx: 0, ty: 0 };
+
+  function startMotion(id, s, now) {
+    if (reduced) { return; }
+    var pt = PARTS[id], it = ITEMS[id];
+    if (pt && MOT[id]) { motions.push({ fn: MOT[id], t0: now, dur: pt.dur, side: s }); }
+    if (it) {
+      motions.push({ item: id, kind: it.act, t0: now, dur: FXDUR[it.act] });
+      if (it.move && MOT[it.move]) { motions.push({ fn: MOT[it.move], t0: now, dur: (PARTS[it.move] || {}).dur || 1300, side: s }); }
+    }
+    while (motions.length > 7) { motions.shift(); }
+  }
+
+  function setTf(node, str) {
+    if (node.__t === str) { return; }
+    node.__t = str;
+    if (str) { node.setAttribute('transform', str); } else { node.removeAttribute('transform'); }
+  }
+  function itemTf(it, v) {
+    it.nodes.forEach(function (n) {
+      if (!v) { setTf(n, ''); return; }
+      var c = n.__c, flip = (n.getAttribute('data-side') === '1') ? -1 : 1;
+      setTf(n, 'translate(' + f(c[0] + v[0] * flip) + ' ' + f(c[1] + v[1]) + ') rotate(' + f(v[2] * flip) + ') scale(' + f(v[3]) + ' ' + f(v[4]) + ') translate(' + f(-c[0]) + ' ' + f(-c[1]) + ')');
+    });
+  }
+
+  function applyPose(P) {
+    for (var s = 0; s < 2; s++) {
+      var sg = s ? -1 : 1;
+      setTf(jn('arm', s).g, 'translate(0 ' + f(P.bounce - P.shrug) + ') rotate(' + f(sg * P.arm[s]) + ' ' + pivot('arm', s) + ')');
+      setTf(jn('fore', s).g, 'rotate(' + f(sg * P.fore[s]) + ' ' + pivot('fore', s) + ')');
+      setTf(jn('hand', s).g, 'rotate(' + f(sg * P.hand[s]) + ' ' + pivot('hand', s) + ')');
+      setTf(jn('thigh', s).g, 'rotate(' + f(sg * P.thigh[s]) + ' ' + pivot('thigh', s) + ')');
+      setTf(jn('shin', s).g, 'rotate(' + f(sg * P.shin[s]) + ' ' + pivot('shin', s) + ')');
+      setTf(jn('foot', s).g, 'rotate(' + f(sg * P.foot[s]) + ' ' + pivot('foot', s) + ')');
+      setTf(earG[s], 'rotate(' + f((s ? -1 : 1) * P.ear[s]) + ' ' + (s ? 262 : 138) + ' 108)');
+      var lid = eyeLid[s], k = Math.max(P.lid, 0.001);
+      setTf(lid, 'translate(' + lid.__cx + ' ' + lid.__top + ') scale(1 ' + f(k) + ') translate(' + (-lid.__cx) + ' ' + (-lid.__top) + ')');
+      setTf(eyePupil[s], 'translate(' + f(look.x * 5 + P.lookX * 4) + ' ' + f(look.y * 4) + ')');
+    }
+    setTf(M.torso.g, 'translate(0 ' + f(P.bounce) + ') translate(200 330) scale(' + f(1 + P.bx) + ' ' + f(1 + P.by) + ') translate(-200 -330)');
+    setTf(M.head.g, 'translate(0 ' + f(P.bounce) + ') rotate(' + f(P.head) + ' 200 182)');
+    setTf(hairN, 'rotate(' + f(P.hair) + ' 200 40)');
+    setTf(noseG, 'translate(200 130) scale(' + f(1 + P.nose) + ') translate(-200 -130)');
+    ['smile', 'ahh', 'laugh'].forEach(function (k) {
+      var want = P.mouth === k ? '' : 'none';
+      if (mouthSt[k].__d !== want) { mouthSt[k].__d = want; if (want) { mouthSt[k].setAttribute('display', 'none'); } else { mouthSt[k].removeAttribute('display'); } }
+    });
+  }
+
+  // ------------------------------------------------------------------
+  // The frame loop runs only while something is moving.
+  // ------------------------------------------------------------------
+  var rafId = 0;
+  var layer = 'body', mode = 'explore';
+  var W = 800, H = 600, land = true;
+  var view = { s: 1, tx: 0, ty: 0 }, viewTo = { s: 1, tx: 0, ty: 0 }, viewAnim = null;
+  var parts = [];
+
+  function idleOn() { return !reduced && (layer === 'organs' || layer === 'body'); }
+  function kick() { if (!rafId) { rafId = requestAnimationFrame(frame); } }
+
+  function frame(now) {
+    rafId = 0;
+    var P = newPose(), TF = {}, i;
+
+    // tweens (pieces gliding, popping in)
+    for (i = tweens.length - 1; i >= 0; i--) {
+      var tw = tweens[i], q = clamp((now - tw.t0) / tw.dur, 0, 1);
+      tw.fn(q);
+      if (q >= 1) { tweens.splice(i, 1); if (tw.done) { tw.done(); } }
+    }
+    if (viewAnim) {
+      var vq = clamp((now - viewAnim.t0) / 420, 0, 1), e = sm(vq);
+      view.s = viewAnim.a.s + (viewTo.s - viewAnim.a.s) * e;
+      view.tx = viewAnim.a.tx + (viewTo.tx - viewAnim.a.tx) * e;
+      view.ty = viewAnim.a.ty + (viewTo.ty - viewAnim.a.ty) * e;
+      if (vq >= 1) { viewAnim = null; }
+      applyView();
+    }
+
+    if (idleOn()) {
+      if (layer === 'body') {
+        var br = Math.sin(now / 900) * 0.006; P.bx = br; P.by = br;
+        if (now > nextBlink) { motions.push({ fn: MOT.blink, t0: now, dur: 230 }); nextBlink = now + 2500 + Math.random() * 3500; }
+      } else {
+        var ph = (now % 860) / 860, hb = 1 + 0.07 * pulse(ph), bl = Math.sin(now / 640);
+        if (ITEMS.heart.placed) { TF.heart = [0, 0, 0, hb, hb]; }
+        if (ITEMS.lungs.placed) { TF.lungs = [0, 0, 0, 1 + 0.025 * bl, 1 + 0.02 * bl]; }
+      }
+    }
+    if (hello && now > hello) {
+      hello = 0;
+      if (layer === 'body' && !reduced) { motions.push({ fn: MOT.arm, t0: now, dur: 2200, side: 1 }); }
+    }
+
+    for (i = motions.length - 1; i >= 0; i--) {
+      var m = motions[i], p = (now - m.t0) / m.dur;
+      if (p >= 1) { motions.splice(i, 1); continue; }
+      if (m.fn) { m.fn(P, p, m.side || 0); }
+      if (m.item) { TF[m.item] = FX[m.kind](p); }
+    }
+
+    // eyes drift towards where the last finger was
+    look.x += (look.tx - look.x) * 0.12; look.y += (look.ty - look.y) * 0.12;
+
+    applyPose(P);
+    var seen = {}, id;
+    for (id in TF) { seen[id] = true; itemTf(ITEMS[id], TF[id]); }
+    for (id in prevTF) { if (!seen[id]) { itemTf(ITEMS[id], null); } }
+    prevTF = seen;
+
+    drawConfetti();
+
+    if (motions.length || tweens.length || viewAnim || parts.length || idleOn() ||
+        Math.abs(look.x - look.tx) > 0.01 || Math.abs(look.y - look.ty) > 0.01) {
+      kick();
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Confetti, on its own canvas so the figure is never repainted for it
+  // ------------------------------------------------------------------
+  var cv = document.getElementById('fx'), cx2 = cv.getContext('2d');
+  var CONF = ['#ff6b86', '#ffd24d', '#5fd0ff', '#8be07a', '#c58cff', '#ff9a4d'];
+  function sizeCanvas() {
+    var d = Math.min(window.devicePixelRatio || 1, 2);
+    cv.width = Math.round(W * d); cv.height = Math.round(H * d);
+    cv.style.width = W + 'px'; cv.style.height = H + 'px';
+    cx2.setTransform(d, 0, 0, d, 0, 0);
+  }
+  function burst(n) {
+    if (reduced || parts.length > 160) { return; }
+    for (var i = 0; i < n; i++) {
+      parts.push({ x: W * (0.15 + Math.random() * 0.7), y: H * 0.3, vx: (Math.random() - 0.5) * 7, vy: -Math.random() * 8 - 2,
+        r: 5 + Math.random() * 6, c: CONF[i % CONF.length], a: Math.random() * 6, va: (Math.random() - 0.5) * 0.3, life: 1 });
+    }
+    kick();
+  }
+  var confWas = 0;
+  function drawConfetti() {
+    if (!parts.length) { if (confWas) { cx2.clearRect(0, 0, W, H); confWas = 0; } return; }
+    confWas = 1;
+    cx2.clearRect(0, 0, W, H);
+    for (var i = parts.length - 1; i >= 0; i--) {
+      var q = parts[i];
+      q.vy += 0.22; q.x += q.vx; q.y += q.vy; q.a += q.va; q.life -= 0.0075;
+      if (q.life <= 0 || q.y > H + 20) { parts.splice(i, 1); continue; }
+      cx2.save(); cx2.translate(q.x, q.y); cx2.rotate(q.a); cx2.globalAlpha = Math.min(1, q.life * 2);
+      cx2.fillStyle = q.c; cx2.fillRect(-q.r / 2, -q.r / 2, q.r, q.r * 0.6); cx2.restore();
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Layout: the figure on one side, the card or the tray on the other
+  // ------------------------------------------------------------------
+  var UI = {}, area = { x: 0, y: 0, w: 100, h: 100 }, panel = { x: 0, y: 0, w: 100, h: 100 };
+  var FOCUS = { body: [-10, 800], bones: [0, 800], organs: [8, 534] };
+
+  var ICONS = {
+    body: '<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="18" fill="#ffd9a8" stroke="#a8683a" stroke-width="2.5"/><circle cx="17.5" cy="21" r="2.6" fill="#3b2a1f"/><circle cx="30.5" cy="21" r="2.6" fill="#3b2a1f"/><path d="M15 29Q24 38 33 29" fill="none" stroke="#a8383a" stroke-width="3" stroke-linecap="round"/></svg>',
+    bones: '<svg viewBox="0 0 48 48"><g transform="rotate(-40 24 24)"><rect x="8" y="21" width="32" height="6" rx="3" fill="#f4ecd6" stroke="#a8946a" stroke-width="2"/><circle cx="8" cy="20" r="4.4" fill="#f4ecd6" stroke="#a8946a" stroke-width="2"/><circle cx="8" cy="28" r="4.4" fill="#f4ecd6" stroke="#a8946a" stroke-width="2"/><circle cx="40" cy="20" r="4.4" fill="#f4ecd6" stroke="#a8946a" stroke-width="2"/><circle cx="40" cy="28" r="4.4" fill="#f4ecd6" stroke="#a8946a" stroke-width="2"/></g></svg>',
+    organs: '<svg viewBox="0 0 48 48"><path d="M24 41C6 28 8 12 18 11C22 11 24 14 24 16C24 14 26 11 30 11C40 12 42 28 24 41Z" fill="#e0405a" stroke="#8a1a30" stroke-width="2.5" stroke-linejoin="round"/><path d="M14 18C14 15 17 14 19 15" fill="none" stroke="#fff" stroke-opacity=".6" stroke-width="2.5" stroke-linecap="round"/></svg>',
+    explore: '<svg viewBox="0 0 48 48"><circle cx="20" cy="20" r="11" fill="#dff3ff" stroke="#2a5d8f" stroke-width="3.2"/><path d="M28.5 28.5L40 40" stroke="#2a5d8f" stroke-width="5" stroke-linecap="round"/><path d="M15 17Q17 13 21 13" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/></svg>',
+    build: '<svg viewBox="0 0 48 48"><path d="M8 14H19C19 8 29 8 29 14H40V25C34 25 34 35 40 35V42H8Z" fill="#7bd36b" stroke="#2f7a2a" stroke-width="2.6" stroke-linejoin="round"/></svg>',
+    sound: '<svg viewBox="0 0 48 48"><path d="M8 19H15L25 11V37L15 29H8Z" fill="#5a6fa0"/><path d="M31 18Q36 24 31 30M35 13Q43 24 35 35" fill="none" stroke="#5a6fa0" stroke-width="3" stroke-linecap="round"/></svg>',
+    mute: '<svg viewBox="0 0 48 48"><path d="M8 19H15L25 11V37L15 29H8Z" fill="#9aa3bd"/><path d="M31 18L43 30M43 18L31 30" fill="none" stroke="#c0414f" stroke-width="3.6" stroke-linecap="round"/></svg>',
+    facts: '<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="18" fill="#dbe6ff" stroke="#4a67b5" stroke-width="3"/><circle cx="24" cy="15" r="2.8" fill="#4a67b5"/><rect x="21.2" y="21" width="5.6" height="14" rx="2.6" fill="#4a67b5"/></svg>',
+    again: '<svg viewBox="0 0 48 48"><path d="M38 24A14 14 0 1 1 30 11.5" fill="none" stroke="#5a4300" stroke-width="5" stroke-linecap="round"/><path d="M29 3L40 11L28 18Z" fill="#5a4300"/></svg>'
+  };
+
+  function makeBtn(act, icon, small) {
+    var b = document.createElement('button');
+    b.className = 'btn' + (small ? ' small' : '');
+    b.setAttribute('data-act', act);
+    b.setAttribute('aria-label', act.replace(':', ' '));
+    b.innerHTML = ICONS[icon];
+    document.body.appendChild(b);
+    UI[act] = b;
+    return b;
+  }
+  makeBtn('layer:body', 'body'); makeBtn('layer:bones', 'bones'); makeBtn('layer:organs', 'organs');
+  makeBtn('mode:explore', 'explore'); makeBtn('mode:build', 'build');
+  makeBtn('sound', muted ? 'mute' : 'sound', true); makeBtn('facts', 'facts', true);
+  UI.again = document.getElementById('again');
+  UI.again.innerHTML = ICONS.again;
+  UI.card = document.getElementById('card'); UI.dots = document.getElementById('dots'); UI.tip = document.getElementById('tip');
+
+  SKINS.forEach(function (k, i) {
+    var d = document.createElement('button');
+    d.className = 'dot'; d.setAttribute('data-skin', i); d.setAttribute('aria-label', 'Skin ' + (i + 1));
+    d.style.background = 'linear-gradient(180deg,' + k.h + ' 0%,' + k.h + ' 34%,' + k.s + ' 35%,' + k.s + ' 100%)';
+    UI.dots.appendChild(d);
+  });
+
+  function place(b, x, y, w) { b.style.left = Math.round(x) + 'px'; b.style.top = Math.round(y) + 'px'; b.style.width = b.style.height = Math.round(w) + 'px'; }
+
+  function layout(animate) {
+    W = window.innerWidth || 800; H = window.innerHeight || 600;
+    land = W >= H * 1.05;
+    stage.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    ['bgX'].forEach(function (id) { var r = document.getElementById(id); r.setAttribute('width', W); r.setAttribute('height', H); });
+    skyRect.setAttribute('width', W); skyRect.setAttribute('height', H);
+    sun.setAttribute('cx', W * 0.9); sun.setAttribute('cy', H * 0.14);
+    cloudA.setAttribute('transform', 'translate(' + W * 0.5 + ' ' + H * 0.12 + ')');
+    cloudB.setAttribute('transform', 'translate(' + W * 0.16 + ' ' + H * 0.3 + ') scale(.8)');
+    sizeCanvas();
+
+    var bs = clamp(Math.round(Math.min(W, H) / 7.4), 46, 68), gap = 10, pad = 10, sep = 18;
+    var acts = ['layer:body', 'layer:bones', 'layer:organs', 'mode:explore', 'mode:build'];
+    var total = 5 * bs + 4 * gap + sep, pos = 0;
+    acts.forEach(function (a, i) {
+      if (i === 3) { pos += sep; }
+      if (land) { place(UI[a], 10, (H - total) / 2 + pos, bs); } else { place(UI[a], (W - total) / 2 + pos, H - bs - 10, bs); }
+      pos += bs + gap;
+    });
+    var cs = 44;
+    place(UI.sound, W - cs - 8, 8, cs); place(UI.facts, W - 2 * cs - 16, 8, cs);
+
+    if (land) {
+      var barW = bs + 20, pw = clamp(W * 0.34, 230, 460);
+      panel = { x: W - pw - pad, y: 62, w: pw, h: H - 62 - pad };
+      area = { x: barW, y: pad, w: W - barW - pw - 2 * pad, h: H - 2 * pad };
+    } else {
+      var barH = bs + 20, avail = H - barH, ph = clamp(avail * 0.3, 150, 270);
+      panel = { x: pad, y: avail - ph, w: W - 2 * pad, h: ph - pad };
+      area = { x: 0, y: pad, w: W, h: avail - ph - pad };
+    }
+    clipRect.setAttribute('x', area.x); clipRect.setAttribute('y', area.y);
+    clipRect.setAttribute('width', area.w); clipRect.setAttribute('height', area.h);
+
+    // card and skin dots live in the panel
+    var dotsH = (layer === 'body' && mode === 'explore') ? 56 : 0;
+    var cw = panel.w, ch = panel.h - dotsH;
+    UI.card.style.left = panel.x + 'px'; UI.card.style.top = panel.y + 'px';
+    UI.card.style.width = cw + 'px'; UI.card.style.height = Math.min(ch, land ? 330 : ch) + 'px';
+    var nameSize = clamp(Math.min(cw / 9, ch / 3.4), 22, 42);
+    UI.card.style.fontSize = nameSize + 'px';
+    document.getElementById('cardName').style.fontSize = '1em';
+    document.getElementById('cardAlt').style.fontSize = '.5em';
+    document.getElementById('cardFact').style.fontSize = '.48em';
+    var isz = clamp(Math.min(ch - 28, cw * 0.3), 56, 130);
+    var ic = document.getElementById('cardIcon'); ic.style.width = ic.style.height = isz + 'px';
+    UI.dots.style.left = panel.x + 'px'; UI.dots.style.width = panel.w + 'px';
+    UI.dots.style.top = (panel.y + panel.h - 50) + 'px'; UI.dots.style.height = '50px';
+    UI.tip.style.left = (area.x + 12) + 'px'; UI.tip.style.top = '12px';
+    UI.tip.style.fontSize = clamp(Math.min(W, H) / 20, 18, 30) + 'px';
+    UI.again.style.left = (panel.x + panel.w / 2 - 48) + 'px'; UI.again.style.top = (panel.y + panel.h / 2 - 30) + 'px';
+    UI.again.style.position = 'fixed';
+
+    computeView(!animate);
+    layoutTray();
+  }
+
+  function computeView(jump) {
+    var fo = FOCUS[layer], hgt = fo[1] - fo[0];
+    var s = Math.min(area.w / 350, area.h / hgt);
+    viewTo = { s: s, tx: area.x + area.w / 2 - 200 * s, ty: area.y + (area.h - hgt * s) / 2 - fo[0] * s };
+    if (jump || reduced) { view = { s: viewTo.s, tx: viewTo.tx, ty: viewTo.ty }; viewAnim = null; applyView(); }
+    else { viewAnim = { t0: performance.now(), a: { s: view.s, tx: view.tx, ty: view.ty } }; kick(); }
+  }
+  function applyView() { bodyG.setAttribute('transform', 'translate(' + f(view.tx) + ' ' + f(view.ty) + ') scale(' + f(view.s) + ')'); }
+
+  // ------------------------------------------------------------------
+  // Card and tip
+  // ------------------------------------------------------------------
+  var sel = { id: null, t: 0 };
+  function showCard(id) {
+    var inf = info(id), it = ITEMS[id];
+    document.getElementById('cardName').textContent = inf.n;
+    var alt = document.getElementById('cardAlt');
+    alt.textContent = inf.alt ? inf.alt : ''; alt.style.display = inf.alt ? 'block' : 'none';
+    var fa = document.getElementById('cardFact');
+    fa.textContent = inf.f || ''; fa.style.display = factsOn ? 'block' : 'none';
+    var ct = document.getElementById('cardCount');
+    if (inf.count > 1) { ct.textContent = inf.count; ct.style.display = 'flex'; } else { ct.style.display = 'none'; }
+    var ic = document.getElementById('cardIcon');
+    clear(ic);
+    if (it) {
+      var sv = el('svg', { viewBox: f(it.bb.x - 10) + ' ' + f(it.bb.y - 10) + ' ' + f(it.bb.w + 20) + ' ' + f(it.bb.h + 20) }, null);
+      drawPiece(sv, it);
+      ic.appendChild(sv); ic.style.display = 'flex';
+    } else { ic.style.display = 'none'; }
+    UI.card.style.display = mode === 'explore' ? 'flex' : 'none';
+  }
+  var tipTimer = 0;
+  function tip(text) {
+    UI.tip.textContent = text; UI.tip.style.display = 'block';
+    clearTimeout(tipTimer);
+    tipTimer = setTimeout(function () { UI.tip.style.display = 'none'; }, 2200);
+  }
+
+  function ring(node) {
+    var host = node.parentNode;
+    if (!host || !node.getBBox) { return; }
+    try {
+      var b = node.getBBox();
+      if (!b.width) { return; }
+      var r = el('ellipse', { 'class': 'ring', cx: b.x + b.width / 2, cy: b.y + b.height / 2,
+        rx: b.width / 2 + 9, ry: b.height / 2 + 9, fill: 'none', stroke: '#fff', 'stroke-width': 4, 'stroke-dasharray': '8 6',
+        'pointer-events': 'none' }, host);
+      setTimeout(function () { if (r.parentNode) { r.parentNode.removeChild(r); } }, 1250);
+    } catch (e) { /* not measurable right now */ }
+  }
+
+  function select(node) {
+    var id = node.getAttribute('data-id'), s = parseInt(node.getAttribute('data-side'), 10) || 0;
+    var inf = info(id); if (!inf) { return; }
+    var it = ITEMS[id];
+    if (it && !it.placed) { return; }
+    var now = performance.now();
+    if (sel.id === id && now - sel.t < 350) { return; }
+    sel.id = id; sel.t = now;
+    if (mode === 'explore') { showCard(id); } else { tip(inf.n); }
+    var text = inf.n + (factsOn ? '. ' + inf.f : '');
+    say(text);
+    sfx(inf.snd);
+    startMotion(id, s, now);
+    if (it || reduced) { ring(node); }
+    kick();
+  }
+
+  // ------------------------------------------------------------------
+  // Puzzle: the pieces wait in a tray, six at a time
+  // ------------------------------------------------------------------
+  var B = null, SLOTS = 6, TR = { x0: 0, y0: 0, sz: 80, cols: 2 }, drag = null;
+  var dotsG = el('g', {}, trayG);
+
+  function layoutTray() {
+    TR.cols = land ? 2 : 3;
+    var rows = Math.ceil(SLOTS / TR.cols);
+    var top = 26;
+    TR.sz = Math.min(panel.w / TR.cols, (panel.h - top) / rows);
+    TR.x0 = panel.x + (panel.w - TR.cols * TR.sz) / 2;
+    TR.y0 = panel.y + top + ((panel.h - top) - rows * TR.sz) / 2;
+    if (B) {
+      B.slots.forEach(function (pc) { if (pc && pc !== (drag && drag.pc)) { fitPiece(pc); placePiece(pc); } });
+      drawDots();
+    }
+  }
+  function slotPos(i) { return [TR.x0 + (i % TR.cols + 0.5) * TR.sz, TR.y0 + (Math.floor(i / TR.cols) + 0.5) * TR.sz]; }
+
+  function fitPiece(pc) {
+    var it = ITEMS[pc.id], pos = slotPos(pc.slot);
+    pc.k = Math.min(TR.sz * 0.78 / Math.max(it.bb.w, it.bb.h), 1.6);
+    pc.x = pos[0]; pc.y = pos[1]; pc.s = pc.k;
+  }
+  function placePiece(pc) { pc.g.setAttribute('transform', 'translate(' + f(pc.x) + ' ' + f(pc.y) + ') scale(' + f(pc.s) + ')'); }
+
+  function setPlaced(it, v) {
+    it.placed = v;
+    it.nodes.forEach(function (n) {
+      if (v) { n.classList.remove('sil'); n.classList.remove('hint'); } else { n.classList.add('sil'); n.classList.remove('hint'); }
+    });
+    if (v) { itemTf(it, null); }
+  }
+
+  function drawDots() {
+    clear(dotsG);
+    if (!B) { return; }
+    var n = B.total, r = clamp(panel.w / (n * 3), 4, 8), gap = r * 2.8, x0 = panel.x + panel.w / 2 - (n - 1) * gap / 2;
+    for (var i = 0; i < n; i++) {
+      el('circle', { cx: x0 + i * gap, cy: panel.y + 12, r: r, fill: i < B.placed ? '#ffd54a' : 'rgba(255,255,255,0.3)' }, dotsG);
+    }
+  }
+
+  function makePiece(id, slot, animate) {
+    var it = ITEMS[id];
+    var g = el('g', { 'class': 'pc', 'data-piece': id }, trayG);
+    var inner = el('g', { transform: 'translate(' + f(-(it.bb.x + it.bb.w / 2)) + ' ' + f(-(it.bb.y + it.bb.h / 2)) + ')' }, g);
+    drawPiece(inner, it);
+    // a fat invisible target so thin pieces are still easy to grab
+    el('circle', { cx: it.bb.x + it.bb.w / 2, cy: it.bb.y + it.bb.h / 2, r: Math.max(it.bb.w, it.bb.h) * 0.62, fill: '#fff', 'fill-opacity': 0 }, inner);
+    var pc = { id: id, g: g, slot: slot, k: 1, x: 0, y: 0, s: 1 };
+    fitPiece(pc);
+    if (animate && !reduced) {
+      var k = pc.k; pc.s = 0.1; placePiece(pc);
+      tweens.push({ t0: performance.now(), dur: 260, fn: function (q) { pc.s = k * (0.1 + 0.9 * sm(q)); placePiece(pc); } });
+      kick();
+    } else { placePiece(pc); }
+    return pc;
+  }
+
+  function fillTray(animate) {
+    for (var i = 0; i < SLOTS; i++) {
+      if (!B.slots[i] && B.queue.length) {
+        var id = B.queue.shift();
+        B.slots[i] = makePiece(id, i, animate);
+      }
+    }
+  }
+
+  function clearTray() {
+    clear(trayG); clear(dragG);
+    dotsG = el('g', {}, trayG);
+    B = null; drag = null;
+    UI.again.style.display = 'none'; UI.again.classList.remove('pulse');
+  }
+
+  function startBuild() {
+    clearTray();
+    var ids = shuffle(ORDER[layer].slice());
+    ORDER[layer].forEach(function (id) { setPlaced(ITEMS[id], false); });
+    B = { layer: layer, queue: ids, slots: [], placed: 0, total: ids.length, wrong: {}, done: false };
+    layoutTray();
+    fillTray(true);
+    drawDots();
+  }
+
+  function endBuild() {
+    if (B) { ORDER[B.layer].forEach(function (id) { setPlaced(ITEMS[id], true); }); }
+    clearTray();
+  }
+
+  function toBody(px, py) { return [(px - view.tx) / view.s, (py - view.ty) / view.s]; }
+
+  function startDrag(pc, e) {
+    if (drag) { return; }
+    drag = { pc: pc, pid: e.pointerId, sx: e.clientX, sy: e.clientY, moved: false };
+    try { stage.setPointerCapture(e.pointerId); } catch (x) { /* fine */ }
+    dragG.appendChild(pc.g);
+    var from = pc.s, to = view.s, t0 = performance.now();
+    if (reduced) { pc.s = to; } else {
+      tweens.push({ t0: t0, dur: 140, fn: function (q) { if (drag && drag.pc === pc) { pc.s = from + (to - from) * sm(q); placePiece(pc); } } });
+    }
+    pc.x = e.clientX; pc.y = e.clientY - 28; placePiece(pc);
+    var inf = ITEMS[pc.id];
+    sfx('pick'); say(inf.n); tip(inf.n);
+    kick();
+  }
+
+  function moveDrag(e) {
+    if (!drag || e.pointerId !== drag.pid) { return; }
+    if (Math.abs(e.clientX - drag.sx) + Math.abs(e.clientY - drag.sy) > 8) { drag.moved = true; }
+    drag.pc.x = e.clientX; drag.pc.y = e.clientY - 28;
+    placePiece(drag.pc);
+  }
+
+  function glide(pc, done) {
+    var from = { x: pc.x, y: pc.y, s: pc.s };
+    fitPiece(pc);
+    var to = { x: pc.x, y: pc.y, s: pc.s };
+    if (reduced) { placePiece(pc); if (done) { done(); } return; }
+    tweens.push({ t0: performance.now(), dur: 260, fn: function (q) {
+      var e = sm(q);
+      pc.x = from.x + (to.x - from.x) * e; pc.y = from.y + (to.y - from.y) * e; pc.s = from.s + (to.s - from.s) * e;
+      placePiece(pc);
+    }, done: done });
+    kick();
+  }
+
+  function endDrag(e) {
+    if (!drag || e.pointerId !== drag.pid) { return; }
+    var pc = drag.pc, moved = drag.moved;
+    try { stage.releasePointerCapture(drag.pid); } catch (x) { /* fine */ }
+    drag = null;
+    var it = ITEMS[pc.id];
+    var bp = toBody(pc.x, pc.y);
+    var R = clamp(Math.max(it.bb.w, it.bb.h) * 0.5, 40, 85);
+    var d = Math.hypot(bp[0] - it.mid[0], bp[1] - it.mid[1]);
+    var overBody = pc.x > area.x && pc.x < area.x + area.w && pc.y > area.y && pc.y < area.y + area.h;
+    if (moved && d <= R) { locate(pc, it); return; }
+    if (moved && overBody) {
+      B.wrong[pc.id] = (B.wrong[pc.id] || 0) + 1;
+      sfx('boing');
+      if (B.wrong[pc.id] >= 2) { it.nodes.forEach(function (n) { n.classList.add('hint'); }); }
+    }
+    glide(pc, function () { trayG.appendChild(pc.g); });
+  }
+
+  function locate(pc, it) {
+    var slot = pc.slot;
+    B.slots[slot] = null;
+    if (pc.g.parentNode) { pc.g.parentNode.removeChild(pc.g); }
+    setPlaced(it, true);
+    B.placed++;
+    sfx('place', B.placed);
+    say(it.n);
+    tip(it.n);
+    if (!reduced) { motions.push({ item: it.id, kind: 'pop', t0: performance.now(), dur: FXDUR.pop }); }
+    drawDots();
+    if (B.placed >= B.total) { celebrate(); } else { fillTray(true); }
+    kick();
+  }
+
+  function celebrate() {
+    B.done = true;
+    sfx('tada');
+    burst(90);
+    var order = ORDER[B.layer], t = performance.now();
+    if (!reduced) {
+      order.forEach(function (id, i) {
+        motions.push({ item: id, kind: ITEMS[id].act, t0: t + i * 140, dur: FXDUR[ITEMS[id].act] });
+      });
+      while (motions.length > 40) { motions.shift(); }
+    }
+    UI.again.style.display = 'flex';
+    UI.again.classList.add('pulse');
+    kick();
+  }
+
+  // ------------------------------------------------------------------
+  // State changes
+  // ------------------------------------------------------------------
+  function applyState(quiet) {
+    stage.setAttribute('class', 'L-' + layer + ' M-' + mode);
+    ['body', 'bones', 'organs'].forEach(function (l) { UI['layer:' + l].classList.toggle('on', layer === l); });
+    ['explore', 'build'].forEach(function (m) { UI['mode:' + m].classList.toggle('on', mode === m); });
+    UI.dots.style.display = (layer === 'body' && mode === 'explore') ? 'flex' : 'none';
+    UI.card.style.display = 'none';
+    UI.tip.style.display = 'none';
+    sel = { id: null, t: 0 };
+    motions = []; prevTF = {};
+    Object.keys(ITEMS).forEach(function (id) { itemTf(ITEMS[id], null); });
+    if (mode === 'build') { startBuild(); } else { endBuild(); }
+    layout(!quiet);
+    if (!quiet) { sfx('layer'); }
+    kick();
+  }
+
+  function setLayer(l) {
+    if (l === layer && !(mode === 'build' && B && B.layer !== l)) { return; }
+    if (mode === 'build') { endBuild(); }
+    layer = l;
+    if (l === 'body') { mode = 'explore'; }
+    applyState();
+  }
+  function setMode(m) {
+    if (m === mode) { return; }
+    if (m === 'build' && layer === 'body') { layer = 'organs'; }
+    if (mode === 'build') { endBuild(); }
+    mode = m;
+    applyState();
+  }
+
+  function refreshToggles() {
+    UI.sound.innerHTML = muted ? ICONS.mute : ICONS.sound;
+    UI.facts.classList.toggle('on', factsOn);
+  }
+
+  // ------------------------------------------------------------------
+  // Input
+  // ------------------------------------------------------------------
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('button') : null;
+    if (!b) { return; }
+    ensureAudio();
+    var act = b.getAttribute('data-act');
+    if (act) {
+      if (act.indexOf('layer:') === 0) { setLayer(act.slice(6)); }
+      else if (act.indexOf('mode:') === 0) { setMode(act.slice(5)); }
+      else if (act === 'sound') {
+        muted = !muted; store('muted', muted ? '1' : '0');
+        if (muted) { try { window.speechSynthesis.cancel(); } catch (x) { /* none */ } }
+        refreshToggles();
+      } else if (act === 'facts') {
+        factsOn = !factsOn; store('facts', factsOn ? '1' : '0'); refreshToggles();
+        if (sel.id && mode === 'explore') { showCard(sel.id); }
+      }
+    } else if (b.id === 'again') { sfx('pick'); startBuild(); }
+    else if (b.hasAttribute('data-skin')) { setSkin(parseInt(b.getAttribute('data-skin'), 10)); sfx('boop'); }
+  });
+
+  stage.addEventListener('pointerdown', function (e) {
+    ensureAudio();
+    var t = e.target;
+    look.tx = clamp((e.clientX - (view.tx + 200 * view.s)) / (area.w / 2), -1, 1);
+    look.ty = clamp((e.clientY - (view.ty + 100 * view.s)) / (area.h / 2), -1, 1);
+    kick();
+    var pcEl = t.closest ? t.closest('.pc') : null;
+    if (pcEl && B) {
+      var pid = pcEl.getAttribute('data-piece');
+      for (var i = 0; i < B.slots.length; i++) { if (B.slots[i] && B.slots[i].id === pid) { startDrag(B.slots[i], e); return; } }
+    }
+    var d = t.closest ? t.closest('[data-id]') : null;
+    if (d) { select(d); }
+  });
+  stage.addEventListener('pointermove', moveDrag);
+  stage.addEventListener('pointerup', endDrag);
+  stage.addEventListener('pointercancel', endDrag);
+
+  var resizeT = 0;
+  window.addEventListener('resize', function () { clearTimeout(resizeT); resizeT = setTimeout(layout, 60); });
+  window.addEventListener('orientationchange', function () { clearTimeout(resizeT); resizeT = setTimeout(layout, 200); });
+  if (reduceQuery.addEventListener) { reduceQuery.addEventListener('change', function () { kick(); }); }
+
+  // ------------------------------------------------------------------
+  // Start
+  // ------------------------------------------------------------------
+  setSkin(skinIdx);
+  UI.dots.querySelectorAll('.dot').forEach(function (d, i) { d.classList.toggle('on', i === skinIdx); });
+  UI.dots.addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('.dot') : null;
+    if (!b) { return; }
+    UI.dots.querySelectorAll('.dot').forEach(function (d) { d.classList.toggle('on', d === b); });
+  });
+  refreshToggles();
+  applyState(true);
+  hello = performance.now() + 700;
+  nextBlink = performance.now() + 2000;
+  kick();
+})();
+</script>
+</body>
+</html>
