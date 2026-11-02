@@ -759,21 +759,6 @@
     return pts.join(' ');
   }
 
-  function dotIcon(kind, k) {
-    // Even: two pairs. Odd: a pair and one on its own.
-    var g = el('g', { transform: 'scale(' + k + ')' });
-    var r = 15, step = 40, xs = kind === 'even' ? [0, 1, 3, 4] : [0, 1, 3];
-    var off = kind === 'even' ? -(4 * step + 0) / 2 + step * 0.0 : -(3 * step) / 2;
-    function bar(i) {
-      g.appendChild(el('rect', { x: off + i * step - 2, y: -r * 0.5, width: step + 4, height: r, rx: r * 0.5, fill: 'rgba(255,255,255,0.55)' }));
-    }
-    if (kind === 'even') { bar(0); bar(3); } else { bar(0); }
-    xs.forEach(function (i) {
-      g.appendChild(el('circle', { cx: off + i * step, cy: 0, r: r, fill: '#ffffff' }));
-    });
-    return g;
-  }
-
   function buildUI() {
     clear(gUI);
     ui = { btn: {}, starEls: [], pipEls: [] };
@@ -785,9 +770,8 @@
     sg.appendChild(el('rect', { x: -L.signW / 2, y: -L.signH / 2, width: L.signW, height: L.signH, rx: 30, fill: '#b98a55' }));
     sg.appendChild(el('rect', { x: -L.signW / 2 + 12, y: -L.signH / 2 + 12, width: L.signW - 24, height: L.signH - 24, rx: 22, fill: '#fff8e6' }));
     var txt = el('text', {
-      x: 0, y: 0, 'text-anchor': 'middle', 'dominant-baseline': 'central',
-      'font-family': '"Trebuchet MS", "Segoe UI", system-ui, sans-serif', 'font-weight': '800',
-      fill: '#26305e', 'font-size': 112
+      x: 0, y: 46, 'text-anchor': 'middle',
+      'font-family': '"Trebuchet MS", "Segoe UI", system-ui, sans-serif', 'font-weight': '800'
     });
     sg.appendChild(txt);
     gUI.appendChild(sg);
@@ -824,13 +808,9 @@
       var face = el('g');
       face.appendChild(el('rect', { x: 0, y: 0, width: L.btnW, height: L.btnH, rx: 36, fill: main }));
       face.appendChild(el('rect', { x: 8, y: 7, width: L.btnW - 16, height: L.btnH * 0.42, rx: 30, fill: 'rgba(255,255,255,0.16)' }));
-      var ik = clamp(L.btnH / 260, 0.55, 0.8);
-      var icon = dotIcon(kind, 1);
-      icon.setAttribute('transform', 'translate(' + (L.btnW * 0.25) + ',' + (L.btnH / 2) + ') scale(' + ik + ')');
-      face.appendChild(icon);
-      var fs = clamp(Math.round(L.btnH * 0.4), 48, 76);
+      var fs = clamp(Math.round(L.btnH * 0.5), 60, 96);
       var label = el('text', {
-        x: L.btnW * 0.7, y: L.btnH / 2, 'text-anchor': 'middle', 'dominant-baseline': 'central',
+        x: L.btnW / 2, y: L.btnH / 2, 'text-anchor': 'middle', 'dominant-baseline': 'central',
         'font-family': '"Trebuchet MS", "Segoe UI", system-ui, sans-serif', 'font-weight': '800',
         'font-size': fs, fill: '#ffffff', stroke: rim, 'stroke-width': 7, 'paint-order': 'stroke',
         'stroke-linejoin': 'round'
@@ -961,8 +941,19 @@
   var MARCH = 560, WALK = 230, EXIT = 760;
 
   function showSign(n) {
-    ui.signText.textContent = n;
-    ui.signText.setAttribute('font-size', n > 9 ? 100 : 124);
+    // The last digit is the big one and the rest sit small beside it, so
+    // the digit that decides the answer is the one she looks at.
+    clear(ui.signText);
+    var s = String(n), head = s.slice(0, -1);
+    ui.signHead = null;
+    if (head) {
+      ui.signHead = el('tspan', { 'font-size': 64, fill: '#9aa3c4' });
+      ui.signHead.textContent = head;
+      ui.signText.appendChild(ui.signHead);
+    }
+    ui.signLast = el('tspan', { 'font-size': 126, fill: '#26305e' });
+    ui.signLast.textContent = s.slice(-1);
+    ui.signText.appendChild(ui.signLast);
     animate(0.4, function (p) {
       var s = Math.max(0, easeOutBack(p));
       ui.sign.setAttribute('transform', 'translate(' + ui.signCx + ',' + ui.signCy + ') scale(' + s.toFixed(3) + ')');
@@ -1111,6 +1102,28 @@
     return t;
   }
 
+  // One kind of animal per round, and a different kind next time.
+  var lastSp = -1;
+  function pickSpecies() {
+    var ix;
+    do { ix = Math.floor(Math.random() * SPECS.length); } while (ix === lastSp);
+    lastSp = ix;
+    return ix;
+  }
+
+  // The answer, in the colour of its button. Everything but the last
+  // digit fades, because nothing but the last digit matters.
+  function lightDigit(kind) {
+    ui.signLast.setAttribute('fill', kind === 'even' ? '#1f9a94' : '#e8741a');
+    if (ui.signHead) {
+      animate(0.5, function (p) { ui.signHead.setAttribute('opacity', (1 - 0.7 * p).toFixed(2)); });
+    }
+    animate(0.5, function (p) {
+      var k = 1 + Math.sin(p * Math.PI) * 0.1;
+      ui.sign.setAttribute('transform', 'translate(' + ui.signCx + ',' + ui.signCy + ') scale(' + k.toFixed(3) + ')');
+    });
+  }
+
   function startRound() {
     rid++;
     clear(gBlocks); clear(gBubbles); clear(gAnimals); clear(gTops);
@@ -1148,11 +1161,11 @@
 
     if (ones > 0 && ay1 - ay0 > 60) {
       var pl = plan(ones, ax0, ax1, ay0, ay1);
-      var order = shuffle([0, 1, 2, 3, 4, 5]), j;
+      var spIx = pickSpecies();
       round.pairsInfo = pl.pairs;
       var shift = L.W - Math.min.apply(null, pl.slots.map(function (q) { return q.x; })) + AW * pl.s;
       for (i = 0; i < pl.slots.length; i++) {
-        var sl = pl.slots[i], spIx = sl.paired ? order[sl.pair % 6] : order[pl.pairs.length % 6];
+        var sl = pl.slots[i];
         var a = makeAnimal(SPECS[spIx], sl, reduced ? 0 : shift);
         a.index = i;
         round.animals.push(a);
@@ -1250,8 +1263,24 @@
       queue.splice(Math.min(queue.length, 3), 0, round.n);
     }
 
-    var pairs = round.pairsInfo, P = pairs.length, N = round.animals.length;
-    var dp = N > 10 ? 0.15 : 0.32, j;
+    // Full tens step aside first, so only the ones are left to pair up.
+    var dimN = (round.n > 10 && round.n <= 20 && round.n % 10) ? 10 : 0;
+    var dimBlocks = round.blocks.length > 0 && round.ones > 0;
+    afterR(0.1, function () { lightDigit(right); });
+    if (dimN || dimBlocks) {
+      t0 += 0.8;
+      afterR(0.7, function () {
+        animate(0.4, function (q) {
+          var o = (1 - 0.7 * q).toFixed(2);
+          round.animals.forEach(function (a) { if (a.slot.k < dimN) { a.g.setAttribute('opacity', o); } });
+          if (dimBlocks) { round.blocks.forEach(function (b) { b.g.setAttribute('opacity', o); }); }
+        });
+      });
+    }
+
+    var pairs = round.pairsInfo.filter(function (p) { return p.members[0].slot.k >= dimN; });
+    var P = pairs.length, N = round.animals.length;
+    var dp = N > 10 ? 0.15 : 0.32;
     pairs.forEach(function (p, j) {
       afterR(t0 + j * dp, function () {
         var left = 2;
@@ -1284,10 +1313,10 @@
           lone.leanT = Math.sin(q * Math.PI * 4) * 9 * (1 - q);
         });
       } else if (N) {
-        round.animals.forEach(function (a, i) { afterR(i * 0.05, function () { hop(a, false); }); });
+        round.animals.forEach(function (a, i) { if (i >= dimN) { afterR(i * 0.05, function () { hop(a, false); }); } });
         sndCheer();
       }
-      if (round.blocks.length) {
+      if (round.blocks.length && !dimBlocks) {
         round.blocks.forEach(function (b, i) {
           afterR(i * 0.06, function () {
             animate(0.4, function (q) {
