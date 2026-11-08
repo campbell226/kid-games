@@ -543,6 +543,105 @@
     return 1 + (c + 1) * Math.pow(p - 1, 3) + c * Math.pow(p - 1, 2);
   }
 
+  // ===================================================================
+  // PICTURES
+  //
+  // If games/animal-mash/images/<id>.png exists for an animal, the game
+  // uses it in place of the drawn SVG. A picture is a side-on animal
+  // facing right on a plain background. It is keyed out, trimmed and
+  // scaled to a standard width. A mash puts the head animal's front half
+  // over the body animal's back half and blends the seam.
+  // Reading pixels needs http(s); from a file:// page the browser refuses
+  // and the drawn SVGs are used instead. See PROMPTS.md.
+  // ===================================================================
+  var IMG = {};      // id -> { c: canvas, w: 1000, h }
+  var mixCache = {}; // "front|rear" -> { url, w, h }
+  var PW = 1000;
+
+  function prepPicture(im) {
+    var k = Math.min(1, 900 / Math.max(im.naturalWidth, im.naturalHeight));
+    var w = Math.max(1, Math.round(im.naturalWidth * k)), h = Math.max(1, Math.round(im.naturalHeight * k));
+    var c = document.createElement('canvas'); c.width = w; c.height = h;
+    var x = c.getContext('2d'); x.drawImage(im, 0, 0, w, h);
+    var d = x.getImageData(0, 0, w, h), p = d.data, i;
+    // Key out the background: flood in from the edge through anything close
+    // to the corner colour. Pictures with a real transparent background skip it.
+    if (p[3] > 200) {
+      var bgR = p[0], bgG = p[1], bgB = p[2], TOL = 70 * 70 * 3 / 3;
+      var seen = new Uint8Array(w * h), stack = [], n;
+      for (i = 0; i < w; i++) { stack.push(i, (h - 1) * w + i); }
+      for (i = 0; i < h; i++) { stack.push(i * w, i * w + w - 1); }
+      while (stack.length) {
+        n = stack.pop();
+        if (seen[n]) { continue; }
+        var o = n * 4, dr = p[o] - bgR, dg = p[o + 1] - bgG, db = p[o + 2] - bgB;
+        if (dr * dr + dg * dg + db * db > TOL) { continue; }
+        seen[n] = 1; p[o + 3] = 0;
+        var cx = n % w;
+        if (cx > 0) { stack.push(n - 1); }
+        if (cx < w - 1) { stack.push(n + 1); }
+        if (n >= w) { stack.push(n - w); }
+        if (n < w * (h - 1)) { stack.push(n + w); }
+      }
+      x.putImageData(d, 0, 0);
+    }
+    var minX = w, minY = h, maxX = 0, maxY = 0, yy, xx;
+    for (yy = 0; yy < h; yy++) {
+      for (xx = 0; xx < w; xx++) {
+        if (p[(yy * w + xx) * 4 + 3] > 20) {
+          if (xx < minX) { minX = xx; } if (xx > maxX) { maxX = xx; }
+          if (yy < minY) { minY = yy; } if (yy > maxY) { maxY = yy; }
+        }
+      }
+    }
+    if (maxX <= minX || maxY <= minY) { return null; }
+    var bw = maxX - minX + 1, bh = maxY - minY + 1, s = PW / bw;
+    var o2 = document.createElement('canvas'); o2.width = PW; o2.height = Math.round(bh * s);
+    o2.getContext('2d').drawImage(c, minX, minY, bw, bh, 0, 0, o2.width, o2.height);
+    return { c: o2, w: PW, h: o2.height };
+  }
+
+  function loadPictures(done) {
+    var left = ANIMALS.length;
+    function one() { left--; if (left === 0) { done(); } }
+    ANIMALS.forEach(function (a) {
+      var im = new Image();
+      im.onload = function () { try { var r = prepPicture(im); if (r) { IMG[a.id] = r; } } catch (e) { /* file:// or bad image */ } one(); };
+      im.onerror = one;
+      im.src = 'images/' + a.id + '.png';
+    });
+  }
+
+  function masked(src, w, h, H, left) {
+    var m = document.createElement('canvas'); m.width = PW; m.height = H;
+    var x = m.getContext('2d');
+    x.drawImage(src, 0, H - h, w, h);
+    x.globalCompositeOperation = 'destination-in';
+    var g = x.createLinearGradient(430, 0, 570, 0);
+    g.addColorStop(0, left ? 'rgba(0,0,0,1)' : 'rgba(0,0,0,0)');
+    g.addColorStop(1, left ? 'rgba(0,0,0,0)' : 'rgba(0,0,0,1)');
+    x.fillStyle = g; x.fillRect(0, 0, PW, H);
+    return m;
+  }
+
+  // Head animal h supplies the front (right) half, body animal b the back.
+  function picFor(h, b) {
+    var F = IMG[h.id], R = IMG[b.id];
+    if (!F || !R) { return null; }
+    var key = h.id + '|' + b.id;
+    if (!mixCache[key]) {
+      if (h === b) { mixCache[key] = { url: F.c.toDataURL('image/png'), w: F.w, h: F.h }; }
+      else {
+        var H = Math.max(F.h, R.h), o = document.createElement('canvas'); o.width = PW; o.height = H;
+        var x = o.getContext('2d');
+        x.drawImage(masked(R.c, R.w, R.h, H, true), 0, 0);
+        x.drawImage(masked(F.c, F.w, F.h, H, false), 0, 0);
+        mixCache[key] = { url: o.toDataURL('image/png'), w: PW, h: H };
+      }
+    }
+    return mixCache[key];
+  }
+
   // ---------------------------------------------------------------- state
   var S = { a: null, b: null, mode: 'pick', flip: false, actors: [], mt: 0, poofed: false, fxs: [] };
   var L = {};
@@ -592,6 +691,12 @@
     inner.appendChild(tail); inner.appendChild(body); inner.appendChild(head);
     g.appendChild(inner);
     gActors.appendChild(g);
+    var pic = picFor(h, b);
+    if (pic) {
+      inner.innerHTML = '';
+      inner.appendChild(svgEl('image', { href: pic.url, x: -pic.w / 2, y: -pic.h, width: pic.w, height: pic.h }));
+      tail = head = null;
+    }
     var A = {
       g: g, inner: inner, tail: tail, body: body, head: head, b: b, h: h, t: t,
       x: x, y: L.ground, f: flipX ? -1 : 1, sx: 1, sy: 1, vis: true,
@@ -599,7 +704,7 @@
       w: boxW, hgt: boxH
     };
     pose(A, 0);
-    var bb = inner.getBBox();
+    var bb = pic ? { x: -pic.w / 2, y: -pic.h, width: pic.w, height: pic.h } : inner.getBBox();
     A.fit = Math.min(boxW / bb.width, boxH / bb.height, 1.7);
     A.cx = bb.x + bb.width / 2;
     inner.setAttribute('transform', 'translate(' + (-A.cx) + ',0)');
@@ -607,6 +712,7 @@
   }
 
   function pose(A, time) {
+    if (!A.head) { return; }
     var b = A.b;
     var tw = Math.sin(time * 3.2 + A.ph) * 9;
     var hr = Math.sin(time * 1.7 + A.ph) * 3.5;
@@ -917,8 +1023,13 @@
     ANIMALS.forEach(function (a) {
       var b = document.createElement('button');
       b.className = 'pick'; b.setAttribute('data-id', a.id); b.setAttribute('aria-label', a.name);
+      var icon = '<g transform="translate(0,12) scale(0.86)">' + a.head + '</g>';
+      if (IMG[a.id]) {
+        var P = IMG[a.id], ih = 150 * P.h / P.w, iw = 150, sc = Math.min(1, 140 / ih);
+        icon = '<image href="' + picFor(a, a).url + '" x="' + (-iw * sc / 2) + '" y="' + (-62 - ih * sc / 2) + '" width="' + (iw * sc) + '" height="' + (ih * sc) + '"/>';
+      }
       b.innerHTML = '<svg viewBox="-125 -150 250 170"><circle cx="0" cy="-62" r="84" fill="' + a.bg + '" stroke="#fff" stroke-width="6"/>'
-        + '<g transform="translate(0,12) scale(0.86)">' + a.head + '</g></svg>';
+        + icon + '</svg>';
       b.addEventListener('click', function () { pick(a.id); });
       tray.appendChild(b);
     });
@@ -934,9 +1045,14 @@
   layout();
   showStatic(-1);
   requestAnimationFrame(frame);
+  loadPictures(function () {
+    if (!Object.keys(IMG).length) { return; }
+    buildTray();
+    if (S.mode !== 'mash') { showStatic(-1); }
+  });
 
   // Test hook for the throwaway preview pages; harmless otherwise.
-  window.__animalMash = { ANIMALS: ANIMALS, pick: pick };
+  window.__animalMash = { ANIMALS: ANIMALS, pick: pick, prepPicture: prepPicture, IMG: IMG, buildTray: buildTray, showStatic: showStatic };
 })();
 </script>
 </body>
