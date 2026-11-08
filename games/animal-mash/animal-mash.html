@@ -371,6 +371,147 @@
     });
   })();
 
+  // ---------------------------------------------------------------- DOG
+  (function () {
+    var B = '#cf955c', D = '#8d5a31', CR = '#fff0d8';
+    var ear = '<ellipse cx="-62" cy="-62" rx="22" ry="40" transform="rotate(14 -62 -62)" fill="' + D + '"/>';
+    ANIMALS.push({
+      id: 'dog', name: 'Dog', pre: 'Dog', suf: 'dog', bg: '#f6e0c8',
+      head: part(ear + mirror(ear)
+        + '<ellipse cx="0" cy="-56" rx="60" ry="52" fill="' + B + '"/>'
+        + '<ellipse cx="-30" cy="-72" rx="20" ry="18" fill="' + D + '" stroke="none"/>'
+        + E(-25, -66, 12) + E(25, -66, 12)
+        + '<ellipse cx="0" cy="-34" rx="32" ry="24" fill="' + CR + '"/>'
+        + '<ellipse cx="0" cy="-45" rx="14" ry="9" fill="' + OL + '" stroke="none"/>'
+        + '<path d="M 0 -37 L 0 -28 M 0 -28 Q -12 -18 -22 -28 M 0 -28 Q 12 -18 22 -28" fill="none" stroke-width="3"/>'
+        + '<path d="M -9 -22 Q 0 4 9 -22 Z" fill="#ff7a93"/>'
+        + blush(-50, -40) + blush(50, -40)),
+      body: part(
+          '<rect x="-70" y="-62" width="32" height="60" rx="15" fill="' + D + '"/>'
+        + '<rect x="32" y="-62" width="32" height="60" rx="15" fill="' + D + '"/>'
+        + '<rect x="-98" y="-62" width="36" height="60" rx="17" fill="' + B + '"/>'
+        + '<rect x="56" y="-62" width="36" height="60" rx="17" fill="' + B + '"/>'
+        + '<rect x="-98" y="-22" width="36" height="20" rx="9" fill="' + CR + '"/><rect x="56" y="-22" width="36" height="20" rx="9" fill="' + CR + '"/>'
+        + '<ellipse cx="0" cy="-102" rx="108" ry="54" fill="' + B + '"/>'
+        + '<ellipse cx="-40" cy="-118" rx="34" ry="24" fill="' + D + '" stroke="none"/>'
+        + '<ellipse cx="10" cy="-76" rx="66" ry="18" fill="' + CR + '" stroke="none"/>'),
+      tail: part(tube('M 0 0 C -20 -6 -34 -22 -36 -56', 16, B)),
+      neck: [82, -112], tailAt: [-100, -116], hs: 1,
+      voice: [['sawtooth', 420, 300, 0, 0.12, 0.4, 1400], ['sawtooth', 440, 280, 0.2, 0.16, 0.4, 1400]]
+    });
+  })();
+
+  // ---------------------------------------------------------------- COW
+  (function () {
+    var W = '#fdfcf8', K = '#3a3548', PK = '#f6b2bd';
+    ANIMALS.push({
+      id: 'cow', name: 'Cow', pre: 'Cow', suf: 'cow', bg: '#e8f0e0',
+      head: part(
+          '<path d="M -34 -100 Q -44 -128 -62 -122" fill="none" stroke="#f1e1b8" stroke-width="12"/><path d="M 34 -100 Q 44 -128 62 -122" fill="none" stroke="#f1e1b8" stroke-width="12"/>'
+        + '<ellipse cx="-70" cy="-80" rx="26" ry="14" transform="rotate(-18 -70 -80)" fill="' + W + '"/>'
+        + '<ellipse cx="70" cy="-80" rx="26" ry="14" transform="rotate(18 70 -80)" fill="' + K + '"/>'
+        + '<ellipse cx="0" cy="-58" rx="56" ry="54" fill="' + W + '"/>'
+        + '<ellipse cx="-34" cy="-86" rx="22" ry="18" fill="' + K + '" stroke="none"/>'
+        + E(-26, -70, 12) + E(26, -70, 12)
+        + '<ellipse cx="0" cy="-26" rx="38" ry="25" fill="' + PK + '"/>'
+        + '<ellipse cx="-14" cy="-28" rx="5" ry="7" fill="#b4566c" stroke="none"/><ellipse cx="14" cy="-28" rx="5" ry="7" fill="#b4566c" stroke="none"/>'
+        + '<path d="M -14 -10 Q 0 -2 14 -10" fill="none" stroke-width="3"/>'),
+      body: part(
+          '<rect x="-70" y="-64" width="30" height="62" rx="13" fill="#e3e0d8"/><rect x="34" y="-64" width="30" height="62" rx="13" fill="#e3e0d8"/>'
+        + '<rect x="-96" y="-64" width="34" height="62" rx="15" fill="' + W + '"/><rect x="58" y="-64" width="34" height="62" rx="15" fill="' + W + '"/>'
+        + '<rect x="-96" y="-18" width="34" height="16" rx="7" fill="' + K + '"/><rect x="58" y="-18" width="34" height="16" rx="7" fill="' + K + '"/>'
+        + '<ellipse cx="-8" cy="-60" rx="22" ry="14" fill="' + PK + '"/>'
+        + '<ellipse cx="0" cy="-104" rx="110" ry="58" fill="' + W + '"/>'
+        + '<path d="M -70 -128 Q -40 -170 -10 -134 Q -20 -108 -52 -104 Q -78 -108 -70 -128 Z" fill="' + K + '" stroke="none"/>'
+        + '<path d="M 30 -90 Q 70 -110 80 -80 Q 70 -56 40 -62 Q 24 -72 30 -90 Z" fill="' + K + '" stroke="none"/>'),
+      tail: part(tube('M 0 0 C -12 16 -14 44 -18 70', 7, W) + '<ellipse cx="-18" cy="76" rx="10" ry="15" fill="' + K + '"/>'),
+      neck: [84, -112], tailAt: [-104, -146], hs: 1.05,
+      voice: [['sawtooth', 200, 150, 0, 0.5, 0.4, 700], ['sawtooth', 150, 120, 0.5, 0.2, 0.3, 600]]
+    });
+  })();
+
+  // ------------------------------------------------------------- RABBIT
+  (function () {
+    var W = '#f4eee6', D = '#d6cabb', PK = '#f7b4c4';
+    var ear = '<ellipse cx="-26" cy="-132" rx="17" ry="46" transform="rotate(-8 -26 -132)" fill="' + W + '"/><ellipse cx="-26" cy="-130" rx="8" ry="32" transform="rotate(-8 -26 -130)" fill="' + PK + '" stroke="none"/>';
+    ANIMALS.push({
+      id: 'rabbit', name: 'Rabbit', pre: 'Rab', suf: 'bit', bg: '#fbe6ee',
+      head: part(ear + mirror(ear)
+        + '<ellipse cx="0" cy="-54" rx="58" ry="50" fill="' + W + '"/>'
+        + E(-24, -62, 12) + E(24, -62, 12)
+        + '<ellipse cx="0" cy="-38" rx="24" ry="16" fill="#fff" stroke="none"/>'
+        + '<path d="M -6 -46 L 6 -46 L 0 -39 Z" fill="#ee7f93" stroke-width="2.5"/>'
+        + '<path d="M 0 -39 L 0 -32 M 0 -32 Q -8 -24 -16 -31 M 0 -32 Q 8 -24 16 -31" fill="none" stroke-width="3"/>'
+        + '<rect x="-7" y="-30" width="14" height="12" rx="3" fill="#fff" stroke-width="2.5"/>'
+        + blush(-44, -38) + blush(44, -38)),
+      body: part(
+          '<rect x="46" y="-60" width="28" height="58" rx="13" fill="' + D + '"/>'
+        + '<ellipse cx="62" cy="-8" rx="28" ry="10" fill="' + D + '"/>'
+        + '<ellipse cx="0" cy="-86" rx="96" ry="58" fill="' + W + '"/>'
+        + '<ellipse cx="14" cy="-66" rx="58" ry="20" fill="#fff" stroke="none"/>'
+        + '<ellipse cx="-62" cy="-62" rx="46" ry="42" fill="' + W + '"/>'
+        + '<ellipse cx="-46" cy="-8" rx="58" ry="12" fill="' + W + '"/>'
+        + '<rect x="26" y="-62" width="28" height="60" rx="13" fill="' + W + '"/>'
+        + '<ellipse cx="42" cy="-8" rx="28" ry="10" fill="' + W + '"/>'),
+      tail: part('<circle cx="-10" cy="-2" r="24" fill="#fff"/>'),
+      neck: [74, -96], tailAt: [-96, -90], hs: 1,
+      voice: [['sine', 900, 1300, 0, 0.07, 0.35, 4000], ['sine', 1000, 1400, 0.12, 0.07, 0.35, 4000], ['sine', 900, 1200, 0.24, 0.08, 0.3, 4000]]
+    });
+  })();
+
+  // ------------------------------------------------------------ PENGUIN
+  (function () {
+    var N = '#37426e', W = '#fff', O = '#ff9a3c';
+    ANIMALS.push({
+      id: 'penguin', name: 'Penguin', pre: 'Pen', suf: 'guin', bg: '#dbe8fb',
+      head: part(
+          '<circle cx="0" cy="-52" r="54" fill="' + N + '"/>'
+        + '<path d="M -40 -62 Q -26 -90 0 -66 Q 26 -90 40 -62 Q 40 -20 0 -14 Q -40 -20 -40 -62 Z" fill="' + W + '"/>'
+        + E(-22, -62, 11) + E(22, -62, 11)
+        + '<path d="M -14 -44 Q 0 -54 14 -44 Q 0 -26 -14 -44 Z" fill="' + O + '"/>'
+        + blush(-38, -40, 8) + blush(38, -40, 8)),
+      body: part(
+          '<ellipse cx="-14" cy="-6" rx="30" ry="10" fill="' + O + '"/><ellipse cx="26" cy="-6" rx="30" ry="10" fill="' + O + '"/>'
+        + '<path d="M -70 -50 Q -86 -140 -26 -176 Q 22 -192 60 -166 Q 84 -120 62 -50 Q 40 -14 -14 -12 Q -56 -16 -70 -50 Z" fill="' + N + '"/>'
+        + '<path d="M -26 -60 Q -30 -130 12 -150 Q 52 -150 54 -100 Q 54 -40 12 -30 Q -22 -30 -26 -60 Z" fill="' + W + '"/>'
+        + '<path d="M -34 -118 Q -86 -90 -66 -52 Q -48 -76 -34 -88 Z" fill="' + N + '"/>'),
+      tail: part('<path d="M 4 4 Q -22 0 -34 -22 Q -14 -20 6 -18 Z" fill="' + N + '"/>'),
+      neck: [8, -150], tailAt: [-70, -42], hs: 1,
+      voice: [['square', 700, 500, 0, 0.16, 0.3, 1800], ['square', 800, 520, 0.22, 0.2, 0.3, 1800]]
+    });
+  })();
+
+  // --------------------------------------------------------------- LION
+  (function () {
+    var G = '#f0b84e', M = '#b8691f', M2 = '#d98a2c', CR = '#fff1cf';
+    var ear = '<circle cx="-54" cy="-96" r="18" fill="' + G + '"/><circle cx="-54" cy="-96" r="9" fill="#f4a1b0" stroke="none"/>';
+    var mane = '';
+    var i;
+    for (i = 0; i < 12; i++) {
+      var a = i * Math.PI / 6;
+      mane += '<circle cx="' + (Math.cos(a) * 62).toFixed(1) + '" cy="' + (-58 + Math.sin(a) * 58).toFixed(1) + '" r="30" fill="' + (i % 2 ? M : M2) + '"/>';
+    }
+    ANIMALS.push({
+      id: 'lion', name: 'Lion', pre: 'Li', suf: 'lion', bg: '#ffe7b8',
+      head: part(mane + ear + mirror(ear)
+        + '<ellipse cx="0" cy="-56" rx="52" ry="48" fill="' + G + '"/>'
+        + E(-22, -64, 12) + E(22, -64, 12)
+        + '<ellipse cx="0" cy="-36" rx="26" ry="18" fill="' + CR + '" stroke="none"/>'
+        + '<path d="M -8 -47 L 8 -47 L 0 -38 Z" fill="#8c4a33" stroke-width="2.5"/>'
+        + '<path d="M 0 -38 L 0 -30 M 0 -30 Q -9 -21 -18 -29 M 0 -30 Q 9 -21 18 -29" fill="none" stroke-width="3"/>'
+        + blush(-42, -38, 8) + blush(42, -38, 8)),
+      body: part(
+          '<rect x="-72" y="-62" width="32" height="60" rx="15" fill="#d99c34"/><rect x="32" y="-62" width="32" height="60" rx="15" fill="#d99c34"/>'
+        + '<rect x="-98" y="-62" width="36" height="60" rx="17" fill="' + G + '"/><rect x="56" y="-62" width="36" height="60" rx="17" fill="' + G + '"/>'
+        + '<ellipse cx="-80" cy="-6" rx="22" ry="9" fill="' + CR + '" stroke-width="3"/><ellipse cx="74" cy="-6" rx="22" ry="9" fill="' + CR + '" stroke-width="3"/>'
+        + '<ellipse cx="0" cy="-102" rx="108" ry="55" fill="' + G + '"/>'
+        + '<ellipse cx="8" cy="-74" rx="66" ry="18" fill="' + CR + '" stroke="none"/>'),
+      tail: part(tube('M 0 0 C -30 -2 -50 -26 -44 -62', 12, G) + '<ellipse cx="-44" cy="-68" rx="13" ry="18" fill="' + M + '"/>'),
+      neck: [82, -112], tailAt: [-100, -112], hs: 1,
+      voice: [['sawtooth', 160, 120, 0, 0.18, 0.45, 600], ['sawtooth', 230, 90, 0.2, 0.6, 0.5, 700]]
+    });
+  })();
+
   // (more animals are appended above this line)
 
   // ===================================================================
