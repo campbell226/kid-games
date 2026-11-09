@@ -233,22 +233,22 @@
   // the cuckoo, the Squirrel's Skip and the lullaby are ours.
   var TUNES = [
     // Cuckoo: the leap over A, down and back.
-    { notes: ['D', 'B', 'D', 'B', 'D', 'B'],
+    { name: 'Cuckoo', notes: ['D', 'B', 'D', 'B', 'D', 'B'],
       beats: [1, 1, 1, 1, 1, 2] },
     // Au Clair de la Lune.
-    { notes: ['G', 'G', 'G', 'A', 'B', 'A', 'G', 'B', 'A', 'A', 'G'],
+    { name: 'Au Clair de la Lune', notes: ['G', 'G', 'G', 'A', 'B', 'A', 'G', 'B', 'A', 'A', 'G'],
       beats: [1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 4] },
     // Lightly Row: the first to want C.
-    { notes: ['D', 'B', 'B', 'C', 'A', 'A', 'G', 'A', 'B', 'C', 'D', 'D', 'D'],
+    { name: 'Lightly Row', notes: ['D', 'B', 'B', 'C', 'A', 'A', 'G', 'A', 'B', 'C', 'D', 'D', 'D'],
       beats: [1, 1, 2, 1, 1, 2, 1, 1, 1, 1, 1, 1, 2] },
     // The Squirrel's Skip: bounces, then tumbles down the hill.
-    { notes: ['D', 'B', 'D', 'B', 'C', 'A', 'C', 'A', 'D', 'C', 'B', 'A', 'G'],
+    { name: "Squirrel's Skip", notes: ['D', 'B', 'D', 'B', 'C', 'A', 'C', 'A', 'D', 'C', 'B', 'A', 'G'],
       beats: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4] },
     // Lullaby: slow, and ends on a long G.
-    { notes: ['G', 'B', 'A', 'G', 'A', 'B', 'D', 'B', 'A', 'G'],
+    { name: 'Lullaby', notes: ['G', 'B', 'A', 'G', 'A', 'B', 'D', 'B', 'A', 'G'],
       beats: [2, 1, 1, 2, 1, 1, 2, 1, 1, 4] },
     // Ode to Joy, both halves.
-    { notes: ['B', 'B', 'C', 'D', 'D', 'C', 'B', 'A', 'G', 'G', 'A', 'B', 'B', 'A', 'A',
+    { name: 'Ode to Joy', notes: ['B', 'B', 'C', 'D', 'D', 'C', 'B', 'A', 'G', 'G', 'A', 'B', 'B', 'A', 'A',
               'B', 'B', 'C', 'D', 'D', 'C', 'B', 'A', 'G', 'G', 'A', 'B', 'A', 'G', 'G'],
       beats: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.5, 0.5, 2,
               1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.5, 0.5, 2] }
@@ -888,7 +888,18 @@
   // What the garden remembers between visits.
   // ------------------------------------------------------------------
   var save = { flowers: 0, done: [0, 0, 0, 0, 0], garden: [], tune: 0, pos: 0,
-               four: true, finished: false };
+               four: true, finished: false,
+               // best is the furthest song she has earned. trial is a parent
+               // opening the way forward for a while: until is when it ends
+               // and pos is where she was, so it can put her back there.
+               best: 0, trial: null };
+
+  // A parent's way past a locked song. It sits in the page like everything
+  // else here, so it keeps a five-year-old out and nobody else; there is
+  // nothing behind it worth stealing.
+  var PARENT_CODE = '7391';
+  var TRIAL_MS = 5 * 60 * 1000;
+  var LOCK_HOLD = 0.9;
 
   function load() {
     try {
@@ -906,6 +917,20 @@
         save.pos = s.pos || 0;
         save.four = true;   // second edition: all four friends from the start
         save.finished = !!s.finished;
+        // Anything she was already on counts as earned, so a garden saved
+        // before the selector existed does not start with its own song
+        // locked.
+        save.best = Math.max(s.best | 0, s.tune | 0);
+        save.trial = null;
+        if (s.trial && typeof s.trial.until === 'number') {
+          if (Date.now() < s.trial.until && s.trial.until - Date.now() <= TRIAL_MS + 2000) {
+            save.trial = { until: s.trial.until, pos: s.trial.pos | 0 };
+          } else {
+            // The time ran out while the game was closed: back to where she was.
+            save.tune = save.best;
+            save.pos = s.trial.pos | 0;
+          }
+        }
       }
     } catch (e) {}
   }
@@ -924,9 +949,9 @@
   // every song the first three notes can make.
   function fourOn() { return !!save.four; }
   function shouldBeHere(i) {
-    if (save.finished) { return false; }
-    // The hedgehog comes with the first song that needs C.
-    if (i === CI) { return tune.idx >= C_FROM; }
+    // Nobody ever leaves. The hedgehog comes with the first song that needs
+    // C, and stays once she has earned that far.
+    if (i === CI) { return tune.idx >= C_FROM || save.best >= C_FROM; }
     return true;
   }
 
@@ -956,7 +981,9 @@
     // landscape is where the friends give something up.
     var songs = tunesOn();
     var stripH = songs ? (wide ? H * 0.23 : H * 0.17) : 0;
-    var stripBot = H - H * 0.045;
+    // The song selector has the very bottom; the tune sits just above it.
+    var navH = clamp(Math.max(W * 0.075, 50 * (1000 / vw)), 56, 150);
+    var stripBot = H - navH - 30;
     var stripTop = stripBot - stripH;
     var floor = songs ? stripTop - H * 0.03 : H;
 
@@ -1002,7 +1029,7 @@
       // a fingertip.
       perPx: 1000 / vw,
       signScale: signScale, signX: signX, flowerX: flowerX, side: side,
-      strip: strip, rowY: rowY, four: four,
+      strip: strip, rowY: rowY, four: four, navH: navH,
       bandTop: [], bandBot: []
     };
 
@@ -1629,6 +1656,173 @@
       + ' letter-spacing="' + (R * 0.03) + '">RESET</text>';
     g.appendChild(resetBig);
     bigRing = resetBig.querySelector('.bigring');
+
+    drawSelector(g);
+  }
+
+  // ------------------------------------------------------------------
+  // The song selector: back, the song's name (tap it for the whole list),
+  // forward. A song she has not earned is greyed with a padlock; holding it
+  // asks a parent for the code, and the way opens for five minutes.
+  // ------------------------------------------------------------------
+  var menuOpen = false, pad = null, lock = null;
+  var navRing = null, trialBar = null, trialLen = 1, rowBars = [], rowBarW = 1;
+  var SANS = 'ui-rounded, Segoe UI, system-ui, -apple-system, sans-serif';
+
+  function padlockArt(x, y, s, ink) {
+    return '<g transform="translate(' + x + ',' + y + ')">'
+      + '<path d="M ' + (-s * 0.26) + ' ' + (-s * 0.1) + ' v ' + (-s * 0.2) + ' a ' + (s * 0.26) + ' ' + (s * 0.26)
+      + ' 0 0 1 ' + (s * 0.52) + ' 0 v ' + (s * 0.2) + '" fill="none" stroke="' + ink + '" stroke-width="' + (s * 0.12)
+      + '" stroke-linecap="round"/>'
+      + '<rect x="' + (-s * 0.4) + '" y="' + (-s * 0.12) + '" width="' + (s * 0.8) + '" height="' + (s * 0.6)
+      + '" rx="' + (s * 0.12) + '" fill="' + ink + '"/></g>';
+  }
+
+  function arrowBtn(x, y, nh, dir, enabled, locked, tag) {
+    var ink = enabled ? '#3f7c36' : '#b0a99d';
+    var b = el('g', { transform: 'translate(' + x + ',' + y + ')' });
+    var rr = nh * 0.6;
+    b.innerHTML =
+      '<rect x="' + (-nh / 2) + '" y="' + (-nh / 2) + '" width="' + nh + '" height="' + nh + '" rx="' + (nh * 0.3)
+      + '" fill="#fdf6e3" opacity="' + (enabled ? 0.94 : 0.55) + '" stroke="#c99a5e" stroke-width="3"/>'
+      + '<path d="M ' + (-dir * nh * 0.11) + ' ' + (-nh * 0.23) + ' L ' + (dir * nh * 0.13) + ' 0 L '
+      + (-dir * nh * 0.11) + ' ' + (nh * 0.23) + '" fill="none" stroke="' + ink + '" stroke-width="' + (nh * 0.11)
+      + '" stroke-linecap="round" stroke-linejoin="round"/>'
+      + (locked ? padlockArt(nh * 0.27, nh * 0.2, nh * 0.26, '#9b9488') : '')
+      + (locked ? '<circle class="lring" cx="0" cy="0" r="' + rr + '" fill="none" stroke="#f2c141" stroke-width="'
+        + (nh * 0.09) + '" stroke-linecap="round" stroke-dasharray="' + (2 * Math.PI * rr)
+        + '" stroke-dashoffset="' + (2 * Math.PI * rr) + '" transform="rotate(-90)"/>' : '')
+      + '<rect class="hit" x="' + (-nh * 0.64) + '" y="' + (-nh * 0.64) + '" width="' + (nh * 1.28) + '" height="'
+      + (nh * 1.28) + '" data-ui="' + tag + '"/>';
+    return b;
+  }
+
+  function drawSelector(g) {
+    var nh = L.navH, W = L.W, y = L.H - 14 - nh / 2, i;
+    var pillW = Math.min(W * 0.56, 640), gap = nh * 0.22;
+    var lx = W / 2 - pillW / 2 - gap - nh / 2, rx = W / 2 + pillW / 2 + gap + nh / 2;
+    var canBack = tune.idx > 0, canNext = tune.idx < TUNES.length - 1;
+    var nextOpen = canNext && tune.idx + 1 <= reachable();
+    var name = TUNES[tune.idx].name;
+    var fs = Math.min(nh * 0.42, pillW * 0.92 / (name.length * 0.58));
+
+    g.appendChild(arrowBtn(lx, y, nh, -1, canBack, false, 'prev'));
+    var pill = el('g', { transform: 'translate(' + (W / 2) + ',' + y + ')' });
+    pill.innerHTML =
+      '<rect x="' + (-pillW / 2) + '" y="' + (-nh / 2) + '" width="' + pillW + '" height="' + nh + '" rx="' + (nh * 0.3)
+      + '" fill="#fdf6e3" opacity="0.94" stroke="#c99a5e" stroke-width="3"/>'
+      + '<text x="0" y="' + (fs * 0.34 - nh * 0.04) + '" text-anchor="middle" fill="#33302a" font-family="' + SANS
+      + '" font-size="' + fs + '" font-weight="800">' + name.replace(/&/g, '&amp;') + '</text>'
+      + (save.trial ? '<path class="tbar" d="M ' + (-pillW * 0.4) + ' ' + (nh * 0.36) + ' H ' + (pillW * 0.4)
+        + '" stroke="#f2a93c" stroke-width="' + (nh * 0.07) + '" stroke-linecap="round" fill="none"/>' : '')
+      + '<rect class="hit" x="' + (-pillW / 2) + '" y="' + (-nh * 0.64) + '" width="' + pillW + '" height="'
+      + (nh * 1.28) + '" data-ui="menu"/>';
+    g.appendChild(pill);
+    trialBar = pill.querySelector('.tbar');
+    trialLen = pillW * 0.8;
+    if (trialBar) { trialBar.setAttribute('stroke-dasharray', trialLen); }
+    var nb = arrowBtn(rx, y, nh, 1, nextOpen, canNext && !nextOpen, 'next');
+    g.appendChild(nb);
+    navRing = nb.querySelector('.lring');
+    if (!canNext) { nb.setAttribute('opacity', 0.45); }
+
+    rowBars = [];
+    if (menuOpen) { drawMenu(g); }
+    if (pad) { drawPad(g); }
+  }
+
+  function drawMenu(g) {
+    var W = L.W, H = L.H, n = TUNES.length, i, ok, cur;
+    var rowW = Math.min(W * 0.86, 780);
+    var rh = Math.min(L.navH * 1.05, H * 0.8 / n - 12), sp = 12;
+    var top = H / 2 - (n * (rh + sp) - sp) / 2;
+    var m = el('g', {});
+    var s = '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="#1b2718" opacity="0.6" data-ui="menuclose"/>';
+    rowBarW = rowW - rh * 0.6;
+    for (i = 0; i < n; i++) {
+      ok = i <= reachable();
+      cur = i === tune.idx;
+      var yy = top + i * (rh + sp);
+      var name = TUNES[i].name;
+      var fs = Math.min(rh * 0.44, rowW * 0.7 / (name.length * 0.58));
+      s += '<g transform="translate(' + (W / 2) + ',' + (yy + rh / 2) + ')">'
+        + '<rect x="' + (-rowW / 2) + '" y="' + (-rh / 2) + '" width="' + rowW + '" height="' + rh + '" rx="' + (rh * 0.3)
+        + '" fill="' + (ok ? '#fdf6e3' : '#e4dfd2') + '" opacity="' + (ok ? 0.97 : 0.88) + '" stroke="' + (cur ? '#f2c141' : '#c99a5e')
+        + '" stroke-width="' + (cur ? 8 : 3) + '"/>'
+        + '<text x="' + (-rowW / 2 + rh * 0.55) + '" y="' + (fs * 0.34) + '" fill="' + (ok ? '#33302a' : '#9b9488')
+        + '" font-family="' + SANS + '" font-size="' + fs + '" font-weight="800">'
+        + name.replace(/&/g, '&amp;') + '</text>'
+        + (ok ? '' : padlockArt(rowW / 2 - rh * 0.6, 0, rh * 0.6, '#9b9488')
+          + '<rect class="rbar" data-i="' + i + '" x="' + (-rowW / 2 + rh * 0.3) + '" y="' + (rh * 0.36)
+          + '" width="0" height="' + (rh * 0.07) + '" rx="' + (rh * 0.035) + '" fill="#f2c141"/>')
+        + '<rect class="hit" x="' + (-rowW / 2) + '" y="' + (-rh / 2) + '" width="' + rowW + '" height="' + rh
+        + '" data-ui="row" data-i="' + i + '"/></g>';
+    }
+    m.innerHTML = s;
+    g.appendChild(m);
+    var bars = m.querySelectorAll('.rbar'), k;
+    for (k = 0; k < bars.length; k++) { rowBars[+bars[k].getAttribute('data-i')] = bars[k]; }
+  }
+
+  function drawPad(g) {
+    var W = L.W, H = L.H;
+    var ks = Math.min(W * 0.2, H * 0.11, 150), gp = ks * 0.2;
+    var pw = ks * 3 + gp * 4, ph = ks * 4 + gp * 4 + ks * 1.1;
+    var x0 = W / 2 - pw / 2, y0 = H / 2 - ph / 2;
+    var bad = pad.bad && clock < pad.bad;
+    var s = '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="#1b2718" opacity="0.72" data-ui="padclose"/>'
+      + '<rect x="' + x0 + '" y="' + y0 + '" width="' + pw + '" height="' + ph + '" rx="' + (ks * 0.3)
+      + '" fill="#fdf6e3" stroke="#c99a5e" stroke-width="4"/>';
+    var d, k, kx, ky, lab;
+    for (d = 0; d < 4; d++) {
+      s += '<circle cx="' + (W / 2 + (d - 1.5) * ks * 0.5) + '" cy="' + (y0 + gp + ks * 0.45) + '" r="' + (ks * 0.15)
+        + '" fill="' + (d < pad.d.length ? (bad ? '#c2564f' : '#3f7c36') : 'none') + '" stroke="'
+        + (bad ? '#c2564f' : '#8d867a') + '" stroke-width="3"/>';
+    }
+    var keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'x', '0', 'b'];
+    for (k = 0; k < 12; k++) {
+      kx = x0 + gp + (k % 3) * (ks + gp) + ks / 2;
+      ky = y0 + gp + ks * 1.1 + Math.floor(k / 3) * (ks + gp) + ks / 2;
+      lab = keys[k] === 'x' ? '×' : keys[k] === 'b' ? '←' : keys[k];
+      s += '<g transform="translate(' + kx + ',' + ky + ')">'
+        + '<circle cx="0" cy="0" r="' + (ks / 2) + '" fill="' + (/\d/.test(keys[k]) ? '#fff' : '#efe6cf')
+        + '" stroke="#c99a5e" stroke-width="3"/>'
+        + '<text x="0" y="' + (ks * 0.17) + '" text-anchor="middle" fill="#33302a" font-family="' + SANS
+        + '" font-size="' + (ks * 0.5) + '" font-weight="800">' + lab + '</text>'
+        + '<circle class="hit" cx="0" cy="0" r="' + (ks * 0.6) + '" data-ui="padkey" data-k="' + keys[k] + '"/></g>';
+    }
+    var m = el('g', {});
+    m.innerHTML = s;
+    g.appendChild(m);
+  }
+
+  function padKey(k) {
+    if (!pad) { return; }
+    if (k === 'x') { pad = null; drawUI(); return; }
+    if (k === 'b') { pad.d = pad.d.slice(0, -1); pad.bad = 0; }
+    else if (pad.d.length < 4) {
+      pad.bad = 0;
+      pad.d += k;
+      if (pad.d.length === 4) {
+        if (pad.d === PARENT_CODE) {
+          var t = pad.target;
+          pad = null; menuOpen = false;
+          startTrial();
+          goTo(t, 0, true);
+          return;
+        }
+        pad.d = '';
+        pad.bad = clock + 0.6;
+        setTimeout(function () { if (pad) { pad.bad = 0; drawUI(); } }, 650);
+      }
+    }
+    drawUI();
+  }
+
+  function selectTune(i) {
+    if (i === tune.idx) { menuOpen = false; drawUI(); return; }
+    menuOpen = false;
+    goTo(i, 0, true);
   }
 
   // Targets, in the order they are stacked: empty ground first, then the
@@ -1803,22 +1997,20 @@
     playThrough(TUNES[tune.idx].notes, 0.8, tuneBeats(tune.idx));
   }
 
-  // Finishing the last song finishes the game. The friends go off in a
-  // shower of the flowers she grew them, and what is left is her garden,
-  // a rainbow over it, and the song still there to play whenever she
-  // likes. Nothing to beat and nowhere further to get to.
+  // Finishing the last song puts a rainbow over the garden and a shower of
+  // petals over everyone. Nobody leaves: the friends stay, and so does
+  // every song, one tap away in the selector. Nothing to beat and nowhere
+  // further to get to.
   function finishGame() {
     var i, f;
     save.finished = true;
+    save.best = TUNES.length - 1;
     for (i = 0; i < friends.length; i++) {
       f = friends[i];
       if (!f.present) { continue; }
       if (!reduced) {
         burst(L.xs[i], L.gy[i] - 90 * L.scale, f.spec.petal, 18, 280);
       }
-      f.present = false;
-      f.growth = 0;
-      f.celebrate = 0;
     }
     [0, 4, 7, 12, 16, 19, 24].forEach(function (s, k) {
       bell(0.05 + k * 0.13, 523.25 * Math.pow(2, s / 12), 0.26, 0.95);
@@ -1827,10 +2019,56 @@
     computeLayout();
   }
 
+  // The selector. What she may play is what she has earned, unless a parent
+  // has opened the way for a while.
+  function reachable() { return save.trial ? TUNES.length - 1 : save.best; }
+
+  function goTo(i, pos, intro) {
+    var k, f;
+    hushAll();
+    visQ.length = 0;
+    tune.playing = false;
+    tune.idx = clamp(i, 0, TUNES.length - 1);
+    tune.pos = clamp(pos | 0, 0, TUNES[tune.idx].notes.length - 1);
+    save.tune = tune.idx;
+    save.pos = tune.pos;
+    tuneLast = null; tuneHeld = 0; tuneGiven = 0;
+    for (k = 0; k < friends.length; k++) {
+      f = friends[k];
+      if (!shouldBeHere(k) && f.present) { f.present = false; f.arriving = false; }
+    }
+    unlockCheck();
+    persist();
+    bee.set = false;
+    drawHills();
+    drawHits();
+    drawTuneStrip();
+    drawUI();
+    if (intro) {
+      tune.advance = false;
+      playThrough(TUNES[tune.idx].notes, 0.9, tuneBeats(tune.idx));
+    }
+  }
+
+  function startTrial() {
+    save.trial = { until: Date.now() + TRIAL_MS, pos: tune.idx === save.best ? tune.pos : 0 };
+    persist();
+  }
+
+  // Time is up: whatever she got to is not hers yet, so she goes back to the
+  // song she had earned, at the place she was, and the way forward locks.
+  function expireTrial() {
+    var tr = save.trial;
+    if (!tr) { return; }
+    save.trial = null;
+    if (tune.idx > save.best) { goTo(save.best, tr.pos, false); }
+    else { persist(); drawUI(); }
+  }
+
   function nextTune() {
     tune.playing = false;
-    if (save.finished || tune.idx >= TUNES.length - 1) {
-      if (!save.finished) { finishGame(); }
+    if (tune.idx >= TUNES.length - 1) {
+      if (!save.finished && !save.trial) { finishGame(); }
       tune.pos = 0;
       save.pos = 0;
       persist();
@@ -1840,6 +2078,9 @@
     }
     tune.idx = (tune.idx + 1) % TUNES.length;
     tune.pos = 0;
+    // Finishing a song is what earns the next one - but not in a parent's
+    // trial, where it is only borrowed.
+    if (!save.trial && tune.idx > save.best) { save.best = tune.idx; }
     save.tune = tune.idx;
     save.pos = 0;
     // Finishing the last song the first three notes can make is what
@@ -1849,6 +2090,7 @@
     persist();
     bee.set = false;
     drawTuneStrip();
+    drawUI();
     // If the new note still has its practice to do, there is no song to
     // introduce yet - the garden goes back to asking for it on its own.
     if (!tunesOn()) { pickAsk(); return; }
@@ -2014,6 +2256,17 @@
       resetBig.setAttribute('opacity', resetting ? 1 : 0);
       if (bigRing) { bigRing.setAttribute('stroke-dashoffset', bigCirc * (1 - p)); }
     }
+    var lp = lock ? clamp(lock.t / LOCK_HOLD, 0, 1) : 0, k;
+    if (navRing) {
+      navRing.setAttribute('stroke-dashoffset', 2 * Math.PI * L.navH * 0.6 * (1 - (lock && lock.row < 0 ? lp : 0)));
+    }
+    for (k = 0; k < rowBars.length; k++) {
+      if (rowBars[k]) { rowBars[k].setAttribute('width', lock && lock.row === k ? rowBarW * lp : 0); }
+    }
+    if (trialBar && save.trial) {
+      var left = clamp((save.trial.until - Date.now()) / TRIAL_MS, 0, 1);
+      trialBar.setAttribute('stroke-dashoffset', trialLen * (1 - left));
+    }
   }
 
   // ------------------------------------------------------------------
@@ -2035,6 +2288,12 @@
       resetHold += dt;
       if (resetHold >= RESET_HOLD) { doReset(); }
     }
+    // A held padlock fills a ring, and when it is full the code pad opens.
+    if (lock) {
+      lock.t += dt;
+      if (lock.t >= LOCK_HOLD) { pad = { target: lock.target, d: '', bad: 0 }; lock = null; drawUI(); }
+    }
+    if (save.trial && Date.now() >= save.trial.until) { expireTrial(); }
     if (cheatHeld && clock > cheatNext) {
       cheatNext = clock + CHEAT_GAP;
       cheatStep();
@@ -2102,6 +2361,23 @@
       var which = ui.getAttribute('data-ui');
       if (which === 'reset') { resetting = true; resetHold = 0; return; }
       if (which === 'tune') { replayTune(); return; }
+      if (which === 'prev') { if (tune.idx > 0) { goTo(tune.idx - 1, 0, true); } return; }
+      if (which === 'next') {
+        if (tune.idx >= TUNES.length - 1) { return; }
+        if (tune.idx + 1 <= reachable()) { goTo(tune.idx + 1, 0, true); }
+        else { lock = { target: tune.idx + 1, t: 0, row: -1 }; }
+        return;
+      }
+      if (which === 'menu') { menuOpen = true; drawUI(); return; }
+      if (which === 'menuclose') { menuOpen = false; drawUI(); return; }
+      if (which === 'row') {
+        var ri = +ui.getAttribute('data-i');
+        if (ri <= reachable()) { selectTune(ri); }
+        else { lock = { target: ri, t: 0, row: ri }; }
+        return;
+      }
+      if (which === 'padkey') { padKey(ui.getAttribute('data-k')); return; }
+      if (which === 'padclose') { pad = null; drawUI(); return; }
       if (which === 'cheat') {
         cheatStep();
         cheatHeld = true;
@@ -2143,7 +2419,14 @@
       }
     }
     touchHold = -1; resetting = false; resetHold = 0; cheatHeld = false;
+    lock = null;
   }
+  window.addEventListener('keydown', function (ev) {
+    if (!pad) { return; }
+    if (/^[0-9]$/.test(ev.key)) { padKey(ev.key); }
+    else if (ev.key === 'Backspace') { padKey('b'); }
+    else if (ev.key === 'Escape') { padKey('x'); }
+  });
   window.addEventListener('pointerup', release);
   window.addEventListener('pointercancel', release);
   svg.addEventListener('contextmenu', function (ev) { ev.preventDefault(); });
