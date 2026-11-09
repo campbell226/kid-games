@@ -226,7 +226,7 @@
   // It changes nothing about what she has to do. The rhythm is the
   // garden's when it plays the song back, and it spaces the notes along
   // the strip the way written music does; she still just plays them.
-  // Second edition: six new songs, all five notes (G A B C D), easiest
+  // Second edition: nine songs, all five notes (G A B C D), easiest
   // first. The first two need nothing she has not got; the hedgehog turns
   // up with the third, which is the first to want C. Three are old tunes
   // that belong to nobody (Au Clair de la Lune, Lightly Row, Ode to Joy);
@@ -251,7 +251,38 @@
     { name: 'Ode to Joy', notes: ['B', 'B', 'C', 'D', 'D', 'C', 'B', 'A', 'G', 'G', 'A', 'B', 'B', 'A', 'A',
               'B', 'B', 'C', 'D', 'D', 'C', 'B', 'A', 'G', 'G', 'A', 'B', 'A', 'G', 'G'],
       beats: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.5, 0.5, 2,
-              1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.5, 0.5, 2] }
+              1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.5, 0.5, 2] },
+
+    // The second helping, a step up from Ode to Joy with the same five
+    // notes: more leaps, quicker notes, longer tunes. Each one is a little
+    // further than the last, and Rainbow Run is the new finale.
+    //
+    // Hedgehog's Waltz is ours, in threes, and leans on C.
+    { name: "Hedgehog's Waltz",
+      notes: ['B', 'C', 'D', 'D', 'C', 'B', 'A', 'G', 'A',
+              'B', 'C', 'D', 'D', 'C', 'B', 'A', 'B', 'G'],
+      beats: [1, 1, 1, 2, 1, 1, 1, 1, 3,
+              1, 1, 1, 2, 1, 1, 1, 1, 3] },
+    // When the Saints Go Marching In, as far as five notes will go: the
+    // jump from G up to D, over the notes in between, three times over.
+    { name: 'When the Saints',
+      notes: ['G', 'B', 'C', 'D', 'G', 'B', 'C', 'D',
+              'G', 'B', 'C', 'D', 'B', 'G', 'B', 'A',
+              'G', 'B', 'C', 'D', 'B', 'G', 'A', 'G'],
+      beats: [1, 1, 1, 3, 1, 1, 1, 3,
+              1, 1, 1, 2, 2, 1, 1, 2,
+              1, 1, 1, 2, 2, 1, 1, 4] },
+    // Rainbow Run, ours: up the whole hill and down in quick steps, then
+    // the leaps, G to D and G to C and back, and one more time round.
+    { name: 'Rainbow Run',
+      notes: ['G', 'A', 'B', 'C', 'D', 'D', 'C', 'B', 'A', 'G',
+              'G', 'B', 'D', 'D', 'B', 'G',
+              'G', 'C', 'D', 'D', 'C', 'G',
+              'G', 'A', 'B', 'C', 'D', 'D', 'C', 'B', 'A', 'G'],
+      beats: [0.5, 0.5, 0.5, 0.5, 1, 0.5, 0.5, 0.5, 0.5, 1,
+              1, 1, 2, 1, 1, 2,
+              1, 1, 2, 1, 1, 2,
+              0.5, 0.5, 0.5, 0.5, 1, 0.5, 0.5, 0.5, 0.5, 4] }
   ];
   var C_FROM = 2;   // the first song that needs C, and so the hedgehog
 
@@ -1739,8 +1770,10 @@
   function drawMenu(g) {
     var W = L.W, H = L.H, n = TUNES.length, i, ok, cur;
     var rowW = Math.min(W * 0.86, 780);
-    var rh = Math.min(L.navH * 1.05, H * 0.8 / n - 12), sp = 12;
-    var top = H / 2 - (n * (rh + sp) - sp) / 2;
+    // The list keeps clear of the selector bar it was opened from.
+    var room = H - L.navH - 50;
+    var rh = Math.min(L.navH * 1.05, room * 0.94 / n - 12), sp = 12;
+    var top = room / 2 + 10 - (n * (rh + sp) - sp) / 2;
     var m = el('g', {});
     var s = '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="#1b2718" opacity="0.6" data-ui="menuclose"/>';
     rowBarW = rowW - rh * 0.6;
