@@ -1972,7 +1972,36 @@
     return null;
   }
 
+  // To earn the next song she has to play the one she is on at a real
+  // tempo, not note by note over a whole afternoon. The clock starts on her
+  // first note and gives her about two and a half times the song's own
+  // length (never under 12 seconds). Out of time, the tune starts again
+  // from its first note: nothing is lost but the progress through it.
+  // Songs she has already earned, and the finished garden, have no clock.
+  var tuneStart = 0;
+  function tuneWindow() {
+    var b = tuneBeats(tune.idx), t = 0, i;
+    for (i = 0; i < b.length; i++) { t += b[i] * 0.4; }
+    return Math.max(12, t * 2.5);
+  }
+  function tuneClock() {
+    if (!tunesOn() || tune.playing || save.finished || tune.idx < save.best || tune.pos === 0) {
+      tuneStart = 0;
+      return;
+    }
+    if (!tuneStart) { tuneStart = clock; return; }
+    if (clock - tuneStart > tuneWindow()) {
+      tuneStart = 0;
+      tune.pos = 0;
+      save.pos = 0;
+      bee.set = false;
+      persist();
+      drawTuneStrip();
+    }
+  }
+
   function tuneTick(dt) {
+    tuneClock();
     var playing = playedNote();
     if (!playing) {
       tuneGap += dt;
