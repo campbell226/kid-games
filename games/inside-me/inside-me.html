@@ -23,7 +23,7 @@
   #stage { position: fixed; left: 0; top: 0; width: 100%; height: 100%; display: block; touch-action: none; }
   #fx { position: fixed; left: 0; top: 0; pointer-events: none; }
 
-  /* ---- layers: what shows, and what can be touched ---- */
+  /* ---- what shows, and what can be touched ---- */
   #stage .skf { fill: var(--skin); }
   #stage .sko { stroke: var(--skino); }
   #stage .sks { stroke: var(--skin); }
@@ -32,23 +32,32 @@
   #stage .hrs { stroke: var(--hair); }
 
   #stage .sk { opacity: 0.26; pointer-events: none; transition: opacity .45s; }
-  #stage.L-body .sk { opacity: 1; pointer-events: auto; }
+  #stage.S-body .sk { opacity: 1; pointer-events: auto; }
 
-  #stage .cl, #stage .bh, #stage .bn, #stage .og {
+  #stage .cl, #stage .bh, #stage .sy {
     opacity: 0; visibility: hidden; pointer-events: none;
     transition: opacity .4s, visibility 0s .4s;
   }
-  #stage.L-body .cl, #stage.L-body .bh,
-  #stage.L-bones .bn, #stage.L-organs .og {
+  #stage.S-body .cl, #stage.S-body .bh {
     opacity: 1; visibility: visible; pointer-events: auto;
     transition: opacity .4s, visibility 0s;
   }
   #stage .ground, #stage .bgSky { opacity: 0; transition: opacity .5s; }
-  #stage.L-body .ground, #stage.L-body .bgSky { opacity: 1; }
+  #stage.S-body .ground, #stage.S-body .bgSky { opacity: 1; }
   #stage .xglow { opacity: 0.9; transition: opacity .5s; }
-  #stage.L-body .xglow { opacity: 0; }
+  #stage.S-body .xglow { opacity: 0; }
   .hit { fill: #fff; fill-opacity: 0; }
   .hitl { fill: none; stroke: #fff; stroke-opacity: 0; }
+
+  /* detail levels: coarse things give way to fine ones as you zoom */
+  #stage .lod1 { display: none; }
+  #stage.Z1 .lod1 { display: inline; }
+  #stage.Z1 .lod0 { display: none; }
+
+  /* close-ups */
+  #stage .scene { display: none; }
+  #stage.Sc .scene { display: inline; }
+  #stage .sc { display: none; }
 
   /* unplaced pieces in the puzzle are outlines */
   #stage .sil :not(.ln):not(.hitl) {
@@ -77,7 +86,25 @@
   .btn svg { width: 72%; height: 72%; display: block; }
   .btn.on { background: #ffd54a; transform: scale(1.1); }
   .btn.small { border-radius: 14px; }
-  .btn.dim { opacity: 0.55; }
+  .btn.dim { opacity: 0.4; pointer-events: none; }
+  .btn.hide { display: none; }
+  #sysBtn { background: #fff; border: 4px solid var(--sc, #ffd54a); }
+  #story { background: #ffd54a; }
+  #story.go { animation: pulse 1.2s ease-in-out infinite; }
+
+  #sysmenu {
+    position: fixed; display: none; z-index: 8; padding: 12px; gap: 10px;
+    grid-template-columns: repeat(3, 1fr);
+    background: rgba(20,34,66,0.94); border-radius: 26px; box-shadow: 0 6px 24px rgba(0,0,0,0.5);
+  }
+  .sysb {
+    border: 0; border-radius: 20px; padding: 6px 4px 8px; cursor: pointer;
+    background: #fff; color: #22305a; font: 800 14px "Trebuchet MS", system-ui, sans-serif;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    border-bottom: 6px solid var(--c); -webkit-tap-highlight-color: transparent;
+  }
+  .sysb svg { width: 62%; max-height: 62%; display: block; }
+  .sysb.on { background: #ffd54a; }
 
   #card {
     position: fixed; display: none; align-items: center; gap: 14px;
@@ -87,15 +114,21 @@
   }
   #cardIcon { flex: none; display: flex; align-items: center; justify-content: center; }
   #cardIcon svg { width: 100%; height: 100%; display: block; }
-  #cardText { min-width: 0; }
+  #cardText { min-width: 0; flex: 1 1 auto; }
   #cardName { font-weight: 800; line-height: 1.05; }
   #cardAlt { font-style: italic; opacity: 0.65; margin-top: 3px; }
   #cardFact { margin-top: 6px; line-height: 1.25; opacity: 0.85; }
   #cardCount {
-    flex: none; margin-left: auto; min-width: 1.7em; height: 1.7em; border-radius: 50%;
+    flex: none; min-width: 1.7em; height: 1.7em; border-radius: 50%;
     background: #ffd54a; color: #4b3a00; font-weight: 800; display: none;
     align-items: center; justify-content: center; padding: 0 .3em;
   }
+  #cardZoom {
+    flex: none; width: 1.9em; height: 1.9em; border-radius: 50%; border: 0; padding: 0;
+    background: #ffd54a; display: none; align-items: center; justify-content: center; cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3); animation: pulse 1.4s ease-in-out infinite;
+  }
+  #cardZoom svg { width: 70%; height: 70%; display: block; }
   #dots { position: fixed; display: none; align-items: center; justify-content: center; gap: 12px; z-index: 4; }
   .dot {
     width: 44px; height: 44px; border-radius: 50%; border: 4px solid #fff; padding: 0;
@@ -113,9 +146,9 @@
   @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.12); } }
 
   @media (prefers-reduced-motion: reduce) {
-    .btn, .dot, #stage .sk, #stage .cl, #stage .bh, #stage .bn, #stage .og,
+    .btn, .dot, #stage .sk, #stage .cl, #stage .bh, #stage .sy,
     #stage .ground, #stage .bgSky, #stage .xglow { transition: none !important; }
-    #stage .sil.hint, #again.pulse { animation: none !important; }
+    #stage .sil.hint, #again.pulse, #cardZoom, #story.go { animation: none !important; }
     .ring { animation: none !important; opacity: 0.8; }
   }
 </style>
@@ -199,9 +232,11 @@
   <div id="cardIcon"></div>
   <div id="cardText"><div id="cardName"></div><div id="cardAlt"></div><div id="cardFact"></div></div>
   <div id="cardCount"></div>
+  <button id="cardZoom" aria-label="Zoom in"></button>
 </div>
 <div id="dots"></div>
 <div id="tip"></div>
+<div id="sysmenu"></div>
 <button class="btn" id="again" aria-label="Again"></button>
 
 <script>
@@ -346,7 +381,16 @@
     tap: function () { tone(160, 0.07, { to: 90, vol: 0.5 }); tone(160, 0.07, { to: 90, vol: 0.45, at: 0.17 }); },
     boing: function () { tone(300, 0.28, { to: 150, vol: 0.3 }); tone(160, 0.2, { to: 280, vol: 0.25, at: 0.2 }); },
     layer: function () { noise(0.4, { f: 300, to: 2400, q: 0.8, vol: 0.28, atk: 0.2 }); },
-    pick: function () { tone(520, 0.08, { vol: 0.25 }); }
+    pick: function () { tone(520, 0.08, { vol: 0.25 }); },
+    zoomin: function () { noise(0.55, { f: 250, to: 3200, q: 0.8, vol: 0.3, atk: 0.3 }); tone(300, 0.5, { to: 900, vol: 0.12, type: 'triangle' }); },
+    zoomout: function () { noise(0.5, { f: 3000, to: 250, q: 0.8, vol: 0.28, atk: 0.1 }); tone(900, 0.45, { to: 300, vol: 0.12, type: 'triangle' }); },
+    zap: function () { for (var i = 0; i < 6; i++) { tone(500 + i * 150, 0.07, { type: 'square', vol: 0.1, at: i * 0.06 }); } },
+    munch: function () { for (var i = 0; i < 3; i++) { noise(0.09, { f: 700, q: 1.5, vol: 0.5, at: i * 0.16 }); tone(140, 0.08, { vol: 0.3, at: i * 0.16, to: 80 }); } },
+    ding: function () { tone(1200, 0.5, { vol: 0.22 }); tone(1800, 0.4, { vol: 0.12, at: 0.05 }); },
+    squelch: function () { noise(0.3, { f: 400, to: 150, q: 5, vol: 0.5 }); tone(120, 0.25, { to: 60, vol: 0.3, type: 'triangle' }); },
+    hum: function () { tone(180, 0.9, { type: 'triangle', vol: 0.22, to: 220 }); tone(270, 0.9, { type: 'sine', vol: 0.12 }); },
+    cough: function () { noise(0.16, { f: 900, q: 1, vol: 0.5 }); noise(0.14, { f: 800, q: 1, vol: 0.4, at: 0.2 }); },
+    sparkle: function () { for (var i = 0; i < 5; i++) { tone(1000 + i * 260, 0.12, { vol: 0.12, at: i * 0.05 }); } }
   };
 
   function sfx(name, arg) {
@@ -395,6 +439,24 @@
   }
 
   // ------------------------------------------------------------------
+  // The body systems. Each one is a layer you can look at on its own;
+  // the ghosts are the faint layers shown behind it for context.
+  // ------------------------------------------------------------------
+  var SYS = [
+    { id: 'body',    n: 'Me',            c: '#f7b98a', ghost: [],                  view: [25, -10, 375, 800] },
+    { id: 'bones',   n: 'Bones',         c: '#e9dcb8', ghost: [],                  view: [25, -10, 375, 800] },
+    { id: 'muscles', n: 'Muscles',       c: '#e0606f', ghost: ['bones'],           view: [25, -10, 375, 800] },
+    { id: 'blood',   n: 'Heart & blood', c: '#e0405a', ghost: ['bones'],           view: [25, -10, 375, 800] },
+    { id: 'breath',  n: 'Breathing',     c: '#6fc3ea', ghost: ['bones'],           view: [75, 60, 325, 400] },
+    { id: 'tummy',   n: 'Food',          c: '#f0a56f', ghost: ['bones'],           view: [60, 70, 340, 540] },
+    { id: 'wee',     n: 'Wee',           c: '#efd24d', ghost: ['bones', 'blood'],  view: [70, 290, 330, 545] },
+    { id: 'nerves',  n: 'Brain & nerves', c: '#f6c93a', ghost: ['bones'],          view: [25, -10, 375, 800] },
+    { id: 'senses',  n: 'Senses',        c: '#b58cf0', ghost: ['bones'],           view: [55, -5, 345, 245] }
+  ];
+  var SYSBY = {};
+  SYS.forEach(function (s) { SYSBY[s.id] = s; });
+
+  // ------------------------------------------------------------------
   // The scene. Body coordinates are 400 wide by about 800 tall, centred
   // on x = 200. The figure faces us, so "L" is the left of the screen.
   // ------------------------------------------------------------------
@@ -420,6 +482,7 @@
 
   var defs = el('defs', null, stage);
   var clipRect = el('rect', { x: 0, y: 0, width: 10, height: 10 }, el('clipPath', { id: 'areaClip' }, defs));
+  el('circle', { cx: 0, cy: 0, r: 196 }, el('clipPath', { id: 'bubbleClip' }, defs));
   function grad(id, kind, attrs, stops) {
     var g = el(kind, attrs, defs); g.setAttribute('id', id);
     stops.forEach(function (s) { el('stop', { offset: s[0], 'stop-color': s[1], 'stop-opacity': s[2] === undefined ? 1 : s[2] }, g); });
@@ -428,6 +491,7 @@
   grad('gXray', 'linearGradient', { x1: 0, y1: 0, x2: 0, y2: 1 }, [[0, '#122244'], [1, '#1c4468']]);
   grad('gGlow', 'radialGradient', { cx: 0.5, cy: 0.5, r: 0.5 }, [[0, '#6fd6ff', 0.35], [1, '#6fd6ff', 0]]);
   grad('gGrass', 'linearGradient', { x1: 0, y1: 0, x2: 0, y2: 1 }, [[0, '#7cc86a'], [1, '#4d9c45']]);
+  grad('gBub', 'radialGradient', { cx: 0.5, cy: 0.4, r: 0.7 }, [[0, '#24467a'], [1, '#0f2447']]);
 
   el('rect', { id: 'bgX', x: 0, y: 0, width: 10, height: 10, fill: 'url(#gXray)' }, stage);
   var bgSky = el('g', { 'class': 'bgSky' }, stage);
@@ -456,11 +520,12 @@
   var M = {};
   function joint(parent, name) {
     var g = el('g', {}, parent);
-    var j = { g: g };
+    var j = { g: g, h: {} };
     j.sk = el('g', { 'class': 'sk' }, g);
     j.cl = el('g', { 'class': 'cl' }, g);
-    j.bn = el('g', { 'class': 'bn' }, g);
-    j.og = el('g', { 'class': 'og' }, g);
+    SYS.forEach(function (s) {
+      if (s.id !== 'body') { j.h[s.id] = el('g', { 'class': 'sy sy-' + s.id }, g); }
+    });
     j.bh = el('g', { 'class': 'bh' }, g);
     M[name] = j;
     return j;
@@ -573,14 +638,39 @@
   hit(HD.bh, 200, 160, 30, 'mouth');
 
   // ------------------------------------------------------------------
-  // Bones and organs. Each is drawn from left-hand coordinates; a pair is
-  // drawn once and mirrored. The same drawing makes the puzzle piece, the
-  // body part and the little picture on the card.
+  // Close-ups. Each is drawn in its own space, 400 wide centred on 0,
+  // inside a bubble that opens over the place you zoomed into.
   // ------------------------------------------------------------------
-  var ITEMS = {}, ORDER = { bones: [], organs: [] };
-  function item(layer, id, o) {
-    o.id = id; o.layer = layer; o.placed = true; o.nodes = [];
-    ITEMS[id] = o; ORDER[layer].push(id);
+  var scrim = el('rect', { 'class': 'scrim', x: -4000, y: -4000, width: 9000, height: 9000, fill: '#0a1530', 'fill-opacity': 0.62, 'data-out': 1 }, null);
+  var sceneRoot = el('g', { 'class': 'scene' }, bodyG);
+  sceneRoot.appendChild(scrim);
+  var bubble = el('g', {}, sceneRoot);
+  var bubClip = el('g', { 'clip-path': 'url(#bubbleClip)' }, bubble);
+  var SCN = {};
+  function scene(id, o) {
+    o.id = id;
+    o.g = el('g', { 'class': 'sc sc-' + id }, bubClip);
+    o.back = el('g', {}, o.g);
+    o.items = el('g', {}, o.g);
+    o.front = el('g', { 'pointer-events': 'none' }, o.g);
+    o.flows = o.flows || [];
+    SCN[id] = o;
+    return o;
+  }
+  var bubRim = el('circle', { cx: 0, cy: 0, r: 196, fill: 'none', stroke: '#fff', 'stroke-width': 9, 'pointer-events': 'none' }, bubble);
+  el('circle', { cx: 0, cy: 0, r: 201, fill: 'none', stroke: '#ffd54a', 'stroke-width': 4, 'pointer-events': 'none', opacity: 0.9 }, bubble);
+
+  // ------------------------------------------------------------------
+  // Parts. Each is drawn from left-hand coordinates; a pair is drawn once
+  // and mirrored. The same drawing makes the puzzle piece, the body part
+  // and the little picture on the card.
+  // ------------------------------------------------------------------
+  var ITEMS = {}, ORDER = [];
+  function item(sys, id, o) {
+    o.id = id; o.sys = sys; o.placed = true; o.nodes = [];
+    o.ax = o.in ? 0 : 200;
+    o.mirT = o.in ? 'scale(-1 1)' : 'translate(400 0) scale(-1 1)';
+    ITEMS[id] = o; ORDER.push(id);
     return o;
   }
 
@@ -592,8 +682,15 @@
     if (extra) { for (var k in extra) { n.setAttribute(k, extra[k]); } }
     return n;
   }
+  // a coloured tube: dark edge, light core
+  function tube(p, d, w, edge, core, extra) {
+    var n = ln(p, d, w);
+    n.setAttribute('stroke', core); n.previousSibling.setAttribute('stroke', edge);
+    if (extra) { for (var k in extra) { n.setAttribute(k, extra[k]); } }
+    return n;
+  }
   function bshape(p, tag, attrs) {
-    attrs.fill = attrs.fill || BONE; attrs.stroke = BONE_D; attrs['stroke-width'] = 2.2;
+    attrs.fill = attrs.fill || BONE; attrs.stroke = attrs.stroke || BONE_D; attrs['stroke-width'] = attrs['stroke-width'] || 2.2;
     return el(tag, attrs, p);
   }
   function longBone(p, x1, y1, x2, y2, w) {
@@ -607,245 +704,969 @@
   }
   function hitLine(p, d, w) { el('path', { d: d, 'class': 'hitl', 'stroke-width': w, 'stroke-linecap': 'round' }, p); }
   function dark(p, tag, attrs) { attrs['class'] = 'dt'; return el(tag, attrs, p); }
+  function shine(p, d, w, op) {
+    return el('path', { 'class': 'dt', d: d, fill: 'none', stroke: '#fff', 'stroke-opacity': op || 0.4, 'stroke-width': w || 3, 'stroke-linecap': 'round' }, p);
+  }
+  // a soft organ: a filled blob with an outline
+  function blob(p, d, fill, stroke, w) {
+    return el('path', { d: d, fill: fill, stroke: stroke, 'stroke-width': w || 2, 'stroke-linejoin': 'round' }, p);
+  }
+  // a muscle belly from (x1,y1) to (x2,y2), widest at `at` of the way along
+  function spindle(p, x1, y1, x2, y2, w, at, col) {
+    var dx = x2 - x1, dy = y2 - y1, len = Math.sqrt(dx * dx + dy * dy), nx = -dy / len, ny = dx / len;
+    at = at || 0.45;
+    var mx = x1 + dx * at, my = y1 + dy * at, c = col || MUS;
+    function side2(k) { return 'Q' + f(mx + nx * w * k) + ' ' + f(my + ny * w * k); }
+    el('path', { d: 'M' + x1 + ' ' + y1 + side2(1) + ' ' + x2 + ' ' + y2 + side2(-1) + ' ' + x1 + ' ' + y1 + 'Z', fill: c[0], stroke: c[1], 'stroke-width': 2, 'stroke-linejoin': 'round' }, p);
+    [-0.55, 0, 0.55].forEach(function (k) {
+      el('path', { 'class': 'dt', d: 'M' + f(x1 + dx * 0.06) + ' ' + f(y1 + dy * 0.06) + side2(k) + ' ' + f(x2 - dx * 0.06) + ' ' + f(y2 - dy * 0.06),
+        fill: 'none', stroke: c[2], 'stroke-width': 1.8, 'stroke-opacity': 0.8, 'stroke-linecap': 'round' }, p);
+    });
+  }
+  var MUS = ['#d65a68', '#7d2433', '#f3a0a8'];
 
-  // ---------- bones ----------
+  function newScene(id, o) {
+    var sc = scene(id, o);
+    el('circle', { cx: 0, cy: 0, r: 196, fill: o.bg || 'url(#gBub)' }, sc.back);
+    return sc;
+  }
+
+  // ==================================================================
+  // BONES
+  // ==================================================================
+  function vert(p, y, w, h, wing) {
+    if (wing) { bshape(p, 'rect', { x: f(200 - wing / 2), y: f(y + h * 0.18), width: wing, height: f(h * 0.6), rx: 3 }); }
+    bshape(p, 'rect', { x: f(200 - w / 2), y: f(y), width: f(w), height: f(h), rx: 4 });
+  }
+  function cerv(p, i) { vert(p, 158 + i * 8.2, 16 + i * 1.1, 6.8, 30 + i); }
+  function thor(p, i) { vert(p, 216 + i * 13.7, 22 + i * 0.9, 11, 40 + i * 1.5); }
+  function lumb(p, i) { vert(p, 384 + i * 13.6, 33 + i * 1.2, 11.5, 56); }
+
+  item('bones', 'scapula', {
+    n: 'Shoulder blade', alt: 'Scapula', f: 'Your shoulder blades are flat bones on your back that your arms swing from.',
+    mount: 'torso', pair: true, c: [146, 262], act: 'rattle', snd: 'clack', count: 2,
+    draw: function (p) {
+      bshape(p, 'path', { d: 'M164 236C156 234 142 233 128 230C122 236 124 244 132 248C134 258 140 266 144 278C148 290 156 296 162 292C158 276 160 256 164 236Z' });
+      dark(p, 'path', { d: 'M164 240C152 242 140 244 130 248', fill: 'none', stroke: BONE_D, 'stroke-width': 2 });
+      dark(p, 'ellipse', { cx: 134, cy: 250, rx: 6, ry: 8, fill: '#4a4132' });
+    }
+  });
   item('bones', 'spine', {
     n: 'Spine', alt: 'Vertebrae', f: 'Your spine is a stack of small bones that lets you bend.',
-    mount: 'torso', c: [200, 310], act: 'rattle', snd: 'clack', count: 33,
+    mount: 'torso', lod: 0, c: [200, 310], act: 'rattle', snd: 'clack', count: 33,
     draw: function (p) {
-      for (var i = 0; i < 17; i++) {
-        var w = 15 + i * 0.95;
-        bshape(p, 'rect', { x: f(200 - w / 2), y: 172 + i * 16.5, width: f(w), height: 12.5, rx: 4 });
-      }
-      bshape(p, 'path', { d: 'M184 452L216 452L207 490L193 490Z' });
+      var i;
+      for (i = 0; i < 7; i++) { cerv(p, i); }
+      for (i = 0; i < 12; i++) { thor(p, i); }
+      for (i = 0; i < 5; i++) { lumb(p, i); }
+      bshape(p, 'path', { d: 'M178 452L222 452L212 486L200 496L188 486Z' });
     }
   });
-  item('bones', 'pelvis', {
-    n: 'Pelvis', f: 'Your pelvis holds up your body and joins your legs to it.',
-    mount: 'torso', c: [200, 478], act: 'rattle', snd: 'clack',
+  item('bones', 'discs', {
+    n: 'Discs', alt: 'Cushions between the bones', f: 'Soft cushions sit between your spine bones so they do not bump.',
+    mount: 'torso', lod: 1, c: [200, 300], act: 'squish', snd: 'boop', count: 23,
     draw: function (p) {
-      bshape(p, 'path', { d: 'M128 436C112 468 134 506 176 512L200 484L224 512C266 506 288 468 272 436C252 450 226 454 200 454C174 454 148 450 128 436Z' });
-      dark(p, 'ellipse', { cx: 170, cy: 490, rx: 10, ry: 12, fill: '#4a4132' });
-      dark(p, 'ellipse', { cx: 230, cy: 490, rx: 10, ry: 12, fill: '#4a4132' });
+      function disc(y, w) { bshape(p, 'ellipse', { cx: 200, cy: f(y), rx: f(w / 2), ry: 2.6, fill: '#9fb7cf', stroke: '#5f7d99', 'stroke-width': 1.4 }); }
+      var i;
+      for (i = 0; i < 7; i++) { disc(158 + i * 8.2 + 7.5, 15 + i * 1.1); }
+      for (i = 0; i < 12; i++) { disc(216 + i * 13.7 + 12.4, 21 + i * 0.9); }
+      for (i = 0; i < 5; i++) { disc(384 + i * 13.6 + 12.7, 32 + i * 1.2); }
     }
   });
+  item('bones', 'cervical', {
+    n: 'Neck bones', alt: 'Cervical vertebrae', f: 'Seven small bones in your neck let your head nod and turn.',
+    mount: 'torso', lod: 1, c: [200, 185], act: 'rattle', snd: 'clack', count: 7,
+    draw: function (p) { for (var i = 0; i < 7; i++) { cerv(p, i); } }
+  });
+  item('bones', 'thoracic', {
+    n: 'Chest bones', alt: 'Thoracic vertebrae', f: 'Twelve bones in your back, each one holding a pair of ribs.',
+    mount: 'torso', lod: 1, c: [200, 298], act: 'rattle', snd: 'clack', count: 12,
+    draw: function (p) { for (var i = 0; i < 12; i++) { thor(p, i); } }
+  });
+  item('bones', 'lumbar', {
+    n: 'Lower back bones', alt: 'Lumbar vertebrae', f: 'Five big strong bones in your lower back do the heavy lifting.',
+    mount: 'torso', lod: 1, c: [200, 416], act: 'rattle', snd: 'clack', count: 5,
+    draw: function (p) { for (var i = 0; i < 5; i++) { lumb(p, i); } }
+  });
+  item('bones', 'sacrum', {
+    n: 'Sacrum', alt: 'And the tailbone', f: 'The sacrum is a triangle of joined bones at the bottom of your spine. The tiny tailbone hangs below.',
+    mount: 'torso', lod: 1, c: [200, 472], act: 'rattle', snd: 'clack',
+    draw: function (p) {
+      bshape(p, 'path', { d: 'M174 452L226 452L214 484L204 492L196 492L186 484Z' });
+      dark(p, 'path', { d: 'M190 462L190 462M200 462M210 462', stroke: BONE_D });
+      [[190, 462], [210, 462], [193, 474], [207, 474]].forEach(function (c) { dark(p, 'circle', { cx: c[0], cy: c[1], r: 2.4, fill: '#8d7d58' }); });
+      bshape(p, 'path', { d: 'M196 494L204 494L202 506L198 506Z' });
+    }
+  });
+
+  // ribs: 12 pairs, with the soft cartilage that joins them to the breastbone
+  function ribGeo(i) {
+    var sy = 222 + i * 13.6, hw = 28 + 48 * Math.sin(Math.PI * (i + 0.8) / 13.2), g = { sy: sy, hw: hw };
+    if (i < 7) { g.tx = 200 - 40; g.ty = 232 + i * 11 + 10; g.cx = 200 - 12; g.cy = 232 + i * 11; }
+    else if (i < 10) { g.tx = 200 - hw * 0.62; g.ty = sy + 30; g.cx = 200 - 24 + (i - 7) * 3; g.cy = 296 + (i - 7) * 6; }
+    else { g.tx = 200 - hw * 0.7; g.ty = sy + 22; }
+    return g;
+  }
+  function ribBone(p, i) {
+    var g = ribGeo(i), hw = g.hw;
+    ln(p, 'M194 ' + f(g.sy) + 'C' + f(200 - hw * 0.7) + ' ' + f(g.sy - 11) + ' ' + f(200 - hw * 1.04) + ' ' + f(g.sy + 4) + ' ' + f(200 - hw * 0.92) + ' ' + f(g.sy + 20) +
+      'S' + f(g.tx - 6) + ' ' + f(g.ty + 4) + ' ' + f(g.tx) + ' ' + f(g.ty), 5.5);
+  }
+  function ribCart(p, i) {
+    var g = ribGeo(i);
+    if (g.cx === undefined) { return; }
+    var d = 'M' + f(g.tx) + ' ' + f(g.ty) + 'Q' + f((g.tx + g.cx) / 2) + ' ' + f(g.ty + 2) + ' ' + f(g.cx) + ' ' + f(g.cy);
+    tube(p, d, 4.5, '#6f93ad', '#cfe3ee');
+  }
   item('bones', 'ribs', {
     n: 'Ribs', alt: 'Rib cage', f: 'Your ribs make a cage that guards your heart and lungs.',
-    mount: 'torso', c: [200, 300], act: 'rattle', snd: 'clack', count: 24,
-    draw: function (p) {
-      [-1, 1].forEach(function (sg) {
-        for (var i = 0; i < 12; i++) {
-          var y0 = 224 + i * 13.5;
-          var hw = 30 + 46 * Math.sin(Math.PI * (i + 1) / 13.5);
-          var ex = i < 7 ? 14 : hw * 0.5;
-          var d = 'M' + (200 + sg * 4) + ' ' + f(y0) +
-            'C' + f(200 + sg * hw * 0.8) + ' ' + f(y0 - 8) + ' ' + f(200 + sg * hw * 1.05) + ' ' + f(y0 + 10) + ' ' + f(200 + sg * hw * 0.75) + ' ' + f(y0 + 26) +
-            'S' + f(200 + sg * hw * 0.35) + ' ' + f(y0 + 30) + ' ' + f(200 + sg * ex) + ' ' + f(y0 + 28);
-          ln(p, d, 5.5);
-        }
-      });
-    }
+    mount: 'torso', lod: 0, pair: true, c: [160, 300], act: 'rattle', snd: 'clack', count: 24,
+    draw: function (p) { var i; for (i = 0; i < 12; i++) { ribCart(p, i); } for (i = 0; i < 12; i++) { ribBone(p, i); } }
+  });
+  item('bones', 'truerib', {
+    n: 'True ribs', f: 'The top seven pairs of ribs join the breastbone at the front.',
+    mount: 'torso', lod: 1, pair: true, c: [160, 268], act: 'rattle', snd: 'clack', count: 14,
+    draw: function (p) { for (var i = 0; i < 7; i++) { ribBone(p, i); } }
+  });
+  item('bones', 'falserib', {
+    n: 'False ribs', f: 'These three pairs join the rib above them, not the breastbone.',
+    mount: 'torso', lod: 1, pair: true, c: [160, 340], act: 'rattle', snd: 'clack', count: 6,
+    draw: function (p) { for (var i = 7; i < 10; i++) { ribBone(p, i); } }
+  });
+  item('bones', 'floatrib', {
+    n: 'Floating ribs', f: 'The bottom two pairs of ribs are not joined at the front at all.',
+    mount: 'torso', lod: 1, pair: true, c: [160, 372], act: 'rattle', snd: 'clack', count: 4,
+    draw: function (p) { for (var i = 10; i < 12; i++) { ribBone(p, i); } }
+  });
+  item('bones', 'costal', {
+    n: 'Rib cartilage', f: 'Bendy cartilage joins your ribs to your breastbone so your chest can swell when you breathe.',
+    mount: 'torso', lod: 1, pair: true, c: [176, 285], act: 'squish', snd: 'boop', count: 20,
+    draw: function (p) { for (var i = 0; i < 10; i++) { ribCart(p, i); } }
   });
   item('bones', 'sternum', {
     n: 'Breastbone', alt: 'Sternum', f: 'Your breastbone joins your ribs together at the front.',
     mount: 'torso', c: [200, 268], act: 'rattle', snd: 'clack',
     draw: function (p) {
-      bshape(p, 'rect', { x: 188, y: 222, width: 24, height: 84, rx: 11 });
-      bshape(p, 'path', { d: 'M193 304L207 304L200 322Z' });
+      bshape(p, 'path', { d: 'M186 224Q200 218 214 224L211 242L189 242Z' });
+      bshape(p, 'rect', { x: 189, y: 244, width: 22, height: 50, rx: 8 });
+      bshape(p, 'path', { d: 'M194 296L206 296L200 314Z' });
+      dark(p, 'ellipse', { cx: 200, cy: 224, rx: 5, ry: 2.5, fill: '#4a4132' });
     }
   });
   item('bones', 'clavicle', {
     n: 'Collarbone', alt: 'Clavicle', f: 'Your collarbones hold your shoulders out wide.',
-    mount: 'torso', pair: true, c: [160, 216], act: 'rattle', snd: 'clack', count: 2,
-    draw: function (p) { ln(p, 'M192 228C176 208 150 206 126 218', 8); }
+    mount: 'torso', pair: true, c: [160, 218], act: 'rattle', snd: 'clack', count: 2,
+    draw: function (p) { ln(p, 'M194 228C186 214 170 210 156 216C146 220 136 214 126 218', 8); bshape(p, 'circle', { cx: 126, cy: 218, r: 6 }); }
+  });
+  item('bones', 'pelvis', {
+    n: 'Pelvis', alt: 'Hip bones', f: 'Your pelvis holds up your body and joins your legs to it.',
+    mount: 'torso', pair: true, c: [160, 480], act: 'rattle', snd: 'clack', count: 2,
+    draw: function (p) {
+      bshape(p, 'path', { d: 'M198 454C176 454 146 450 128 438C112 462 118 498 142 512L156 522C166 528 178 526 186 518L192 508L198 508Z' });
+      dark(p, 'path', { d: 'M132 444C150 456 176 460 198 460', fill: 'none', stroke: BONE_D, 'stroke-width': 2 });
+      dark(p, 'ellipse', { cx: 166, cy: 494, rx: 11, ry: 12, fill: '#4a4132' });
+      dark(p, 'ellipse', { cx: 184, cy: 510, rx: 6, ry: 8, fill: '#4a4132' });
+    }
   });
   item('bones', 'skull', {
     n: 'Skull', f: 'Your skull is a hard helmet for your brain.',
     mount: 'head', c: [200, 92], act: 'rattle', snd: 'clack',
     draw: function (p) {
-      bshape(p, 'path', { d: 'M146 96C146 50 170 34 200 34C230 34 254 50 254 96C254 118 246 128 240 138L232 150L168 150L160 138C154 128 146 118 146 96Z' });
-      dark(p, 'ellipse', { cx: 180, cy: 100, rx: 14, ry: 16, fill: '#3a3226' });
-      dark(p, 'ellipse', { cx: 220, cy: 100, rx: 14, ry: 16, fill: '#3a3226' });
-      dark(p, 'path', { d: 'M200 114L192 134L208 134Z', fill: '#3a3226' });
-      dark(p, 'path', { d: 'M174 140L226 140M182 140L182 150M191 140L191 150M200 140L200 150M209 140L209 150M218 140L218 150', stroke: BONE_D, 'stroke-width': 2, fill: '#fff' });
+      bshape(p, 'path', { d: 'M146 98C144 56 168 32 200 32C232 32 256 56 254 98C254 112 250 122 244 130L240 142C236 150 228 154 222 154L178 154C172 154 164 150 160 142L156 130C150 122 146 112 146 98Z' });
+      dark(p, 'path', { d: 'M156 74C168 58 186 52 200 52C214 52 232 58 244 74', fill: 'none', stroke: BONE_D, 'stroke-width': 1.8, 'stroke-dasharray': '5 3' });
+      dark(p, 'path', { d: 'M200 33L200 52', fill: 'none', stroke: BONE_D, 'stroke-width': 1.8, 'stroke-dasharray': '5 3' });
+      dark(p, 'ellipse', { cx: 178, cy: 104, rx: 15, ry: 14, fill: '#3a3226' });
+      dark(p, 'ellipse', { cx: 222, cy: 104, rx: 15, ry: 14, fill: '#3a3226' });
+      dark(p, 'path', { d: 'M200 114C196 121 192 129 194 136L206 136C208 129 204 121 200 114Z', fill: '#3a3226' });
+      dark(p, 'path', { d: 'M160 118C166 128 172 134 180 138M240 118C234 128 228 134 220 138', fill: 'none', stroke: BONE_D, 'stroke-width': 2.2, 'stroke-linecap': 'round' });
+      dark(p, 'path', { d: 'M178 141L222 141L220 152L180 152Z', fill: '#fff', stroke: BONE_D, 'stroke-width': 1.5 });
+      dark(p, 'path', { d: 'M186 141L186 152M194 141L194 152M200 141L200 152M206 141L206 152M214 141L214 152', stroke: BONE_D, 'stroke-width': 1.3 });
     }
   });
   item('bones', 'jaw', {
     n: 'Jaw', alt: 'Mandible', f: 'Your jaw is the only bone in your head that moves.',
-    mount: 'head', c: [200, 168], act: 'chatter', snd: 'chatter',
+    mount: 'head', c: [200, 172], act: 'chatter', snd: 'chatter',
     draw: function (p) {
-      bshape(p, 'path', { d: 'M168 146L232 146C234 176 218 188 200 188C182 188 166 176 168 146Z' });
-      dark(p, 'path', { d: 'M174 146L226 146L226 156L174 156Z', fill: '#fff', stroke: BONE_D, 'stroke-width': 1.5 });
+      ln(p, 'M156 102L162 146Q170 184 200 188Q230 184 238 146L244 102', 9);
+      dark(p, 'path', { d: 'M178 156L222 156L220 166L180 166Z', fill: '#fff', stroke: BONE_D, 'stroke-width': 1.5 });
+      dark(p, 'path', { d: 'M186 156L186 166M194 156L194 166M200 156L200 166M206 156L206 166M214 156L214 166', stroke: BONE_D, 'stroke-width': 1.3 });
     }
   });
+
+  // arm bones
   item('bones', 'humerus', {
     n: 'Upper arm bone', alt: 'Humerus', f: 'The humerus is the bone in your upper arm.',
     mount: 'arm', limb: true, pair: true, c: [113, 286], act: 'rattle', snd: 'clack', move: 'arm', count: 2,
-    draw: function (p) { longBone(p, 128, 238, 99, 334, 13); }
+    draw: function (p) {
+      ln(p, 'M129 242C120 276 108 308 101 328', 12);
+      bshape(p, 'circle', { cx: 130, cy: 236, r: 11 });
+      bshape(p, 'circle', { cx: 91, cy: 336, r: 6.5 }); bshape(p, 'circle', { cx: 108, cy: 335, r: 8 });
+    }
   });
   item('bones', 'forearm', {
     n: 'Forearm bones', alt: 'Radius and ulna', f: 'Two bones in your forearm let your hand twist.',
-    mount: 'fore', limb: true, pair: true, c: [94, 390], act: 'rattle', snd: 'clack', move: 'elbow', count: 4,
-    draw: function (p) { longBone(p, 101, 350, 97, 428, 8); longBone(p, 93, 350, 85, 430, 8); }
+    mount: 'fore', limb: true, pair: true, lod: 0, c: [94, 390], act: 'rattle', snd: 'clack', move: 'elbow', count: 4,
+    draw: function (p) { longBone(p, 102, 350, 98, 428, 8); longBone(p, 92, 346, 85, 430, 8); }
   });
+  item('bones', 'radius', {
+    n: 'Radius', f: 'The radius is the forearm bone on the thumb side. It spins round when you turn your hand.',
+    mount: 'fore', limb: true, pair: true, lod: 1, c: [101, 392], act: 'rattle', snd: 'clack', move: 'elbow', count: 2,
+    draw: function (p) { ln(p, 'M104 348C103 376 100 404 98 424', 7); bshape(p, 'circle', { cx: 104, cy: 347, r: 6 }); bshape(p, 'ellipse', { cx: 97, cy: 430, rx: 10, ry: 6.5 }); }
+  });
+  item('bones', 'ulna', {
+    n: 'Ulna', f: 'The ulna is the forearm bone on the little finger side. Its top is the point of your elbow.',
+    mount: 'fore', limb: true, pair: true, lod: 1, c: [90, 392], act: 'rattle', snd: 'clack', move: 'elbow', count: 2,
+    draw: function (p) { ln(p, 'M92 346C90 376 87 404 86 424', 7); bshape(p, 'path', { d: 'M86 340C86 334 96 334 98 340L98 352L86 352Z' }); bshape(p, 'circle', { cx: 85, cy: 430, r: 5 }); }
+  });
+
+  // hands: the same drawing, whole or in pieces
+  var FING = [-26, -13, 0, 13, 26];
+  function fbone(p, x1, y1, x2, y2, w) {
+    ln(p, 'M' + f(x1) + ' ' + f(y1) + 'L' + f(x2) + ' ' + f(y2), w * 0.5);
+    bshape(p, 'circle', { cx: f(x1), cy: f(y1), r: f(w * 0.5), 'stroke-width': 1.3 });
+    bshape(p, 'circle', { cx: f(x2), cy: f(y2), r: f(w * 0.5), 'stroke-width': 1.3 });
+  }
+  function handPart(p, which) {
+    var i, pts = [];
+    if (which === 'carpals' || which === 'all') {
+      [[80, 442], [87, 439], [94, 439], [100, 443], [82, 450], [88, 448], [94, 448], [99, 451]].forEach(function (c) { bshape(p, 'circle', { cx: c[0], cy: c[1], r: 3.6 }); });
+    }
+    FING.forEach(function (a, k) {
+      var r = a * Math.PI / 180, sx = Math.sin(r), cy = Math.cos(r), x = 90, y = 450;
+      [[12, 'meta', 5], [10, 'phal', 4.2], [8, 'phal', 3.8], [6, 'phal', 3.4]].forEach(function (seg2) {
+        var nx = x + sx * seg2[0], ny = y + cy * seg2[0];
+        if (which === 'all' || (which === 'metacarpals' && seg2[1] === 'meta') || (which === 'phalanges' && seg2[1] === 'phal' && !(seg2[0] === 12))) {
+          fbone(p, x, y, nx, ny, seg2[2]);
+        }
+        x = nx; y = ny;
+      });
+    });
+    // thumb
+    var tx = 97, ty = 447, ta = 62 * Math.PI / 180;
+    [[10, 'meta', 4.8], [9, 'phal', 4], [8, 'phal', 3.4]].forEach(function (seg2) {
+      var nx = tx + Math.sin(ta) * seg2[0], ny = ty + Math.cos(ta) * seg2[0];
+      if (which === 'all' || (which === 'metacarpals' && seg2[1] === 'meta') || (which === 'phalanges' && seg2[1] === 'phal')) { fbone(p, tx, ty, nx, ny, seg2[2]); }
+      tx = nx; ty = ny;
+    });
+  }
   item('bones', 'handbones', {
     n: 'Hand bones', f: 'Each hand has 27 bones.',
-    mount: 'hand', limb: true, pair: true, c: [89, 462], act: 'rattle', snd: 'clack', move: 'hand', count: 54,
-    draw: function (p) {
-      [[86, 441, 5], [94, 441, 5.5], [90, 448, 5]].forEach(function (c) { bshape(p, 'circle', { cx: c[0], cy: c[1], r: c[2] }); });
-      [-26, -13, 0, 13, 26, 62].forEach(function (a, i) {
-        var r = a * Math.PI / 180, sx = Math.sin(r), cy = Math.cos(r);
-        var len = i === 5 ? [10, 9] : [15, 12, 9];
-        var bx = i === 5 ? 96 : 90, by = i === 5 ? 446 : 452, d = 'M' + bx + ' ' + by, x = bx, y = by, pts = [];
-        len.forEach(function (l) { x += sx * l; y += cy * l; pts.push([x, y]); d += 'L' + f(x) + ' ' + f(y); });
-        ln(p, d, 4.5);
-        pts.forEach(function (q) { bshape(p, 'circle', { cx: f(q[0]), cy: f(q[1]), r: 3.2 }); });
-      });
-    }
+    mount: 'hand', limb: true, pair: true, lod: 0, c: [89, 462], act: 'rattle', snd: 'clack', move: 'hand', count: 54,
+    draw: function (p) { handPart(p, 'all'); }
   });
+  item('bones', 'carpals', {
+    n: 'Wrist bones', alt: 'Carpals', f: 'Eight small wrist bones fit together like a puzzle so your hand can bend.',
+    mount: 'hand', limb: true, pair: true, lod: 1, c: [90, 444], act: 'rattle', snd: 'clack', move: 'hand', count: 16,
+    draw: function (p) { handPart(p, 'carpals'); }
+  });
+  item('bones', 'metacarpals', {
+    n: 'Palm bones', alt: 'Metacarpals', f: 'Five long bones make the palm of your hand.',
+    mount: 'hand', limb: true, pair: true, lod: 1, c: [90, 458], act: 'rattle', snd: 'clack', move: 'hand', count: 10,
+    draw: function (p) { handPart(p, 'metacarpals'); }
+  });
+  item('bones', 'phalanges', {
+    n: 'Finger bones', alt: 'Phalanges', f: 'Each finger has three bones. A thumb has just two.',
+    mount: 'hand', limb: true, pair: true, lod: 1, c: [90, 478], act: 'wriggle', snd: 'clack', move: 'hand', count: 28,
+    draw: function (p) { handPart(p, 'phalanges'); }
+  });
+
+  // leg bones
   item('bones', 'femur', {
     n: 'Thigh bone', alt: 'Femur', f: 'Your thigh bone is the longest, strongest bone you have.',
     mount: 'thigh', limb: true, pair: true, c: [164, 560], act: 'rattle', snd: 'clack', move: 'legs', count: 2,
-    draw: function (p) { longBone(p, 166, 502, 162, 620, 16); }
+    draw: function (p) {
+      ln(p, 'M176 504L160 522', 12);
+      ln(p, 'M160 520C162 560 163 590 163 612', 15);
+      bshape(p, 'circle', { cx: 178, cy: 500, r: 10.5 });
+      bshape(p, 'ellipse', { cx: 153, cy: 517, rx: 8, ry: 10 });
+      bshape(p, 'circle', { cx: 154, cy: 624, r: 11 }); bshape(p, 'circle', { cx: 173, cy: 624, r: 11.5 });
+    }
   });
   item('bones', 'kneecap', {
     n: 'Kneecap', alt: 'Patella', f: 'Your kneecap guards your knee joint.',
-    mount: 'shin', limb: true, pair: true, c: [160, 632], act: 'rattle', snd: 'clack', move: 'knee', count: 2,
-    draw: function (p) { bshape(p, 'path', { d: 'M147 626C147 618 173 618 173 626C173 640 166 648 160 648C154 648 147 640 147 626Z' }); }
+    mount: 'shin', limb: true, pair: true, c: [162, 632], act: 'rattle', snd: 'clack', move: 'knee', count: 2,
+    draw: function (p) { bshape(p, 'path', { d: 'M149 626C149 617 175 617 175 626C175 640 168 650 162 650C156 650 149 640 149 626Z' }); }
   });
   item('bones', 'tibia', {
-    n: 'Shin bone', alt: 'Tibia', f: 'The tibia carries your weight, with the thin fibula beside it.',
-    mount: 'shin', limb: true, pair: true, c: [153, 694], act: 'rattle', snd: 'clack', move: 'knee', count: 4,
-    draw: function (p) { longBone(p, 160, 654, 157, 736, 12); longBone(p, 145, 654, 143, 734, 6); }
+    n: 'Shin bone', alt: 'Tibia and fibula', f: 'The tibia carries your weight, with the thin fibula beside it.',
+    mount: 'shin', limb: true, pair: true, lod: 0, c: [153, 694], act: 'rattle', snd: 'clack', move: 'knee', count: 4,
+    draw: function (p) { longBone(p, 161, 656, 158, 736, 12); longBone(p, 144, 656, 142, 734, 6); }
   });
+  item('bones', 'tibiafine', {
+    n: 'Tibia', alt: 'Shin bone', f: 'The tibia is the big bone at the front of your lower leg. It carries your weight.',
+    mount: 'shin', limb: true, pair: true, lod: 1, c: [160, 696], act: 'rattle', snd: 'clack', move: 'knee', count: 2,
+    draw: function (p) {
+      ln(p, 'M161 650C161 690 160 712 158 732', 12);
+      bshape(p, 'rect', { x: 148, y: 640, width: 29, height: 11, rx: 5 });
+      bshape(p, 'path', { d: 'M164 734C160 744 152 744 150 738L152 730Z' });
+    }
+  });
+  item('bones', 'fibula', {
+    n: 'Fibula', f: 'The fibula is a thin bone beside the shin. It helps your ankle stay steady.',
+    mount: 'shin', limb: true, pair: true, lod: 1, c: [143, 692], act: 'rattle', snd: 'clack', move: 'knee', count: 2,
+    draw: function (p) { ln(p, 'M143 650C143 690 143 710 142 730', 6); bshape(p, 'circle', { cx: 143, cy: 646, r: 6 }); bshape(p, 'ellipse', { cx: 141, cy: 735, rx: 5, ry: 8 }); }
+  });
+  var TOES = [[108, 768], [111, 774], [117, 780], [127, 784], [139, 786]];
   item('bones', 'footbones', {
     n: 'Foot bones', f: 'Each foot has 26 bones.',
-    mount: 'foot', limb: true, pair: true, c: [135, 764], act: 'rattle', snd: 'clack', move: 'foot', count: 52,
+    mount: 'foot', limb: true, pair: true, lod: 0, c: [135, 764], act: 'rattle', snd: 'clack', move: 'foot', count: 52,
     draw: function (p) {
       [[154, 750, 7], [147, 757, 6.5], [159, 758, 6]].forEach(function (c) { bshape(p, 'circle', { cx: c[0], cy: c[1], r: c[2] }); });
-      [[108, 768], [111, 774], [117, 780], [127, 784], [139, 786]].forEach(function (e) {
-        ln(p, 'M148 762L' + e[0] + ' ' + e[1], 5.5);
-        bshape(p, 'circle', { cx: e[0], cy: e[1], r: 3.4 });
+      TOES.forEach(function (e) { ln(p, 'M148 762L' + e[0] + ' ' + e[1], 5.5); bshape(p, 'circle', { cx: e[0], cy: e[1], r: 3.4 }); });
+    }
+  });
+  item('bones', 'tarsals', {
+    n: 'Ankle bones', alt: 'Tarsals', f: 'Seven chunky bones make your heel and ankle. The heel bone is the biggest.',
+    mount: 'foot', limb: true, pair: true, lod: 1, c: [150, 760], act: 'rattle', snd: 'clack', move: 'foot', count: 14,
+    draw: function (p) {
+      bshape(p, 'ellipse', { cx: 162, cy: 764, rx: 10, ry: 7.5 });
+      bshape(p, 'circle', { cx: 153, cy: 751, r: 7.5 });
+      [[143, 758, 5.5], [149, 767, 5.5], [133, 757, 4.2], [129, 763, 4.2], [133, 769, 4.2]].forEach(function (c) { bshape(p, 'circle', { cx: c[0], cy: c[1], r: c[2] }); });
+    }
+  });
+  item('bones', 'metatarsals', {
+    n: 'Foot long bones', alt: 'Metatarsals', f: 'Five long bones make the middle of your foot.',
+    mount: 'foot', limb: true, pair: true, lod: 1, c: [128, 772], act: 'rattle', snd: 'clack', move: 'foot', count: 10,
+    draw: function (p) { TOES.forEach(function (e) { ln(p, 'M140 763L' + f(140 + (e[0] - 140) * 0.55) + ' ' + f(763 + (e[1] - 763) * 0.55), 5); }); }
+  });
+  item('bones', 'toebones', {
+    n: 'Toe bones', alt: 'Phalanges', f: 'Your big toe has two bones. The other toes have three.',
+    mount: 'foot', limb: true, pair: true, lod: 1, c: [116, 778], act: 'wriggle', snd: 'clack', move: 'foot', count: 28,
+    draw: function (p) { TOES.forEach(function (e) { var mx = 140 + (e[0] - 140) * 0.55, my = 763 + (e[1] - 763) * 0.55; ln(p, 'M' + f(mx) + ' ' + f(my) + 'L' + e[0] + ' ' + e[1], 3.8); bshape(p, 'circle', { cx: e[0], cy: e[1], r: 3 }); }); }
+  });
+
+  // ==================================================================
+  // MUSCLES
+  // ==================================================================
+  var MUSD = ['#b84a5a', '#6a1c2b', '#e58a95'], TEND = '#f3e6cd';
+  function tendon(p, d, w) { el('path', { d: d, fill: 'none', stroke: '#b9a98a', 'stroke-width': w + 2, 'stroke-linecap': 'round' }, p); el('path', { d: d, fill: 'none', stroke: TEND, 'stroke-width': w, 'stroke-linecap': 'round' }, p); }
+  function mshape(p, d, c) {
+    c = c || MUS;
+    el('path', { d: d, fill: c[0], stroke: c[1], 'stroke-width': 2, 'stroke-linejoin': 'round' }, p);
+  }
+  function mfibre(p, d, c) { el('path', { 'class': 'dt', d: d, fill: 'none', stroke: (c || MUS)[2], 'stroke-width': 1.8, 'stroke-opacity': 0.8, 'stroke-linecap': 'round' }, p); }
+
+  item('muscles', 'sternomastoid', {
+    n: 'Neck muscle', alt: 'Sternocleidomastoid', f: 'This strap of muscle turns your head and tips it to the side.',
+    mount: 'torso', pair: true, c: [172, 184], act: 'stretch', snd: 'boop', move: 'neck', count: 2,
+    draw: function (p) { tendon(p, 'M148 136L152 142', 5); spindle(p, 152, 142, 190, 222, 11, 0.5); tendon(p, 'M190 222L193 228', 4); }
+  });
+  item('muscles', 'trapezius', {
+    n: 'Trapezius', alt: 'Shoulder muscle', f: 'This big flat muscle lifts your shoulders when you shrug.',
+    mount: 'torso', pair: true, c: [160, 198], act: 'flex', snd: 'boop', move: 'shoulders', count: 2,
+    draw: function (p) {
+      mshape(p, 'M196 150Q178 172 154 192L128 214Q152 228 174 220Q190 212 200 222L200 156Z');
+      mfibre(p, 'M194 160Q176 184 140 214M194 176Q178 194 156 218M194 194Q184 206 172 220');
+    }
+  });
+  item('muscles', 'pecs', {
+    n: 'Chest muscle', alt: 'Pectoralis', f: 'Your chest muscles pull your arms in, like when you hug.',
+    mount: 'torso', pair: true, c: [168, 262], act: 'flex', snd: 'boop', count: 2,
+    draw: function (p) {
+      mshape(p, 'M198 230Q166 224 138 242Q146 274 170 294Q190 300 198 294Z');
+      mfibre(p, 'M142 246L194 238M146 256L194 254M152 268L194 270M160 282L194 286');
+    }
+  });
+  item('muscles', 'abs', {
+    n: 'Tummy muscles', alt: 'Abs', f: 'Your tummy muscles help you sit up, bend and keep your balance.',
+    mount: 'torso', c: [200, 352], act: 'flex', snd: 'boop',
+    draw: function (p) {
+      for (var r = 0; r < 4; r++) {
+        [-1, 1].forEach(function (sg) {
+          mshape(p, 'M' + (200 + sg * 2) + ' ' + (312 + r * 22) + 'h' + (sg * 15) + 'q' + (sg * 3) + ' 0 ' + (sg * 3) + ' 4v13q0 4 ' + (sg * -3) + ' 4h' + (sg * -15) + 'z');
+        });
+      }
+      el('path', { d: 'M200 308L200 402', stroke: TEND, 'stroke-width': 3, 'stroke-linecap': 'round' }, p);
+    }
+  });
+  item('muscles', 'obliques', {
+    n: 'Side tummy muscles', alt: 'Obliques', f: 'These muscles at your sides help you twist and lean.',
+    mount: 'torso', pair: true, c: [160, 360], act: 'flex', snd: 'boop', count: 2,
+    draw: function (p) {
+      mshape(p, 'M182 308Q156 316 136 344Q140 384 168 408Q178 404 182 396Q176 356 182 308Z');
+      mfibre(p, 'M180 316L146 350M180 336L150 372M178 360L156 394M178 382L166 402');
+    }
+  });
+  item('muscles', 'deltoid', {
+    n: 'Shoulder muscle', alt: 'Deltoid', f: 'The deltoid is the round cap of muscle that lifts your arm.',
+    mount: 'arm', limb: true, pair: true, c: [116, 240], act: 'flex', snd: 'boop', move: 'arm', count: 2,
+    draw: function (p) {
+      mshape(p, 'M128 210C106 208 90 226 92 258C104 270 126 262 140 240C146 224 142 212 128 210Z');
+      mfibre(p, 'M124 214C108 222 100 240 98 256M130 216C120 230 114 246 114 262M136 224C132 236 128 246 124 256');
+    }
+  });
+  item('muscles', 'triceps', {
+    n: 'Back of arm muscle', alt: 'Triceps', f: 'The triceps straightens your elbow when you push.',
+    mount: 'arm', limb: true, pair: true, c: [104, 290], act: 'flex', snd: 'boop', move: 'elbow', count: 2,
+    draw: function (p) { spindle(p, 108, 252, 91, 336, 20, 0.4, MUSD); }
+  });
+  item('muscles', 'biceps', {
+    n: 'Biceps', alt: 'Front of arm muscle', f: 'The biceps bunches up when you bend your arm to show your muscles.',
+    mount: 'arm', limb: true, pair: true, c: [117, 292], act: 'flex', snd: 'boop', move: 'elbow', count: 2,
+    draw: function (p) { tendon(p, 'M124 244L123 250', 4); spindle(p, 123, 250, 106, 332, 26, 0.45); tendon(p, 'M106 332L104 344', 4); }
+  });
+  item('muscles', 'forearmmuscles', {
+    n: 'Forearm muscles', f: 'Your forearm muscles pull on long tendons to make your fingers move.',
+    mount: 'fore', limb: true, pair: true, c: [96, 385], act: 'flex', snd: 'boop', move: 'hand', count: 2,
+    draw: function (p) {
+      spindle(p, 103, 345, 94, 412, 24, 0.28);
+      [[100, 411, 98, 440], [95, 411, 91, 442], [91, 410, 86, 440]].forEach(function (t) { tendon(p, 'M' + t[0] + ' ' + t[1] + 'L' + t[2] + ' ' + t[3], 2.4); });
+    }
+  });
+  item('muscles', 'quads', {
+    n: 'Thigh muscles', alt: 'Quadriceps', f: 'The quadriceps is made of four muscles. They straighten your leg and help you jump.',
+    mount: 'thigh', limb: true, pair: true, c: [164, 562], act: 'flex', snd: 'boop', move: 'legs', count: 8,
+    draw: function (p) {
+      spindle(p, 153, 508, 152, 620, 26, 0.4, MUSD);
+      spindle(p, 176, 524, 171, 620, 22, 0.7, MUSD);
+      spindle(p, 165, 504, 163, 618, 24, 0.45);
+      tendon(p, 'M163 614L162 632', 4);
+    }
+  });
+  item('muscles', 'sartorius', {
+    n: 'Sartorius', alt: 'The tailor muscle', f: 'The longest muscle in your body crosses your thigh like a ribbon. It helps you sit cross-legged.',
+    mount: 'thigh', limb: true, pair: true, c: [166, 565], act: 'stretch', snd: 'boop', move: 'legs', count: 2,
+    draw: function (p) { spindle(p, 152, 500, 178, 622, 8, 0.5, ['#e07a86', '#7d2433', '#f6c0c6']); }
+  });
+  item('muscles', 'shinmuscle', {
+    n: 'Shin muscle', alt: 'Tibialis', f: 'This muscle lifts your foot up so you do not trip over your toes.',
+    mount: 'shin', limb: true, pair: true, c: [152, 690], act: 'flex', snd: 'boop', move: 'foot', count: 2,
+    draw: function (p) { spindle(p, 152, 646, 156, 722, 14, 0.3); tendon(p, 'M156 720L154 744', 3.5); }
+  });
+  item('muscles', 'calf', {
+    n: 'Calf muscle', alt: 'Gastrocnemius', f: 'Your calf muscle pushes you up on your toes. It is the start of every step.',
+    mount: 'shin', limb: true, pair: true, c: [172, 670], act: 'flex', snd: 'boop', move: 'foot', count: 2,
+    draw: function (p) { spindle(p, 172, 640, 166, 716, 22, 0.3, MUSD); tendon(p, 'M166 714L162 746', 4); }
+  });
+  item('muscles', 'forehead', {
+    n: 'Forehead muscle', alt: 'Frontalis', f: 'This muscle lifts your eyebrows when you are surprised.',
+    mount: 'head', c: [200, 64], act: 'flex', snd: 'boop',
+    draw: function (p) { mshape(p, 'M160 64Q200 40 240 64L238 84Q200 70 162 84Z'); mfibre(p, 'M172 62L172 80M186 56L186 76M200 54L200 74M214 56L214 76M228 62L228 80'); }
+  });
+  item('muscles', 'eyering', {
+    n: 'Eye muscle ring', alt: 'Orbicularis oculi', f: 'A ring of muscle closes your eyelids when you blink or squint.',
+    mount: 'head', pair: true, c: [172, 108], act: 'squeeze', snd: 'blink', count: 2,
+    draw: function (p) {
+      el('ellipse', { cx: 172, cy: 108, rx: 25, ry: 22, fill: MUS[0], stroke: MUS[1], 'stroke-width': 2 }, p);
+      el('ellipse', { cx: 172, cy: 108, rx: 13, ry: 12, fill: '#2a2040', stroke: MUS[1], 'stroke-width': 2 }, p);
+      mfibre(p, 'M172 86L172 94M172 122L172 130M150 108L158 108M186 108L194 108M156 94L162 99M188 117L194 123M156 122L162 117M188 99L194 94');
+    }
+  });
+  item('muscles', 'cheek', {
+    n: 'Chewing muscle', alt: 'Masseter', f: 'This is one of the strongest muscles for its size. It closes your jaw when you chew.',
+    mount: 'head', pair: true, c: [158, 136], act: 'flex', snd: 'chatter', count: 2,
+    draw: function (p) { spindle(p, 150, 112, 164, 158, 18, 0.5); }
+  });
+  item('muscles', 'smile', {
+    n: 'Smile muscle', alt: 'Zygomaticus', f: 'It takes about a dozen little muscles to make a smile.',
+    mount: 'head', pair: true, c: [180, 144], act: 'flex', snd: 'giggle', count: 2,
+    draw: function (p) { spindle(p, 160, 132, 188, 156, 9, 0.5, ['#e07a86', '#7d2433', '#f6c0c6']); }
+  });
+  item('muscles', 'lips', {
+    n: 'Lip muscle', alt: 'Orbicularis oris', f: 'A ring of muscle around your mouth makes kisses, whistles and funny faces.',
+    mount: 'head', c: [200, 160], act: 'squeeze', snd: 'giggle',
+    draw: function (p) {
+      el('ellipse', { cx: 200, cy: 160, rx: 27, ry: 13, fill: MUS[0], stroke: MUS[1], 'stroke-width': 2 }, p);
+      el('ellipse', { cx: 200, cy: 160, rx: 14, ry: 4.5, fill: '#2a1020' }, p);
+      mfibre(p, 'M176 160L186 160M214 160L224 160M200 148L200 154M200 166L200 172');
+    }
+  });
+
+  // ==================================================================
+  // CLOSE-UP: THE EYE (seen from the side, front on the left)
+  // ==================================================================
+  newScene('eye', { n: 'Eye', bg: 'url(#gBub)' });
+  (function () {
+    var sc = SCN.eye, b = sc.back, fr = sc.front;
+    // the socket, behind everything
+    el('ellipse', { cx: 40, cy: 0, rx: 150, ry: 150, fill: '#3b2a3a', opacity: 0.35 }, b);
+    // light rays are drawn on the canvas; their paths:
+    sc.flows = [
+      { scene: 'eye', pts: [[-190, -70], [-112, -32], [-44, -14], [120, 0]], col: '#ffe27a', n: 4, spd: 120, r: 3.6 },
+      { scene: 'eye', pts: [[-190, 0], [120, 0]], col: '#ffe27a', n: 5, spd: 120, r: 3.6 },
+      { scene: 'eye', pts: [[-190, 70], [-112, 32], [-44, 14], [120, 0]], col: '#ffe27a', n: 4, spd: 120, r: 3.6 }
+    ];
+    sc.flows.forEach(function (o) {
+      el('path', { d: 'M' + o.pts.map(function (q) { return q[0] + ' ' + q[1]; }).join('L'), fill: 'none', stroke: '#ffe27a', 'stroke-opacity': 0.28, 'stroke-width': 2, 'stroke-dasharray': '6 6' }, fr);
+    });
+    sc.idle = function (now, TF) {
+      put(TF, 'iris', [0, 0, 0, 1, 1 + 0.18 * Math.sin(now / 1100)]);
+    };
+    // lower lid sits behind the eye, upper lid is a part you can tap
+    el('path', { d: 'M-130 60Q-70 110 0 80L0 100Q-70 140 -134 90Z', 'class': 'skf sko', 'stroke-width': 3, 'stroke-linejoin': 'round' }, b);
+  })();
+  item(null, 'eyemuscles', {
+    n: 'Eye muscles', f: 'Six little muscles turn each eyeball so you can look all around.', 'in': 'eye',
+    c: [84, -100], act: 'stretch', snd: 'boop',
+    draw: function (p) {
+      spindle(p, 40, -124, 128, -78, 24, 0.5);
+      spindle(p, 40, 124, 128, 78, 24, 0.5);
+      tendon(p, 'M122 -80L108 -66', 4); tendon(p, 'M122 80L108 66', 4);
+    }
+  });
+  item(null, 'sclera', {
+    n: 'White of the eye', alt: 'Sclera', f: 'The white part is tough. It holds your eye in its round shape.', 'in': 'eye',
+    c: [60, -70], act: 'squish', snd: 'boop',
+    draw: function (p) {
+      el('path', { d: 'M-62 -52A100 100 0 1 1 -62 52', transform: 'translate(0 0)', fill: '#f7f4ea', stroke: '#c7bfa8', 'stroke-width': 7, 'stroke-linecap': 'round' }, p);
+      el('path', { 'class': 'dt', d: 'M-30 -78C20 -104 80 -92 110 -48', fill: 'none', stroke: '#fff', 'stroke-opacity': 0.6, 'stroke-width': 6, 'stroke-linecap': 'round' }, p);
+    }
+  });
+  item(null, 'vitreous', {
+    n: 'Eye jelly', alt: 'Vitreous humour', f: 'Clear jelly fills the middle of your eye and keeps it round.', 'in': 'eye',
+    c: [40, 0], act: 'wobble', snd: 'blop',
+    draw: function (p) {
+      el('path', { d: 'M-30 -72.7A90 90 0 1 1 -30 72.7Z', transform: 'translate(0 0)', fill: '#cfe8f7', stroke: '#9cc6e0', 'stroke-width': 2 }, p);
+      el('path', { 'class': 'dt', d: 'M0 -60C40 -76 78 -60 92 -26', fill: 'none', stroke: '#fff', 'stroke-opacity': 0.7, 'stroke-width': 7, 'stroke-linecap': 'round' }, p);
+      [[30, 20], [64, -14], [20, -30], [74, 36]].forEach(function (c) { el('circle', { 'class': 'dt', cx: c[0], cy: c[1], r: 3, fill: '#fff', opacity: 0.6 }, p); });
+    }
+  });
+  item(null, 'retina', {
+    n: 'Retina', f: 'The retina at the back of your eye turns light into signals.', 'in': 'eye',
+    c: [118, 0], act: 'glow', snd: 'sparkle',
+    draw: function (p) {
+      ln(p, 'M72.6 -76.3A91 91 0 0 1 72.6 76.3', 9).setAttribute('stroke', '#f29a6a');
+      p.lastChild.previousSibling.setAttribute('stroke', '#b05a2c');
+      el('circle', { 'class': 'dt', cx: 113, cy: 0, r: 6, fill: '#ffd24d', stroke: '#b58a00', 'stroke-width': 1.5 }, p);
+      el('path', { 'class': 'dt', d: 'M110 20C100 40 92 56 84 68M110 20C116 40 114 56 108 70M110 20C106 8 98 -8 90 -22', fill: 'none', stroke: '#c0364a', 'stroke-width': 2, 'stroke-linecap': 'round' }, p);
+      hitLine(p, 'M72.6 -76.3A91 91 0 0 1 72.6 76.3', 26);
+    }
+  });
+  item(null, 'opticnerve', {
+    n: 'Optic nerve', f: 'This nerve carries what you see to your brain.', 'in': 'eye',
+    c: [156, 34], act: 'glow', snd: 'zap',
+    draw: function (p) {
+      tube(p, 'M110 22C138 26 160 34 188 46', 17, '#b58a00', '#f6d34a');
+      el('path', { 'class': 'dt', d: 'M124 20C146 24 164 32 186 42M124 26C146 30 164 38 186 50', fill: 'none', stroke: '#fff', 'stroke-opacity': 0.5, 'stroke-width': 1.6 }, p);
+    }
+  });
+  item(null, 'lens', {
+    n: 'Lens', f: 'The lens bends light so the picture is sharp. It changes shape to focus.', 'in': 'eye',
+    c: [-46, 0], act: 'focus', snd: 'boop',
+    draw: function (p) {
+      el('ellipse', { cx: -46, cy: 0, rx: 15, ry: 36, fill: '#e4f4ff', stroke: '#8fb7d8', 'stroke-width': 3 }, p);
+      el('path', { 'class': 'dt', d: 'M-50 -22C-54 -8 -54 8 -50 22', fill: 'none', stroke: '#fff', 'stroke-width': 4, 'stroke-linecap': 'round' }, p);
+      el('path', { 'class': 'dt', d: 'M-44 -42L-38 -52M-44 42L-38 52', stroke: '#c97a5a', 'stroke-width': 5, 'stroke-linecap': 'round' }, p);
+    }
+  });
+  item(null, 'iris', {
+    n: 'Iris', alt: 'The coloured part', f: 'The iris is the coloured ring. It makes the pupil bigger or smaller.', 'in': 'eye',
+    c: [-68, 0], act: 'pupil', snd: 'blink',
+    draw: function (p) {
+      ln(p, 'M-68 -56L-68 -22', 11).setAttribute('stroke', '#4a8ed0'); p.lastChild.previousSibling.setAttribute('stroke', '#274f80');
+      ln(p, 'M-68 56L-68 22', 11).setAttribute('stroke', '#4a8ed0'); p.lastChild.previousSibling.setAttribute('stroke', '#274f80');
+      hitLine(p, 'M-68 -56L-68 56', 30);
+    }
+  });
+  item(null, 'cornea', {
+    n: 'Cornea', f: 'The cornea is a clear window at the front. It starts to bend the light.', 'in': 'eye',
+    c: [-92, 0], act: 'glow', snd: 'sparkle',
+    draw: function (p) {
+      el('path', { d: 'M-62 -52Q-116 -34 -116 0Q-116 34 -62 52Q-90 0 -62 -52Z', fill: '#d8f0ff', 'fill-opacity': 0.75, stroke: '#8fc2e6', 'stroke-width': 3, 'stroke-linejoin': 'round' }, p);
+      el('path', { 'class': 'dt', d: 'M-100 -22Q-106 0 -100 22', fill: 'none', stroke: '#fff', 'stroke-width': 4, 'stroke-linecap': 'round' }, p);
+    }
+  });
+  item(null, 'eyelid', {
+    n: 'Eyelid', f: 'Eyelids blink to keep your eye wet and clean.', 'in': 'eye',
+    c: [-62, -88], act: 'lid', snd: 'blink',
+    draw: function (p) {
+      el('path', { d: 'M-134 -92Q-70 -140 6 -92L-6 -66Q-70 -104 -124 -62Z', 'class': 'skf sko', 'stroke-width': 3, 'stroke-linejoin': 'round' }, p);
+      [[-122, -70, -132, -50], [-102, -86, -110, -62], [-82, -94, -88, -70], [-62, -96, -64, -72]].forEach(function (l) {
+        el('path', { d: 'M' + l[0] + ' ' + l[1] + 'L' + l[2] + ' ' + l[3], 'class': 'hrs', 'stroke-width': 4, 'stroke-linecap': 'round' }, p);
       });
     }
   });
 
-  // ---------- organs ----------
-  function bean(p, fill) {
-    el('path', { d: 'M2 -22C16 -20 20 -2 14 12C10 24 -4 26 -8 16C-6 10 -6 4 -10 -2C-14 -12 -8 -22 2 -22Z', fill: fill, stroke: '#6e2432', 'stroke-width': 2 }, p);
-    el('path', { d: 'M-4 -12C-8 -2 -2 6 0 14', fill: 'none', stroke: '#fff', 'stroke-opacity': 0.3, 'stroke-width': 3, 'stroke-linecap': 'round', 'class': 'dt' }, p);
+  // ==================================================================
+  // HEART AND BLOOD
+  // ==================================================================
+  var ART = ['#7f1426', '#e0405a'], VEN = ['#24407f', '#5a82d6'];
+  function vessel(p, d, w, c, extra) {
+    var n = tube(p, d, w, c[0], c[1], extra);
+    hitLine(p, d, Math.max(24, w + 16));
+    return n;
   }
-  item('organs', 'kidneys', {
-    n: 'Kidneys', f: 'Your kidneys clean your blood and make wee.',
-    mount: 'torso', c: [200, 392], act: 'squeeze', snd: 'blop', count: 2,
+  function vpair(p, ad, vd, wa, wv) { vessel(p, vd, wv || wa, VEN); vessel(p, ad, wa, ART); }
+
+  item('blood', 'heart', {
+    n: 'Heart', f: 'Your heart is a muscle that pumps blood all round your body.',
+    mount: 'torso', c: [214, 298], act: 'beat', snd: 'thump', open: 'heart',
     draw: function (p) {
-      var a = el('g', { transform: 'translate(138 392) rotate(14)' }, p); bean(a, '#9a3d4e');
-      var b = el('g', { transform: 'translate(262 392) scale(-1 1) rotate(14)' }, p); bean(b, '#9a3d4e');
+      blob(p, 'M192 298C190 312 202 328 224 330C240 326 248 304 240 286C236 274 226 268 214 270L206 276C200 282 194 288 192 298Z', '#d9364f', '#7f1426', 2.2);
+      blob(p, 'M192 276C184 282 184 296 190 304C198 300 206 296 208 286C208 278 202 272 192 276Z', '#bf2a4a', '#7f1426', 2);
+      blob(p, 'M226 270C236 264 246 272 242 284C236 282 230 278 226 270Z', '#bf2a4a', '#7f1426', 2);
+      el('path', { 'class': 'dt', d: 'M208 280C214 298 220 314 226 326M214 276C226 284 236 296 238 306', fill: 'none', stroke: '#f6a8b2', 'stroke-width': 2.4, 'stroke-linecap': 'round' }, p);
+      shine(p, 'M200 300C200 310 206 318 212 322', 3, 0.5);
     }
   });
-  item('organs', 'large', {
-    n: 'Large intestine', alt: 'Colon', f: 'The large intestine soaks up water from leftovers.',
-    mount: 'torso', c: [200, 420], act: 'wriggle', snd: 'gurgle',
+  item('blood', 'aorta', {
+    n: 'Aorta', f: 'The aorta is your biggest blood tube. It carries fresh blood away from your heart.',
+    mount: 'torso', c: [212, 360], act: 'wriggle', snd: 'thump', open: 'blood',
     draw: function (p) {
-      var d = 'M168 466L158 466L158 380L242 380L242 466L232 466C226 474 212 462 206 470';
-      ln(p, d, 17).setAttribute('stroke', '#e0b04c');
-      p.lastChild.previousSibling.setAttribute('stroke', '#a87a1f');
-      el('path', { d: d, fill: 'none', stroke: '#fff', 'stroke-opacity': 0.4, 'stroke-width': 17, 'stroke-dasharray': '2 11', 'class': 'ln dt' }, p);
-      hitLine(p, d, 30);
+      vessel(p, 'M219 276L219 252C219 238 233 234 235 247C236 258 222 262 213 268L209 300L208 400L207 468', 9, ART);
+      vessel(p, 'M207 468L192 488M207 468L222 488', 7, ART);
+      vessel(p, 'M225 240C214 228 204 222 198 218', 6, ART);
     }
   });
-  item('organs', 'small', {
-    n: 'Small intestine', f: 'The small intestine takes the goodness from your food.',
-    mount: 'torso', c: [200, 424], act: 'wriggle', snd: 'gurgle',
+  item('blood', 'venacava', {
+    n: 'Big veins', alt: 'Vena cava', f: 'These two big veins bring tired blood back to your heart.',
+    mount: 'torso', c: [196, 320], act: 'wriggle', snd: 'thump', open: 'blood',
     draw: function (p) {
-      var d = 'M178 398Q200 388 224 398Q234 408 216 412Q190 416 178 412Q166 420 184 426Q210 430 226 428Q238 438 218 442Q196 446 180 442Q168 450 188 454Q210 456 224 452';
-      ln(p, d, 11);
-      p.lastChild.setAttribute('stroke', '#f27f9a'); p.lastChild.previousSibling.setAttribute('stroke', '#a8405c');
-      hitLine(p, d, 24);
+      vessel(p, 'M196 466L197 400L198 340L202 314', 9, VEN);
+      vessel(p, 'M196 208L197 250L199 276', 9, VEN);
     }
   });
-  item('organs', 'bladder', {
-    n: 'Bladder', f: 'Your bladder holds wee until you go to the toilet.',
-    mount: 'torso', c: [200, 488], act: 'fill', snd: 'drip',
+  item('blood', 'pulmonary', {
+    n: 'Lung blood tubes', alt: 'Pulmonary vessels', f: 'Blue tubes carry blood to your lungs to pick up oxygen. Red tubes bring it back.',
+    mount: 'torso', c: [208, 272], act: 'wriggle', snd: 'thump', open: 'blood',
     draw: function (p) {
-      el('path', { d: 'M200 470C216 470 220 484 218 494C216 504 208 508 200 508C192 508 184 504 182 494C180 484 184 470 200 470Z', fill: '#f2d96b', stroke: '#a08a1f', 'stroke-width': 2 }, p);
-      el('path', { 'class': 'dt', d: 'M192 482Q190 492 194 498', fill: 'none', stroke: '#fff', 'stroke-opacity': 0.6, 'stroke-width': 3, 'stroke-linecap': 'round' }, p);
+      vessel(p, 'M170 284C190 286 206 284 222 280M254 284C244 286 236 284 232 280', 6, ART);
+      vessel(p, 'M208 280L208 258C196 250 182 254 166 266M208 258C220 250 234 254 248 266', 7, VEN);
     }
   });
-  item('organs', 'liver', {
-    n: 'Liver', f: 'Your liver cleans your blood and helps with your food.',
-    mount: 'torso', c: [170, 356], act: 'wobble', snd: 'blop',
+  item('blood', 'neckvessels', {
+    n: 'Neck blood tubes', alt: 'Carotid artery and jugular vein', f: 'Blood climbs up your neck to your head. You can feel it as a pulse.',
+    mount: 'torso', pair: true, c: [188, 190], act: 'wriggle', snd: 'thump', open: 'blood', count: 4,
+    draw: function (p) { vpair(p, 'M195 220C194 200 192 180 190 160', 'M185 214C184 196 182 178 180 160', 6, 5.5); }
+  });
+  item('blood', 'shoulderblood', {
+    n: 'Shoulder blood tubes', alt: 'Subclavian vessels', f: 'These tubes run under your collarbone out to your arm.',
+    mount: 'torso', pair: true, c: [160, 228], act: 'wriggle', snd: 'thump', count: 4,
+    draw: function (p) { vpair(p, 'M200 222C180 214 152 218 130 236', 'M200 232C180 226 154 230 134 246', 6.5, 6); }
+  });
+  item('blood', 'headvessels', {
+    n: 'Face blood tubes', f: 'Tiny tubes bring blood to your face. They make your cheeks pink when you run.',
+    mount: 'head', pair: true, c: [178, 108], act: 'wriggle', snd: 'thump', count: 4,
     draw: function (p) {
-      el('path', { d: 'M120 340C150 328 190 332 218 342C226 354 218 374 200 378C170 382 140 368 120 340Z', fill: '#a8523a', stroke: '#5f2a1b', 'stroke-width': 2 }, p);
-      el('path', { 'class': 'dt', d: 'M132 346C156 340 184 342 206 350', fill: 'none', stroke: '#fff', 'stroke-opacity': 0.25, 'stroke-width': 4, 'stroke-linecap': 'round' }, p);
+      vessel(p, 'M180 162C170 148 162 132 163 112C164 96 170 84 182 76', 5, VEN);
+      vessel(p, 'M190 162C176 148 170 132 172 112C173 96 178 84 188 76M190 162C192 134 192 100 196 66', 4.5, ART);
     }
   });
-  item('organs', 'stomach', {
-    n: 'Stomach', f: 'Your stomach mashes food into a soup.',
-    mount: 'torso', c: [244, 364], act: 'squish', snd: 'gurgle',
+  item('blood', 'armvessels', {
+    n: 'Arm blood tubes', f: 'A red tube takes blood down your arm and a blue one brings it back up.',
+    mount: 'arm', limb: true, pair: true, c: [112, 290], act: 'wriggle', snd: 'thump', move: 'arm', count: 4,
+    draw: function (p) { vpair(p, 'M126 240C122 262 112 300 103 338', 'M131 242C127 264 117 302 109 338', 5.5, 5); }
+  });
+  item('blood', 'forearmvessels', {
+    n: 'Forearm blood tubes', f: 'You can see blue veins through the skin on the inside of your wrist.',
+    mount: 'fore', limb: true, pair: true, c: [95, 390], act: 'wriggle', snd: 'thump', move: 'elbow', count: 4,
+    draw: function (p) { vpair(p, 'M101 346C101 380 97 410 95 432', 'M96 346C96 380 91 410 89 432', 4.5, 4.2); }
+  });
+  item('blood', 'handvessels', {
+    n: 'Hand blood tubes', f: 'Blood reaches right to the tips of your fingers to keep them warm.',
+    mount: 'hand', limb: true, pair: true, c: [90, 462], act: 'wriggle', snd: 'thump', move: 'hand', count: 4,
     draw: function (p) {
-      el('path', { d: 'M222 340C250 330 274 346 268 374C264 396 236 400 224 388C216 380 226 376 232 376C244 374 248 362 238 356C228 352 220 350 222 340Z', fill: '#f0a56f', stroke: '#a85b2a', 'stroke-width': 2 }, p);
-      el('path', { 'class': 'dt', d: 'M250 346C262 350 264 362 260 372', fill: 'none', stroke: '#fff', 'stroke-opacity': 0.4, 'stroke-width': 4, 'stroke-linecap': 'round' }, p);
+      var ad = 'M95 438C93 446 90 450 90 450', vd = 'M88 438C86 446 86 450 88 452';
+      FING.forEach(function (a) {
+        var r = a * Math.PI / 180;
+        ad += 'M90 450L' + f(90 + Math.sin(r) * 34) + ' ' + f(450 + Math.cos(r) * 34);
+        vd += 'M88 452L' + f(88 + Math.sin(r) * 31) + ' ' + f(452 + Math.cos(r) * 31);
+      });
+      vessel(p, vd, 2.6, VEN); vessel(p, ad, 2.6, ART);
     }
   });
-  item('organs', 'foodpipe', {
-    n: 'Food pipe', alt: 'Oesophagus', f: 'Food slides down this tube to your stomach.',
-    mount: 'torso', c: [214, 262], act: 'swallow', snd: 'gulp',
+  item('blood', 'thighvessels', {
+    n: 'Leg blood tubes', f: 'The big blood tubes in your leg are the femoral artery and vein.',
+    mount: 'thigh', limb: true, pair: true, c: [164, 565], act: 'wriggle', snd: 'thump', move: 'legs', count: 4,
+    draw: function (p) { vpair(p, 'M174 506C170 540 166 580 162 622', 'M164 508C160 542 156 582 153 622', 6, 5.5); }
+  });
+  item('blood', 'shinvessels', {
+    n: 'Shin blood tubes', f: 'Blood has a long way to go to your toes, and a long way back up.',
+    mount: 'shin', limb: true, pair: true, c: [158, 690], act: 'wriggle', snd: 'thump', move: 'knee', count: 4,
+    draw: function (p) { vpair(p, 'M162 640C161 680 160 714 158 740', 'M153 640C152 680 152 714 152 740', 5, 4.6); }
+  });
+  item('blood', 'footvessels', {
+    n: 'Foot blood tubes', f: 'Even your toes get a fresh supply of blood.',
+    mount: 'foot', limb: true, pair: true, c: [136, 766], act: 'wriggle', snd: 'thump', move: 'foot', count: 4,
     draw: function (p) {
-      var d = 'M206 172L206 236Q210 280 226 310Q232 326 232 346';
-      ln(p, d, 9);
-      p.lastChild.setAttribute('stroke', '#e07c7c'); p.lastChild.previousSibling.setAttribute('stroke', '#a64343');
-      hitLine(p, d, 26);
+      var ad = 'M158 744C152 756 146 762 140 764', vd = 'M152 744C148 754 144 760 138 762';
+      TOES.forEach(function (e) { ad += 'M140 764L' + e[0] + ' ' + e[1]; });
+      vessel(p, vd, 3, VEN); vessel(p, ad, 3, ART);
     }
   });
-  item('organs', 'windpipe', {
-    n: 'Windpipe', alt: 'Trachea', f: 'Air goes down your windpipe to your lungs.',
-    mount: 'torso', c: [200, 214], act: 'air', snd: 'whoosh',
+
+  // ==================================================================
+  // BREATHING
+  // ==================================================================
+  var AIRC = ['#5f8aa3', '#bfe3f2'];
+  item('breath', 'sinuses', {
+    n: 'Sinuses', f: 'Sinuses are air pockets inside your skull. They make your head lighter.',
+    mount: 'head', pair: true, c: [176, 100], act: 'air', snd: 'whoosh', count: 4,
     draw: function (p) {
-      var d = 'M194 168L194 236M194 236L170 264M194 236L218 262';
-      ln(p, d, 12);
-      p.lastChild.setAttribute('stroke', '#9cc3d6'); p.lastChild.previousSibling.setAttribute('stroke', '#5f8aa3');
-      el('path', { 'class': 'ln dt', d: 'M194 172L194 232', fill: 'none', stroke: '#fff', 'stroke-opacity': 0.55, 'stroke-width': 12, 'stroke-dasharray': '2.5 6' }, p);
+      blob(p, 'M170 70C170 62 192 62 194 70C194 78 170 80 170 70Z', '#d6ecf8', '#6f9cbc', 2);
+      blob(p, 'M160 122C158 112 172 108 178 114C184 122 176 134 168 134C162 134 160 128 160 122Z', '#d6ecf8', '#6f9cbc', 2);
+    }
+  });
+  item('breath', 'nasal', {
+    n: 'Nose inside', alt: 'Nasal cavity', f: 'Air is warmed and cleaned inside your nose before it goes to your lungs.',
+    mount: 'head', c: [200, 126], act: 'air', snd: 'sniff', open: 'nose',
+    draw: function (p) {
+      blob(p, 'M188 138C184 124 188 110 200 104C212 110 216 124 212 138Z', '#f4b9b0', '#b0605a', 2.2);
+      el('path', { 'class': 'dt', d: 'M192 128C196 122 204 122 208 128M193 118C197 113 203 113 207 118M192 136C196 132 204 132 208 136', fill: 'none', stroke: '#c8756e', 'stroke-width': 2.4, 'stroke-linecap': 'round' }, p);
+      el('path', { 'class': 'dt', d: 'M192 140L192 144M196 140L196 145M204 140L204 145M208 140L208 144', stroke: '#6b4423', 'stroke-width': 1.6, 'stroke-linecap': 'round' }, p);
+    }
+  });
+  item('breath', 'throat', {
+    n: 'Throat', alt: 'Pharynx', f: 'Your throat is shared by air and food. A little flap shuts the windpipe when you swallow.',
+    mount: 'head', c: [200, 158], act: 'swallow', snd: 'gulp',
+    draw: function (p) {
+      blob(p, 'M191 142C191 138 209 138 209 142L210 170L190 170Z', '#eaa0a0', '#a85a5a', 2.2);
+      shine(p, 'M195 146L195 166', 3, 0.4);
+    }
+  });
+  item('breath', 'larynx', {
+    n: 'Voice box', alt: 'Larynx', f: 'Your voice box makes sounds when air squeezes past two stretchy folds.',
+    mount: 'torso', c: [200, 184], act: 'shake', snd: 'hum',
+    draw: function (p) {
+      blob(p, 'M186 170L214 170L211 196L189 196Z', '#d9ecf5', '#5f8aa3', 2.2);
+      el('path', { 'class': 'dt', d: 'M200 172L200 194M194 178L200 186L206 178', fill: 'none', stroke: '#7fa8c0', 'stroke-width': 2, 'stroke-linecap': 'round' }, p);
+    }
+  });
+  item('breath', 'windpipe', {
+    n: 'Windpipe', alt: 'Trachea', f: 'Air goes down your windpipe to your lungs. Rings of cartilage keep it open.',
+    mount: 'torso', c: [200, 224], act: 'air', snd: 'whoosh',
+    draw: function (p) {
+      var d = 'M200 196L200 246M200 246L172 270M200 246L228 274';
+      tube(p, d, 13, AIRC[0], AIRC[1]);
+      el('path', { 'class': 'ln dt', d: 'M200 198L200 244', fill: 'none', stroke: '#5f8aa3', 'stroke-opacity': 0.7, 'stroke-width': 13, 'stroke-dasharray': '1.6 5' }, p);
       hitLine(p, d, 28);
     }
   });
-  item('organs', 'lungs', {
+  var LUNGR = 'M192 238C172 230 144 244 136 274C130 304 136 332 158 342C178 350 194 344 196 330L196 250Z';
+  var LUNGL = 'M208 238C228 230 256 244 264 274C270 304 264 330 244 342C228 348 212 342 206 332C214 326 222 316 226 302C224 290 214 284 206 294Z';
+  item('breath', 'lungs', {
     n: 'Lungs', f: 'Your lungs take air in and put oxygen into your blood.',
-    mount: 'torso', c: [200, 275], act: 'breathe', snd: 'breath', count: 2,
+    mount: 'torso', c: [200, 290], act: 'breathe', snd: 'breath', count: 2, open: 'lung',
     draw: function (p) {
-      var lung = 'M192 228C170 218 138 232 132 270C126 305 134 334 158 332C180 330 190 314 192 292Z';
-      [0, 1].forEach(function (s) {
-        var g = el('g', s ? { transform: 'translate(400 0) scale(-1 1)' } : {}, p);
-        el('path', { d: lung, fill: '#f1a3b8', stroke: '#a8506a', 'stroke-width': 2.2 }, g);
-        el('path', { 'class': 'dt', d: 'M186 246L160 272M160 272L150 298M160 272L172 302', fill: 'none', stroke: '#c97088', 'stroke-width': 3, 'stroke-linecap': 'round' }, g);
-      });
+      blob(p, LUNGR, '#f1a3b8', '#a8506a', 2.2);
+      blob(p, LUNGL, '#f1a3b8', '#a8506a', 2.2);
+      el('path', { 'class': 'dt', d: 'M138 296L196 292M142 270L196 296M262 296L212 308M258 268L206 296', fill: 'none', stroke: '#c97088', 'stroke-width': 1.8, 'stroke-dasharray': '4 4' }, p);
+      shine(p, 'M146 262C142 280 142 300 146 318', 3.5, 0.35);
+      shine(p, 'M254 262C258 280 258 300 254 318', 3.5, 0.35);
     }
   });
-  item('organs', 'heart', {
-    n: 'Heart', f: 'Your heart is a muscle that pumps blood all round your body.',
-    mount: 'torso', c: [214, 292], act: 'beat', snd: 'thump',
+  item('breath', 'bronchi', {
+    n: 'Air tubes', alt: 'Bronchi', f: 'Your windpipe splits into smaller and smaller tubes, like the branches of a tree.',
+    mount: 'torso', c: [200, 290], act: 'air', snd: 'whoosh', open: 'lung',
     draw: function (p) {
-      var g = el('g', { transform: 'translate(214 292) rotate(-12) scale(1.45)' }, p);
-      el('path', { 'class': 'dt', d: 'M-4 -17Q-6 -33 8 -32', fill: 'none', stroke: '#b62d3f', 'stroke-width': 7, 'stroke-linecap': 'round' }, g);
-      el('path', { 'class': 'dt', d: 'M9 -17Q16 -30 25 -26', fill: 'none', stroke: '#4a74c9', 'stroke-width': 7, 'stroke-linecap': 'round' }, g);
-      el('path', { d: 'M0 22C-26 4 -26 -20 -8 -20C-2 -20 0 -14 0 -10C0 -14 4 -20 10 -20C28 -20 28 4 0 22Z', fill: '#d9364f', stroke: '#7f1426', 'stroke-width': 2 }, g);
-      el('path', { 'class': 'dt', d: 'M-15 -8C-17 -14 -12 -16 -9 -14', fill: 'none', stroke: '#fff', 'stroke-opacity': 0.5, 'stroke-width': 3, 'stroke-linecap': 'round' }, g);
+      var d = 'M172 270L156 292L146 314M156 292L170 312M168 276L150 278L140 272M228 274L244 294L254 316M244 294L230 314M232 278L252 282L260 276';
+      tube(p, d, 5, AIRC[0], AIRC[1]);
+      hitLine(p, d, 24);
     }
   });
-  item('organs', 'brain', {
-    n: 'Brain', f: 'Your brain thinks, remembers and controls your body.',
-    mount: 'head', c: [200, 72], act: 'think', snd: 'think',
+  item('breath', 'diaphragm', {
+    n: 'Diaphragm', f: 'This dome of muscle under your lungs pulls down when you breathe in.',
+    mount: 'torso', c: [200, 352], act: 'stretch', snd: 'breath',
     draw: function (p) {
-      el('path', { d: 'M200 44C175 36 150 46 148 66C140 78 150 98 172 100C182 108 196 106 200 100C204 106 218 108 228 100C250 98 260 78 252 66C250 46 225 36 200 44Z', fill: '#f3a6c0', stroke: '#a8506a', 'stroke-width': 2.4 }, p);
-      el('path', { 'class': 'dt', d: 'M200 46L200 100M166 56C176 60 178 70 170 74M232 56C224 60 222 70 230 74M160 84C170 82 178 88 176 96M240 84C230 82 222 88 224 96M184 70C190 76 192 84 188 90M216 70C210 76 208 84 212 90', fill: 'none', stroke: '#c9708f', 'stroke-width': 3, 'stroke-linecap': 'round' }, p);
+      mshape(p, 'M122 358C138 326 168 334 200 336C232 334 262 326 278 358C262 346 232 348 200 350C168 348 138 346 122 358Z');
+      el('path', { d: 'M178 340C190 336 210 336 222 340C214 346 186 346 178 340Z', fill: TEND, stroke: '#b9a98a', 'stroke-width': 1.5 }, p);
+      mfibre(p, 'M130 354L178 342M146 346L180 342M270 354L222 342M254 346L220 342');
     }
   });
 
-  // mount every item into the figure
+  // ==================================================================
+  // FOOD AND TUMMY
+  // ==================================================================
+  item('tummy', 'salivary', {
+    n: 'Spit glands', alt: 'Salivary glands', f: 'These glands make spit. It makes food soft and starts to break it down.',
+    mount: 'head', pair: true, c: [150, 136], act: 'squish', snd: 'drip', count: 6,
+    draw: function (p) {
+      blob(p, 'M142 122C148 114 160 120 160 132C158 144 148 148 142 140C138 134 138 128 142 122Z', '#f2c9a0', '#b07a4a', 2);
+      [[150, 128], [153, 136], [147, 136]].forEach(function (c) { dark(p, 'circle', { cx: c[0], cy: c[1], r: 2.2, fill: '#d49a66' }); });
+    }
+  });
+  item('tummy', 'tongue', {
+    n: 'Tongue', f: 'Your tongue moves food around and tastes it. It is a strong muscle.',
+    mount: 'head', c: [200, 162], act: 'wriggle', snd: 'giggle', open: 'mouth',
+    draw: function (p) {
+      blob(p, 'M178 158C184 150 216 150 222 158C226 170 214 180 200 180C186 180 174 170 178 158Z', '#ee7f93', '#a83a50', 2.2);
+      el('path', { 'class': 'dt', d: 'M200 154L200 172', stroke: '#c0506a', 'stroke-width': 2, 'stroke-linecap': 'round' }, p);
+      [[190, 163], [208, 165], [199, 170], [194, 158], [206, 158]].forEach(function (c) { dark(p, 'circle', { cx: c[0], cy: c[1], r: 1.8, fill: '#f6b0be' }); });
+    }
+  });
+  item('tummy', 'teeth', {
+    n: 'Teeth', f: 'Children have 20 baby teeth. Grown-ups get 32 big ones.',
+    mount: 'head', c: [200, 154], act: 'chatter', snd: 'chatter', count: 20, open: 'mouth',
+    draw: function (p) {
+      var i;
+      for (i = 0; i < 10; i++) {
+        var x = 178 + i * 4.9, h = (i === 0 || i === 9) ? 7 : 9;
+        bshape(p, 'rect', { x: f(x), y: 143, width: 4.4, height: h, rx: 1.6, fill: '#fff', stroke: '#c9c0a8', 'stroke-width': 1.2 });
+        bshape(p, 'rect', { x: f(x), y: f(167 - h), width: 4.4, height: h, rx: 1.6, fill: '#fff', stroke: '#c9c0a8', 'stroke-width': 1.2 });
+      }
+    }
+  });
+  item('tummy', 'oesophagus', {
+    n: 'Food pipe', alt: 'Oesophagus', f: 'Food slides down this tube to your stomach. Muscles squeeze it along.',
+    mount: 'torso', c: [212, 270], act: 'swallow', snd: 'gulp',
+    draw: function (p) {
+      var d = 'M205 168L205 236Q208 288 220 318Q226 330 227 342';
+      tube(p, d, 9, '#a64343', '#e8908c');
+      hitLine(p, d, 26);
+    }
+  });
+  item('tummy', 'liver', {
+    n: 'Liver', f: 'Your liver cleans your blood and helps with your food. It is the biggest organ inside you.',
+    mount: 'torso', c: [166, 360], act: 'wobble', snd: 'blop',
+    draw: function (p) {
+      blob(p, 'M122 346C148 332 192 334 216 348C224 362 214 380 198 386C166 392 136 378 122 346Z', '#a8523a', '#5f2a1b', 2.2);
+      el('path', { 'class': 'dt', d: 'M170 338C176 354 178 368 176 384', fill: 'none', stroke: '#5f2a1b', 'stroke-opacity': 0.5, 'stroke-width': 2, 'stroke-linecap': 'round' }, p);
+      shine(p, 'M132 350C154 342 184 342 206 352', 4, 0.25);
+    }
+  });
+  item('tummy', 'gallbladder', {
+    n: 'Gall bladder', f: 'This little green bag stores a juice that helps you digest fat.',
+    mount: 'torso', c: [186, 390], act: 'fill', snd: 'blop',
+    draw: function (p) { blob(p, 'M182 384C190 380 196 388 194 398C192 406 184 406 182 398C180 392 180 388 182 384Z', '#6ea85a', '#37652a', 2); shine(p, 'M185 388C184 392 185 397 187 399', 2, 0.5); }
+  });
+  item('tummy', 'pancreas', {
+    n: 'Pancreas', f: 'Your pancreas makes juices that break food down, and it makes insulin too.',
+    mount: 'torso', c: [208, 402], act: 'wobble', snd: 'blop',
+    draw: function (p) {
+      blob(p, 'M168 408C184 398 216 396 246 386C254 390 252 400 242 404C214 414 188 416 168 414Z', '#e6c35a', '#98791e', 2.2);
+      [[190, 406], [206, 402], [224, 398], [238, 395]].forEach(function (c) { dark(p, 'circle', { cx: c[0], cy: c[1], r: 1.8, fill: '#f6e08a' }); });
+    }
+  });
+  item('tummy', 'stomach', {
+    n: 'Stomach', f: 'Your stomach mashes food into a soup with strong juices.',
+    mount: 'torso', c: [244, 366], act: 'squish', snd: 'gurgle', open: 'stomach',
+    draw: function (p) {
+      blob(p, 'M226 340C238 326 264 334 268 360C272 386 254 406 230 404C216 402 206 398 202 394C206 388 216 388 224 388C240 386 250 372 244 360C238 352 226 352 226 340Z', '#f0a56f', '#a85b2a', 2.2);
+      shine(p, 'M252 342C262 350 264 366 260 378', 4, 0.4);
+      el('path', { 'class': 'dt', d: 'M232 392C240 396 250 394 256 386', fill: 'none', stroke: '#c97a3e', 'stroke-width': 2.4, 'stroke-linecap': 'round' }, p);
+    }
+  });
+
+  // intestines: one winding tube, drawn whole or in its three parts
+  function serp(rows, a, b) {
+    var d = '', i, y, xl = 168, xr = 232;
+    for (i = a; i < b; i++) {
+      y = 432 + i * 9;
+      var fromL = (i % 2 === 0);
+      if (i === a) { d += 'M' + (fromL ? xl : xr) + ' ' + y; }
+      d += 'C' + (fromL ? xl + 22 : xr - 22) + ' ' + (y - 4) + ' ' + (fromL ? xr - 8 : xl + 8) + ' ' + (y - 4) + ' ' + (fromL ? xr : xl) + ' ' + (y + 2) + 'C' + (fromL ? xr + 6 : xl - 6) + ' ' + (y + 5) + ' ' + (fromL ? xr + 6 : xl - 6) + ' ' + (y + 7) + ' ' + (fromL ? xr : xl) + ' ' + (y + 9);
+    }
+    return d;
+  }
+  var SI = [['#a8405c', '#f5a1b3'], ['#a8405c', '#f27f9a'], ['#a8405c', '#e55f86']];
+  item('tummy', 'small', {
+    n: 'Small intestine', f: 'The small intestine takes the goodness from your food. It is about as long as a bus is tall.',
+    mount: 'torso', lod: 0, c: [200, 452], act: 'wriggle', snd: 'gurgle', open: 'villi',
+    draw: function (p) {
+      var d = serp(0, 0, 6) + 'L160 484';
+      tube(p, 'M204 398C186 398 174 408 174 418C174 428 186 430 200 428', 9, SI[0][0], SI[0][1]);
+      tube(p, d, 11, SI[1][0], SI[1][1]);
+      hitLine(p, d, 24);
+    }
+  });
+  item('tummy', 'duodenum', {
+    n: 'Duodenum', f: 'The first bit of small intestine. Juices from the liver and pancreas pour in here.',
+    mount: 'torso', lod: 1, c: [186, 414], act: 'wriggle', snd: 'gurgle',
+    draw: function (p) { var d = 'M222 394C198 396 176 402 174 418C173 428 186 432 200 430'; tube(p, d, 10, SI[0][0], SI[0][1]); hitLine(p, d, 24); }
+  });
+  item('tummy', 'jejunum', {
+    n: 'Jejunum', f: 'The middle part of the small intestine soaks up most of your food goodness.',
+    mount: 'torso', lod: 1, c: [200, 446], act: 'wriggle', snd: 'gurgle',
+    draw: function (p) { var d = serp(0, 0, 3); tube(p, d, 11, SI[1][0], SI[1][1]); hitLine(p, d, 24); }
+  });
+  item('tummy', 'ileum', {
+    n: 'Ileum', f: 'The last part of the small intestine. What is left goes on to the large intestine.',
+    mount: 'torso', lod: 1, c: [200, 468], act: 'wriggle', snd: 'gurgle',
+    draw: function (p) { var d = serp(0, 3, 6) + 'L160 484'; tube(p, d, 11, SI[2][0], SI[2][1]); hitLine(p, d, 24); }
+  });
+  function colon(p, d, w) {
+    tube(p, d, w || 17, '#a87a1f', '#e0b04c');
+    el('path', { 'class': 'ln dt', d: d, fill: 'none', stroke: '#fff', 'stroke-opacity': 0.4, 'stroke-width': w || 17, 'stroke-dasharray': '2 9' }, p);
+    hitLine(p, d, 30);
+  }
+  var COL = { a: 'M152 480L152 414', t: 'M152 414C170 400 232 400 250 414', d: 'M250 414L250 462', s: 'M250 462C250 482 232 474 224 486C216 498 208 494 205 506', r: 'M205 506L202 524' };
+  item('tummy', 'large', {
+    n: 'Large intestine', alt: 'Colon', f: 'The large intestine soaks up water from the leftovers.',
+    mount: 'torso', lod: 0, c: [200, 450], act: 'wriggle', snd: 'gurgle',
+    draw: function (p) { colon(p, COL.a + COL.t.replace('M152 414', 'L152 414') + COL.d.replace('M250 414', 'L250 414') + COL.s.replace('M250 462', 'L250 462') + COL.r.replace('M205 506', 'L205 506')); }
+  });
+  item('tummy', 'caecum', {
+    n: 'Caecum', alt: 'And the appendix', f: 'Where the small intestine meets the large. The little worm-shaped appendix hangs from it.',
+    mount: 'torso', lod: 1, c: [152, 486], act: 'squish', snd: 'gurgle',
+    draw: function (p) {
+      blob(p, 'M140 476C140 468 164 468 164 476C166 492 156 500 152 500C146 500 138 492 140 476Z', '#e0b04c', '#a87a1f', 2.2);
+      tube(p, 'M148 498C146 506 150 512 154 510', 4.5, '#a87a1f', '#f0c866');
+    }
+  });
+  item('tummy', 'colonA', {
+    n: 'Rising colon', alt: 'Ascending colon', f: 'The colon goes up on one side, across the middle, and down the other.',
+    mount: 'torso', lod: 1, c: [152, 446], act: 'wriggle', snd: 'gurgle',
+    draw: function (p) { colon(p, 'M152 470L152 414'); }
+  });
+  item('tummy', 'colonT', {
+    n: 'Across colon', alt: 'Transverse colon', f: 'This part crosses your tummy from one side to the other.',
+    mount: 'torso', lod: 1, c: [200, 408], act: 'wriggle', snd: 'gurgle',
+    draw: function (p) { colon(p, COL.t); }
+  });
+  item('tummy', 'colonD', {
+    n: 'Falling colon', alt: 'Descending colon', f: 'The leftovers travel down this side. They are getting drier.',
+    mount: 'torso', lod: 1, c: [250, 438], act: 'wriggle', snd: 'gurgle',
+    draw: function (p) { colon(p, COL.d); }
+  });
+  item('tummy', 'sigmoid', {
+    n: 'S-shaped colon', alt: 'Sigmoid colon', f: 'The colon makes an S before it ends.',
+    mount: 'torso', lod: 1, c: [230, 484], act: 'wriggle', snd: 'gurgle',
+    draw: function (p) { colon(p, COL.s); }
+  });
+  item('tummy', 'rectum', {
+    n: 'Rectum', f: 'Poo waits here until you go to the toilet.',
+    mount: 'torso', lod: 1, c: [204, 514], act: 'squish', snd: 'blop',
+    draw: function (p) { colon(p, COL.r, 15); }
+  });
+
+  // ==================================================================
+  // WEE
+  // ==================================================================
+  function bean(p, fill) {
+    el('path', { d: 'M2 -22C16 -20 20 -2 14 12C10 24 -4 26 -8 16C-6 10 -6 4 -10 -2C-14 -12 -8 -22 2 -22Z', fill: fill, stroke: '#6e2432', 'stroke-width': 2 }, p);
+    el('path', { 'class': 'dt', d: 'M-4 -12C-8 -2 -2 6 0 14', fill: 'none', stroke: '#fff', 'stroke-opacity': 0.3, 'stroke-width': 3, 'stroke-linecap': 'round' }, p);
+  }
+  item('wee', 'adrenals', {
+    n: 'Adrenal glands', f: 'A little hat of glands sits on each kidney. They help you get ready to run.',
+    mount: 'torso', pair: true, c: [146, 358], act: 'squish', snd: 'blop', count: 2,
+    draw: function (p) { blob(p, 'M132 366C136 350 160 348 166 360C158 358 148 362 142 374Z', '#e8c860', '#98791e', 2); }
+  });
+  item('wee', 'kidneys', {
+    n: 'Kidneys', f: 'Your kidneys clean your blood and make wee.',
+    mount: 'torso', pair: true, c: [148, 392], act: 'squeeze', snd: 'blop', count: 2, open: 'kidney',
+    draw: function (p) { var a = el('g', { transform: 'translate(148 392) rotate(14) scale(1.15)' }, p); bean(a, '#9a3d4e'); }
+  });
+  item('wee', 'renalvessels', {
+    n: 'Kidney blood tubes', f: 'Your kidneys clean all your blood about twenty times every hour.',
+    mount: 'torso', pair: true, c: [180, 394], act: 'wriggle', snd: 'thump', count: 4,
+    draw: function (p) { vessel(p, 'M196 402L170 400', 4, VEN); vessel(p, 'M206 392L168 390', 4.2, ART); }
+  });
+  item('wee', 'ureters', {
+    n: 'Wee tubes', alt: 'Ureters', f: 'Two thin tubes carry wee from your kidneys down to your bladder.',
+    mount: 'torso', pair: true, c: [172, 444], act: 'wriggle', snd: 'drip', count: 2,
+    draw: function (p) { var d = 'M158 404C162 432 176 462 192 486'; tube(p, d, 4.5, '#98791e', '#efd24d'); hitLine(p, d, 24); }
+  });
+  item('wee', 'bladder', {
+    n: 'Bladder', f: 'Your bladder holds wee until you go to the toilet.',
+    mount: 'torso', c: [200, 492], act: 'fill', snd: 'drip',
+    draw: function (p) {
+      blob(p, 'M200 468C217 468 224 483 221 497C218 509 208 513 200 513C192 513 182 509 179 497C176 483 183 468 200 468Z', '#f2d96b', '#a08a1f', 2.2);
+      shine(p, 'M190 482Q188 494 193 502', 3, 0.6);
+    }
+  });
+  item('wee', 'urethra', {
+    n: 'Wee tube out', alt: 'Urethra', f: 'Wee leaves your body through this short tube.',
+    mount: 'torso', c: [200, 521], act: 'squish', snd: 'drip',
+    draw: function (p) { var d = 'M200 512L200 532'; tube(p, d, 6, '#98791e', '#efd24d'); hitLine(p, d, 24); }
+  });
+
+  //@@ITEMS6
+
+  // mount every item into the figure, or into its close-up
   function drawPiece(parent, it) {
     var g = el('g', {}, parent);
     (it.pair ? [0, 1] : [0]).forEach(function (s) {
-      var h = s ? el('g', { transform: 'translate(400 0) scale(-1 1)' }, g) : g;
+      var h = s ? el('g', { transform: it.mirT }, g) : g;
       it.draw(h);
     });
     return g;
@@ -854,12 +1675,14 @@
     Object.keys(ITEMS).forEach(function (id) {
       var it = ITEMS[id];
       (it.pair ? [0, 1] : [0]).forEach(function (s) {
-        var j = it.limb ? jn(it.mount, s) : M[it.mount];
-        var host = it.layer === 'bones' ? j.bn : j.og;
+        var host;
+        if (it['in']) { host = SCN[it['in']].items; }
+        else { host = (it.limb ? jn(it.mount, s) : M[it.mount]).h[it.sys]; }
         var node = el('g', { 'data-id': id, 'data-side': s }, host);
-        var inner = s ? el('g', { transform: 'translate(400 0) scale(-1 1)' }, node) : node;
+        if (it.lod !== undefined) { node.setAttribute('class', 'lod' + it.lod); }
+        var inner = s ? el('g', { transform: it.mirT }, node) : node;
         it.draw(inner);
-        node.__c = [s ? 400 - it.c[0] : it.c[0], it.c[1]];
+        node.__c = [s ? 2 * it.ax - it.c[0] : it.c[0], it.c[1]];
         it.nodes.push(node);
       });
     });
@@ -872,31 +1695,45 @@
     Object.keys(ITEMS).forEach(function (id) {
       var it = ITEMS[id], g = drawPiece(meas, it), b = g.getBBox();
       it.bb = { x: b.x, y: b.y, w: Math.max(b.width, 1), h: Math.max(b.height, 1) };
-      it.mid = [it.pair ? 200 : it.c[0], it.c[1]];
+      var g1 = el('g', {}, meas); it.draw(g1); var b1 = g1.getBBox(); it.rad = Math.max(b1.width, b1.height, 4) / 2; meas.removeChild(g1);
+      it.mid = [it.pair ? it.ax : it.c[0], it.c[1]];
       clear(g); meas.removeChild(g);
     });
     stage.removeChild(meas);
   })();
 
+  (function () {
+    var c = '';
+    SYS.forEach(function (s) {
+      if (s.id !== 'body') { c += '#stage.G-' + s.id + ' .sy-' + s.id + '{opacity:.14;visibility:visible;pointer-events:none;transition:opacity .4s,visibility 0s}\n'; }
+    });
+    SYS.forEach(function (s) {
+      if (s.id !== 'body') { c += '#stage.S-' + s.id + ' .sy-' + s.id + '{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .4s,visibility 0s}\n'; }
+    });
+    Object.keys(SCN).forEach(function (id) { c += '#stage.SC-' + id + ' .sc-' + id + '{display:inline}\n'; });
+    var st = document.createElement('style'); st.textContent = c; document.head.appendChild(st);
+  })();
+
   // ------------------------------------------------------------------
-  // Things you can tap on the outside
+  // Things you can tap on the outside. c is where a close-up opens,
+  // z is the box the camera zooms to, open names the close-up.
   // ------------------------------------------------------------------
   var PARTS = {
-    hair:      { n: 'Hair', f: 'Hair keeps your head warm.', snd: 'swish', dur: 900 },
-    head:      { n: 'Head', f: 'Your head holds your brain, eyes, ears, nose and mouth.', snd: 'boop', dur: 1200 },
-    eyes:      { n: 'Eyes', f: 'Your eyes catch light so you can see.', snd: 'blink', dur: 1700, count: 2 },
-    ears:      { n: 'Ears', f: 'Your ears catch sounds and help you balance.', snd: 'wiggle', dur: 1100, count: 2 },
-    nose:      { n: 'Nose', f: 'Your nose helps you smell and taste.', snd: 'sniff', dur: 900 },
-    mouth:     { n: 'Mouth', f: 'Your mouth is for eating, talking and smiling.', snd: 'ahh', dur: 1200 },
-    neck:      { n: 'Neck', f: 'Your neck holds your head up and lets it turn.', snd: 'boop', dur: 1300 },
-    shoulders: { n: 'Shoulders', f: 'Shoulders let your arms swing all the way round.', snd: 'swish', dur: 800, count: 2 },
-    arm:       { n: 'Arm', f: 'Your arms can reach, lift and wave.', snd: 'swish', dur: 1900, count: 2 },
-    elbow:     { n: 'Elbow', f: 'Your elbow is where your arm bends.', snd: 'boop', dur: 1400, count: 2 },
-    hand:      { n: 'Hand', f: 'Each hand has five fingers.', snd: 'wiggle', dur: 1500, count: 2 },
-    tummy:     { n: 'Tummy', f: 'Your tummy holds your stomach and intestines.', snd: 'giggle', dur: 1500 },
-    legs:      { n: 'Leg', f: 'Strong legs help you run and jump.', snd: 'swish', dur: 1400, count: 2 },
-    knee:      { n: 'Knee', f: 'Your knees bend so you can sit and kneel.', snd: 'boop', dur: 1300, count: 2 },
-    feet:      { n: 'Foot', f: 'Your feet carry you everywhere.', snd: 'tap', dur: 1300, count: 2 }
+    hair:      { n: 'Hair', f: 'Hair keeps your head warm.', snd: 'swish', dur: 900, c: [200, 50], z: [90, 0, 310, 170] },
+    head:      { n: 'Head', f: 'Your head holds your brain, eyes, ears, nose and mouth.', snd: 'boop', dur: 1200, c: [200, 105], z: [90, -5, 310, 235] },
+    eyes:      { n: 'Eyes', f: 'Your eyes catch light so you can see.', snd: 'blink', dur: 1700, count: 2, c: [172, 110], z: [130, 60, 270, 160], open: 'eye' },
+    ears:      { n: 'Ears', f: 'Your ears catch sounds and help you balance.', snd: 'wiggle', dur: 1100, count: 2, c: [131, 108], z: [95, 60, 215, 160], open: 'ear' },
+    nose:      { n: 'Nose', f: 'Your nose helps you smell and taste.', snd: 'sniff', dur: 900, c: [200, 130], z: [150, 70, 250, 180], open: 'nose' },
+    mouth:     { n: 'Mouth', f: 'Your mouth is for eating, talking and smiling.', snd: 'ahh', dur: 1200, c: [200, 160], z: [140, 100, 260, 210], open: 'mouth' },
+    neck:      { n: 'Neck', f: 'Your neck holds your head up and lets it turn.', snd: 'boop', dur: 1300, c: [200, 185], z: [110, 120, 290, 280] },
+    shoulders: { n: 'Shoulders', f: 'Shoulders let your arms swing all the way round.', snd: 'swish', dur: 800, count: 2, c: [128, 228], z: [50, 160, 210, 330] },
+    arm:       { n: 'Arm', f: 'Your arms can reach, lift and wave.', snd: 'swish', dur: 1900, count: 2, c: [112, 300], z: [30, 190, 200, 480], open: 'skin' },
+    elbow:     { n: 'Elbow', f: 'Your elbow is where your arm bends.', snd: 'boop', dur: 1400, count: 2, c: [98, 342], z: [30, 270, 170, 420] },
+    hand:      { n: 'Hand', f: 'Each hand has five fingers.', snd: 'wiggle', dur: 1500, count: 2, c: [90, 458], z: [30, 395, 150, 505], open: 'skin' },
+    tummy:     { n: 'Tummy', f: 'Your tummy holds your stomach and intestines.', snd: 'giggle', dur: 1500, c: [200, 380], z: [80, 270, 320, 540] },
+    legs:      { n: 'Leg', f: 'Strong legs help you run and jump.', snd: 'swish', dur: 1400, count: 2, c: [163, 620], z: [95, 480, 235, 800] },
+    knee:      { n: 'Knee', f: 'Your knees bend so you can sit and kneel.', snd: 'boop', dur: 1300, count: 2, c: [160, 628], z: [90, 550, 230, 710] },
+    feet:      { n: 'Foot', f: 'Your feet carry you everywhere.', snd: 'tap', dur: 1300, count: 2, c: [146, 766], z: [70, 700, 230, 800] }
   };
   function info(id) { return PARTS[id] || ITEMS[id]; }
 
@@ -951,6 +1788,7 @@
   };
   MOT.feet = MOT.foot;
 
+  // each effect returns [dx, dy, turn, scaleX, scaleY] about the part's centre
   var FX = {
     beat:    function (p) { var s = 1 + 0.24 * pulse((p * 3) % 1); return [0, 0, 0, s, s]; },
     breathe: function (p) { var b = env(p) * (0.5 - 0.5 * Math.cos(p * Math.PI * 4)); return [0, 0, 0, 1 + 0.16 * b, 1 + 0.1 * b]; },
@@ -964,10 +1802,20 @@
     swallow: function (p) { var e = env(p); return [0, e * 3, 0, 1 - 0.2 * e, 1 + 0.06 * e]; },
     rattle:  function (p) { var w = 1 - p; return [Math.sin(p * Math.PI * 30) * 3 * w, 0, Math.sin(p * Math.PI * 22) * 5 * w, 1, 1]; },
     chatter: function (p) { return [0, Math.abs(Math.sin(p * Math.PI * 5)) * 17, 0, 1, 1]; },
-    pop:     function (p) { var s = 1 + 0.35 * env(p) * (1 - p); return [0, 0, 0, s, s]; }
+    pop:     function (p) { var s = 1 + 0.35 * env(p) * (1 - p); return [0, 0, 0, s, s]; },
+    flex:    function (p) { var e = env(p); return [0, 0, 0, 1 + 0.2 * e, 1 - 0.1 * e]; },
+    pupil:   function (p) { var w = 1 + 0.5 * Math.sin(p * Math.PI * 2) * env(p); return [0, 0, 0, 1, w]; },
+    focus:   function (p) { var w = Math.sin(p * Math.PI * 3) * env(p) * 0.35; return [0, 0, 0, 1 + w, 1 - w * 0.6]; },
+    glow:    function (p) { var s = 1 + 0.06 * Math.sin(p * Math.PI * 6) * env(p); return [0, 0, 0, s, s]; },
+    lid:     function (p) { return [0, 52 * env(Math.min(1, p * 1.2)), 0, 1, 1]; },
+    shake:   function (p) { var w = 1 - p; return [Math.sin(p * Math.PI * 20) * 4 * w, 0, 0, 1, 1]; },
+    stretch: function (p) { var e = env(p); return [0, 0, 0, 1 - 0.1 * e, 1 + 0.12 * e]; },
+    slide:   function (p) { var e = Math.sin(p * Math.PI * 4) * env(p); return [e * 5, 0, 0, 1, 1]; },
+    spin:    function (p) { return [0, 0, 18 * Math.sin(p * Math.PI * 2), 1, 1]; }
   };
   var FXDUR = { beat: 2400, breathe: 2800, squish: 1300, wobble: 1200, think: 1500, wriggle: 1500,
-    squeeze: 1400, fill: 1400, air: 1300, swallow: 1100, rattle: 650, chatter: 700, pop: 450 };
+    squeeze: 1400, fill: 1400, air: 1300, swallow: 1100, rattle: 650, chatter: 700, pop: 450,
+    flex: 900, pupil: 1600, focus: 1500, glow: 1400, lid: 600, shake: 800, stretch: 1200, slide: 1200, spin: 1400 };
 
   var motions = [], tweens = [], prevTF = {};
   var nextBlink = 0, hello = 0;
@@ -978,7 +1826,8 @@
     var pt = PARTS[id], it = ITEMS[id];
     if (pt && MOT[id]) { motions.push({ fn: MOT[id], t0: now, dur: pt.dur, side: s }); }
     if (it) {
-      motions.push({ item: id, kind: it.act, t0: now, dur: FXDUR[it.act] });
+      var kind = FX[it.act] ? it.act : 'wobble';
+      motions.push({ item: id, kind: kind, t0: now, dur: FXDUR[kind] || 1200 });
       if (it.move && MOT[it.move]) { motions.push({ fn: MOT[it.move], t0: now, dur: (PARTS[it.move] || {}).dur || 1300, side: s }); }
     }
     while (motions.length > 7) { motions.shift(); }
@@ -996,6 +1845,7 @@
       setTf(n, 'translate(' + f(c[0] + v[0] * flip) + ' ' + f(c[1] + v[1]) + ') rotate(' + f(v[2] * flip) + ') scale(' + f(v[3]) + ' ' + f(v[4]) + ') translate(' + f(-c[0]) + ' ' + f(-c[1]) + ')');
     });
   }
+  function put(TF, id, v) { if (ITEMS[id] && ITEMS[id].placed) { TF[id] = v; } }
 
   function applyPose(P) {
     for (var s = 0; s < 2; s++) {
@@ -1022,78 +1872,49 @@
   }
 
   // ------------------------------------------------------------------
-  // The frame loop runs only while something is moving.
+  // State
   // ------------------------------------------------------------------
   var rafId = 0;
-  var layer = 'body', mode = 'explore';
+  var sys = 'body', mode = 'explore';
+  var scene = null, scLast = null, scClosing = false, sceneStack = [], savedView = null;
+  var anc = { x: 200, y: 300 }, BK = 0.75;
   var W = 800, H = 600, land = true;
   var view = { s: 1, tx: 0, ty: 0 }, viewTo = { s: 1, tx: 0, ty: 0 }, viewAnim = null;
   var parts = [];
+  var z1 = false;
+  var IDLE = {}, STORY = {};
 
-  function idleOn() { return !reduced && (layer === 'organs' || layer === 'body'); }
   function kick() { if (!rafId) { rafId = requestAnimationFrame(frame); } }
 
-  function frame(now) {
-    rafId = 0;
-    var P = newPose(), TF = {}, i;
-
-    // tweens (pieces gliding, popping in)
-    for (i = tweens.length - 1; i >= 0; i--) {
-      var tw = tweens[i], q = clamp((now - tw.t0) / tw.dur, 0, 1);
-      tw.fn(q);
-      if (q >= 1) { tweens.splice(i, 1); if (tw.done) { tw.done(); } }
+  // ------------------------------------------------------------------
+  // Flows (blood, air, signals) are drawn on the canvas, not in the SVG.
+  // A flow is a path with dots running along it; a runner is one dot
+  // making a single trip.
+  // ------------------------------------------------------------------
+  var FLOWS = [], runners = [];
+  function prep(o) {
+    o.cum = [0];
+    for (var i = 1; i < o.pts.length; i++) {
+      o.cum.push(o.cum[i - 1] + Math.hypot(o.pts[i][0] - o.pts[i - 1][0], o.pts[i][1] - o.pts[i - 1][1]));
     }
-    if (viewAnim) {
-      var vq = clamp((now - viewAnim.t0) / 420, 0, 1), e = sm(vq);
-      view.s = viewAnim.a.s + (viewTo.s - viewAnim.a.s) * e;
-      view.tx = viewAnim.a.tx + (viewTo.tx - viewAnim.a.tx) * e;
-      view.ty = viewAnim.a.ty + (viewTo.ty - viewAnim.a.ty) * e;
-      if (vq >= 1) { viewAnim = null; }
-      applyView();
-    }
+    o.len = o.cum[o.cum.length - 1] || 1;
+    return o;
+  }
+  function flow(o) { FLOWS.push(prep(o)); return o; }
+  function pointAt(o, d) {
+    d = clamp(d, 0, o.len);
+    var i = 1;
+    while (i < o.cum.length - 1 && o.cum[i] < d) { i++; }
+    var a = o.pts[i - 1], b = o.pts[i], q = (d - o.cum[i - 1]) / Math.max(o.cum[i] - o.cum[i - 1], 0.0001);
+    return [a[0] + (b[0] - a[0]) * q, a[1] + (b[1] - a[1]) * q];
+  }
+  Object.keys(SCN).forEach(function (id) { SCN[id].flows.forEach(function (o) { flow(o); }); });
+  function run(o) { o.t0 = performance.now(); runners.push(prep(o)); while (runners.length > 8) { runners.shift(); } kick(); return o; }
 
-    if (idleOn()) {
-      if (layer === 'body') {
-        var br = Math.sin(now / 900) * 0.006; P.bx = br; P.by = br;
-        if (now > nextBlink) { motions.push({ fn: MOT.blink, t0: now, dur: 230 }); nextBlink = now + 2500 + Math.random() * 3500; }
-      } else {
-        var ph = (now % 860) / 860, hb = 1 + 0.07 * pulse(ph), bl = Math.sin(now / 640);
-        if (ITEMS.heart.placed) { TF.heart = [0, 0, 0, hb, hb]; }
-        if (ITEMS.lungs.placed) { TF.lungs = [0, 0, 0, 1 + 0.025 * bl, 1 + 0.02 * bl]; }
-      }
-    }
-    if (hello && now > hello) {
-      hello = 0;
-      if (layer === 'body' && !reduced) { motions.push({ fn: MOT.arm, t0: now, dur: 2200, side: 1 }); }
-    }
-
-    for (i = motions.length - 1; i >= 0; i--) {
-      var m = motions[i], p = (now - m.t0) / m.dur;
-      if (p >= 1) { motions.splice(i, 1); continue; }
-      if (m.fn) { m.fn(P, p, m.side || 0); }
-      if (m.item) { TF[m.item] = FX[m.kind](p); }
-    }
-
-    // eyes drift towards where the last finger was
-    look.x += (look.tx - look.x) * 0.12; look.y += (look.ty - look.y) * 0.12;
-
-    applyPose(P);
-    var seen = {}, id;
-    for (id in TF) { seen[id] = true; itemTf(ITEMS[id], TF[id]); }
-    for (id in prevTF) { if (!seen[id]) { itemTf(ITEMS[id], null); } }
-    prevTF = seen;
-
-    drawConfetti();
-
-    if (motions.length || tweens.length || viewAnim || parts.length || idleOn() ||
-        Math.abs(look.x - look.tx) > 0.01 || Math.abs(look.y - look.ty) > 0.01) {
-      kick();
-    }
+  function flowsOn() {
+    return !(mode === 'build' && B && !B.done);
   }
 
-  // ------------------------------------------------------------------
-  // Confetti, on its own canvas so the figure is never repainted for it
-  // ------------------------------------------------------------------
   var cv = document.getElementById('fx'), cx2 = cv.getContext('2d');
   var CONF = ['#ff6b86', '#ffd24d', '#5fd0ff', '#8be07a', '#c58cff', '#ff9a4d'];
   function sizeCanvas() {
@@ -1110,13 +1931,72 @@
     }
     kick();
   }
-  var confWas = 0;
-  function drawConfetti() {
-    if (!parts.length) { if (confWas) { cx2.clearRect(0, 0, W, H); confWas = 0; } return; }
-    confWas = 1;
+
+  var fxWas = false, lastFx = 0, flowT = 0, flowMul = 1;
+  // world (or close-up) point to screen
+  function scr(fl, p) {
+    var x = p[0], y = p[1], k = view.s;
+    if (fl.scene) { x = anc.x + x * BK; y = anc.y + y * BK; k = view.s * BK; }
+    return [view.tx + x * view.s, view.ty + y * view.s, k];
+  }
+  function flowActive(fl) {
+    if (fl.scene) { return scene === fl.scene; }
+    return !scene && fl.sys === sys;
+  }
+  function anyFlow() {
+    var i;
+    if (runners.length) { return true; }
+    if (!flowsOn()) { return false; }
+    for (i = 0; i < FLOWS.length; i++) { if (flowActive(FLOWS[i])) { return true; } }
+    return false;
+  }
+  function drawFx(now) {
+    var need = parts.length || anyFlow();
+    if (!need) { if (fxWas) { cx2.clearRect(0, 0, W, H); fxWas = false; } return; }
+    fxWas = true;
     cx2.clearRect(0, 0, W, H);
-    for (var i = parts.length - 1; i >= 0; i--) {
-      var q = parts[i];
+    var i, j, fl, q, p, sp;
+    var dt = lastFx ? Math.min(0.05, (now - lastFx) / 1000) : 0; lastFx = now;
+    flowMul += (1 - flowMul) * 0.02; flowT += dt * flowMul;
+    var t = reduced ? 0 : flowT;
+    cx2.save();
+    cx2.beginPath(); cx2.rect(area.x, area.y, area.w, area.h); cx2.clip();
+    if (flowsOn()) {
+      for (i = 0; i < FLOWS.length; i++) {
+        fl = FLOWS[i];
+        if (!flowActive(fl)) { continue; }
+        cx2.fillStyle = fl.col; cx2.globalAlpha = fl.a || 0.95;
+        for (j = 0; j < fl.n; j++) {
+          var d;
+          if (fl.osc) { var ph = (t / fl.osc) % 1, tri = ph < 0.5 ? ph * 2 : 2 - ph * 2; d = fl.len * clamp(0.04 + tri * 0.92 - (j / fl.n) * 0.2, 0, 1); }
+          else { d = ((t * fl.spd + j * fl.len / fl.n) % fl.len + fl.len) % fl.len; }
+          if (fl.back) { d = fl.len - d; }
+          p = pointAt(fl, d); sp = scr(fl, p);
+          var wob = fl.wob ? Math.sin(t * 3 + j * 2) * fl.wob : 0;
+          cx2.beginPath(); cx2.arc(sp[0] + wob * sp[2], sp[1], Math.max(1.5, fl.r * sp[2]), 0, 6.3); cx2.fill();
+        }
+      }
+    }
+    for (i = runners.length - 1; i >= 0; i--) {
+      var r = runners[i], pr = (now - r.t0) / r.dur;
+      if (pr >= 1) { runners.splice(i, 1); if (r.done) { r.done(); } continue; }
+      if (r.stops) {
+        r.stops.forEach(function (s) { if (!s.fired && pr >= s.t) { s.fired = true; s.fn(); } });
+      }
+      for (j = 4; j >= 0; j--) {
+        var pp = clamp(pr - j * 0.012, 0, 1);
+        p = pointAt(r, r.len * pp); sp = scr(r, p);
+        cx2.globalAlpha = (1 - j * 0.18); cx2.fillStyle = typeof r.col === 'function' ? r.col(pr) : r.col;
+        cx2.beginPath(); cx2.arc(sp[0], sp[1], Math.max(2, r.r * sp[2] * (1 - j * 0.1)), 0, 6.3); cx2.fill();
+        if (r.glow && j === 0) {
+          cx2.globalAlpha = 0.25; cx2.beginPath(); cx2.arc(sp[0], sp[1], Math.max(4, r.r * 2.4 * sp[2]), 0, 6.3); cx2.fill();
+        }
+      }
+    }
+    cx2.restore();
+    cx2.globalAlpha = 1;
+    for (i = parts.length - 1; i >= 0; i--) {
+      q = parts[i];
       q.vy += 0.22; q.x += q.vx; q.y += q.vy; q.a += q.va; q.life -= 0.0075;
       if (q.life <= 0 || q.y > H + 20) { parts.splice(i, 1); continue; }
       cx2.save(); cx2.translate(q.x, q.y); cx2.rotate(q.a); cx2.globalAlpha = Math.min(1, q.life * 2);
@@ -1125,21 +2005,89 @@
   }
 
   // ------------------------------------------------------------------
+  // The frame loop
+  // ------------------------------------------------------------------
+  function frame(now) {
+    rafId = 0;
+    var P = newPose(), TF = {}, i;
+
+    for (i = tweens.length - 1; i >= 0; i--) {
+      var tw = tweens[i], q = clamp((now - tw.t0) / tw.dur, 0, 1);
+      tw.fn(q);
+      if (q >= 1) { tweens.splice(i, 1); if (tw.done) { tw.done(); } }
+    }
+    if (viewAnim) {
+      var vq = clamp((now - viewAnim.t0) / 480, 0, 1), e = sm(vq);
+      view.s = viewAnim.a.s * Math.pow(viewTo.s / viewAnim.a.s, e);
+      // pan in step with the zoom so the target lands in the middle
+      var cxA = (area.x + area.w / 2 - viewAnim.a.tx) / viewAnim.a.s, cyA = (area.y + area.h / 2 - viewAnim.a.ty) / viewAnim.a.s;
+      var cxB = (area.x + area.w / 2 - viewTo.tx) / viewTo.s, cyB = (area.y + area.h / 2 - viewTo.ty) / viewTo.s;
+      var cxN = cxA + (cxB - cxA) * e, cyN = cyA + (cyB - cyA) * e;
+      view.tx = area.x + area.w / 2 - cxN * view.s; view.ty = area.y + area.h / 2 - cyN * view.s;
+      if (vq >= 1) { viewAnim = null; view.s = viewTo.s; view.tx = viewTo.tx; view.ty = viewTo.ty; }
+      applyView();
+    }
+
+    if (!reduced) {
+      if (scene) { if (SCN[scene].idle) { SCN[scene].idle(now, TF); } }
+      else if (sys === 'body') {
+        var br = Math.sin(now / 900) * 0.006; P.bx = br; P.by = br;
+        if (now > nextBlink) { motions.push({ fn: MOT.blink, t0: now, dur: 230 }); nextBlink = now + 2500 + Math.random() * 3500; }
+      } else if (IDLE[sys]) { IDLE[sys](now, TF); }
+    }
+    if (hello && now > hello) {
+      hello = 0;
+      if (sys === 'body' && !scene && !reduced) { motions.push({ fn: MOT.arm, t0: now, dur: 2200, side: 1 }); }
+    }
+
+    for (i = motions.length - 1; i >= 0; i--) {
+      var m = motions[i], p = (now - m.t0) / m.dur;
+      if (p >= 1) { motions.splice(i, 1); continue; }
+      if (m.fn) { m.fn(P, p, m.side || 0); }
+      if (m.item) { TF[m.item] = FX[m.kind](p); }
+    }
+
+    look.x += (look.tx - look.x) * 0.12; look.y += (look.ty - look.y) * 0.12;
+
+    applyPose(P);
+    var seen = {}, id;
+    for (id in TF) { seen[id] = true; itemTf(ITEMS[id], TF[id]); }
+    for (id in prevTF) { if (!seen[id]) { itemTf(ITEMS[id], null); } }
+    prevTF = seen;
+
+    drawFx(now);
+
+    if (motions.length || tweens.length || viewAnim || parts.length || !reduced ||
+        Math.abs(look.x - look.tx) > 0.01 || Math.abs(look.y - look.ty) > 0.01) {
+      kick();
+    }
+  }
+
+  // ------------------------------------------------------------------
   // Layout: the figure on one side, the card or the tray on the other
   // ------------------------------------------------------------------
   var UI = {}, area = { x: 0, y: 0, w: 100, h: 100 }, panel = { x: 0, y: 0, w: 100, h: 100 };
-  var FOCUS = { body: [-10, 800], bones: [0, 800], organs: [8, 534] };
 
   var ICONS = {
     body: '<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="18" fill="#ffd9a8" stroke="#a8683a" stroke-width="2.5"/><circle cx="17.5" cy="21" r="2.6" fill="#3b2a1f"/><circle cx="30.5" cy="21" r="2.6" fill="#3b2a1f"/><path d="M15 29Q24 38 33 29" fill="none" stroke="#a8383a" stroke-width="3" stroke-linecap="round"/></svg>',
     bones: '<svg viewBox="0 0 48 48"><g transform="rotate(-40 24 24)"><rect x="8" y="21" width="32" height="6" rx="3" fill="#f4ecd6" stroke="#a8946a" stroke-width="2"/><circle cx="8" cy="20" r="4.4" fill="#f4ecd6" stroke="#a8946a" stroke-width="2"/><circle cx="8" cy="28" r="4.4" fill="#f4ecd6" stroke="#a8946a" stroke-width="2"/><circle cx="40" cy="20" r="4.4" fill="#f4ecd6" stroke="#a8946a" stroke-width="2"/><circle cx="40" cy="28" r="4.4" fill="#f4ecd6" stroke="#a8946a" stroke-width="2"/></g></svg>',
-    organs: '<svg viewBox="0 0 48 48"><path d="M24 41C6 28 8 12 18 11C22 11 24 14 24 16C24 14 26 11 30 11C40 12 42 28 24 41Z" fill="#e0405a" stroke="#8a1a30" stroke-width="2.5" stroke-linejoin="round"/><path d="M14 18C14 15 17 14 19 15" fill="none" stroke="#fff" stroke-opacity=".6" stroke-width="2.5" stroke-linecap="round"/></svg>',
+    muscles: '<svg viewBox="0 0 48 48"><path d="M9 33C8 22 15 14 25 15C31 15 33 20 30 24C28 27 30 29 34 29C39 30 40 38 33 40L15 40C11 40 9 37 9 33Z" fill="#e0606f" stroke="#7d2433" stroke-width="2.5" stroke-linejoin="round"/><path d="M16 30C18 24 23 21 27 22" fill="none" stroke="#f3a0a8" stroke-width="2.5" stroke-linecap="round"/></svg>',
+    blood: '<svg viewBox="0 0 48 48"><path d="M24 41C6 28 8 12 18 11C22 11 24 14 24 16C24 14 26 11 30 11C40 12 42 28 24 41Z" fill="#e0405a" stroke="#8a1a30" stroke-width="2.5" stroke-linejoin="round"/><path d="M14 18C14 15 17 14 19 15" fill="none" stroke="#fff" stroke-opacity=".6" stroke-width="2.5" stroke-linecap="round"/></svg>',
+    breath: '<svg viewBox="0 0 48 48"><path d="M24 5V20" stroke="#5f8aa3" stroke-width="4.5" stroke-linecap="round"/><path d="M23 20C15 20 8 25 7 35C6 43 12 44 17 41C21 38 22 31 22 23Z" fill="#f1a3b8" stroke="#a8506a" stroke-width="2.2" stroke-linejoin="round"/><path d="M25 20C33 20 40 25 41 35C42 43 36 44 31 41C27 38 26 31 26 23Z" fill="#f1a3b8" stroke="#a8506a" stroke-width="2.2" stroke-linejoin="round"/></svg>',
+    tummy: '<svg viewBox="0 0 48 48"><path d="M17 6C25 4 41 13 41 28C41 41 30 45 22 41C15 37 19 31 24 31C31 31 31 23 25 21C18 18 12 9 17 6Z" fill="#f0a56f" stroke="#a85b2a" stroke-width="2.6" stroke-linejoin="round"/><path d="M33 20C37 24 38 30 35 36" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="3" stroke-linecap="round"/></svg>',
+    wee: '<svg viewBox="0 0 48 48"><path d="M16 10C30 6 40 18 36 32C33 42 20 44 15 36C12 31 20 28 18 22C16 17 12 11 16 10Z" fill="#9a3d4e" stroke="#5f1a2a" stroke-width="2.5" stroke-linejoin="round"/><path d="M36 4C40 10 42 13 42 16A6 6 0 0 1 30 16C30 13 32 10 36 4Z" fill="#efd24d" stroke="#a08a1f" stroke-width="2"/></svg>',
+    nerves: '<svg viewBox="0 0 48 48"><path d="M28 4L11 27H22L19 44L37 19H26Z" fill="#ffd54a" stroke="#b58a00" stroke-width="2.6" stroke-linejoin="round"/></svg>',
+    senses: '<svg viewBox="0 0 48 48"><path d="M3 24C11 10 37 10 45 24C37 38 11 38 3 24Z" fill="#fff" stroke="#3b4a8c" stroke-width="2.8"/><circle cx="24" cy="24" r="8.5" fill="#5aa0d8"/><circle cx="24" cy="24" r="4.2" fill="#16100c"/><circle cx="21.5" cy="21.5" r="1.9" fill="#fff"/></svg>',
     explore: '<svg viewBox="0 0 48 48"><circle cx="20" cy="20" r="11" fill="#dff3ff" stroke="#2a5d8f" stroke-width="3.2"/><path d="M28.5 28.5L40 40" stroke="#2a5d8f" stroke-width="5" stroke-linecap="round"/><path d="M15 17Q17 13 21 13" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/></svg>',
     build: '<svg viewBox="0 0 48 48"><path d="M8 14H19C19 8 29 8 29 14H40V25C34 25 34 35 40 35V42H8Z" fill="#7bd36b" stroke="#2f7a2a" stroke-width="2.6" stroke-linejoin="round"/></svg>',
     sound: '<svg viewBox="0 0 48 48"><path d="M8 19H15L25 11V37L15 29H8Z" fill="#5a6fa0"/><path d="M31 18Q36 24 31 30M35 13Q43 24 35 35" fill="none" stroke="#5a6fa0" stroke-width="3" stroke-linecap="round"/></svg>',
     mute: '<svg viewBox="0 0 48 48"><path d="M8 19H15L25 11V37L15 29H8Z" fill="#9aa3bd"/><path d="M31 18L43 30M43 18L31 30" fill="none" stroke="#c0414f" stroke-width="3.6" stroke-linecap="round"/></svg>',
     facts: '<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="18" fill="#dbe6ff" stroke="#4a67b5" stroke-width="3"/><circle cx="24" cy="15" r="2.8" fill="#4a67b5"/><rect x="21.2" y="21" width="5.6" height="14" rx="2.6" fill="#4a67b5"/></svg>',
-    again: '<svg viewBox="0 0 48 48"><path d="M38 24A14 14 0 1 1 30 11.5" fill="none" stroke="#5a4300" stroke-width="5" stroke-linecap="round"/><path d="M29 3L40 11L28 18Z" fill="#5a4300"/></svg>'
+    again: '<svg viewBox="0 0 48 48"><path d="M38 24A14 14 0 1 1 30 11.5" fill="none" stroke="#5a4300" stroke-width="5" stroke-linecap="round"/><path d="M29 3L40 11L28 18Z" fill="#5a4300"/></svg>',
+    out: '<svg viewBox="0 0 48 48"><circle cx="20" cy="20" r="11" fill="#dff3ff" stroke="#2a5d8f" stroke-width="3.2"/><path d="M28.5 28.5L40 40" stroke="#2a5d8f" stroke-width="5" stroke-linecap="round"/><path d="M14.5 20H25.5" stroke="#2a5d8f" stroke-width="3.6" stroke-linecap="round"/></svg>',
+    zin: '<svg viewBox="0 0 48 48"><circle cx="20" cy="20" r="11" fill="#dff3ff" stroke="#5a4300" stroke-width="3.2"/><path d="M28.5 28.5L40 40" stroke="#5a4300" stroke-width="5" stroke-linecap="round"/><path d="M14.5 20H25.5M20 14.5V25.5" stroke="#5a4300" stroke-width="3.6" stroke-linecap="round"/></svg>',
+    apple: '<svg viewBox="0 0 48 48"><path d="M24 14C14 8 6 16 8 28C10 40 20 44 24 40C28 44 38 40 40 28C42 16 34 8 24 14Z" fill="#e5484d" stroke="#8a1a1a" stroke-width="2.5" stroke-linejoin="round"/><path d="M24 14C24 9 26 6 30 5" stroke="#5a3a1a" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M27 9C30 6 34 7 35 9C32 11 29 11 27 9Z" fill="#5fb84a"/></svg>',
+    zap: '<svg viewBox="0 0 48 48"><path d="M28 4L11 27H22L19 44L37 19H26Z" fill="#fff" stroke="#8a6a00" stroke-width="2.6" stroke-linejoin="round"/></svg>'
   };
 
   function makeBtn(act, icon, small) {
@@ -1152,12 +2100,22 @@
     UI[act] = b;
     return b;
   }
-  makeBtn('layer:body', 'body'); makeBtn('layer:bones', 'bones'); makeBtn('layer:organs', 'organs');
-  makeBtn('mode:explore', 'explore'); makeBtn('mode:build', 'build');
+  makeBtn('sys', 'body'); makeBtn('mode:explore', 'explore'); makeBtn('mode:build', 'build'); makeBtn('out', 'out');
   makeBtn('sound', muted ? 'mute' : 'sound', true); makeBtn('facts', 'facts', true);
+  makeBtn('story', 'apple', true);
+  UI.sys.id = 'sysBtn'; UI.story.id = 'story';
   UI.again = document.getElementById('again');
   UI.again.innerHTML = ICONS.again;
   UI.card = document.getElementById('card'); UI.dots = document.getElementById('dots'); UI.tip = document.getElementById('tip');
+  UI.menu = document.getElementById('sysmenu'); UI.zoom = document.getElementById('cardZoom');
+  UI.zoom.innerHTML = ICONS.zin;
+
+  SYS.forEach(function (s) {
+    var b = document.createElement('button');
+    b.className = 'sysb'; b.setAttribute('data-sys', s.id); b.style.setProperty('--c', s.c);
+    b.innerHTML = ICONS[s.id] + '<span>' + s.n + '</span>';
+    UI.menu.appendChild(b);
+  });
 
   SKINS.forEach(function (k, i) {
     var d = document.createElement('button');
@@ -1180,10 +2138,10 @@
     sizeCanvas();
 
     var bs = clamp(Math.round(Math.min(W, H) / 7.4), 46, 68), gap = 10, pad = 10, sep = 18;
-    var acts = ['layer:body', 'layer:bones', 'layer:organs', 'mode:explore', 'mode:build'];
-    var total = 5 * bs + 4 * gap + sep, pos = 0;
+    var acts = ['sys', 'mode:explore', 'mode:build', 'out'];
+    var total = 4 * bs + 3 * gap + sep, pos = 0;
     acts.forEach(function (a, i) {
-      if (i === 3) { pos += sep; }
+      if (i === 1) { pos += sep; }
       if (land) { place(UI[a], 10, (H - total) / 2 + pos, bs); } else { place(UI[a], (W - total) / 2 + pos, H - bs - 10, bs); }
       pos += bs + gap;
     });
@@ -1201,9 +2159,17 @@
     }
     clipRect.setAttribute('x', area.x); clipRect.setAttribute('y', area.y);
     clipRect.setAttribute('width', area.w); clipRect.setAttribute('height', area.h);
+    place(UI.story, area.x + 10, area.y + 56, 56);
 
-    // card and skin dots live in the panel
-    var dotsH = (layer === 'body' && mode === 'explore') ? 56 : 0;
+    // the system menu opens beside the bar
+    var tile = clamp(Math.min(W, H) / 4.3, 74, 116), mw = tile * 3 + 20 + 24, mh = tile * 3 + 20 + 24;
+    UI.menu.style.width = mw + 'px'; UI.menu.style.height = mh + 'px';
+    UI.menu.style.gridTemplateRows = 'repeat(3, 1fr)';
+    if (land) { UI.menu.style.left = (barW + 4) + 'px'; UI.menu.style.top = clamp((H - mh) / 2, 6, H) + 'px'; }
+    else { UI.menu.style.left = ((W - mw) / 2) + 'px'; UI.menu.style.top = Math.max(6, H - bs - 24 - mh) + 'px'; }
+    UI.menu.style.fontSize = '14px';
+
+    var dotsH = (sys === 'body' && mode === 'explore' && !scene) ? 56 : 0;
     var cw = panel.w, ch = panel.h - dotsH;
     UI.card.style.left = panel.x + 'px'; UI.card.style.top = panel.y + 'px';
     UI.card.style.width = cw + 'px'; UI.card.style.height = Math.min(ch, land ? 330 : ch) + 'px';
@@ -1221,24 +2187,84 @@
     UI.again.style.left = (panel.x + panel.w / 2 - 48) + 'px'; UI.again.style.top = (panel.y + panel.h / 2 - 30) + 'px';
     UI.again.style.position = 'fixed';
 
-    computeView(!animate);
+    goView(currentTarget(), !animate);
     layoutTray();
   }
 
-  function computeView(jump) {
-    var fo = FOCUS[layer], hgt = fo[1] - fo[0];
-    var s = Math.min(area.w / 350, area.h / hgt);
-    viewTo = { s: s, tx: area.x + area.w / 2 - 200 * s, ty: area.y + (area.h - hgt * s) / 2 - fo[0] * s };
-    if (jump || reduced) { view = { s: viewTo.s, tx: viewTo.tx, ty: viewTo.ty }; viewAnim = null; applyView(); }
-    else { viewAnim = { t0: performance.now(), a: { s: view.s, tx: view.tx, ty: view.ty } }; kick(); }
+  // ------------------------------------------------------------------
+  // The camera: fit a box of the body to the screen, glide there, and
+  // swap coarse parts for fine ones as you get close.
+  // ------------------------------------------------------------------
+  function baseScale() { return Math.min(area.w / 350, area.h / 800); }
+  function fitRect(r) {
+    var rw = r[2] - r[0], rh = r[3] - r[1], s = Math.min(area.w / rw, area.h / rh);
+    return { s: s, tx: area.x + area.w / 2 - (r[0] + rw / 2) * s, ty: area.y + area.h / 2 - (r[1] + rh / 2) * s };
   }
+  function sceneRect() { var R = 205 * BK; return [anc.x - R, anc.y - R, anc.x + R, anc.y + R]; }
+  function defaultRect() { return scene ? sceneRect() : SYSBY[sys].view; }
+  var camRect = null;
+  function currentTarget() { return fitRect(camRect || defaultRect()); }
   function applyView() { bodyG.setAttribute('transform', 'translate(' + f(view.tx) + ' ' + f(view.ty) + ') scale(' + f(view.s) + ')'); }
+
+  function setLod() {
+    var want = !scene && viewTo.s >= baseScale() * 2.1;
+    if (want !== z1) { z1 = want; applyClass(); }
+  }
+  function goView(t, jump) {
+    viewTo = { s: t.s, tx: t.tx, ty: t.ty };
+    setLod();
+    if (jump || reduced) { view = { s: t.s, tx: t.tx, ty: t.ty }; viewAnim = null; applyView(); }
+    else { viewAnim = { t0: performance.now(), a: { s: view.s, tx: view.tx, ty: view.ty } }; kick(); }
+    refreshUI();
+  }
+  function goRect(r, jump) { camRect = r; goView(fitRect(r), jump); }
+
+  function atTop() {
+    if (scene) { return false; }
+    return viewTo.s <= fitRect(SYSBY[sys].view).s * 1.12;
+  }
+  function refreshUI() {
+    UI.out.classList.toggle('dim', atTop());
+    UI.sys.innerHTML = ICONS[sys];
+    UI.sys.style.setProperty('--sc', SYSBY[sys].c);
+    var showStory = !scene && !!STORY[sys] && mode === 'explore';
+    UI.story.classList.toggle('hide', !showStory);
+    if (showStory) { UI.story.innerHTML = ICONS[STORY[sys].icon]; }
+  }
+
+  // user gestures
+  function viewLimits() {
+    var b = scene ? fitRect(sceneRect()).s : baseScale();
+    return { min: b * (scene ? 0.9 : 0.8), max: b * (scene ? 5 : 14) };
+  }
+  function clampView() {
+    var lim = viewLimits();
+    view.s = clamp(view.s, lim.min, lim.max);
+    var cx = (area.x + area.w / 2 - view.tx) / view.s, cy = (area.y + area.h / 2 - view.ty) / view.s;
+    if (scene) { cx = clamp(cx, anc.x - 160 * BK, anc.x + 160 * BK); cy = clamp(cy, anc.y - 160 * BK, anc.y + 160 * BK); }
+    else { cx = clamp(cx, -40, 440); cy = clamp(cy, -40, 840); }
+    view.tx = area.x + area.w / 2 - cx * view.s; view.ty = area.y + area.h / 2 - cy * view.s;
+  }
+  function userMoved() {
+    clampView(); viewAnim = null; viewTo = { s: view.s, tx: view.tx, ty: view.ty };
+    camRect = null; applyView(); setLod(); refreshUI(); kick();
+  }
+  function zoomAt(mx, my, k) {
+    var ns = clamp(view.s * k, viewLimits().min, viewLimits().max); k = ns / view.s;
+    view.tx = mx - (mx - view.tx) * k; view.ty = my - (my - view.ty) * k; view.s = ns;
+    userMoved();
+  }
+  function gesturesOn() { return !(mode === 'build' && B) && UI.menu.style.display !== 'grid'; }
 
   // ------------------------------------------------------------------
   // Card and tip
   // ------------------------------------------------------------------
-  var sel = { id: null, t: 0 };
-  function showCard(id) {
+  var sel = { id: null, t: 0, node: null, side: 0 };
+  function canZoom(inf) {
+    if (inf.open && SCN[inf.open]) { return true; }
+    return !scene;
+  }
+  function showCard(id, node) {
     var inf = info(id), it = ITEMS[id];
     document.getElementById('cardName').textContent = inf.n;
     var alt = document.getElementById('cardAlt');
@@ -1247,6 +2273,7 @@
     fa.textContent = inf.f || ''; fa.style.display = factsOn ? 'block' : 'none';
     var ct = document.getElementById('cardCount');
     if (inf.count > 1) { ct.textContent = inf.count; ct.style.display = 'flex'; } else { ct.style.display = 'none'; }
+    UI.zoom.style.display = canZoom(inf) ? 'flex' : 'none';
     var ic = document.getElementById('cardIcon');
     clear(ic);
     if (it) {
@@ -1283,13 +2310,96 @@
     if (it && !it.placed) { return; }
     var now = performance.now();
     if (sel.id === id && now - sel.t < 350) { return; }
-    sel.id = id; sel.t = now;
-    if (mode === 'explore') { showCard(id); } else { tip(inf.n); }
+    sel = { id: id, t: now, node: node, side: s };
+    if (mode === 'explore') { showCard(id, node); } else { tip(inf.n); }
     var text = inf.n + (factsOn ? '. ' + inf.f : '');
     say(text);
     sfx(inf.snd);
     startMotion(id, s, now);
+    if (inf.tap) { inf.tap(node, s); }
     if (it || reduced) { ring(node); }
+    kick();
+  }
+
+  // the magnifier on the card: into a close-up, or in on that part
+  function zoomInto() {
+    if (!sel.id) { return; }
+    var inf = info(sel.id), it = ITEMS[sel.id], s = sel.side, node = sel.node;
+    if (inf.open && SCN[inf.open]) {
+      var at;
+      if (scene) { at = [anc.x, anc.y]; }
+      else if (it) { at = [node.__c[0], node.__c[1]]; }
+      else { at = [s ? 400 - inf.c[0] : inf.c[0], inf.c[1]]; }
+      openScene(inf.open, at);
+      return;
+    }
+    if (scene) { return; }
+    var r;
+    if (inf.z) { r = s ? [400 - inf.z[2], inf.z[1], 400 - inf.z[0], inf.z[3]] : inf.z.slice(); }
+    else {
+      var cx = node.__c[0], cy = node.__c[1], h = Math.max(200, Math.max(it.bb.w, it.bb.h) * 1.7) / 2;
+      r = [cx - h, cy - h, cx + h, cy + h];
+    }
+    sfx('zoomin');
+    goRect(r);
+    if (mode === 'build') { startBuild(); }
+  }
+
+  // ------------------------------------------------------------------
+  // Close-ups open as a bubble over the place you zoomed into
+  // ------------------------------------------------------------------
+  function setBubble(k, a) {
+    bubble.setAttribute('transform', 'translate(' + f(anc.x) + ' ' + f(anc.y) + ') scale(' + f(k) + ')');
+    scrim.setAttribute('fill-opacity', f(0.62 * a));
+    bubble.setAttribute('opacity', f(Math.min(1, a * 1.6)));
+  }
+  function openScene(id, at) {
+    if (!SCN[id]) { return; }
+    if (mode === 'build' && B) { endBuild(); }
+    if (!scene) { savedView = { t: viewTo, rect: camRect }; anc = { x: at[0], y: at[1] }; sceneStack = []; scClosing = false; }
+    else { sceneStack.push(scene); }
+    scene = id; scLast = id;
+    applyClass();
+    UI.card.style.display = 'none'; UI.tip.style.display = 'none';
+    sel = { id: null, t: 0, node: null, side: 0 };
+    motions = []; prevTF = {};
+    Object.keys(ITEMS).forEach(function (k) { itemTf(ITEMS[k], null); });
+    camRect = sceneRect();
+    goView(fitRect(camRect));
+    if (reduced) { setBubble(BK, 1); } else {
+      setBubble(BK * 0.3, 0);
+      tweens.push({ t0: performance.now(), dur: 420, fn: function (q) { var e = sm(q); setBubble(BK * (0.3 + 0.7 * e), e); } });
+    }
+    sfx('zoomin'); say(SCN[id].n); tip(SCN[id].n);
+    if (SCN[id].enter) { SCN[id].enter(); }
+    if (mode === 'build') { startBuild(); }
+    layout(true);
+    kick();
+  }
+  function closeScene() {
+    if (!scene) { return; }
+    if (mode === 'build' && B) { endBuild(); }
+    sfx('zoomout');
+    UI.card.style.display = 'none';
+    sel = { id: null, t: 0, node: null, side: 0 };
+    motions = []; prevTF = {}; runners = [];
+    Object.keys(ITEMS).forEach(function (k) { itemTf(ITEMS[k], null); });
+    if (sceneStack.length) {
+      scene = sceneStack.pop(); scLast = scene;
+      applyClass(); tip(SCN[scene].n);
+    } else {
+      scene = null; scClosing = true;
+      camRect = savedView.rect;
+      applyClass();
+      var tgt = savedView.t;
+      goView(tgt);
+      var done = function () { scClosing = false; applyClass(); };
+      if (reduced) { setBubble(BK, 0); done(); } else {
+        tweens.push({ t0: performance.now(), dur: 380, fn: function (q) { var e = 1 - sm(q); setBubble(BK * (0.3 + 0.7 * e), e); }, done: done });
+      }
+    }
+    if (mode === 'build') { startBuild(); }
+    layout(true);
     kick();
   }
 
@@ -1331,7 +2441,7 @@
   function drawDots() {
     clear(dotsG);
     if (!B) { return; }
-    var n = B.total, r = clamp(panel.w / (n * 3), 4, 8), gap = r * 2.8, x0 = panel.x + panel.w / 2 - (n - 1) * gap / 2;
+    var n = B.total, r = clamp(panel.w / (n * 3), 3, 8), gap = r * 2.8, x0 = panel.x + panel.w / 2 - (n - 1) * gap / 2;
     for (var i = 0; i < n; i++) {
       el('circle', { cx: x0 + i * gap, cy: panel.y + 12, r: r, fill: i < B.placed ? '#ffd54a' : 'rgba(255,255,255,0.3)' }, dotsG);
     }
@@ -1342,7 +2452,6 @@
     var g = el('g', { 'class': 'pc', 'data-piece': id }, trayG);
     var inner = el('g', { transform: 'translate(' + f(-(it.bb.x + it.bb.w / 2)) + ' ' + f(-(it.bb.y + it.bb.h / 2)) + ')' }, g);
     drawPiece(inner, it);
-    // a fat invisible target so thin pieces are still easy to grab
     el('circle', { cx: it.bb.x + it.bb.w / 2, cy: it.bb.y + it.bb.h / 2, r: Math.max(it.bb.w, it.bb.h) * 0.62, fill: '#fff', 'fill-opacity': 0 }, inner);
     var pc = { id: id, g: g, slot: slot, k: 1, x: 0, y: 0, s: 1 };
     fitPiece(pc);
@@ -1370,18 +2479,36 @@
     UI.again.style.display = 'none'; UI.again.classList.remove('pulse');
   }
 
+  // what is on screen right now, and so what can be built
+  function buildSet() {
+    var r = [(area.x - viewTo.tx) / viewTo.s, (area.y - viewTo.ty) / viewTo.s, (area.x + area.w - viewTo.tx) / viewTo.s, (area.y + area.h - viewTo.ty) / viewTo.s];
+    var px = (r[2] - r[0]) * 0.04, py = (r[3] - r[1]) * 0.04;
+    var ids = ORDER.filter(function (id) {
+      var it = ITEMS[id];
+      if (scene) { return it['in'] === scene; }
+      if (it['in'] || it.sys !== sys) { return false; }
+      if (it.lod !== undefined && it.lod !== (z1 ? 1 : 0)) { return false; }
+      return it.nodes.some(function (n) { var c = n.__c; return c[0] > r[0] - px && c[0] < r[2] + px && c[1] > r[1] - py && c[1] < r[3] + py; });
+    });
+    return ids;
+  }
+
   function startBuild() {
+    var old = B ? B.ids : null;
+    if (old) { old.forEach(function (id) { setPlaced(ITEMS[id], true); }); }
     clearTray();
-    var ids = shuffle(ORDER[layer].slice());
-    ORDER[layer].forEach(function (id) { setPlaced(ITEMS[id], false); });
-    B = { layer: layer, queue: ids, slots: [], placed: 0, total: ids.length, wrong: {}, done: false };
+    var ids = buildSet();
+    if (!ids.length) { return; }
+    shuffle(ids);
+    ids.forEach(function (id) { setPlaced(ITEMS[id], false); });
+    B = { ids: ids.slice(), queue: ids.slice(), slots: [], placed: 0, total: ids.length, wrong: {}, done: false };
     layoutTray();
     fillTray(true);
     drawDots();
   }
 
   function endBuild() {
-    if (B) { ORDER[B.layer].forEach(function (id) { setPlaced(ITEMS[id], true); }); }
+    if (B) { B.ids.forEach(function (id) { setPlaced(ITEMS[id], true); }); }
     clearTray();
   }
 
@@ -1392,13 +2519,13 @@
     drag = { pc: pc, pid: e.pointerId, sx: e.clientX, sy: e.clientY, moved: false };
     try { stage.setPointerCapture(e.pointerId); } catch (x) { /* fine */ }
     dragG.appendChild(pc.g);
-    var from = pc.s, to = view.s, t0 = performance.now();
+    var it = ITEMS[pc.id];
+    var from = pc.s, to = view.s * (it['in'] ? BK : 1), t0 = performance.now();
     if (reduced) { pc.s = to; } else {
       tweens.push({ t0: t0, dur: 140, fn: function (q) { if (drag && drag.pc === pc) { pc.s = from + (to - from) * sm(q); placePiece(pc); } } });
     }
     pc.x = e.clientX; pc.y = e.clientY - 28; placePiece(pc);
-    var inf = ITEMS[pc.id];
-    sfx('pick'); say(inf.n); tip(inf.n);
+    sfx('pick'); say(it.n); tip(it.n);
     kick();
   }
 
@@ -1429,8 +2556,11 @@
     drag = null;
     var it = ITEMS[pc.id];
     var bp = toBody(pc.x, pc.y);
-    var R = clamp(Math.max(it.bb.w, it.bb.h) * 0.5, 40, 85);
-    var d = Math.hypot(bp[0] - it.mid[0], bp[1] - it.mid[1]);
+    var R = clamp(it.rad, 30, 80) * (it['in'] ? BK : 1), d = 1e9;
+    it.nodes.forEach(function (n) {
+      var c = it['in'] ? [anc.x + n.__c[0] * BK, anc.y + n.__c[1] * BK] : n.__c;
+      d = Math.min(d, Math.hypot(bp[0] - c[0], bp[1] - c[1]));
+    });
     var overBody = pc.x > area.x && pc.x < area.x + area.w && pc.y > area.y && pc.y < area.y + area.h;
     if (moved && d <= R) { locate(pc, it); return; }
     if (moved && overBody) {
@@ -1460,10 +2590,11 @@
     B.done = true;
     sfx('tada');
     burst(90);
-    var order = ORDER[B.layer], t = performance.now();
+    var t = performance.now();
     if (!reduced) {
-      order.forEach(function (id, i) {
-        motions.push({ item: id, kind: ITEMS[id].act, t0: t + i * 140, dur: FXDUR[ITEMS[id].act] });
+      B.ids.forEach(function (id, i) {
+        var a = ITEMS[id].act;
+        motions.push({ item: id, kind: FX[a] ? a : 'wobble', t0: t + i * 140, dur: FXDUR[a] || 1200 });
       });
       while (motions.length > 40) { motions.shift(); }
     }
@@ -1475,35 +2606,63 @@
   // ------------------------------------------------------------------
   // State changes
   // ------------------------------------------------------------------
+  function applyClass() {
+    var g = SYSBY[sys].ghost.map(function (x) { return ' G-' + x; }).join('');
+    var sc = (scene || scClosing) ? ' Sc SC-' + scLast : '';
+    stage.setAttribute('class', 'S-' + sys + g + sc + (z1 ? ' Z1' : '') + ' M-' + mode);
+  }
+
   function applyState(quiet) {
-    stage.setAttribute('class', 'L-' + layer + ' M-' + mode);
-    ['body', 'bones', 'organs'].forEach(function (l) { UI['layer:' + l].classList.toggle('on', layer === l); });
+    scene = null; scClosing = false; sceneStack = []; camRect = null;
+    z1 = false;
+    applyClass();
     ['explore', 'build'].forEach(function (m) { UI['mode:' + m].classList.toggle('on', mode === m); });
-    UI.dots.style.display = (layer === 'body' && mode === 'explore') ? 'flex' : 'none';
+    UI.dots.style.display = (sys === 'body' && mode === 'explore') ? 'flex' : 'none';
     UI.card.style.display = 'none';
     UI.tip.style.display = 'none';
-    sel = { id: null, t: 0 };
-    motions = []; prevTF = {};
+    UI.menu.style.display = 'none';
+    sel = { id: null, t: 0, node: null, side: 0 };
+    motions = []; prevTF = {}; runners = [];
     Object.keys(ITEMS).forEach(function (id) { itemTf(ITEMS[id], null); });
-    if (mode === 'build') { startBuild(); } else { endBuild(); }
     layout(!quiet);
+    if (mode === 'build') { startBuild(); } else { endBuild(); }
     if (!quiet) { sfx('layer'); }
+    refreshUI();
     kick();
   }
 
-  function setLayer(l) {
-    if (l === layer && !(mode === 'build' && B && B.layer !== l)) { return; }
-    if (mode === 'build') { endBuild(); }
-    layer = l;
-    if (l === 'body') { mode = 'explore'; }
+  function setSys(id) {
+    if (id === sys && !scene && !camRect) { return; }
+    if (mode === 'build' && B) { endBuild(); }
+    var wasScene = !!scene;
+    sys = id;
+    if (id === 'body') { mode = 'explore'; }
+    if (wasScene) { setBubble(BK, 0); }
     applyState();
   }
   function setMode(m) {
     if (m === mode) { return; }
-    if (m === 'build' && layer === 'body') { layer = 'organs'; }
+    if (m === 'build' && sys === 'body') { sys = 'bones'; }
     if (mode === 'build') { endBuild(); }
     mode = m;
-    applyState();
+    ['explore', 'build'].forEach(function (k) { UI['mode:' + k].classList.toggle('on', mode === k); });
+    UI.dots.style.display = (sys === 'body' && mode === 'explore' && !scene) ? 'flex' : 'none';
+    UI.card.style.display = 'none';
+    applyClass();
+    layout(true);
+    if (mode === 'build') { startBuild(); }
+    refreshUI();
+    kick();
+  }
+  function zoomOut() {
+    if (scene) { closeScene(); return; }
+    if (atTop()) { return; }
+    sfx('zoomout');
+    if (mode === 'build' && B) { endBuild(); }
+    camRect = null;
+    goView(fitRect(SYSBY[sys].view));
+    UI.card.style.display = 'none';
+    if (mode === 'build') { startBuild(); }
   }
 
   function refreshToggles() {
@@ -1512,27 +2671,129 @@
   }
 
   // ------------------------------------------------------------------
+  // What moves on its own in each system, and the things that flow
+  // ------------------------------------------------------------------
+  function mir(pts) { return pts.map(function (q) { return [400 - q[0], q[1]]; }); }
+  function both(o, pts) {
+    var a = {}, b = {}, k;
+    for (k in o) { a[k] = o[k]; b[k] = o[k]; }
+    a.pts = pts; b.pts = mir(pts);
+    flow(a); flow(b);
+  }
+  var RED = '#ff6f84', BLU = '#7ea4ff';
+  (function () {
+    function bl(pts, col, n, spd, r) { return { sys: 'blood', pts: pts, col: col, n: n || 6, spd: spd || 70, r: r || 2.5 }; }
+    flow(bl([[219, 276], [219, 252], [226, 241], [234, 247], [222, 262], [211, 270], [209, 300], [208, 400], [207, 468]], RED, 9, 85, 3));
+    flow(bl([[196, 466], [197, 400], [198, 340], [202, 314]], BLU, 7, 80, 3));
+    flow(bl([[196, 208], [197, 250], [199, 276]], BLU, 3, 60, 3));
+    both(bl(0, RED, 7, 85, 2.5), [[207, 468], [192, 488], [174, 506], [168, 540], [163, 580], [160, 622], [161, 640], [160, 680], [158, 740], [140, 764], [116, 772]]);
+    both(bl(0, BLU, 7, 85, 2.5), [[138, 762], [152, 742], [152, 700], [152, 640], [153, 622], [158, 580], [160, 540], [164, 508], [190, 482], [196, 470]]);
+    both(bl(0, RED, 6, 80, 2.2), [[225, 240], [214, 228], [200, 220], [180, 214], [152, 218], [130, 236], [122, 262], [112, 300], [103, 338], [101, 346], [97, 400], [95, 432], [90, 450], [86, 478]]);
+    both(bl(0, BLU, 6, 80, 2.2), [[88, 478], [88, 452], [89, 432], [96, 346], [109, 338], [117, 302], [131, 242], [134, 246], [180, 226], [200, 232], [198, 262]]);
+    both(bl(0, RED, 5, 80, 2.2), [[195, 220], [193, 190], [190, 160], [182, 130], [190, 76]]);
+    both(bl(0, BLU, 5, 80, 2.2), [[180, 70], [166, 100], [164, 130], [180, 160], [185, 214], [196, 222]]);
+    both(bl(0, BLU, 4, 60, 2.6), [[208, 280], [208, 258], [182, 254], [166, 266], [152, 292]]);
+    both(bl(0, RED, 4, 60, 2.6), [[152, 296], [170, 286], [206, 284], [222, 280]]);
+    // air in and out, together, like breathing
+    var ar = { sys: 'breath', col: '#d6f1ff', n: 5, osc: 4.2, spd: 0, r: 2.6, a: 0.9 };
+    both(ar, [[200, 134], [200, 170], [200, 246], [172, 270], [156, 292], [146, 316]]);
+    // wee drips down to the bladder
+    both({ sys: 'wee', col: '#f6d93a', n: 3, spd: 24, r: 2.8 }, [[158, 404], [162, 432], [176, 462], [192, 486]]);
+  })();
+
+  IDLE.blood = function (now, TF) {
+    var hb = 1 + 0.07 * pulse((now % 860) / 860);
+    put(TF, 'heart', [0, 0, 0, hb, hb]);
+  };
+  IDLE.breath = function (now, TF) {
+    var b = 0.5 - 0.5 * Math.cos(2 * Math.PI * flowT / 4.2);
+    put(TF, 'lungs', [0, 0, 0, 1 + 0.05 * b, 1 + 0.06 * b]);
+    put(TF, 'bronchi', [0, 0, 0, 1 + 0.05 * b, 1 + 0.06 * b]);
+    put(TF, 'diaphragm', [0, 6 * b, 0, 1, 1 - 0.16 * b]);
+  };
+  IDLE.tummy = function (now, TF) {
+    var w = Math.sin(now / 520) * 0.012;
+    ['small', 'jejunum', 'ileum', 'large'].forEach(function (id, i) { put(TF, id, [0, 0, 0, 1 + w * (i % 2 ? -1 : 1), 1 - w * (i % 2 ? -1 : 1)]); });
+    var s = 0.03 * Math.sin(now / 900);
+    put(TF, 'stomach', [0, 0, 0, 1 + s, 1 - s]);
+  };
+  IDLE.wee = function (now, TF) {
+    var s = 1 + 0.06 * Math.sin(now / 1700);
+    put(TF, 'bladder', [0, 0, 0, s, s]);
+  };
+
+  // the apple's journey from mouth to toilet
+  STORY.tummy = {
+    icon: 'apple',
+    go: function () {
+      sfx('munch'); say('Yum');
+      var sp = [[200, 160], [205, 172], [205, 236], [208, 288], [220, 318], [227, 342], [250, 362], [244, 388], [208, 392], [186, 404], [176, 418], [200, 430]];
+      var i;
+      for (i = 0; i < 6; i++) { var y = 432 + i * 9; sp.push(i % 2 ? [168, y + 2] : [232, y + 2]); sp.push(i % 2 ? [232, y + 9] : [168, y + 9]); }
+      sp.push([160, 484], [152, 486], [152, 414], [170, 405], [210, 403], [250, 414], [250, 462], [250, 480], [232, 476], [224, 486], [212, 498], [205, 506], [202, 524]);
+      var o = prep({ pts: sp, r: 5.5, dur: 15000, glow: true,
+        col: function (pr) { return 'rgb(' + Math.round(229 - pr * 110) + ',' + Math.round(72 + pr * 8) + ',' + Math.round(77 - pr * 38) + ')'; } });
+      function at(idx) { return o.cum[idx] / o.len; }
+      function hit2(id, kind, snd) { return function () { motions.push({ item: id, kind: kind, t0: performance.now(), dur: FXDUR[kind] }); sfx(snd); }; }
+      o.stops = [
+        { t: 0.0, fn: hit2('teeth', 'chatter', 'munch') },
+        { t: at(2) - 0.01, fn: hit2('oesophagus', 'swallow', 'gulp') },
+        { t: at(6), fn: hit2('stomach', 'squish', 'gurgle') },
+        { t: at(8) + 0.02, fn: hit2('pancreas', 'wobble', 'blop') },
+        { t: at(11), fn: hit2('small', 'wriggle', 'gurgle') },
+        { t: at(26), fn: hit2('large', 'wriggle', 'gurgle') },
+        { t: at(sp.length - 2), fn: hit2('rectum', 'squish', 'blop') }
+      ];
+      o.done = function () { sfx('giggle'); };
+      o.t0 = performance.now(); runners.push(o);
+      while (runners.length > 8) { runners.shift(); }
+      kick();
+    }
+  };
+
+  //@@STORIES
+
+  // ------------------------------------------------------------------
   // Input
   // ------------------------------------------------------------------
   document.addEventListener('click', function (e) {
     var b = e.target.closest ? e.target.closest('button') : null;
+    if (UI.menu.style.display === 'grid' && !(b && (b.classList.contains('sysb') || b === UI.sys))) {
+      UI.menu.style.display = 'none';
+    }
     if (!b) { return; }
     ensureAudio();
     var act = b.getAttribute('data-act');
     if (act) {
-      if (act.indexOf('layer:') === 0) { setLayer(act.slice(6)); }
+      if (act === 'sys') { UI.menu.style.display = UI.menu.style.display === 'grid' ? 'none' : 'grid'; sfx('pick'); }
       else if (act.indexOf('mode:') === 0) { setMode(act.slice(5)); }
+      else if (act === 'out') { zoomOut(); }
+      else if (act === 'story') { if (STORY[sys]) { STORY[sys].go(); } }
       else if (act === 'sound') {
         muted = !muted; store('muted', muted ? '1' : '0');
         if (muted) { try { window.speechSynthesis.cancel(); } catch (x) { /* none */ } }
         refreshToggles();
       } else if (act === 'facts') {
         factsOn = !factsOn; store('facts', factsOn ? '1' : '0'); refreshToggles();
-        if (sel.id && mode === 'explore') { showCard(sel.id); }
+        if (sel.id && mode === 'explore') { showCard(sel.id, sel.node); }
       }
     } else if (b.id === 'again') { sfx('pick'); startBuild(); }
-    else if (b.hasAttribute('data-skin')) { setSkin(parseInt(b.getAttribute('data-skin'), 10)); sfx('boop'); }
+    else if (b.id === 'cardZoom') { zoomInto(); }
+    else if (b.hasAttribute('data-sys')) { UI.menu.style.display = 'none'; setSys(b.getAttribute('data-sys')); }
+    else if (b.hasAttribute('data-skin')) {
+      setSkin(parseInt(b.getAttribute('data-skin'), 10)); sfx('boop');
+      UI.dots.querySelectorAll('.dot').forEach(function (d) { d.classList.toggle('on', d === b); });
+    }
   });
+
+  var ptr = {}, np = 0, pinchD = 0, pinchM = null;
+  function ptrIds() { return Object.keys(ptr); }
+  function tapAt(p) {
+    var t = p.t;
+    if (t.closest && t.closest('[data-out]')) { if (scene) { closeScene(); } return; }
+    var d = t.closest ? t.closest('[data-id]') : null;
+    if (d) { select(d); }
+  }
 
   stage.addEventListener('pointerdown', function (e) {
     ensureAudio();
@@ -1545,12 +2806,50 @@
       var pid = pcEl.getAttribute('data-piece');
       for (var i = 0; i < B.slots.length; i++) { if (B.slots[i] && B.slots[i].id === pid) { startDrag(B.slots[i], e); return; } }
     }
-    var d = t.closest ? t.closest('[data-id]') : null;
-    if (d) { select(d); }
+    ptr[e.pointerId] = { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, t: t, moved: false };
+    np = ptrIds().length;
+    if (np === 2) {
+      var ids = ptrIds(), a = ptr[ids[0]], b2 = ptr[ids[1]];
+      pinchD = Math.hypot(a.x - b2.x, a.y - b2.y) || 1; pinchM = [(a.x + b2.x) / 2, (a.y + b2.y) / 2];
+      a.moved = b2.moved = true;
+    }
   });
-  stage.addEventListener('pointermove', moveDrag);
-  stage.addEventListener('pointerup', endDrag);
-  stage.addEventListener('pointercancel', endDrag);
+  stage.addEventListener('pointermove', function (e) {
+    if (drag) { moveDrag(e); return; }
+    var p = ptr[e.pointerId];
+    if (!p) { return; }
+    var dx = e.clientX - p.x, dy = e.clientY - p.y;
+    if (!p.moved && Math.abs(e.clientX - p.sx) + Math.abs(e.clientY - p.sy) > 10) {
+      p.moved = true;
+      try { stage.setPointerCapture(e.pointerId); } catch (x) { /* fine */ }
+    }
+    p.x = e.clientX; p.y = e.clientY;
+    if (!gesturesOn()) { return; }
+    if (np === 2) {
+      var ids = ptrIds(), a = ptr[ids[0]], b2 = ptr[ids[1]];
+      var d = Math.hypot(a.x - b2.x, a.y - b2.y) || 1, mid = [(a.x + b2.x) / 2, (a.y + b2.y) / 2];
+      view.tx += mid[0] - pinchM[0]; view.ty += mid[1] - pinchM[1];
+      zoomAt(mid[0], mid[1], d / pinchD);
+      pinchD = d; pinchM = mid;
+    } else if (np === 1 && p.moved) {
+      view.tx += dx; view.ty += dy; userMoved();
+    }
+  });
+  function pend(e) {
+    if (drag) { endDrag(e); return; }
+    var p = ptr[e.pointerId];
+    if (!p) { return; }
+    delete ptr[e.pointerId];
+    var was = np; np = ptrIds().length;
+    if (!p.moved && was === 1 && e.type === 'pointerup') { tapAt(p); }
+  }
+  stage.addEventListener('pointerup', pend);
+  stage.addEventListener('pointercancel', function (e) { if (drag) { endDrag(e); return; } delete ptr[e.pointerId]; np = ptrIds().length; });
+  stage.addEventListener('wheel', function (e) {
+    if (!gesturesOn()) { return; }
+    e.preventDefault();
+    zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.0015));
+  }, { passive: false });
 
   var resizeT = 0;
   window.addEventListener('resize', function () { clearTimeout(resizeT); resizeT = setTimeout(layout, 60); });
@@ -1562,11 +2861,6 @@
   // ------------------------------------------------------------------
   setSkin(skinIdx);
   UI.dots.querySelectorAll('.dot').forEach(function (d, i) { d.classList.toggle('on', i === skinIdx); });
-  UI.dots.addEventListener('click', function (e) {
-    var b = e.target.closest ? e.target.closest('.dot') : null;
-    if (!b) { return; }
-    UI.dots.querySelectorAll('.dot').forEach(function (d) { d.classList.toggle('on', d === b); });
-  });
   refreshToggles();
   applyState(true);
   hello = performance.now() + 700;
