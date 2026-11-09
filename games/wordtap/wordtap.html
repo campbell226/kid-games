@@ -1,0 +1,643 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#FFF9E6">
+<title>WordTap</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #FFF9E6; color: #3a3350;
+    font-family: ui-rounded, "Arial Rounded MT Bold", system-ui, sans-serif;
+    overflow: hidden;
+    touch-action: manipulation;
+    overscroll-behavior: none;
+    -webkit-user-select: none; user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button { font: inherit; color: inherit; border: 0; cursor: pointer; -webkit-touch-callout: none; }
+  .screen {
+    position: fixed; inset: 0; display: none; flex-direction: column;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  .screen.on { display: flex; }
+
+  /* corner controls */
+  .gear {
+    position: absolute; top: calc(env(safe-area-inset-top) + 8px); left: calc(env(safe-area-inset-left) + 8px);
+    width: 56px; height: 56px; background: transparent; opacity: 0.35; padding: 8px; z-index: 5;
+  }
+  .gear svg { width: 100%; height: 100%; display: block; pointer-events: none; }
+  #progress {
+    position: absolute; top: calc(env(safe-area-inset-top) + 14px); right: calc(env(safe-area-inset-right) + 18px);
+    font-size: 22px; font-weight: 800; opacity: 0.6; z-index: 5; padding: 8px;
+  }
+
+  /* start */
+  #start { align-items: center; justify-content: center; }
+  .bigplay {
+    width: min(52vmin, 320px); height: min(52vmin, 320px); border-radius: 50%;
+    background: #00B894; box-shadow: 0 10px 0 #00876c; padding: 0;
+  }
+  .bigplay:active { transform: translateY(6px); box-shadow: 0 4px 0 #00876c; }
+  .bigplay svg { width: 60%; height: 60%; display: block; margin: 0 auto; }
+  #albumBtn {
+    position: absolute; bottom: calc(env(safe-area-inset-bottom) + 18px); right: calc(env(safe-area-inset-right) + 18px);
+    width: 76px; height: 76px; border-radius: 22px; background: #FFD700; box-shadow: 0 5px 0 #c9a800; padding: 12px;
+  }
+  #albumBtn svg { width: 100%; height: 100%; display: block; }
+  #loadErr { position: absolute; bottom: 20px; left: 20px; right: 110px; font-size: 14px; color: #b0413e; display: none; }
+
+  /* game */
+  #top { flex: 0 0 33%; display: flex; align-items: center; justify-content: center; }
+  #speaker {
+    height: min(70%, 44vw); aspect-ratio: 1; border-radius: 50%;
+    background: #FF8A65; box-shadow: 0 8px 0 #cf5a38; padding: 0;
+  }
+  #speaker:active { transform: translateY(5px); box-shadow: 0 3px 0 #cf5a38; }
+  #speaker svg { width: 62%; height: 62%; display: block; margin: 0 auto; pointer-events: none; }
+  #tiles { flex: 1; display: flex; gap: 4vmin; padding: 2vmin 4vmin 5vmin; min-height: 0; }
+  .tile {
+    flex: 1; min-width: 0; background: #6C5CE7; color: #fff; border-radius: 28px;
+    box-shadow: 0 8px 0 #4a3ab8; font-weight: 800; padding: 0 10px; overflow: hidden;
+    display: flex; align-items: center; justify-content: center; white-space: nowrap;
+    -webkit-user-select: none; user-select: none;
+  }
+  .tile:disabled { cursor: default; opacity: 0.88; }
+  .tile.good { background: #00B894; box-shadow: 0 8px 0 #00876c; }
+  .tile.glow { background: #00B894; box-shadow: 0 8px 0 #00876c, 0 0 0 10px rgba(0,184,148,0.35), 0 0 40px 12px rgba(0,184,148,0.6); }
+  .tile.pulse { animation: pulse 350ms cubic-bezier(.3,1.6,.5,1); }
+  .tile.shake { animation: shake 420ms; }
+  @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.08); } 100% { transform: scale(1); } }
+  @keyframes shake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-16px); } 40% { transform: translateX(14px); }
+    60% { transform: translateX(-10px); } 80% { transform: translateX(6px); } }
+
+  #streak {
+    position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+    pointer-events: none; z-index: 8;
+  }
+  #streak.on { display: flex; }
+  #streak .badge { transform: scale(0); opacity: 0; position: relative; width: min(60vmin, 360px); height: min(60vmin, 360px); }
+  #streak.on .badge { animation: streakIn 1500ms ease forwards; }
+  #streak svg { width: 100%; height: 100%; display: block; }
+  #streak .n { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: min(20vmin, 120px); font-weight: 900; color: #fff; padding-top: 6%; text-shadow: 0 4px 0 rgba(0,0,0,0.2); }
+  @keyframes streakIn {
+    0% { transform: scale(0); opacity: 0; } 25% { transform: scale(1.15); opacity: 1; } 35% { transform: scale(1); }
+    80% { transform: scale(1); opacity: 1; } 100% { transform: scale(1); opacity: 0; }
+  }
+
+  /* summary */
+  #summary { align-items: center; justify-content: center; gap: 3vmin; }
+  .score { display: flex; align-items: center; gap: 14px; font-size: min(14vmin, 80px); font-weight: 900; }
+  .score svg { width: 1.1em; height: 1.1em; }
+  #sticker {
+    width: min(42vmin, 260px); height: min(42vmin, 260px); border-radius: 12%; display: flex; align-items: center; justify-content: center;
+    font-size: min(24vmin, 150px); transform: scale(0); opacity: 0; box-shadow: 0 8px 0 rgba(0,0,0,0.15);
+  }
+  #sticker.pop { animation: pop 600ms 300ms cubic-bezier(.3,1.5,.5,1) forwards; }
+  @keyframes pop { 0% { transform: scale(0); opacity: 0; } 70% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+  .row { display: flex; gap: 5vmin; }
+  .iconbtn { width: min(24vmin, 130px); height: min(24vmin, 130px); border-radius: 28px; padding: 14%; }
+  .iconbtn svg { width: 100%; height: 100%; display: block; }
+  .iconbtn.go { background: #00B894; box-shadow: 0 6px 0 #00876c; }
+  .iconbtn.alb { background: #FFD700; box-shadow: 0 6px 0 #c9a800; }
+  .iconbtn:active { transform: translateY(4px); }
+
+  /* album */
+  #album { align-items: center; }
+  #grid { flex: 1; min-height: 0; width: 100%; display: grid; grid-template-columns: repeat(6, 1fr); gap: 2vmin; padding: 14px 3vmin; align-content: center; }
+  @media (orientation: portrait) { #grid { grid-template-columns: repeat(5, 1fr); } }
+  .slot { aspect-ratio: 1; border-radius: 16%; display: flex; align-items: center; justify-content: center; font-size: min(8vmin, 54px); }
+  .slot.locked { background: #E0E0E0; opacity: 0.5; }
+  #albumBack { margin: 6px 0 calc(env(safe-area-inset-bottom) + 14px); width: 84px; height: 70px; border-radius: 20px; background: #6C5CE7; box-shadow: 0 5px 0 #4a3ab8; padding: 14px; }
+  #albumBack svg { width: 100%; height: 100%; display: block; }
+
+  /* parent settings (words allowed here) */
+  #settings { background: #fff; overflow-y: auto; padding-left: 22px; padding-right: 22px; }
+  #settings h1 { font-size: 26px; margin: 20px 0 6px; }
+  #settings h2 { font-size: 17px; margin: 22px 0 8px; color: #6b6585; }
+  .seg { display: flex; flex-wrap: wrap; gap: 8px; }
+  .seg button { padding: 14px 18px; border-radius: 14px; background: #ece9f7; font-size: 17px; font-weight: 700; min-height: 52px; }
+  .seg button.sel { background: #6C5CE7; color: #fff; }
+  .toggle { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; font-size: 17px; gap: 12px; }
+  .toggle button { width: 74px; height: 42px; border-radius: 21px; background: #ccc; position: relative; flex: none; }
+  .toggle button::after { content: ""; position: absolute; top: 4px; left: 4px; width: 34px; height: 34px; border-radius: 50%; background: #fff; transition: left .15s; }
+  .toggle button.on { background: #00B894; }
+  .toggle button.on::after { left: 36px; }
+  .note { font-size: 14px; color: #8a849e; margin: 2px 0 0; }
+  .danger { margin-top: 24px; padding: 14px 18px; border-radius: 14px; background: #fde4e2; color: #b0413e; font-size: 17px; font-weight: 700; min-height: 52px; }
+  .done { margin: 26px 0 calc(env(safe-area-inset-bottom) + 30px); padding: 16px 28px; border-radius: 16px; background: #00B894; color: #fff; font-size: 20px; font-weight: 800; min-height: 56px; }
+  #confirm { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: none; align-items: center; justify-content: center; z-index: 20; padding: 24px; }
+  #confirm.on { display: flex; }
+  #confirm .box { background: #fff; border-radius: 22px; padding: 24px; max-width: 420px; font-size: 18px; }
+  #confirm .box .seg { margin-top: 18px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tile.pulse, .tile.shake { animation: none; }
+    #streak.on .badge { animation: none; transform: none; opacity: 1; }
+    #sticker.pop { animation: none; transform: none; opacity: 1; }
+    .toggle button::after { transition: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- start: a big play button, nothing to read -->
+<section id="start" class="screen on">
+  <button class="gear" data-gear aria-label="Parent settings">
+    <svg viewBox="0 0 24 24" fill="#3a3350"><path d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.6 7.6 0 0 0-1.7-1L15 3.3h-4l-.4 2.6a7.6 7.6 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1c.5.4 1.1.7 1.7 1l.4 2.6h4l.4-2.6c.6-.3 1.2-.6 1.7-1l2.5 1 2-3.5zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"/></svg>
+  </button>
+  <button class="bigplay" id="playBtn" aria-label="Play">
+    <svg viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5z" fill="#fff"/></svg>
+  </button>
+  <button id="albumBtn" aria-label="Stickers">
+    <svg viewBox="0 0 24 24" fill="#fff"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg>
+  </button>
+  <div id="loadErr">The word list could not be loaded. Open this game from its website rather than from a file.</div>
+</section>
+
+<!-- game -->
+<section id="game" class="screen">
+  <button class="gear" data-gear aria-label="Parent settings">
+    <svg viewBox="0 0 24 24" fill="#3a3350"><path d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.6 7.6 0 0 0-1.7-1L15 3.3h-4l-.4 2.6a7.6 7.6 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1c.5.4 1.1.7 1.7 1l.4 2.6h4l.4-2.6c.6-.3 1.2-.6 1.7-1l2.5 1 2-3.5zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"/></svg>
+  </button>
+  <div id="progress" aria-live="off"></div>
+  <div id="top">
+    <button id="speaker" aria-label="Hear the word again">
+      <svg viewBox="0 0 24 24" fill="#fff"><path d="M3 9.5v5h4l5 4.5V5L7 9.5z"/><path d="M15 8.5a5 5 0 0 1 0 7M17.5 5.5a9 9 0 0 1 0 13" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+  <div id="tiles">
+    <button class="tile" id="tileL" disabled></button>
+    <button class="tile" id="tileR" disabled></button>
+  </div>
+  <div id="streak"><div class="badge">
+    <svg viewBox="0 0 100 100"><path d="M50 4l13 28 30 4-22 21 6 30-27-15-27 15 6-30L7 36l30-4z" fill="#FFC107" stroke="#FF8F00" stroke-width="3" stroke-linejoin="round"/></svg>
+    <div class="n" id="streakN"></div>
+  </div></div>
+</section>
+
+<!-- summary: a star, a number and a sticker -->
+<section id="summary" class="screen">
+  <div class="score">
+    <svg viewBox="0 0 100 100"><path d="M50 4l13 28 30 4-22 21 6 30-27-15-27 15 6-30L7 36l30-4z" fill="#FFC107" stroke="#FF8F00" stroke-width="3" stroke-linejoin="round"/></svg>
+    <span id="scoreTxt"></span>
+  </div>
+  <div id="sticker"></div>
+  <div class="row">
+    <button class="iconbtn go" id="againBtn" aria-label="Play again">
+      <svg viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5z" fill="#fff"/></svg>
+    </button>
+    <button class="iconbtn alb" id="sumAlbumBtn" aria-label="My stickers">
+      <svg viewBox="0 0 24 24" fill="#fff"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg>
+    </button>
+  </div>
+</section>
+
+<!-- album -->
+<section id="album" class="screen">
+  <div id="grid"></div>
+  <button id="albumBack" aria-label="Back">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+  </button>
+</section>
+
+<!-- parent settings -->
+<section id="settings" class="screen">
+  <h1>Parent settings</h1>
+  <h2>Questions per session</h2>
+  <div class="seg" id="segLen"></div>
+  <p class="note" id="openNote" style="display:none">Open-ended: touch and hold the number at the top right to finish.</p>
+  <h2>Starting difficulty</h2>
+  <div class="seg" id="segDiff"></div>
+  <h2>Sounds</h2>
+  <div class="toggle"><span>Celebration sounds</span><button id="tgCel" aria-label="Celebration sounds"></button></div>
+  <div class="toggle"><span>Background music <span class="note">(not built yet)</span></span><button id="tgAmb" aria-label="Background music"></button></div>
+  <h2>Progress</h2>
+  <div id="lastTxt"></div>
+  <button class="danger" id="resetBtn">Reset progress &amp; stickers</button>
+  <div><button class="done" id="doneBtn">Done</button></div>
+</section>
+
+<div id="confirm"><div class="box">
+  <div>This will clear all progress and stickers. Are you sure?</div>
+  <div class="seg"><button id="resetNo">Cancel</button><button id="resetYes" class="sel" style="background:#b0413e">Reset</button></div>
+</div></div>
+
+<script src="engine.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var STICKERS = [
+    ['⭐', '#FFD700'], ['🌟', '#FFC107'], ['🦁', '#FF7043'], ['🐯', '#FF8A65'], ['🦊', '#FF5722'],
+    ['🐸', '#66BB6A'], ['🦋', '#AB47BC'], ['🌈', '#42A5F5'], ['🎈', '#EF5350'], ['🚀', '#5C6BC0'],
+    ['⚡', '#FFEE58'], ['🍭', '#EC407A'], ['🎀', '#F06292'], ['💎', '#26C6DA'], ['🌸', '#F48FB1'],
+    ['🏆', '#FFA726'], ['🦄', '#CE93D8'], ['🎪', '#29B6F6'], ['🌊', '#26C6DA'], ['🦅', '#78909C'],
+    ['🍕', '#FF7043'], ['🌙', '#7E57C2'], ['☀️', '#FDD835'], ['🎸', '#8D6E63'], ['🦩', '#F48FB1'],
+    ['🍄', '#EF5350'], ['🎯', '#EF5350'], ['🦕', '#66BB6A'], ['🎉', '#AB47BC'], ['🌺', '#EF5350']
+  ];
+  var NS = 'wordtap.';
+  var NEXT_CORRECT = 900, NEXT_WRONG = 1400, NEXT_STREAK = 1800, GLOW_MS = 1000;
+  var SPEECH_SAFETY = 3000, SPEECH_RATE = 0.85;
+  var reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function $(id) { return document.getElementById(id); }
+
+  // ---- storage (everything namespaced; the whole site shares one origin) ----
+  function load(key, def) {
+    try {
+      var v = localStorage.getItem(NS + key);
+      return v === null ? def : JSON.parse(v);
+    } catch (e) { return def; }
+  }
+  function save(key, val) {
+    try { localStorage.setItem(NS + key, JSON.stringify(val)); } catch (e) {}
+  }
+  function drop(key) { try { localStorage.removeItem(NS + key); } catch (e) {} }
+
+  var settings = {
+    len: load('sessionLength', 10),            // 0 = open-ended
+    override: load('difficultyOverride', null), // null = adaptive
+    celebratory: load('celebratory', true),
+    ambient: load('ambient', true)
+  };
+
+  // ---- screens ----
+  var current = 'start';
+  function show(name) {
+    ['start', 'game', 'summary', 'album', 'settings'].forEach(function (s) {
+      $(s).classList.toggle('on', s === name);
+    });
+    current = name;
+  }
+
+  // ---- timers owned by the game screen ----
+  var timers = [];
+  function later(fn, ms) { var t = setTimeout(fn, ms); timers.push(t); return t; }
+  function clearTimers() { timers.forEach(clearTimeout); timers = []; }
+
+  // ---- words ----
+  var words = null;
+  function loadWords(cb) {
+    if (words) { cb(true); return; }
+    fetch('words.json').then(function (r) {
+      if (!r.ok) { throw new Error('http'); }
+      return r.json();
+    }).then(function (j) { words = j; cb(true); }, function () { cb(false); });
+  }
+
+  // ---- speech ----
+  var voice = null, voiceReady = false, voiceWaiters = [];
+  function pickVoice() {
+    var vs = window.speechSynthesis ? speechSynthesis.getVoices() : [];
+    if (!vs.length) { return false; }
+    var best = null, bestScore = -1;
+    vs.forEach(function (v) {
+      var s = 0, lang = (v.lang || '').replace('_', '-').toLowerCase();
+      if (lang === 'en-gb') { s += 100; } else if (lang.indexOf('en') === 0) { s += 10; } else { return; }
+      if (v.localService) { s += 20; }
+      if (/female|hazel|libby|sonia|serena|kate|susan|martha|emma|amy|google uk english female/i.test(v.name)) { s += 15; }
+      if (/male/i.test(v.name) && !/female/i.test(v.name)) { s -= 5; }
+      if (s > bestScore) { best = v; bestScore = s; }
+    });
+    voice = best;
+    return true;
+  }
+  function whenVoice(cb) {
+    if (voiceReady) { cb(); return; }
+    voiceWaiters.push(cb);
+  }
+  function voiceDone() {
+    if (voiceReady) { return; }
+    voiceReady = true;
+    pickVoice();
+    var w = voiceWaiters; voiceWaiters = [];
+    w.forEach(function (f) { f(); });
+  }
+  if (window.speechSynthesis) {
+    if (pickVoice()) { voiceReady = true; }
+    else {
+      speechSynthesis.addEventListener && speechSynthesis.addEventListener('voiceschanged', voiceDone);
+      setTimeout(voiceDone, 1500);
+    }
+  } else { voiceReady = true; }
+
+  var speakToken = 0;
+  function speak(word, done) {
+    var token = ++speakToken, finished = false;
+    function finish() {
+      if (finished || token !== speakToken) { return; }
+      finished = true; done && done();
+    }
+    if (!window.speechSynthesis) { setTimeout(finish, 600); return; }
+    whenVoice(function () {
+      if (token !== speakToken) { return; }
+      try { speechSynthesis.cancel(); } catch (e) {}
+      setTimeout(function () {
+        if (token !== speakToken) { return; }
+        try {
+          var u = new SpeechSynthesisUtterance(word);
+          u.lang = 'en-GB'; u.rate = SPEECH_RATE;
+          if (voice) { u.voice = voice; }
+          u.onend = finish; u.onerror = finish;
+          speechSynthesis.speak(u);
+        } catch (e) { finish(); }
+      }, 60);
+      setTimeout(finish, SPEECH_SAFETY + 60);   // onend does not always fire
+    });
+  }
+  function stopSpeech() {
+    speakToken++;
+    try { window.speechSynthesis && speechSynthesis.cancel(); } catch (e) {}
+  }
+
+  // ---- sound ----
+  var ctx = null, buffers = {};
+  var CLIPS = { horn: ['correct_horn.mp3', 0.45], applause: ['correct_applause.mp3', 0.65], cheers: ['correct_cheers.mp3', 0.65] };
+  function unlockAudio() {
+    if (!ctx) {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) { return; }
+      try { ctx = new AC(); } catch (e) { return; }
+      Object.keys(CLIPS).forEach(function (k) {
+        fetch('sounds/' + CLIPS[k][0]).then(function (r) { return r.arrayBuffer(); }).then(function (ab) {
+          return new Promise(function (res, rej) { ctx.decodeAudioData(ab, res, rej); });
+        }).then(function (b) { buffers[k] = b; }, function () {});
+      });
+    }
+    if (ctx.state === 'suspended') { ctx.resume(); }
+    try {   // a silent blip so iOS counts the context as started
+      var s = ctx.createBufferSource(); s.buffer = ctx.createBuffer(1, 1, 22050);
+      s.connect(ctx.destination); s.start(0);
+    } catch (e) {}
+  }
+  function ding() {
+    if (!ctx) { return; }
+    var t = ctx.currentTime;
+    [880, 1318.5].forEach(function (f, i) {
+      var o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'sine'; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t + i * 0.09);
+      g.gain.exponentialRampToValueAtTime(0.28, t + i * 0.09 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.09 + 0.55);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(t + i * 0.09); o.stop(t + i * 0.09 + 0.6);
+    });
+  }
+  function celebrate(kind) {
+    if (!ctx) { return; }
+    if (kind === 'ding' || !buffers[kind]) { ding(); return; }
+    try {
+      var vol = CLIPS[kind][1], t = ctx.currentTime;
+      var src = ctx.createBufferSource(), g = ctx.createGain();
+      src.buffer = buffers[kind];
+      g.gain.setValueAtTime(vol, t);
+      g.gain.linearRampToValueAtTime(vol / 2, t + 1.5);
+      src.connect(g); g.connect(ctx.destination); src.start(0);
+    } catch (e) { ding(); }
+  }
+
+  // ---- fit one word on one line ----
+  function fit(btn) {
+    var size = Math.min(window.innerWidth, window.innerHeight) * 0.22;
+    btn.style.fontSize = size + 'px';
+    var guard = 60;
+    while (guard-- > 0 && btn.scrollWidth > btn.clientWidth + 1 && size > 14) {
+      size *= 0.92; btn.style.fontSize = size + 'px';
+    }
+  }
+
+  // ---- session ----
+  var engine = null, round = null, awaiting = false, roundOpen = false, answered = 0, correctCount = 0, streak = 0;
+  var tileL = $('tileL'), tileR = $('tileR');
+
+  function newEngine() {
+    var state = { difficulty: load('difficulty', undefined), seenWords: load('seen', []), failedWords: load('failed', {}) };
+    engine = new WordTapEngine.Engine(words, state);
+    if (settings.override !== null) { engine.setDifficulty(settings.override); }
+  }
+  function persist() {
+    var s = engine.getState();
+    save('difficulty', s.difficulty); save('seen', s.seenWords); save('failed', s.failedWords);
+  }
+
+  function startSession() {
+    clearTimers(); stopSpeech();
+    newEngine();
+    answered = 0; correctCount = 0; streak = 0;
+    show('game');
+    nextRound();
+  }
+
+  function updateProgress() {
+    $('progress').textContent = settings.len ? (answered + 1) + ' / ' + settings.len : String(answered + 1);
+  }
+
+  function resetTiles() {
+    [tileL, tileR].forEach(function (t) { t.className = 'tile'; t.disabled = true; });
+  }
+
+  function nextRound() {
+    if (current !== 'game') { return; }
+    if (settings.len && answered >= settings.len) { endSession(); return; }
+    round = engine.nextRound();
+    resetTiles();
+    var l = round.targetOnLeft ? round.target : round.distractor;
+    var r = round.targetOnLeft ? round.distractor : round.target;
+    tileL.textContent = l.word; tileR.textContent = r.word;
+    fit(tileL); fit(tileR);
+    updateProgress();
+    awaiting = false; roundOpen = true;
+    speak(round.target.word, enableTiles);
+  }
+  function enableTiles() {
+    if (current === 'game' && roundOpen) { tileL.disabled = false; tileR.disabled = false; awaiting = true; }
+  }
+
+  function answer(isLeft) {
+    if (!awaiting) { return; }
+    awaiting = false; roundOpen = false;
+    tileL.disabled = true; tileR.disabled = true;
+    var correct = isLeft === round.targetOnLeft;
+    var tapped = isLeft ? tileL : tileR, right = round.targetOnLeft ? tileL : tileR;
+    var res = engine.record(round.target.word, correct);   // eslint-disable-line
+    persist();
+    answered++;
+    var delay;
+    if (correct) {
+      correctCount++; streak++;
+      tapped.classList.add('good', 'pulse');
+      celebrate(WordTapEngine.celebrationFor(res.accuracy, Math.random(), settings.celebratory));
+      delay = NEXT_CORRECT;
+      if (streak % WordTapEngine.CONSTANTS.streakCelebrationThreshold === 0) {
+        showStreak(streak); delay = NEXT_STREAK;
+      }
+    } else {
+      streak = 0;
+      tapped.classList.add('shake');
+      right.classList.add('glow');
+      later(function () { right.classList.remove('glow'); }, GLOW_MS);
+      delay = NEXT_WRONG;
+    }
+    later(nextRound, delay);
+  }
+
+  function showStreak(n) {
+    var el = $('streak');
+    $('streakN').textContent = n;
+    el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
+    later(function () { el.classList.remove('on'); }, 1600);
+  }
+
+  tileL.addEventListener('click', function () { answer(true); });
+  tileR.addEventListener('click', function () { answer(false); });
+  $('speaker').addEventListener('click', function () {
+    if (!round) { return; }
+    // replay without disturbing the answer state
+    if (current !== 'game') { return; }
+    speak(round.target.word, enableTiles);
+  });
+
+  // ---- summary ----
+  function endSession() {
+    clearTimers(); stopSpeech(); awaiting = false;
+    var n = load('sessions', 0) + 1;
+    var stickers = Math.min(STICKERS.length, load('stickers', 0) + 1);
+    save('sessions', n); save('stickers', stickers);
+    save('lastCorrect', correctCount); save('lastTotal', answered);
+    var st = STICKERS[stickers - 1];
+    $('scoreTxt').textContent = correctCount + ' / ' + answered;
+    var sEl = $('sticker');
+    sEl.className = ''; sEl.textContent = st[0]; sEl.style.background = st[1];
+    show('summary');
+    void sEl.offsetWidth;
+    sEl.classList.add('pop');
+    unlockAudio(); celebrate('ding');
+  }
+
+  // ---- album ----
+  function showAlbum(from) {
+    var have = load('stickers', 0), g = $('grid');
+    g.innerHTML = '';
+    STICKERS.forEach(function (s, i) {
+      var d = document.createElement('div');
+      if (i < have) { d.className = 'slot'; d.style.background = s[1]; d.textContent = s[0]; }
+      else { d.className = 'slot locked'; d.textContent = '🔒'; }
+      g.appendChild(d);
+    });
+    albumFrom = from || 'start';
+    show('album');
+  }
+  var albumFrom = 'start';
+  $('albumBack').addEventListener('click', function () { show(albumFrom === 'summary' ? 'summary' : 'start'); });
+  $('albumBtn').addEventListener('click', function () { showAlbum('start'); });
+  $('sumAlbumBtn').addEventListener('click', function () { showAlbum('summary'); });
+  $('againBtn').addEventListener('click', function () { unlockAudio(); startSession(); });
+
+  // ---- start ----
+  $('playBtn').addEventListener('click', function () {
+    unlockAudio();
+    loadWords(function (ok) {
+      $('loadErr').style.display = ok ? 'none' : 'block';
+      if (ok) { startSession(); }
+    });
+  });
+
+  // ---- long press (gear, and the counter to finish an open-ended session) ----
+  function longPress(el, fn) {
+    var t = null;
+    function cancel() { clearTimeout(t); t = null; }
+    el.addEventListener('pointerdown', function () { cancel(); t = setTimeout(function () { t = null; fn(); }, 700); });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (e) { el.addEventListener(e, cancel); });
+    el.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('[data-gear]'), function (g) {
+    longPress(g, function () { openSettings(); });
+  });
+  longPress($('progress'), function () {
+    if (current === 'game' && !settings.len && answered > 0) { endSession(); }
+  });
+  document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
+  // ---- parent settings ----
+  function seg(containerId, options, isSel, onPick) {
+    var c = $(containerId); c.innerHTML = '';
+    options.forEach(function (o) {
+      var b = document.createElement('button');
+      b.textContent = o[0];
+      if (isSel(o[1])) { b.className = 'sel'; }
+      b.addEventListener('click', function () { onPick(o[1]); renderSettings(); });
+      c.appendChild(b);
+    });
+  }
+  function toggle(id, key, storeKey) {
+    var b = $(id);
+    b.className = settings[key] ? 'on' : '';
+    b.onclick = function () { settings[key] = !settings[key]; save(storeKey, settings[key]); renderSettings(); };
+  }
+  function renderSettings() {
+    seg('segLen', [['5', 5], ['10', 10], ['20', 20], ['Open-ended', 0]],
+      function (v) { return v === settings.len; },
+      function (v) { settings.len = v; save('sessionLength', v); });
+    $('openNote').style.display = settings.len ? 'none' : 'block';
+    seg('segDiff', [['Easy', 2], ['Medium', 5], ['Hard', 8], ['Adaptive (recommended)', null]],
+      function (v) { return v === settings.override; },
+      function (v) { settings.override = v; if (v === null) { drop('difficultyOverride'); } else { save('difficultyOverride', v); } });
+    toggle('tgCel', 'celebratory', 'celebratory');
+    toggle('tgAmb', 'ambient', 'ambient');
+    var tot = load('lastTotal', 0);
+    $('lastTxt').textContent = tot
+      ? 'Last session: ' + tot + ' questions · ' + Math.round(load('lastCorrect', 0) / tot * 100) + '% correct'
+      : 'No sessions completed yet.';
+  }
+  function openSettings() {
+    clearTimers(); stopSpeech(); awaiting = false;
+    renderSettings();
+    show('settings');
+  }
+  $('doneBtn').addEventListener('click', function () {
+    // leaving settings always lands on the start screen, so a half-finished round is not resumed
+    show('start');
+  });
+  $('resetBtn').addEventListener('click', function () { $('confirm').classList.add('on'); });
+  $('resetNo').addEventListener('click', function () { $('confirm').classList.remove('on'); });
+  $('resetYes').addEventListener('click', function () {
+    ['sessions', 'stickers', 'difficulty', 'seen', 'failed', 'lastCorrect', 'lastTotal'].forEach(drop);
+    $('confirm').classList.remove('on');
+    renderSettings();
+  });
+
+  // ---- housekeeping ----
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) { try { window.speechSynthesis && speechSynthesis.cancel(); } catch (e) {} }
+  });
+  window.addEventListener('resize', function () {
+    if (current === 'game') { fit(tileL); fit(tileR); }
+  });
+
+  // Full screen on the first touch, where the browser allows it.
+  (function () {
+    var el = document.documentElement, go = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (!go) { return; }
+    function once() {
+      document.removeEventListener('pointerup', once, true);
+      document.removeEventListener('touchend', once, true);
+      try { if (!document.fullscreenElement) { var p = go.call(el); p && p.catch && p.catch(function () {}); } } catch (e) {}
+    }
+    document.addEventListener('pointerup', once, true);
+    document.addEventListener('touchend', once, true);
+  })();
+
+  // For testing from the console: window.__wordtap
+  window.__wordtap = { get engine() { return engine; }, get round() { return round; } };
+})();
+</script>
+</body>
+</html>
