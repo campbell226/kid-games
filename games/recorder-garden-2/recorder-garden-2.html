@@ -1,0 +1,2151 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#7fc3e8">
+<title>Recorder Garden 2</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #7fc3e8;
+    overflow: hidden;
+    touch-action: manipulation;
+    overscroll-behavior: none;
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #stage {
+    display: block;
+    width: 100vw; height: 100vh;
+    width: 100dvw; height: 100dvh;
+  }
+  .hit { fill: transparent; cursor: pointer; }
+  /* Scenery and sparks are not targets, and neither are the two glows,
+     which are far bigger than the things they light up. */
+  #garden, #effects, .halo, .signglow, .plain { pointer-events: none; }
+</style>
+</head>
+<body>
+<script>
+// Full screen on the first touch.
+//
+// A browser will not do this by itself: the request has to come out of a
+// gesture the browser counts as user activation, and that list is fussier
+// than it looks. pointerdown only counts when the pointer is a mouse - on
+// a touchscreen it grants nothing at all, which is why listening for it
+// worked on a laptop and did nothing whatever on a tablet. For a finger it
+// is pointerup and touchend that count.
+//
+// So: listen for all of the ones that can work, and keep trying until one
+// of them actually gets us there. Once it has, stop asking - deliberately
+// leaving full screen should stay left.
+//
+// An iPhone ignores the lot, because Safari there gives full screen to
+// video and nothing else. That is what the home screen tags above are for.
+(function () {
+  var el = document.documentElement;
+  var go = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (!go) { return; }
+  var EVENTS = ['pointerup', 'touchend', 'click', 'mousedown'];
+  var asking = false, done = false, i;
+
+  function isFull() {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement);
+  }
+  function stop() {
+    done = true;
+    for (var k = 0; k < EVENTS.length; k++) {
+      document.removeEventListener(EVENTS[k], attempt, true);
+    }
+  }
+  function attempt() {
+    if (done || asking) { return; }
+    if (isFull()) { stop(); return; }
+    asking = true;
+    try {
+      var p = go.call(el);
+      if (p && p.then) { p.then(stop, function () { asking = false; }); }
+      else { setTimeout(function () { asking = false; }, 500); }
+    } catch (e) { asking = false; }
+  }
+
+  document.addEventListener('fullscreenchange', function () { if (isFull()) { stop(); } });
+  document.addEventListener('webkitfullscreenchange', function () { if (isFull()) { stop(); } });
+  for (i = 0; i < EVENTS.length; i++) {
+    document.addEventListener(EVENTS[i], attempt, true);
+  }
+})();
+</script>
+
+<svg id="stage" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 640" preserveAspectRatio="xMidYMid meet" aria-label="Recorder Garden 2">
+  <defs>
+    <linearGradient id="skywash" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#57a4dc"/>
+      <stop offset="0.6" stop-color="#a7dbf2"/>
+      <stop offset="1" stop-color="#dff2dd"/>
+    </linearGradient>
+    <linearGradient id="hilltop" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c9e8b9"/><stop offset="1" stop-color="#abd897"/>
+    </linearGradient>
+    <linearGradient id="hill0" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#b3daa0"/><stop offset="1" stop-color="#94c882"/>
+    </linearGradient>
+    <linearGradient id="hill1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#96cf7c"/><stop offset="1" stop-color="#74b664"/>
+    </linearGradient>
+    <linearGradient id="hill2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7cc069"/><stop offset="1" stop-color="#4f9a4b"/>
+    </linearGradient>
+    <linearGradient id="post" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#9d6f39"/><stop offset="0.45" stop-color="#d3a163"/><stop offset="1" stop-color="#8c6029"/>
+    </linearGradient>
+    <linearGradient id="pipe" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#a8262f"/>
+      <stop offset="0.3" stop-color="#ef6f78"/>
+      <stop offset="0.62" stop-color="#d43d49"/>
+      <stop offset="1" stop-color="#8e1f27"/>
+    </linearGradient>
+    <radialGradient id="sung" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff8d6" stop-opacity="0.95"/>
+      <stop offset="0.4" stop-color="#ffeaa6" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#ffeaa6" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowg" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.9"/>
+      <stop offset="0.5" stop-color="#fff3b4" stop-opacity="0.4"/>
+      <stop offset="1" stop-color="#fff3b4" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <g id="sky"></g>
+  <g id="hills"></g>
+  <g id="garden"></g>
+  <g id="hits"></g>
+  <g id="signs"></g>
+  <g id="friends"></g>
+  <g id="flowers"></g>
+  <g id="tunes"></g>
+  <g id="effects"></g>
+  <g id="ui"></g>
+</svg>
+
+<script>
+(function () {
+  'use strict';
+
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  var svg = document.getElementById('stage');
+
+  function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+  function el(tag, attrs) {
+    var n = document.createElementNS(SVGNS, tag);
+    if (attrs) { for (var k in attrs) { n.setAttribute(k, attrs[k]); } }
+    return n;
+  }
+  function clear(n) { while (n.firstChild) { n.removeChild(n.firstChild); } }
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+  function G(id) { return document.getElementById(id); }
+
+  var reduceQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+  var reduced = reduceQuery.matches;
+  if (reduceQuery.addEventListener) {
+    reduceQuery.addEventListener('change', function (e) { reduced = e.matches; });
+  }
+
+  // ------------------------------------------------------------------
+  // The three notes.
+  //
+  // A soprano recorder sounds an octave above what is written, so the B,
+  // A and G in her book reach the microphone as B5, A5 and G5. These are
+  // the first three fingerings every beginner learns, and they are the
+  // same on baroque and german instruments, so hers is right either way:
+  // left thumb behind, then one, two, three fingers down the front.
+  //
+  // Highest note sits highest on the hill. Nobody has to be told that.
+  // ------------------------------------------------------------------
+  // row 0 is highest on the hill and highest in pitch. D sits above the
+  // bird, up a tree, because a fourth terrace would shrink everyone.
+  //
+  // D is the only one of the four with no thumb at all: thumb off, middle
+  // finger on hole two. That is a real new skill and worth the wait. It is
+  // also three semitones clear of B, where C would have been one - close
+  // enough that being slightly sharp on B would read as C, which at five
+  // she reliably is.
+  var SPECS = [
+    { id: 'B', midi: 83, row: 1, holes: 1, thumb: true, animal: 'bird',
+      colour: '#f2c141', dark: '#d69c1c', petal: '#ffd45c', top: 182 },
+    { id: 'A', midi: 81, row: 2, holes: 2, thumb: true, animal: 'rabbit',
+      colour: '#cbb4a3', dark: '#a08675', petal: '#f58aa6', top: 240 },
+    { id: 'G', midi: 79, row: 3, holes: 3, thumb: true, animal: 'badger',
+      colour: '#8d959e', dark: '#585f68', petal: '#a982e0', top: 176 },
+    { id: 'D', midi: 86, row: 0, holes: 0, thumb: false, animal: 'squirrel',
+      colour: '#c8703a', dark: '#9d5326', petal: '#4fb8d8', top: 186 }
+  ];
+
+  function specByRow(r) {
+    for (var i = 0; i < SPECS.length; i++) { if (SPECS[i].row === r) { return SPECS[i]; } }
+    return SPECS[0];
+  }
+
+  function mtof(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+
+  function noteIndex(id) {
+    for (var i = 0; i < SPECS.length; i++) { if (SPECS[i].id === id) { return i; } }
+    return 0;
+  }
+
+  // ------------------------------------------------------------------
+  // The tunes.
+  //
+  // This is the whole reason the first three notes are B, A and G rather
+  // than any other three: real songs are made of them and nothing else.
+  // Which is also why the garden could not end at a pile of flowers - it
+  // stopped one step short of the thing the notes are for.
+  // ------------------------------------------------------------------
+  // beats says how long each note is held: 1 is one count, 2 is twice
+  // that, a half is half. Without it every note lasted exactly as long as
+  // every other one, and a tune she knows perfectly well still did not
+  // sound like itself.
+  //
+  // It changes nothing about what she has to do. The rhythm is the
+  // garden's when it plays the song back, and it spaces the notes along
+  // the strip the way written music does; she still just plays them.
+  // Second edition: all four notes from the first touch, so the ladder
+  // starts where the first garden's ended. A warm-up she knows, then the
+  // songs she graduated through, then the ones that need the squirrel,
+  // finishing on the whole of Mary.
+  var TUNES = [
+    { notes: ['B', 'A', 'G', 'B', 'A', 'G'],
+      beats: [1, 1, 2, 1, 1, 2] },
+    { notes: ['B', 'A', 'G', 'A', 'B', 'B', 'B'],
+      beats: [1, 1, 1, 1, 1, 1, 2] },
+    { notes: ['B', 'A', 'G', 'B', 'A', 'G', 'G', 'G', 'G', 'A', 'A', 'A', 'B', 'A', 'G'],
+      beats: [1, 1, 2, 1, 1, 2, 0.5, 0.5, 1, 0.5, 0.5, 1, 1, 1, 2] },
+    { notes: ['D', 'B', 'A', 'G', 'D', 'B', 'A', 'G'],
+      beats: [1, 1, 1, 1, 1, 1, 1, 2] },
+    { notes: ['G', 'A', 'B', 'D', 'D', 'B', 'A', 'G'],
+      beats: [1, 1, 1, 1, 1, 1, 1, 2] },
+    { notes: ['B', 'A', 'G', 'A', 'B', 'B', 'B', 'A', 'A', 'A', 'B', 'D', 'D'],
+      beats: [1, 1, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 2] },
+    { notes: ['B', 'A', 'G', 'A', 'B', 'B', 'B', 'A', 'A', 'A', 'B', 'D', 'D',
+              'B', 'A', 'G', 'A', 'B', 'B', 'B', 'B', 'A', 'A', 'B', 'A', 'G'],
+      beats: [1, 1, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 2,
+              1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4] }
+  ];
+  var TUNES_3 = 0;   // unused here: nothing is held back
+
+  function tuneBeats(idx) {
+    var tn = TUNES[idx], i, b;
+    if (!tn.beats) { b = []; for (i = 0; i < tn.notes.length; i++) { b.push(1); } return b; }
+    return tn.beats;
+  }
+
+
+  // ------------------------------------------------------------------
+  // Audio, synthesised from nothing so the garden is never silent and
+  // never waits on a download.
+  // ------------------------------------------------------------------
+  var AC = null, master = null, noiseBuf = null;
+  // Everything audible hangs off this one node rather than off master,
+  // so it can all be cut at once. Once a note is scheduled it is going
+  // to sound - stopping it means silencing what it is plugged into.
+  var voices = null;
+
+  // Everything the garden says is heard straight back by the microphone,
+  // because echo cancellation is turned off on purpose. So the listener
+  // is deaf until this moment passes.
+  var speakUntil = 0;
+
+  function initAudio() {
+    if (AC) { if (AC.state === 'suspended') { AC.resume(); } return; }
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) { return; }
+    AC = new Ctx();
+    var comp = AC.createDynamicsCompressor();
+    comp.threshold.setValueAtTime(-14, AC.currentTime);
+    comp.ratio.setValueAtTime(5, AC.currentTime);
+    comp.attack.setValueAtTime(0.005, AC.currentTime);
+    comp.release.setValueAtTime(0.2, AC.currentTime);
+    master = AC.createGain();
+    master.gain.setValueAtTime(0.6, AC.currentTime);
+    master.connect(comp);
+    voices = AC.createGain();
+    voices.gain.setValueAtTime(1, AC.currentTime);
+    voices.connect(master);
+    comp.connect(AC.destination);
+
+    var n = Math.floor(AC.sampleRate * 0.5);
+    noiseBuf = AC.createBuffer(1, n, AC.sampleRate);
+    var d = noiseBuf.getChannelData(0);
+    for (var i = 0; i < n; i++) { d[i] = Math.random() * 2 - 1; }
+    if (AC.state === 'suspended') { AC.resume(); }
+  }
+
+  function held(t, dur) { if (t + dur > speakUntil) { speakUntil = t + dur; } }
+
+  // A scheduled note cannot be unscheduled, so the bus it is plugged into
+  // is faded out and thrown away and a fresh one put in its place. That is
+  // how a tune stops the instant the garden is emptied instead of playing
+  // on over the top of nothing.
+  function hushAll() {
+    if (!AC || !voices) { return; }
+    var old = voices, now = AC.currentTime;
+    old.gain.cancelScheduledValues(now);
+    old.gain.setValueAtTime(old.gain.value, now);
+    old.gain.linearRampToValueAtTime(0.0001, now + 0.07);
+    setTimeout(function () { try { old.disconnect(); } catch (e) {} }, 500);
+    voices = AC.createGain();
+    voices.gain.setValueAtTime(1, now);
+    voices.connect(master);
+    speakUntil = now + 0.1;
+  }
+
+  // A recorder is very nearly a sine wave with a breathy edge, a chiff at
+  // the start and a vibrato that only arrives once the note has settled.
+  // That is the whole instrument.
+  function recorderNote(delay, f, dur, vol) {
+    if (!AC) { return; }
+    var t = AC.currentTime + (delay || 0);
+    dur = Math.max(0.35, dur);
+    vol = vol == null ? 0.4 : vol;
+
+    var g = AC.createGain();
+    var lp = AC.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(Math.min(11000, f * 7), t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.04);
+    g.gain.setValueAtTime(vol, t + dur - 0.11);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    lp.connect(g); g.connect(voices);
+
+    var vib = AC.createOscillator();
+    vib.type = 'sine';
+    vib.frequency.setValueAtTime(4.9, t);
+    vib.start(t); vib.stop(t + dur + 0.05);
+
+    [[1, 1], [2, 0.13], [3, 0.045], [4, 0.018]].forEach(function (p) {
+      var o = AC.createOscillator(), og = AC.createGain(), vg = AC.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(f * p[0], t);
+      og.gain.setValueAtTime(p[1], t);
+      vg.gain.setValueAtTime(0, t);
+      vg.gain.setValueAtTime(0, t + Math.min(0.3, dur * 0.45));
+      vg.gain.linearRampToValueAtTime(f * p[0] * 0.005, t + dur);
+      vib.connect(vg); vg.connect(o.frequency);
+      o.connect(og); og.connect(lp);
+      o.start(t); o.stop(t + dur + 0.05);
+    });
+
+    var src = AC.createBufferSource();
+    src.buffer = noiseBuf; src.loop = true;
+    var bp = AC.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.Q.setValueAtTime(0.8, t);
+    bp.frequency.setValueAtTime(f * 2.2, t);
+    var ng = AC.createGain();
+    ng.gain.setValueAtTime(0.0001, t);
+    ng.gain.exponentialRampToValueAtTime(vol * 0.3, t + 0.014);
+    ng.gain.exponentialRampToValueAtTime(vol * 0.055, t + 0.1);
+    ng.gain.setValueAtTime(vol * 0.055, t + dur - 0.09);
+    ng.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(bp); bp.connect(ng); ng.connect(voices);
+    src.start(t); src.stop(t + dur + 0.05);
+
+    held(t, dur + 0.22);
+  }
+
+  function bell(delay, f, vol, dur) {
+    if (!AC) { return; }
+    var t = AC.currentTime + (delay || 0);
+    dur = dur || 0.5;
+    var o = AC.createOscillator(), g = AC.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(f, t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol || 0.28, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(voices);
+    o.start(t); o.stop(t + dur + 0.05);
+    held(t, dur + 0.12);
+  }
+
+  function sparkleSound() {
+    [0, 4, 7, 12, 16, 19].forEach(function (s, i) {
+      bell(0.02 + i * 0.07, 523.25 * Math.pow(2, s / 12), 0.2, 0.6);
+    });
+  }
+
+  function arriveSound() {
+    [0, 4, 7, 12].forEach(function (s, i) {
+      bell(0.02 + i * 0.12, 392 * Math.pow(2, s / 12), 0.26, 0.75);
+    });
+  }
+
+  // Blowing too hard is not a mistake, it is a joke. This is the laugh.
+  function giggle() {
+    if (!AC) { return; }
+    var t = AC.currentTime + 0.01;
+    var o = AC.createOscillator(), g = AC.createGain();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(760, t);
+    for (var i = 0; i < 7; i++) {
+      o.frequency.setValueAtTime(i % 2 ? 540 : 780, t + i * 0.065);
+    }
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.26, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+    o.connect(g); g.connect(voices);
+    o.start(t); o.stop(t + 0.55);
+    held(t, 0.6);
+  }
+
+  // ------------------------------------------------------------------
+  // The ears.
+  //
+  // getUserMedia normally hands back a stream cleaned up for speech, and
+  // every one of those cleanups is aimed squarely at a steady quiet tone:
+  // noise suppression deletes a recorder outright, automatic gain hides
+  // how hard she is blowing, and echo cancellation strips the garden's
+  // own replies and takes her note out with them. All three are refused.
+  // ------------------------------------------------------------------
+  var MIC = {
+    state: 'off',       // off | asking | on | blocked
+    stream: null, src: null, analyser: null, buf: null, nsdf: null,
+    level: 0, smooth: 0, note: null, cents: 0, octave: false,
+    clarity: 0, pitch: 0, anyPitch: false
+  };
+
+  function micPossible() {
+    return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+  }
+
+  function startMic() {
+    if (!AC) { return; }
+    if (MIC.state === 'on' || MIC.state === 'asking') { return; }
+    if (!micPossible()) { MIC.state = 'blocked'; drawUI(); return; }
+    MIC.state = 'asking';
+    drawUI();
+    navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+        channelCount: 1
+      }
+    }).then(function (stream) {
+      MIC.stream = stream;
+      MIC.src = AC.createMediaStreamSource(stream);
+      // The instrument cannot go below C5, so everything under 340 Hz is
+      // room rumble, chair legs and voices. Throwing it away first makes
+      // the pitch tracker far steadier.
+      var hp = AC.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.setValueAtTime(340, AC.currentTime);
+      var an = AC.createAnalyser();
+      an.fftSize = 2048;
+      an.smoothingTimeConstant = 0;
+      MIC.src.connect(hp); hp.connect(an);
+      MIC.analyser = an;
+      MIC.buf = new Float32Array(an.fftSize);
+      MIC.nsdf = new Float32Array(Math.floor(AC.sampleRate / 300) + 4);
+      MIC.state = 'on';
+      drawUI();
+    })['catch'](function () {
+      MIC.state = 'blocked';
+      drawUI();
+    });
+  }
+
+  function stopMic() {
+    if (MIC.stream) {
+      MIC.stream.getTracks().forEach(function (tr) { tr.stop(); });
+    }
+    if (MIC.src) { try { MIC.src.disconnect(); } catch (e) {} }
+    MIC.stream = null; MIC.src = null; MIC.analyser = null;
+    MIC.state = 'off'; MIC.level = 0; MIC.smooth = 0; MIC.note = null;
+    drawUI();
+  }
+
+  // Normalised square difference: autocorrelation with the loud bits
+  // divided out, so a timid note scores as well as a confident one.
+  function listen() {
+    MIC.note = null;
+    MIC.anyPitch = false;
+    if (MIC.state !== 'on' || !MIC.analyser) { MIC.level = 0; return; }
+
+    var an = MIC.analyser, buf = MIC.buf, n = buf.length, i;
+    an.getFloatTimeDomainData(buf);
+
+    var mean = 0;
+    for (i = 0; i < n; i++) { mean += buf[i]; }
+    mean /= n;
+    var sq = 0;
+    for (i = 0; i < n; i++) { buf[i] -= mean; sq += buf[i] * buf[i]; }
+    MIC.level = Math.sqrt(sq / n);
+
+    if (AC.currentTime < speakUntil) { return; }
+    if (MIC.level < 0.007) { return; }
+
+    var sr = AC.sampleRate;
+    // D overblows to about 2350 Hz, so the search has to reach past it.
+    var minLag = Math.max(2, Math.floor(sr / 2550));
+    var maxLag = Math.min(MIC.nsdf.length - 2, Math.floor(sr / 380));
+    var W = Math.min(1024, n - maxLag);
+    var nsdf = MIC.nsdf, lag, best = 0, a, b, r, m, v;
+
+    for (lag = minLag; lag <= maxLag; lag++) {
+      r = 0; m = 0;
+      for (i = 0; i < W; i++) {
+        a = buf[i]; b = buf[i + lag];
+        r += a * b;
+        m += a * a + b * b;
+      }
+      v = m > 1e-9 ? (2 * r / m) : 0;
+      nsdf[lag] = v;
+      if (v > best) { best = v; }
+    }
+    MIC.clarity = best;
+    if (best < 0.55) { return; }
+
+    // The first peak that is nearly as good as the best one, rather than
+    // the best one itself. That is what stops a clean note being heard an
+    // octave too low.
+    var pick = -1, thresh = best * 0.9;
+    for (lag = minLag + 1; lag < maxLag; lag++) {
+      if (nsdf[lag] > thresh && nsdf[lag] >= nsdf[lag - 1] && nsdf[lag] > nsdf[lag + 1]) { pick = lag; break; }
+    }
+    if (pick < 0) { return; }
+
+    var y0 = nsdf[pick - 1], y1 = nsdf[pick], y2 = nsdf[pick + 1];
+    var den = y0 - 2 * y1 + y2;
+    var off = den !== 0 ? clamp(0.5 * (y0 - y2) / den, -1, 1) : 0;
+    MIC.pitch = sr / (pick + off);
+    MIC.anyPitch = true;
+
+    // Nearest of the three she is learning, in either octave. Being a
+    // whole tone apart, they stay told apart even when she is badly out
+    // of tune, which at five she reliably is.
+    var midi = 69 + 12 * Math.log(MIC.pitch / 440) / Math.LN2;
+    var hit = null, err = 99, oct = false, cents = 0, e1, e2;
+    for (i = 0; i < SPECS.length; i++) {
+      e1 = midi - SPECS[i].midi;
+      e2 = midi - (SPECS[i].midi + 12);
+      if (Math.abs(e1) < err) { err = Math.abs(e1); hit = SPECS[i]; oct = false; cents = e1 * 100; }
+      if (Math.abs(e2) < err) { err = Math.abs(e2); hit = SPECS[i]; oct = true; cents = e2 * 100; }
+    }
+    if (!hit || err > 0.8) { return; }
+    MIC.note = hit.id;
+    MIC.cents = cents;
+    MIC.octave = oct;
+  }
+
+  // How long the same note has run, how still it has sat, how softly it
+  // was blown. None of these can fail; they only change how fast a
+  // flower opens.
+  var hold = { note: null, time: 0, hist: [], steady: 1, gentle: 1, shrill: false };
+
+  function updateHold(dt) {
+    if (!MIC.note) {
+      hold.note = null; hold.time = 0; hold.hist.length = 0; hold.shrill = false;
+      return;
+    }
+    if (MIC.note !== hold.note) {
+      hold.note = MIC.note; hold.time = 0; hold.hist.length = 0;
+    }
+    hold.time += dt;
+    hold.hist.push(MIC.cents);
+    if (hold.hist.length > 20) { hold.hist.shift(); }
+
+    var i, mu = 0, d, vr = 0, L = hold.hist.length;
+    for (i = 0; i < L; i++) { mu += hold.hist[i]; }
+    mu /= L;
+    for (i = 0; i < L; i++) { d = hold.hist[i] - mu; vr += d * d; }
+    hold.steady = clamp(1 - Math.sqrt(vr / L) / 45, 0, 1);
+
+    // How loud she arrives is a fact about how close the tablet is, not
+    // about how hard she is blowing, and with automatic gain refused it
+    // is louder still. Judging effort by it was plainly wrong: a recorder
+    // at arm's length sat above the old ceiling almost all the time, so
+    // the friend covered its ears and laughed every couple of seconds,
+    // the laugh deafened the microphone for half of each of them, and the
+    // flower could not grow while any of that was going on.
+    //
+    // Blowing a recorder too hard makes it jump the octave. That is the
+    // real signal, it is physics rather than a guessed threshold, and it
+    // is already detected exactly. So it is the only thing that counts.
+    var l = MIC.level;
+    hold.gentle = l < 0.015 ? clamp(l / 0.015, 0, 1)
+      : (l <= 0.45 ? 1 : clamp(1 - (l - 0.45) / 0.55, 0.6, 1));
+    hold.shrill = MIC.octave;
+  }
+
+  // A good note fills a flower in about four and a half seconds. A rough
+  // one takes nearer twelve. Neither ever empties it again.
+  function growthRate() {
+    return (1 / 4.5) * (0.55 + 0.45 * hold.steady) * (0.65 + 0.35 * hold.gentle);
+  }
+
+  // ------------------------------------------------------------------
+  // Drawing. Every friend stands with its feet on y = 0 and everything
+  // else above it, so a friend can be dropped anywhere on the hill.
+  // ------------------------------------------------------------------
+  function eyePair(cx, cy, sp, r, pr) {
+    var s = '<g class="eyes">';
+    [-1, 1].forEach(function (d) {
+      var ex = cx + sp * d;
+      s += '<ellipse cx="' + ex + '" cy="' + cy + '" rx="' + r + '" ry="' + r + '" fill="#ffffff"/>'
+        + '<g class="look">'
+        + '<circle cx="' + ex + '" cy="' + (cy + 1) + '" r="' + pr + '" fill="#23212f"/>'
+        + '<circle cx="' + (ex + pr * 0.36) + '" cy="' + (cy - pr * 0.48) + '" r="' + (pr * 0.33) + '" fill="#ffffff"/>'
+        + '</g>';
+    });
+    return s + '</g>';
+  }
+
+  function mouthG(cx, cy, rest, inner) {
+    return '<g class="mouth" data-cx="' + cx + '" data-cy="' + cy + '" data-rest="' + rest + '">'
+      + inner + '</g>';
+  }
+
+  // Paws that come up over the ears when she blows too hard. Drawn now,
+  // hidden until they are wanted.
+  function paws(x, y, r, fill) {
+    return '<g class="paws" opacity="0">'
+      + '<circle cx="' + (-x) + '" cy="' + y + '" r="' + r + '" fill="' + fill + '"/>'
+      + '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="' + fill + '"/>'
+      + '</g>';
+  }
+
+  var ART = {};
+
+  ART.bird = function (s) {
+    return '<g class="legs">'
+      + '<rect x="-25" y="-22" width="8" height="24" rx="4" fill="#e0912c"/>'
+      + '<rect x="17" y="-22" width="8" height="24" rx="4" fill="#e0912c"/>'
+      + '<path d="M -33 0 h 24 M 9 0 h 24" stroke="#e0912c" stroke-width="7" stroke-linecap="round"/>'
+      + '</g>'
+      + '<g class="wing" data-side="-1"><ellipse cx="-50" cy="-74" rx="19" ry="33" fill="' + s.dark + '"/></g>'
+      + '<g class="wing" data-side="1"><ellipse cx="50" cy="-74" rx="19" ry="33" fill="' + s.dark + '"/></g>'
+      + '<ellipse cx="0" cy="-68" rx="56" ry="52" fill="' + s.colour + '"/>'
+      + '<ellipse cx="0" cy="-54" rx="32" ry="30" fill="#fff4cd"/>'
+      + '<circle cx="0" cy="-126" r="40" fill="' + s.colour + '"/>'
+      + '<path d="M -12 -164 q 12 -22 28 -12" stroke="' + s.dark + '" stroke-width="8" fill="none" stroke-linecap="round"/>'
+      + eyePair(0, -134, 19, 13, 8)
+      + mouthG(0, -108, 0.45, '<path d="M -17 -108 L 17 -108 L 0 -86 Z" fill="#cf7c22"/>'
+        + '<path d="M -17 -108 L 17 -108 L 0 -130 Z" fill="#f0a63c"/>')
+      + paws(34, -132, 19, s.dark);
+  };
+
+  ART.rabbit = function (s) {
+    return '<g class="legs">'
+      + '<rect x="-48" y="-28" width="28" height="30" rx="14" fill="' + s.dark + '"/>'
+      + '<rect x="20" y="-28" width="28" height="30" rx="14" fill="' + s.dark + '"/>'
+      + '</g>'
+      + '<ellipse cx="0" cy="-66" rx="58" ry="56" fill="' + s.colour + '"/>'
+      + '<ellipse cx="0" cy="-50" rx="32" ry="32" fill="#f8efe4"/>'
+      + '<g class="ear" data-side="-1">'
+      + '<ellipse cx="-25" cy="-184" rx="15" ry="46" fill="' + s.colour + '"/>'
+      + '<ellipse cx="-25" cy="-184" rx="7" ry="32" fill="#efbfc6"/></g>'
+      + '<g class="ear" data-side="1">'
+      + '<ellipse cx="25" cy="-184" rx="15" ry="46" fill="' + s.colour + '"/>'
+      + '<ellipse cx="25" cy="-184" rx="7" ry="32" fill="#efbfc6"/></g>'
+      + '<circle cx="0" cy="-134" r="43" fill="' + s.colour + '"/>'
+      + eyePair(0, -142, 20, 13, 8)
+      + '<ellipse cx="0" cy="-118" rx="9" ry="7" fill="#d98a94"/>'
+      + mouthG(0, -104, 0.4, '<path d="M -16 -108 Q 0 -92 16 -108 Q 0 -100 -16 -108 Z" fill="#a8636c"/>')
+      + paws(30, -172, 20, s.dark);
+  };
+
+  ART.badger = function (s) {
+    var stripe = '#343a41';
+    return '<g class="legs">'
+      + '<rect x="-58" y="-22" width="30" height="24" rx="11" fill="' + s.dark + '"/>'
+      + '<rect x="28" y="-22" width="30" height="24" rx="11" fill="' + s.dark + '"/>'
+      + '</g>'
+      + '<ellipse cx="0" cy="-58" rx="80" ry="50" fill="' + s.colour + '"/>'
+      + '<ellipse cx="0" cy="-46" rx="44" ry="28" fill="#cdd2d8"/>'
+      + '<circle cx="-31" cy="-145" r="11" fill="' + stripe + '"/>'
+      + '<circle cx="31" cy="-145" r="11" fill="' + stripe + '"/>'
+      + '<ellipse cx="0" cy="-112" rx="41" ry="45" fill="#f5f3ef"/>'
+      + '<path d="M -38 -147 L -18 -152 L -12 -80 L -26 -78 Z" fill="' + stripe + '"/>'
+      + '<path d="M 38 -147 L 18 -152 L 12 -80 L 26 -78 Z" fill="' + stripe + '"/>'
+      + eyePair(0, -126, 21, 11, 7)
+      + '<ellipse cx="0" cy="-88" rx="12" ry="9" fill="' + stripe + '"/>'
+      + mouthG(0, -72, 0.4, '<path d="M -15 -76 Q 0 -60 15 -76 Q 0 -68 -15 -76 Z" fill="#7d5a5f"/>')
+      + paws(40, -120, 20, s.dark);
+  };
+
+  ART.squirrel = function (s) {
+    return '<g class="legs">'
+      + '<rect x="-32" y="-20" width="21" height="22" rx="10" fill="' + s.dark + '"/>'
+      + '<rect x="11" y="-20" width="21" height="22" rx="10" fill="' + s.dark + '"/>'
+      + '</g>'
+      + '<path d="M 40 -14 q 60 -20 54 -80 q -6 -58 -60 -66 q 40 30 34 72 q -6 44 -38 60 z" fill="' + s.dark + '"/>'
+      + '<path d="M 42 -18 q 48 -20 42 -72 q -6 -46 -48 -54 q 30 26 26 62 q -4 38 -30 54 z" fill="' + s.colour + '"/>'
+      + '<ellipse cx="0" cy="-54" rx="42" ry="44" fill="' + s.colour + '"/>'
+      + '<ellipse cx="0" cy="-44" rx="25" ry="28" fill="#f7e5cf"/>'
+      + '<path d="M -28 -100 l -7 -32 l 25 15 z" fill="' + s.colour + '"/>'
+      + '<path d="M 28 -100 l 7 -32 l -25 15 z" fill="' + s.colour + '"/>'
+      + '<circle cx="0" cy="-104" r="34" fill="' + s.colour + '"/>'
+      + eyePair(0, -110, 16, 12, 7)
+      + '<ellipse cx="0" cy="-88" rx="8" ry="6" fill="#54382a"/>'
+      + mouthG(0, -76, 0.4, '<path d="M -13 -80 Q 0 -66 13 -80 Q 0 -72 -13 -80 Z" fill="#8a5c4a"/>')
+      + paws(24, -134, 16, s.dark);
+  };
+
+  // ------------------------------------------------------------------
+  // The fingering chart: a soprano recorder from the front, in her own
+  // translucent red, with the thumb hole floated off to the side the way
+  // every recorder book draws it. Filled means covered.
+  // ------------------------------------------------------------------
+  function hole(x, y, r, filled, tint) {
+    if (filled) {
+      return '<circle cx="' + x + '" cy="' + y + '" r="' + (r + 4) + '" fill="' + tint + '" opacity="0.5"/>'
+        + '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="#26292f"/>';
+    }
+    return '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="#fdf7ee" stroke="#8e1f27" stroke-width="2.5"/>';
+  }
+
+  function chartArt(holes, tint, thumb) {
+    var s = '';
+    s += '<rect x="-13" y="-176" width="26" height="32" rx="11" fill="url(#pipe)"/>';
+    s += '<rect x="-20" y="-152" width="40" height="300" rx="17" fill="url(#pipe)"/>';
+    s += '<rect x="-14" y="-146" width="9" height="284" rx="5" fill="#ffffff" opacity="0.24"/>';
+    s += '<rect x="-9" y="-136" width="18" height="16" rx="4" fill="#59151a"/>';
+    s += '<rect x="-20" y="-114" width="40" height="5" fill="#7d1a21" opacity="0.5"/>';
+    s += '<ellipse cx="0" cy="145" rx="28" ry="11" fill="#8e1f27"/>';
+
+    // D is fingered on hole two alone, so "how many from the top" is not
+    // enough any more: holes is a count for B, A and G, and D asks for the
+    // second hole and nothing else.
+    var ys = [-88, -56, -24, 10, 42], i, down;
+    for (i = 0; i < ys.length; i++) {
+      down = (holes === 0) ? (i === 1) : (i < holes);
+      s += hole(0, ys[i], 9, down, tint);
+    }
+    // Six and seven are the doubled pair at the foot; open for all three
+    // of these notes, but drawn because that is what her chart looks like.
+    [76, 106].forEach(function (y) {
+      s += hole(-8, y, 6, false, tint) + hole(8, y, 6, false, tint);
+    });
+    // The thumb, round the back. Down for B, A and G; off for D, which is
+    // the only one of the four that leaves it open.
+    s += '<path d="M -35 -88 h 13" stroke="#f0a0a5" stroke-width="3" stroke-dasharray="4 4" stroke-linecap="round"/>';
+    s += hole(-47, -88, 10, thumb !== false, tint);
+    return s;
+  }
+
+  // The note's own name, in capitals, on a badge at the top of its
+  // signpost. A letter is a name, which is the one kind of word this game
+  // allows itself. In landscape the whole plaque is turned on its side, so
+  // the badge is turned back the other way to stay the right way up.
+  function plaqueArt(holes, tint, thumb, name, wide) {
+    return '<rect class="signglow" x="-100" y="-224" width="200" height="448" rx="36" fill="#fff3ac" opacity="0"/>'
+      + '<rect x="-78" y="-202" width="156" height="404" rx="26" fill="#fdf6e3" stroke="#c99a5e" stroke-width="7"/>'
+      + '<g transform="translate(0,-152)' + (wide ? ' rotate(90)' : '') + '">'
+      + '<circle cx="0" cy="0" r="37" fill="' + tint + '"/>'
+      + '<text x="0" y="15" text-anchor="middle" fill="#33302a"'
+      + ' font-family="ui-rounded, Segoe UI, system-ui, -apple-system, sans-serif"'
+      + ' font-size="50" font-weight="800">' + name + '</text>'
+      + '</g>'
+      + '<g transform="translate(0,58) scale(0.85)">' + chartArt(holes, tint, thumb) + '</g>';
+  }
+
+  // Landscape lays the chart on its side. That is the only way it fits
+  // in a short row, and it is also how the instrument is actually held,
+  // thumb hole underneath.
+  function signArt(holes, tint, wide, thumb, name) {
+    var postH = wide ? 62 : 118;
+    var cy = -(postH + (wide ? 90 : 210));
+    return '<rect x="-10" y="' + (-postH - 2) + '" width="20" height="' + (postH + 4) + '" rx="8" fill="url(#post)"/>'
+      + '<g transform="translate(0,' + cy + ')' + (wide ? ' rotate(-90)' : '') + '">'
+      + plaqueArt(holes, tint, thumb, name, wide) + '</g>';
+  }
+
+  // ------------------------------------------------------------------
+  // A flower, rooted at y = 0, opening from nothing to full.
+  // ------------------------------------------------------------------
+  function flowerArt(petal) {
+    var s = '<path class="stem" d="M 0 0 L 0 -20" stroke="#4c8c45" stroke-width="7" fill="none" stroke-linecap="round"/>'
+      + '<g class="leaves">'
+      + '<ellipse cx="-17" cy="0" rx="18" ry="9" fill="#5aa04f" transform="rotate(-18 -17 0)"/>'
+      + '<ellipse cx="17" cy="0" rx="18" ry="9" fill="#4c8c45" transform="rotate(18 17 0)"/>'
+      + '</g>'
+      + '<g class="head"><circle cx="0" cy="0" r="17" fill="#4c8c45"/><g class="petals">';
+    for (var i = 0; i < 6; i++) {
+      s += '<ellipse cx="0" cy="-24" rx="12" ry="23" fill="' + petal + '" transform="rotate(' + (i * 60) + ')"/>';
+    }
+    return s + '</g><circle cx="0" cy="0" r="12" fill="#ffd977"/><circle cx="0" cy="0" r="6" fill="#e8a63c"/></g>';
+  }
+
+  // A patch is one colour but not one shade. Identical flowers read as a
+  // pattern; slightly different ones read as flowers, and she can tell
+  // which is which without them looking like different plants.
+  function hexToHsl(hex) {
+    var r = parseInt(hex.substr(1, 2), 16) / 255;
+    var g = parseInt(hex.substr(3, 2), 16) / 255;
+    var b = parseInt(hex.substr(5, 2), 16) / 255;
+    var mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+    var l = (mx + mn) / 2, s = 0, h = 0;
+    if (d) {
+      s = d / (1 - Math.abs(2 * l - 1));
+      if (mx === r) { h = 60 * (((g - b) / d) % 6); }
+      else if (mx === g) { h = 60 * ((b - r) / d + 2); }
+      else { h = 60 * ((r - g) / d + 4); }
+    }
+    return [(h + 360) % 360, s * 100, l * 100];
+  }
+
+  // Wobble that depends only on which flower this is, so a flower keeps
+  // its own shade across a redraw, a rotate and tomorrow.
+  function wobble(n, seed) {
+    var x = Math.sin(n * 78.233 + seed * 311.7) * 43758.5453;
+    return (x - Math.floor(x)) - 0.5;
+  }
+
+  function petalShade(hex, n) {
+    var c = hexToHsl(hex);
+    return 'hsl(' + (((c[0] + wobble(n, 1) * 26) % 360 + 360) % 360).toFixed(1) + ','
+      + clamp(c[1] + wobble(n, 2) * 22, 38, 100).toFixed(1) + '%,'
+      + clamp(c[2] + wobble(n, 3) * 15, 46, 88).toFixed(1) + '%)';
+  }
+
+  // The ones that stay behind. Exactly the flower she grew, at exactly
+  // the size she grew it to - a smaller one reads as the flower being
+  // taken away and swapped for a token.
+  var FULL_H = 166;
+
+  function pickedFlower(x, y, sc, petal, lean) {
+    var i, s = '<g transform="translate(' + x + ',' + y + ') scale(' + sc + ')">'
+      + '<path d="M 0 0 Q ' + lean + ' ' + (-FULL_H * 0.5) + ' ' + (lean * 0.4) + ' ' + (-FULL_H)
+      + '" stroke="#4c8c45" stroke-width="7" fill="none" stroke-linecap="round"/>'
+      + '<g transform="translate(' + (lean * 0.5) + ',' + (-FULL_H * 0.42) + ')">'
+      + '<ellipse cx="-17" cy="0" rx="18" ry="9" fill="#5aa04f" transform="rotate(-18 -17 0)"/>'
+      + '<ellipse cx="17" cy="0" rx="18" ry="9" fill="#4c8c45" transform="rotate(18 17 0)"/>'
+      + '</g>'
+      + '<g transform="translate(' + (lean * 0.4) + ',' + (-FULL_H) + ')">'
+      + '<circle cx="0" cy="0" r="17" fill="#4c8c45"/>';
+    for (i = 0; i < 6; i++) {
+      s += '<ellipse cx="0" cy="-24" rx="12" ry="23" fill="' + petal
+        + '" transform="rotate(' + (i * 60) + ')"/>';
+    }
+    return s + '<circle cx="0" cy="0" r="12" fill="#ffd977"/>'
+      + '<circle cx="0" cy="0" r="6" fill="#e8a63c"/></g></g>';
+  }
+
+  // ------------------------------------------------------------------
+  // What the garden remembers between visits.
+  // ------------------------------------------------------------------
+  var save = { flowers: 0, done: [0, 0, 0, 0], garden: [], tune: 0, pos: 0,
+               four: true, finished: false };
+
+  function load() {
+    try {
+      var s = JSON.parse(window.localStorage.getItem('recorder-garden-2') || 'null');
+      if (s && typeof s.flowers === 'number') {
+        save.flowers = s.flowers;
+        // Counted per friend, and there are four of them now. A saved
+        // game from before the squirrel has three, so it is copied across
+        // rather than thrown away for being the wrong length.
+        if (s.done && s.done.length) {
+          for (var k = 0; k < save.done.length; k++) { save.done[k] = s.done[k] || 0; }
+        }
+        save.garden = s.garden || [];
+            save.tune = s.tune || 0;
+        save.pos = s.pos || 0;
+        save.four = true;   // second edition: all four friends from the start
+        save.finished = !!s.finished;
+      }
+    } catch (e) {}
+  }
+  function persist() {
+    try { window.localStorage.setItem('recorder-garden-2',JSON.stringify(save)); } catch (e) {}
+  }
+  // The rabbit comes once B is hers, the badger once B and A both are.
+  var ARRIVE_AT = [0, 3, 8];
+  function unlocked() {
+    var n = 1;
+    while (n < 3 && save.flowers >= ARRIVE_AT[n]) { n++; }
+    return n;
+  }
+
+  // The squirrel is not earned with flowers. She gets it for finishing
+  // every song the first three notes can make.
+  function fourOn() { return !!save.four; }
+  function shouldBeHere(i) {
+    if (save.finished) { return false; }
+    return true;   // second edition: nobody has to be earned
+  }
+
+  // ------------------------------------------------------------------
+  // Layout. The world is 1000 wide and as many tall as the viewport
+  // needs, so nothing is ever letterboxed or cropped.
+  //
+  // Landscape turns the fingering chart on its side, which is both the
+  // only way it fits and the way the instrument is actually held.
+  // ------------------------------------------------------------------
+  var L = {};
+
+  function computeLayout() {
+    // Measured off the stage itself rather than asked of the window:
+    // innerHeight lies whenever a phone browser's address bar is in the
+    // middle of sliding away.
+    var box = svg.getBoundingClientRect();
+    var vw = Math.max(1, box.width || document.documentElement.clientWidth || window.innerWidth);
+    var vh = Math.max(1, box.height || document.documentElement.clientHeight || window.innerHeight);
+    var W = 1000;
+    var H = clamp(Math.round(1000 * vh / vw), 430, 2400);
+    var wide = (vw / vh) >= 1.15;
+
+    // The tune lies on the ground in front of the badger, nearest the
+    // player, and the whole hillside is squeezed into whatever height is
+    // left above it. Portrait has room to spare and loses nothing;
+    // landscape is where the friends give something up.
+    var songs = tunesOn();
+    var stripH = songs ? (wide ? (fourOn() ? H * 0.20 : H * 0.175)
+                               : (fourOn() ? H * 0.15 : H * 0.13)) : 0;
+    var stripBot = H - H * 0.045;
+    var stripTop = stripBot - stripH;
+    var floor = songs ? stripTop - H * 0.03 : H;
+
+    // Four heights once the squirrel is here, and everyone shuffles to
+    // make room for it. Landscape is where that costs something: portrait
+    // has height to spare and the friends stay exactly as big.
+    var four = fourOn();
+    var rowY, rowX, rowH;
+    if (four) {
+      rowY = wide ? [floor * 0.26, floor * 0.485, floor * 0.71, floor * 0.935]
+                  : [floor * 0.295, floor * 0.50, floor * 0.705, floor * 0.91];
+      rowX = wide ? [W * 0.80, W * 0.585, W * 0.365, W * 0.16]
+                  : [W * 0.66, W * 0.30, W * 0.68, W * 0.32];
+      rowH = (rowY[3] - rowY[0]) / 3;
+    } else {
+      rowY = wide ? [0, floor * 0.315, floor * 0.605, floor * 0.895]
+                  : [0, floor * 0.40, floor * 0.645, floor * 0.885];
+      rowX = wide ? [0, W * 0.765, W * 0.505, W * 0.245]
+                  : [0, W * 0.655, W * 0.315, W * 0.645];
+      rowH = wide ? floor * 0.29 : floor * 0.245;
+    }
+
+    // Everything below is still indexed by friend, not by row, so that
+    // saved gardens and every existing lookup keep working.
+    var gy = [], xs = [], r;
+    for (r = 0; r < SPECS.length; r++) {
+      gy.push(rowY[SPECS[r].row]);
+      xs.push(rowX[SPECS[r].row]);
+    }
+    var strip = songs ? { y: stripTop, h: stripH } : null;
+    var scale = clamp(Math.min(W * 0.30 / 200, rowH / 230), 0.26, 1.5);
+    var signScale = wide
+      ? clamp(Math.min((W * 0.26) / 430, (rowH * 0.62) / 180), 0.16, 0.8)
+      : clamp(Math.min((W * 0.19) / 170, (rowH * 0.92) / 514), 0.14, 1.0);
+
+    var signX = [], flowerX = [], side = [], i, sd;
+    for (i = 0; i < SPECS.length; i++) {
+      sd = xs[i] > W * 0.5 ? -1 : 1;
+      side.push(sd);
+      signX.push(xs[i] + sd * (92 * scale + (wide ? 210 : 86) * signScale + 14));
+      flowerX.push(xs[i] - sd * (100 * scale + 44 * scale));
+    }
+
+    L = {
+      W: W, H: H, wide: wide, gy: gy, xs: xs, scale: scale,
+      // How many of our units make one real pixel on this screen. A phone
+      // packs the whole thousand into about four hundred of them, so a
+      // control sized as a share of the drawing comes out half the size of
+      // a fingertip.
+      perPx: 1000 / vw,
+      signScale: signScale, signX: signX, flowerX: flowerX, side: side,
+      strip: strip, rowY: rowY, four: four,
+      bandTop: [], bandBot: []
+    };
+
+    // A friend's share of the empty ground: from just under whoever is
+    // above it to just under itself.
+    var edge = [], q;
+    for (q = 0; q < 4; q++) {
+      edge.push(q === 0 ? 0 : (rowY[q - 1] + rowY[q]) / 2);
+    }
+    edge.push(H);
+    for (i = 0; i < SPECS.length; i++) {
+      L.bandTop.push(edge[SPECS[i].row]);
+      L.bandBot.push(edge[SPECS[i].row + 1]);
+    }
+
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    drawSky();
+    drawHills();
+    drawGarden();
+    drawTuneStrip();
+    buildSigns();
+    placeAll();
+    drawHits();
+    drawUI();
+  }
+
+  function drawSky() {
+    var g = G('sky'), W = L.W, H = L.H;
+    clear(g);
+    g.appendChild(el('rect', { x: 0, y: 0, width: W, height: H, fill: 'url(#skywash)' }));
+    var sx = L.wide ? W * 0.13 : W * 0.2, sy = L.gy[0] * 0.28;
+    g.appendChild(el('circle', { cx: sx, cy: sy, r: 110, fill: 'url(#glowg)' }));
+    g.appendChild(el('circle', { cx: sx, cy: sy, r: 44, fill: '#fff6cc' }));
+    if (save.finished) {
+      var base = L.rowY[L.four ? 0 : 1];
+      var cols = ['#e2564f', '#ef9a3d', '#f2d049', '#6cb85c', '#4f9be0', '#8a6bd1'];
+      var rr = Math.min(W * 0.46, base * 0.94), band = Math.max(4, rr * 0.085), k, rad;
+      for (k = 0; k < cols.length; k++) {
+        rad = rr - k * band;
+        g.appendChild(el('path', {
+          d: 'M ' + (W / 2 - rad) + ' ' + base + ' A ' + rad + ' ' + rad
+            + ' 0 0 1 ' + (W / 2 + rad) + ' ' + base,
+          fill: 'none', stroke: cols[k], 'stroke-width': band, opacity: 0.5
+        }));
+      }
+    }
+    [[0.42, 0.2, 1], [0.8, 0.12, 0.78], [0.6, 0.42, 0.6]].forEach(function (c) {
+      var cg = el('g', {
+        transform: 'translate(' + (W * c[0]) + ',' + (L.gy[0] * c[1] + 24) + ') scale(' + c[2] + ')',
+        opacity: 0.9
+      });
+      cg.innerHTML = '<ellipse cx="0" cy="0" rx="54" ry="23" fill="#ffffff"/>'
+        + '<ellipse cx="-34" cy="7" rx="33" ry="17" fill="#ffffff"/>'
+        + '<ellipse cx="36" cy="6" rx="37" ry="18" fill="#ffffff"/>'
+        + '<ellipse cx="5" cy="-15" rx="29" ry="19" fill="#ffffff"/>';
+      g.appendChild(cg);
+    });
+  }
+
+  var HILLS = ['hilltop', 'hill0', 'hill1', 'hill2'];
+
+  function hillPath(y, amp) {
+    var W = L.W, H = L.H;
+    return 'M -30 ' + (y + 12)
+      + ' C ' + (W * 0.2) + ' ' + (y - amp) + ' ' + (W * 0.34) + ' ' + (y + amp) + ' ' + (W * 0.56) + ' ' + (y + 2)
+      + ' C ' + (W * 0.74) + ' ' + (y - amp * 1.1) + ' ' + (W * 0.9) + ' ' + (y + amp * 0.5) + ' ' + (W + 30) + ' ' + (y - 6)
+      + ' L ' + (W + 30) + ' ' + (H + 40) + ' L -30 ' + (H + 40) + ' Z';
+  }
+
+  function drawHills() {
+    var g = G('hills'), i, k, amp = clamp(L.H * 0.014, 8, 26);
+    clear(g);
+
+    // One terrace per note, palest at the back. Adding a fifth note later
+    // is adding a fifth row and nothing else.
+    var first = L.four ? 0 : 1;
+    for (i = first; i < 4; i++) {
+      g.appendChild(el('path', {
+        d: hillPath(L.rowY[i], amp), fill: 'url(#' + HILLS[i] + ')'
+      }));
+      var tufts = '';
+      for (k = 0; k < 9; k++) {
+        var gx = rnd(20, L.W - 20), ty = L.rowY[i] + rnd(14, 30), th = rnd(9, 18);
+        tufts += '<path d="M ' + gx + ' ' + ty + ' q ' + rnd(-5, 5) + ' ' + (-th) + ' ' + rnd(3, 8) + ' ' + (-th * 1.3) + '" '
+          + 'stroke="#3f8a44" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.5"/>';
+      }
+      var tg = el('g', {});
+      tg.innerHTML = tufts;
+      g.appendChild(tg);
+    }
+    for (i = 0; i < friends.length; i++) {
+      if (friends[i] && friends[i].present) {
+        g.appendChild(el('ellipse', {
+          cx: L.xs[i], cy: L.gy[i] + 8, rx: 112 * L.scale, ry: 18 * L.scale,
+          fill: '#1d4a22', opacity: 0.1
+        }));
+      }
+    }
+  }
+
+  // Where the finished ones stand: a bed that spreads out from the spot
+  // the flower was actually grown in, rather than anywhere on the hill.
+  // She has to be able to see that the one she just made is still there.
+  // The bud keeps the middle; the finished ones fill in around and below
+  // it, never back up the slope where the friend is standing.
+  var PLOT = [
+    [-56, 10], [56, 14], [-22, 34], [24, 38], [-74, 30],
+    [74, 34], [0, 58], [-46, 70], [48, 74], [0, 96]
+  ];
+
+  function drawGarden() {
+    var g = G('garden'), s = '', i, f, lvl, top, bot, y, x, sc, pl, list = [];
+    for (i = 0; i < save.garden.length; i++) {
+      f = save.garden[i];
+      // Four friends, not three. Clamping to two sent every one of the
+      // squirrel's flowers to the badger's bed, in the badger's colour,
+      // which looked for all the world like they had not been saved.
+      lvl = clamp(f.i | 0, 0, SPECS.length - 1);
+      sc = clamp(L.scale * 0.85, 0.3, 1.25);
+      if (typeof f.k === 'number') {
+        pl = PLOT[f.k % PLOT.length];
+        x = L.flowerX[lvl] + pl[0] * sc;
+        y = L.gy[lvl] + 10 + pl[1] * sc;
+      } else {
+        // Flowers from before the beds existed. Left where they fell.
+        top = L.gy[lvl] + 14;
+        bot = (L.bandBot[lvl] || L.H) - 10;
+        y = top + Math.max(0, bot - top) * (f.v || 0.5);
+        x = 40 + (L.W - 80) * (f.u || 0.5);
+      }
+      list.push({
+        x: clamp(x, 26, L.W - 26),
+        y: clamp(y, L.gy[lvl] + 6, L.H - 8),
+        sc: sc, lean: ((i * 37) % 19) - 9,
+        petal: petalShade(SPECS[lvl].petal, typeof f.k === 'number' ? f.k : i)
+      });
+    }
+    // Nearest last, so a flower lower down the slope stands in front of
+    // the ones behind it rather than being cut in half by them.
+    list.sort(function (a, b) { return a.y - b.y; });
+    for (i = 0; i < list.length; i++) {
+      s += pickedFlower(list[i].x, list[i].y, list[i].sc, list[i].petal, list[i].lean);
+    }
+    g.innerHTML = s;
+  }
+
+
+  // ------------------------------------------------------------------
+  // The tune strip: three lines in the sky, one per friend, and the notes
+  // of the song sitting on them. Higher note, higher line - the same
+  // thing the hill has been teaching all along, which makes this a stave
+  // she can already read.
+  // ------------------------------------------------------------------
+  function beeArt(r) {
+    // Drawn facing left, mirrored here so it faces the way it travels.
+    return '<g transform="scale(' + (-r * 0.05) + ',' + (r * 0.05) + ')">'
+      + '<ellipse cx="-15" cy="-15" rx="17" ry="11" fill="#ffffff" opacity="0.7" transform="rotate(-26 -15 -15)"/>'
+      + '<ellipse cx="15" cy="-15" rx="17" ry="11" fill="#ffffff" opacity="0.7" transform="rotate(26 15 -15)"/>'
+      + '<ellipse cx="0" cy="0" rx="22" ry="16" fill="#f5c542"/>'
+      + '<path d="M -6 -14 q 3 14 0 28" stroke="#3a3327" stroke-width="7" fill="none"/>'
+      + '<path d="M 8 -13 q 3 13 0 26" stroke="#3a3327" stroke-width="7" fill="none"/>'
+      + '<circle cx="-20" cy="-4" r="9" fill="#3a3327"/>'
+      + '<circle cx="-23" cy="-6" r="2.6" fill="#ffffff"/>'
+      + '</g>';
+  }
+
+  var beeNode = null;
+  var bee = { x: 0, y: 0, tx: 0, ty: 0, face: 1, set: false };
+
+  function drawTuneStrip() {
+    var g = G('tunes');
+    beeNode = null;
+    if (!L.strip || !tunesOn()) {
+      // Nothing left pointing at nodes that are no longer there.
+      clear(g); tune.discs = []; tune.lit = []; return;
+    }
+
+    var notes = TUNES[tune.idx].notes, n = notes.length;
+    var beats = tuneBeats(tune.idx);
+    var s = L.strip, pad = 38, k;
+    var left = pad, right = L.W - pad;
+    // Spaced by how long each note lasts, the way written music is, so a
+    // held note plainly takes up more room than a quick one.
+    var total = 0, least = 99;
+    for (k = 0; k < n; k++) { total += beats[k]; if (beats[k] < least) { least = beats[k]; } }
+    var unit = (right - left) / total;
+    var r = clamp(Math.min(unit * least * 0.38, s.h * (L.four ? 0.095 : 0.19)), 5, 26);
+    // One line per friend, in hill order: the squirrel's on top, the
+    // badger's at the bottom. Which is a stave, and she can already read
+    // it, because the hill has been saying the same thing all along.
+    var rows = L.four ? [0, 1, 2, 3] : [1, 2, 3];
+    var lineY = {}, span = rows.length - 1, sp;
+    for (k = 0; k < rows.length; k++) {
+      lineY[rows[k]] = s.y + s.h * (0.2 + 0.6 * (span ? k / span : 0.5));
+    }
+    var html = '<g class="plain">'
+      + '<rect x="' + (left - 18) + '" y="' + (s.y - 10) + '" width="' + (right - left + 36)
+      + '" height="' + (s.h + 20) + '" rx="' + (s.h * 0.3) + '" fill="#ffffff" opacity="0.34"/>';
+    var i, fi, cx, cy, done, cur, discs = [];
+    tune.lit = [];
+    for (k = 0; k < rows.length; k++) {
+      sp = specByRow(rows[k]);
+      html += '<path d="M ' + left + ' ' + lineY[rows[k]] + ' H ' + right + '" stroke="' + sp.petal
+        + '" stroke-width="3" opacity="0.38" stroke-linecap="round"/>';
+    }
+    html += '</g>';
+
+    // One shape per note, as long as the note lasts. A blob with a line
+    // after it says "and then a line"; a single long pill says hold on.
+    var acc = 0, x0, w, gap = Math.min(r * 0.4, unit * 0.14);
+    for (i = 0; i < n; i++) {
+      fi = noteIndex(notes[i]);
+      cy = lineY[SPECS[fi].row];
+      x0 = left + acc * unit + gap;
+      w = Math.max(r * 1.7, beats[i] * unit - gap * 2);
+      acc += beats[i];
+      cx = x0 + r;
+      done = i < tune.pos;
+      cur = (i === tune.pos);
+      html += '<g data-note="' + i + '">';
+      discs.push({ x: cx, y: cy - r * 2.6, cx: x0 + w / 2, cy: cy });
+      html += '<rect class="flash" x="' + (x0 - r * 0.55) + '" y="' + (cy - r * 1.55)
+        + '" width="' + (w + r * 1.1) + '" height="' + (r * 3.1) + '" rx="' + (r * 1.55)
+        + '" fill="#ffe37a" opacity="0"/>';
+      if (cur) {
+        html += '<circle cx="' + cx + '" cy="' + cy + '" r="' + (r * 2) + '" fill="url(#glowg)"/>';
+        bee.tx = cx;
+        bee.ty = cy - r * 2.6;
+      }
+      html += '<rect x="' + x0 + '" y="' + (cy - r) + '" width="' + w + '" height="' + (r * 2)
+        + '" rx="' + r + '" fill="' + (done ? SPECS[fi].petal : '#fffdf6') + '" stroke="'
+        + SPECS[fi].petal + '" stroke-width="' + (r * 0.32) + '"/>';
+      html += '</g>';
+    }
+    if (tune.pos >= n) { bee.tx = right; bee.ty = lineY[rows[rows.length >> 1]] - r * 2.6; }
+    tune.discs = discs;
+    html += '<g class="plain" id="beeg">' + beeArt(r) + '</g>';
+    html += '<rect class="hit" x="' + (left - 18) + '" y="' + (s.y - 10) + '" width="'
+      + (right - left + 36) + '" height="' + (s.h + 20) + '" data-ui="tune"/>';
+    g.innerHTML = html;
+    for (i = 0; i < discs.length; i++) {
+      discs[i].node = g.querySelector('[data-note="' + i + '"]');
+      discs[i].flash = discs[i].node ? discs[i].node.querySelector('.flash') : null;
+    }
+    beeNode = g.querySelector('#beeg');
+    if (!bee.set) { bee.x = bee.tx; bee.y = bee.ty; bee.set = true; }
+    placeBee();
+  }
+
+  function litUpStrip() {
+    var i, d, lit;
+    for (i = 0; i < tune.discs.length; i++) {
+      d = tune.discs[i];
+      if (!d.node) { continue; }
+      lit = tune.lit[i] ? clamp((tune.lit[i] - clock) / 0.22, 0, 1) : 0;
+      if (!lit && !d.wasLit) { continue; }
+      d.wasLit = lit;
+      if (d.flash) { d.flash.setAttribute('opacity', (lit * 0.95).toFixed(3)); }
+      d.node.setAttribute('transform', lit
+        ? 'translate(' + d.cx + ',' + d.cy + ') scale(' + (1 + 0.22 * lit).toFixed(3)
+          + ') translate(' + (-d.cx) + ',' + (-d.cy) + ')'
+        : '');
+    }
+  }
+
+  function placeBee() {
+    if (!beeNode) { return; }
+    var wob = reduced ? 0 : Math.sin(clock * 6) * 2.5;
+    beeNode.setAttribute('transform',
+      'translate(' + bee.x + ',' + (bee.y + wob) + ') scale(' + bee.face + ',1)');
+  }
+
+  // ------------------------------------------------------------------
+  // The friends
+  // ------------------------------------------------------------------
+  var friends = [];
+
+  function buildFriends() {
+    var i;
+    for (i = 0; i < SPECS.length; i++) {
+      var s = SPECS[i];
+      var node = el('g', { 'data-friend': i });
+      node.innerHTML = '<circle class="halo" cx="0" cy="-95" r="135" fill="url(#sung)" opacity="0"/>' + ART[s.animal](s);
+      var flower = el('g', { 'data-friend': i });
+      flower.innerHTML = flowerArt(s.petal);
+      G('friends').appendChild(node);
+      G('flowers').appendChild(flower);
+      friends.push({
+        spec: s, i: i, node: node, flower: flower, sign: null, glow: null,
+        halo: node.querySelector('.halo'),
+        mouth: node.querySelector('.mouth'),
+        looks: node.querySelectorAll('.look'),
+        pawsG: node.querySelector('.paws'),
+        stem: flower.querySelector('.stem'),
+        leaves: flower.querySelector('.leaves'),
+        head: flower.querySelector('.head'),
+        growth: 0, sing: 0, excite: 0, shy: 0, hop: 0, pulse: 0, celebrate: 0,
+        singUntil: 0, gigUntil: 0, done: save.done[i] || 0,
+        present: shouldBeHere(i), arriving: false, arriveT: 0,
+        bob: Math.random() * 6.28
+      });
+    }
+  }
+
+  function buildSigns() {
+    var g = G('signs'), i;
+    clear(g);
+    for (i = 0; i < friends.length; i++) {
+      var f = friends[i];
+      var sign = el('g', { 'data-friend': i });
+      sign.innerHTML = signArt(f.spec.holes, f.spec.petal, L.wide, f.spec.thumb, f.spec.id);
+      g.appendChild(sign);
+      f.sign = sign;
+      f.glow = sign.querySelector('.signglow');
+    }
+  }
+
+  function placeAll() {
+    var i;
+    for (i = 0; i < friends.length; i++) {
+      var f = friends[i];
+      placeFlower(f);
+      f.sign.setAttribute('opacity', f.present ? 1 : 0);
+      f.flower.setAttribute('opacity', f.present ? 1 : 0);
+      f.node.setAttribute('opacity', f.present ? 1 : 0);
+      placeSign(f);
+      paintFlower(f);
+      paintFriend(f);
+    }
+  }
+
+  function placeSign(f) {
+    var sc = L.signScale * (1 + 0.22 * f.pulse);
+    f.sign.setAttribute('transform', 'translate(' + L.signX[f.i] + ',' + (L.gy[f.i] + 6) + ') scale(' + sc + ')');
+  }
+
+  function friendPos(f) {
+    var x = L.xs[f.i], y = L.gy[f.i], hop = f.hop;
+    if (f.arriving) {
+      var u = clamp(f.arriveT / 1.9, 0, 1);
+      var e = u * u * (3 - 2 * u);
+      var from = L.side[f.i] > 0 ? -170 : L.W + 170;
+      x = from + (L.xs[f.i] - from) * e;
+      if (f.spec.animal === 'bird') {
+        y = L.gy[f.i] - Math.sin(u * Math.PI) * 150 * L.scale;
+      } else {
+        hop += Math.abs(Math.sin(u * Math.PI * (f.spec.animal === 'rabbit' ? 4 : 6)))
+          * (1 - u * 0.5) * 38 * L.scale;
+      }
+    }
+    return { x: x, y: y, hop: hop };
+  }
+
+  function paintFriend(f) {
+    var p = friendPos(f);
+    var bobY = reduced ? 0 : Math.sin(f.bob) * 3 * L.scale;
+    var sc = L.scale * (1 + f.excite * 0.09);
+    // A tilt on top of the jump, so it reads as delight rather than as
+    // something simply moving up and down.
+    var tilt = reduced ? 0 : f.excite * Math.sin(clock * 6.9) * 6;
+    f.node.setAttribute('transform',
+      'translate(' + p.x + ',' + (p.y - p.hop + bobY) + ') rotate(' + tilt.toFixed(2)
+      + ') scale(' + sc + ')');
+    if (f.halo) { f.halo.setAttribute('opacity', clamp(f.sing * 0.55 + f.excite * 0.45, 0, 0.9)); }
+    if (f.mouth) {
+      var cx = +f.mouth.getAttribute('data-cx'), cy = +f.mouth.getAttribute('data-cy');
+      var rest = parseFloat(f.mouth.getAttribute('data-rest')) || 0.2;
+      var k = rest + (1 - rest) * f.sing;
+      f.mouth.setAttribute('transform',
+        'translate(' + cx + ',' + cy + ') scale(1,' + k + ') translate(' + (-cx) + ',' + (-cy) + ')');
+    }
+    if (f.pawsG) { f.pawsG.setAttribute('opacity', f.shy); }
+  }
+
+  // Where this friend's next flower stands. It is the same slot the
+  // finished one will be saved into, so nothing moves at the moment it is
+  // planted - the growing flower simply starts the next one along.
+  function flowerSlot(f) {
+    var sc = clamp(L.scale * 0.85, 0.3, 1.25);
+    var pl = PLOT[f.done % PLOT.length];
+    return { x: L.flowerX[f.i] + pl[0] * sc, y: L.gy[f.i] + 10 + pl[1] * sc, sc: sc };
+  }
+
+  function placeFlower(f) {
+    var s = flowerSlot(f);
+    f.flower.setAttribute('transform',
+      'translate(' + s.x + ',' + s.y + ') scale(' + s.sc + ')');
+    // The bud is already wearing the shade it will keep once planted.
+    var shade = petalShade(f.spec.petal, f.done), ps, i;
+    ps = f.flower.querySelectorAll('.petals ellipse');
+    for (i = 0; i < ps.length; i++) { ps[i].setAttribute('fill', shade); }
+    f.shade = shade;
+  }
+
+  function paintFlower(f) {
+    var h = 26 + 140 * f.growth;
+    var bend = reduced ? 0 : 9 * Math.sin(f.bob * 0.6);
+    f.stem.setAttribute('d', 'M 0 0 Q ' + bend + ' ' + (-h * 0.5) + ' 0 ' + (-h));
+    f.leaves.setAttribute('transform', 'translate(0,' + (-h * 0.42) + ') scale(' + (0.4 + 0.6 * f.growth) + ')');
+    var k = 0.34 + 0.66 * f.growth;
+    if (f.celebrate > 0 && !reduced) { k *= 1 + 0.13 * Math.sin((1.5 - f.celebrate) * 11); }
+    f.head.setAttribute('transform', 'translate(0,' + (-h) + ') scale(' + k + ')');
+  }
+
+  // ------------------------------------------------------------------
+  // Sparks
+  // ------------------------------------------------------------------
+  var parts = [];
+
+  function burst(x, y, colour, n, spread) {
+    var g = G('effects'), i;
+    for (i = 0; i < n; i++) {
+      var a = rnd(0, Math.PI * 2), sp = rnd(0.35, 1) * spread;
+      var node = el('circle', { cx: 0, cy: 0, r: rnd(3, 9), fill: colour });
+      g.appendChild(node);
+      parts.push({
+        n: node, x: x, y: y,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - spread * 0.55, life: 1
+      });
+    }
+  }
+
+  function updateParts(dt) {
+    var i, p;
+    for (i = parts.length - 1; i >= 0; i--) {
+      p = parts[i];
+      p.life -= dt * 0.85;
+      if (p.life <= 0) {
+        if (p.n.parentNode) { p.n.parentNode.removeChild(p.n); }
+        parts.splice(i, 1);
+        continue;
+      }
+      p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 340 * dt;
+      p.n.setAttribute('transform', 'translate(' + p.x + ',' + p.y + ')');
+      p.n.setAttribute('opacity', clamp(p.life, 0, 1));
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // The parent's one control: the ears, on or off.
+  // ------------------------------------------------------------------
+  // A recorder is not a touchscreen. She can play for two solid minutes
+  // without a finger going anywhere near the glass, and the tablet has no
+  // way of knowing anything is happening.
+  var wakeLock = null, wakeAsking = false;
+
+  function keepAwake() {
+    if (wakeLock || wakeAsking) { return; }
+    if (!navigator.wakeLock || !navigator.wakeLock.request) { return; }
+    wakeAsking = true;
+    navigator.wakeLock.request('screen').then(function (w) {
+      wakeAsking = false;
+      wakeLock = w;
+      w.addEventListener('release', function () { wakeLock = null; });
+    })['catch'](function () { wakeAsking = false; wakeLock = null; });
+  }
+
+  var micRing = null, resetRing = null, resetCirc = 1;
+  var resetBig = null, bigRing = null, bigCirc = 1;
+  var resetting = false, resetHold = 0;
+  var RESET_HOLD = 2.4;
+
+  // A door for me. Start the reset, let go while the ring is somewhere in
+  // its second quarter, four times running, and a button appears that
+  // plays the note the game is waiting for - perfectly, and for as long as
+  // it wanted. It is how I get to the fourth note without an afternoon of
+  // blowing, and she will not find it by accident: a quarter of a ring is
+  // a narrow thing to stop on once, let alone four times in a row.
+  var cheatOn = false, cheatStreak = 0;
+  // Held down, it keeps going. Walking a twenty-six note tune forward
+  // one press at a time is not a fast forward.
+  var cheatHeld = false, cheatNext = 0;
+  var CHEAT_GAP = 0.3;
+
+  function cheatStep() {
+    var idx = (tunesOn() && !tune.playing)
+      ? noteIndex(TUNES[tune.idx].notes[tune.pos] || 'B') : ask.idx;
+    var f = friends[idx];
+    if (!f || !f.present) { f = friends[ask.idx] || friends[0]; }
+    if (!f) { return; }
+    var completes = false;
+    if (tunesOn() && !tune.playing && tune.pos < TUNES[tune.idx].notes.length) {
+      tune.pos++;
+      save.pos = tune.pos;
+      drawTuneStrip();
+      completes = tune.pos >= TUNES[tune.idx].notes.length;
+      if (completes) { finishTune(); } else { persist(); }
+    }
+    // Silent on the step that finishes the tune. Otherwise the note it
+    // sounds lands straight on top of the playback it just started, which
+    // is the stray note you could hear before every play-through.
+    if (!completes) { sing(f, 0.32); }
+    if (f.celebrate <= 0 && f.growth < 1) { f.growth = 1; finish(f); }
+  }
+
+  // Emptying the garden. Two and a half seconds of held finger, which she
+  // will not manage by accident and I will not do twice. Everything goes:
+  // the flowers, the count, and the two friends who had arrived.
+  function doReset() {
+    resetting = false;
+    resetHold = 0;
+    hushAll();
+    var i, f;
+    for (i = 0; i < friends.length; i++) {
+      f = friends[i];
+      if (f.present && !reduced) {
+        burst(L.flowerX[i], L.gy[i] - 70 * L.scale, f.spec.petal, 10, 210);
+      }
+      f.growth = 0; f.celebrate = 0; f.done = 0;
+      f.present = true;
+      f.arriving = false; f.arriveT = 0;
+      f.sing = 0; f.excite = 0; f.shy = 0; f.hop = 0; f.pulse = 0;
+      f.singUntil = 0; f.gigUntil = 0;
+    }
+    save.flowers = 0;
+    save.done = [0, 0, 0, 0];
+    save.garden = [];
+    save.tune = 0;
+    save.pos = 0;
+    save.four = true;
+    save.finished = false;
+    tune.idx = 0; tune.pos = 0; tune.playing = false; tune.advance = true;
+    tuneLast = null; tuneHeld = 0; tuneGiven = 0;
+    visQ.length = 0;
+    bee.set = false;
+    persist();
+    ask.idx = 0;
+    [12, 9, 7, 4, 0].forEach(function (s, k) {
+      bell(0.02 + k * 0.06, 523.25 * Math.pow(2, s / 12), 0.2, 0.4);
+    });
+    computeLayout();
+  }
+
+  function flowerIcon(rs) {
+    var r = rs * 0.2, s = '<g opacity="0.8">', i;
+    for (i = 0; i < 5; i++) {
+      s += '<ellipse cx="0" cy="' + (-r) + '" rx="' + (r * 0.5) + '" ry="' + r
+        + '" fill="#b7b0a4" transform="rotate(' + (i * 72) + ')"/>';
+    }
+    return s + '<circle cx="0" cy="0" r="' + (r * 0.5) + '" fill="#8f887c"/></g>';
+  }
+
+  function drawUI() {
+    if (!L.W) { return; }
+    var g = G('ui');
+    clear(g);
+    var sz = clamp(Math.max(L.W * 0.08, 54 * L.perPx), 58, 190);
+    // Top corners: the tune has the bottom of the screen now, and out
+    // of the way of a hand resting on the edge of the tablet.
+    var cx = 22 + sz / 2, cy = 22 + sz / 2;
+    var on = MIC.state === 'on';
+    var busy = MIC.state === 'asking';
+    var ink = on ? '#3f7c36' : '#948d82';
+    var body = el('g', { transform: 'translate(' + cx + ',' + cy + ')' });
+    body.innerHTML =
+      '<circle class="ring" cx="0" cy="0" r="' + (sz * 0.6) + '" fill="#7ecf6a" opacity="0"/>'
+      + '<rect x="' + (-sz / 2) + '" y="' + (-sz / 2) + '" width="' + sz + '" height="' + sz
+      + '" rx="' + (sz * 0.3) + '" fill="#fdf6e3" opacity="' + (on ? 0.94 : 0.6) + '" stroke="#c99a5e" stroke-width="3"/>'
+      + '<rect x="' + (-sz * 0.11) + '" y="' + (-sz * 0.3) + '" width="' + (sz * 0.22) + '" height="' + (sz * 0.36)
+      + '" rx="' + (sz * 0.11) + '" fill="' + ink + '"/>'
+      + '<path d="M ' + (-sz * 0.21) + ' 0 a ' + (sz * 0.21) + ' ' + (sz * 0.21) + ' 0 0 0 ' + (sz * 0.42) + ' 0" '
+      + 'fill="none" stroke="' + ink + '" stroke-width="' + (sz * 0.075) + '" stroke-linecap="round"/>'
+      + '<path d="M 0 ' + (sz * 0.21) + ' v ' + (sz * 0.13) + '" stroke="' + ink + '" stroke-width="'
+      + (sz * 0.075) + '" stroke-linecap="round"/>'
+      + (on || busy ? '' : '<path d="M ' + (-sz * 0.29) + ' ' + (-sz * 0.29) + ' L ' + (sz * 0.29) + ' '
+        + (sz * 0.29) + '" stroke="#c2564f" stroke-width="' + (sz * 0.09) + '" stroke-linecap="round"/>')
+      + '<rect class="hit" x="' + (-sz * 0.68) + '" y="' + (-sz * 0.68) + '" width="' + (sz * 1.36)
+      + '" height="' + (sz * 1.36) + '" data-ui="mic"/>';
+    g.appendChild(body);
+    micRing = body.querySelector('.ring');
+
+    var rs = sz, rr = rs * 0.6;
+    resetCirc = 2 * Math.PI * rr;
+    var rst = el('g', {
+      transform: 'translate(' + (L.W - 22 - rs / 2) + ',' + (22 + rs / 2) + ')'
+    });
+    rst.innerHTML =
+      '<rect x="' + (-rs / 2) + '" y="' + (-rs / 2) + '" width="' + rs + '" height="' + rs
+      + '" rx="' + (rs * 0.3) + '" fill="#fdf6e3" opacity="0.5" stroke="#c99a5e" stroke-width="3"/>'
+      + flowerIcon(rs)
+      + '<circle class="rring" cx="0" cy="0" r="' + rr + '" fill="none" stroke="#c2564f" stroke-width="'
+      + (rs * 0.11) + '" stroke-linecap="round" stroke-dasharray="' + resetCirc
+      + '" stroke-dashoffset="' + resetCirc + '" transform="rotate(-90)"/>'
+      + '<rect class="hit" x="' + (-rs * 0.68) + '" y="' + (-rs * 0.68) + '" width="' + (rs * 1.36)
+      + '" height="' + (rs * 1.36) + '" data-ui="reset"/>';
+    g.appendChild(rst);
+    resetRing = rst.querySelector('.rring');
+
+    if (cheatOn) {
+      var chx = L.W - 22 - rs - 14 - rs / 2;
+      var ch = el('g', { transform: 'translate(' + chx + ',' + (22 + rs / 2) + ')' });
+      ch.innerHTML =
+        '<rect x="' + (-rs / 2) + '" y="' + (-rs / 2) + '" width="' + rs + '" height="' + rs
+        + '" rx="' + (rs * 0.3) + '" fill="#fdf6e3" opacity="0.85" stroke="#c99a5e" stroke-width="3"/>'
+        + '<path d="M ' + (-rs * 0.27) + ' ' + (-rs * 0.21) + ' L ' + (-rs * 0.02) + ' 0 L '
+        + (-rs * 0.27) + ' ' + (rs * 0.21) + ' Z" fill="#3f7c36"/>'
+        + '<path d="M ' + (rs * 0.02) + ' ' + (-rs * 0.21) + ' L ' + (rs * 0.27) + ' 0 L '
+        + (rs * 0.02) + ' ' + (rs * 0.21) + ' Z" fill="#3f7c36"/>'
+        + '<rect class="hit" x="' + (-rs * 0.68) + '" y="' + (-rs * 0.68) + '" width="' + (rs * 1.36)
+        + '" height="' + (rs * 1.36) + '" data-ui="cheat"/>';
+      g.appendChild(ch);
+    }
+
+    // The countdown belongs in the middle of the screen. On the button it
+    // is directly underneath the thumb holding the button down, which is
+    // the one place it cannot be seen. This one is for me, so it says so
+    // in words.
+    var R = clamp(Math.min(L.W, L.H) * 0.19, 96, 260);
+    bigCirc = 2 * Math.PI * R;
+    resetBig = el('g', {
+      'class': 'plain', opacity: 0,
+      transform: 'translate(' + (L.W / 2) + ',' + (L.H / 2) + ')'
+    });
+    resetBig.innerHTML =
+      '<circle cx="0" cy="0" r="' + (R * 1.32) + '" fill="#1b2718" opacity="0.66"/>'
+      + '<circle cx="0" cy="0" r="' + R + '" fill="none" stroke="#ffffff" stroke-width="'
+      + (R * 0.15) + '" opacity="0.28"/>'
+      + '<circle class="bigring" cx="0" cy="0" r="' + R + '" fill="none" stroke="#f2c141"'
+      + ' stroke-width="' + (R * 0.15) + '" stroke-linecap="round" stroke-dasharray="' + bigCirc
+      + '" stroke-dashoffset="' + bigCirc + '" transform="rotate(-90)"/>'
+      + '<text x="0" y="' + (R * 0.12) + '" text-anchor="middle" fill="#ffffff"'
+      + ' font-family="ui-rounded, Segoe UI, system-ui, -apple-system, sans-serif"'
+      + ' font-size="' + (R * 0.3) + '" font-weight="800"'
+      + ' letter-spacing="' + (R * 0.03) + '">RESET</text>';
+    g.appendChild(resetBig);
+    bigRing = resetBig.querySelector('.bigring');
+  }
+
+  // Targets, in the order they are stacked: empty ground first, then the
+  // signpost, then the animal on top.
+  //
+  // Horizontal bands alone were wrong, and wrong in a way that felt like
+  // bad aim. A rabbit's ears reach the height of the bird's feet, so the
+  // whole top of the rabbit sat inside the bird's band. Now each friend
+  // owns the space it actually occupies, and the bands only ever catch a
+  // tap on empty sky or grass.
+  function hitRect(g, i, x, y, w, h) {
+    g.appendChild(el('rect', { 'class': 'hit', 'data-friend': i, x: x, y: y, width: w, height: h }));
+  }
+
+  function drawHits() {
+    var g = G('hits'), i, ss, fs, sc, halfW, top;
+    clear(g);
+
+    // Empty sky and grass first. These only ever catch a miss.
+    for (i = 0; i < friends.length; i++) {
+      if (!friends[i] || !friends[i].present) { continue; }
+      hitRect(g, i, 0, L.bandTop[i], L.W, L.bandBot[i] - L.bandTop[i]);
+    }
+
+    // Then row by row, back to front, in the order the artwork itself is
+    // painted: a friend's signpost, then its flower, then the animal on
+    // top of both. Grouping all the signs and then all the animals put
+    // one friend's whole body over its neighbour's signpost.
+    for (i = 0; i < friends.length; i++) {
+      if (!friends[i] || !friends[i].present) { continue; }
+      sc = L.scale;
+      ss = L.signScale;
+      fs = clamp(sc * 0.85, 0.3, 1.25);
+
+      halfW = (L.wide ? 226 : 106) * ss;
+      top = (L.wide ? 256 : 556) * ss;
+      hitRect(g, i, L.signX[i] - halfW, L.gy[i] - top, halfW * 2, top + 14);
+
+      hitRect(g, i, L.flowerX[i] - 98 * fs, L.gy[i] - 200 * fs, 196 * fs, 300 * fs);
+
+      // Each animal's own height, not the tallest one's: a box sized for
+      // the rabbit's ears would have the bird and the badger claiming a
+      // strip of empty air their neighbour's signpost hangs in.
+      top = (friends[i].spec.top + 14) * sc;
+      hitRect(g, i, L.xs[i] - 124 * sc, L.gy[i] - top, 248 * sc, top + 14 * sc);
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Asking.
+  //
+  // There is no round and no turn. A friend sings its note and waits,
+  // and if she answers a different one instead, that friend answers her
+  // just as gladly. The asking only ever points at something.
+  // ------------------------------------------------------------------
+  var ask = { idx: 0 };
+  var clock = 0, lookAt = -1, touchHold = -1, firstTouch = false;
+
+  function sing(f, dur) {
+    initAudio();
+    recorderNote(0.02, mtof(f.spec.midi), dur, 0.4);
+    f.singUntil = clock + dur;
+    ask.idx = f.i;
+  }
+
+  function pickAsk() {
+    // Once the tunes are running the asking follows the song instead, so
+    // the glowing signpost is always the fingering she needs next.
+    if (tunesOn()) { return; }
+    var best = ask.idx, bestScore = 1e9, i, sc;
+    for (i = 0; i < friends.length; i++) {
+      if (!friends[i].present) { continue; }
+      sc = friends[i].done * 10 + (i === ask.idx ? 7 : 0) + Math.random() * 4;
+      if (sc < bestScore) { bestScore = sc; best = i; }
+    }
+    ask.idx = best;
+  }
+
+  // ------------------------------------------------------------------
+  // Playing a tune.
+  //
+  // There is no mode and no menu. The strip is simply there once all
+  // three notes are hers, and playing carries on doing everything it did
+  // before - the friend answers, the flower grows - while the song moves
+  // along underneath whenever the note happens to be the next one.
+  // ------------------------------------------------------------------
+  var tune = { idx: 0, pos: 0, playing: false, advance: true, nextAt: 0, discs: [], lit: [] };
+  var tuneLast = null, tuneHeld = 0, tuneGiven = 0, tuneGap = 0;
+  var visQ = [];
+
+  // Songs wait until the newest note has been worked at on its own.
+  //
+  // Three flowers of it, which is what it took to fetch each friend in the
+  // first place. Before that the strip is not there at all and the garden
+  // simply keeps asking for the new note, so she meets it by itself rather
+  // than halfway through a song made of things she has not learned.
+  function tunesOn() {
+    return true;   // second edition: songs from the very first touch
+  }
+
+  function playedNote() {
+    if (MIC.note) { return MIC.note; }
+    if (touchHold >= 0 && MIC.state !== 'on' && friends[touchHold]) {
+      return friends[touchHold].spec.id;
+    }
+    return null;
+  }
+
+  function tuneTick(dt) {
+    var playing = playedNote();
+    if (!playing) {
+      tuneGap += dt;
+      if (tuneGap > 0.2) { tuneLast = null; tuneHeld = 0; tuneGiven = 0; }
+      return;
+    }
+    tuneGap = 0;
+    if (playing !== tuneLast) { tuneLast = playing; tuneHeld = 0; tuneGiven = 0; }
+    tuneHeld += dt;
+
+    if (!tunesOn() || tune.playing) { return; }
+    var notes = TUNES[tune.idx].notes;
+    if (tune.pos >= notes.length || playing !== notes[tune.pos]) { return; }
+
+    // The first score comes after a moment of steady tone. After that a
+    // note only scores again if she keeps holding it, so three Gs in a
+    // row can be tongued apart - or, if she cannot tongue yet, simply sat
+    // on until they tick over. There is no way to be stuck.
+    var due = tuneGiven === 0 ? 0.18 : 0.18 + tuneGiven * 1.1;
+    if (tuneHeld < due) { return; }
+    tuneGiven++;
+    tune.pos++;
+    save.pos = tune.pos;
+    // No chime for a note landing. Anything the garden says goes straight
+    // back into its own microphone and deafens it for a third of a second,
+    // which is most of the gap between two notes of a tune.
+    drawTuneStrip();
+    if (tune.pos >= notes.length) { finishTune(); } else { persist(); }
+  }
+
+  function playThrough(notes, tail, beats) {
+    var i, f, b, at = 0.3, step = 0.40;
+    tune.playing = true;
+    for (i = 0; i < notes.length; i++) {
+      f = friends[noteIndex(notes[i])];
+      b = beats ? beats[i] : 1;
+      recorderNote(at, mtof(f.spec.midi), step * b * 0.92, 0.4);
+      if (AC) { visQ.push({ at: AC.currentTime + at, i: f.i, dur: step * b * 0.82, k: i }); }
+      at += step * b;
+    }
+    tune.nextAt = clock + at + tail;
+    // Nothing else speaks over a song.
+  }
+
+  function finishTune() {
+    tune.advance = true;
+    playThrough(TUNES[tune.idx].notes, 1.7, tuneBeats(tune.idx));
+    burst(L.W * 0.5, L.strip ? L.strip.y + L.strip.h : L.gy[0], '#ffd45c', reduced ? 0 : 22, 260);
+    persist();
+  }
+
+  // Tapping the tune itself plays it through and puts her back at the
+  // start of it. She can hear what she is aiming at as often as she likes,
+  // which is what anyone learning a song does.
+  function replayTune() {
+    if (tune.playing || !tunesOn()) { return; }
+    tune.pos = 0;
+    save.pos = 0;
+    persist();
+    bee.set = false;
+    drawTuneStrip();
+    tune.advance = false;
+    playThrough(TUNES[tune.idx].notes, 0.8, tuneBeats(tune.idx));
+  }
+
+  // Finishing the last song finishes the game. The friends go off in a
+  // shower of the flowers she grew them, and what is left is her garden,
+  // a rainbow over it, and the song still there to play whenever she
+  // likes. Nothing to beat and nowhere further to get to.
+  function finishGame() {
+    var i, f;
+    save.finished = true;
+    for (i = 0; i < friends.length; i++) {
+      f = friends[i];
+      if (!f.present) { continue; }
+      if (!reduced) {
+        burst(L.xs[i], L.gy[i] - 90 * L.scale, f.spec.petal, 18, 280);
+      }
+      f.present = false;
+      f.growth = 0;
+      f.celebrate = 0;
+    }
+    [0, 4, 7, 12, 16, 19, 24].forEach(function (s, k) {
+      bell(0.05 + k * 0.13, 523.25 * Math.pow(2, s / 12), 0.26, 0.95);
+    });
+    persist();
+    computeLayout();
+  }
+
+  function nextTune() {
+    tune.playing = false;
+    if (save.finished || tune.idx >= TUNES.length - 1) {
+      if (!save.finished) { finishGame(); }
+      tune.pos = 0;
+      save.pos = 0;
+      persist();
+      bee.set = false;
+      drawTuneStrip();
+      return;
+    }
+    tune.idx = (tune.idx + 1) % TUNES.length;
+    tune.pos = 0;
+    save.tune = tune.idx;
+    save.pos = 0;
+    // Finishing the last song the first three notes can make is what
+    // fetches the squirrel, and the hill has to be laid out again around
+    // it before anything else is drawn.
+    if (tune.idx >= TUNES_3 && !save.four) {
+      save.four = true;
+      unlockCheck();
+      computeLayout();
+    }
+    persist();
+    bee.set = false;
+    drawTuneStrip();
+    // If the new note still has its practice to do, there is no song to
+    // introduce yet - the garden goes back to asking for it on its own.
+    if (!tunesOn()) { pickAsk(); return; }
+    // A new song gets played through once. Being told only its first note
+    // is no way to meet a tune.
+    tune.advance = false;
+    playThrough(TUNES[tune.idx].notes, 0.9, tuneBeats(tune.idx));
+  }
+
+  function drainVis() {
+    if (!AC) { visQ.length = 0; return; }
+    var now = AC.currentTime;
+    while (visQ.length && visQ[0].at <= now) {
+      var v = visQ.shift();
+      friends[v.i].singUntil = clock + v.dur;
+      friends[v.i].excite = 1;
+      if (typeof v.k === 'number' && tune.discs[v.k]) {
+        bee.tx = tune.discs[v.k].x;
+        bee.ty = tune.discs[v.k].y;
+        // and the note itself lights up under the bee, so it is plain
+        // which one is sounding rather than only where the bee has got to
+        tune.lit[v.k] = clock + v.dur;
+      }
+    }
+  }
+
+  function unlockCheck() {
+    var i, f;
+    for (i = 0; i < friends.length; i++) {
+      f = friends[i];
+      if (shouldBeHere(i) && !f.present) {
+        f.present = true;
+        f.arriving = !reduced;
+        f.arriveT = 0;
+        f.sign.setAttribute('opacity', 1);
+        f.flower.setAttribute('opacity', 1);
+        arriveSound();
+        ask.idx = i;
+        drawHills();
+        drawHits();
+      }
+    }
+  }
+
+  // A full flower stands there and is admired before it is planted. It
+  // used to blink out the instant it filled, which read as losing it.
+  function finish(f) {
+    f.growth = 1;
+    f.celebrate = 1.5;
+    f.excite = 1;
+    // Once there are songs, a finished flower says nothing. The chime
+    // lands in the middle of a tune she is halfway through, and worse, it
+    // goes into the garden's own microphone and deafens it for a second -
+    // which is two notes of the song she is playing.
+    if (!tunesOn()) { sparkleSound(); }
+    var at = flowerSlot(f);
+    burst(at.x, at.y - FULL_H * at.sc, f.shade || f.spec.petal, reduced ? 0 : 18, 250);
+  }
+
+  function plant(f) {
+    var wasSongs = tunesOn();
+    f.celebrate = 0;
+    f.growth = 0;
+    save.garden.push({ i: f.i, k: f.done });
+    f.done++;
+    save.done[f.i] = f.done;
+    save.flowers++;
+    // The next bud starts in the next slot along, so the one just planted
+    // is left standing exactly where she grew it.
+    placeFlower(f);
+    if (save.garden.length > 90) { save.garden.shift(); }
+    persist();
+    drawGarden();
+    unlockCheck();
+    pickAsk();
+    // The tunes arriving makes room for themselves at the foot of the
+    // hill, so the whole thing has to be laid out again - and the very
+    // first song introduces itself the same way every later one does.
+    if (tunesOn() !== wasSongs) { computeLayout(); replayTune(); }
+    paintFlower(f);
+  }
+
+  function computeLook() {
+    var i;
+    for (i = 0; i < friends.length; i++) { if (clock < friends[i].singUntil) { return i; } }
+    if (MIC.note) {
+      for (i = 0; i < friends.length; i++) { if (friends[i].spec.id === MIC.note) { return i; } }
+    }
+    if (touchHold >= 0) { return touchHold; }
+    return -1;
+  }
+
+  function updateFriend(f, dt) {
+    if (!f.present && !f.arriving) { f.node.setAttribute('opacity', 0); return; }
+    f.node.setAttribute('opacity', 1);
+    if (!reduced) { f.bob += dt * 1.6; }
+
+    if (f.arriving) {
+      f.arriveT += dt;
+      if (f.arriveT >= 1.9) { f.arriving = false; }
+    }
+
+    var micMine = MIC.note === f.spec.id;
+    var tapMine = (touchHold === f.i) && MIC.state !== 'on';
+    var mine = micMine || tapMine;
+
+    var open = 0;
+    if (clock < f.singUntil) { open = 1; }
+    else if (micMine) { open = clamp(MIC.level / 0.13, 0.3, 1); }
+    else if (tapMine) { open = 0.85; }
+    f.sing += (open - f.sing) * clamp(dt * 12, 0, 1);
+
+    f.excite += ((mine ? 1 : 0) - f.excite) * clamp(dt * 5, 0, 1);
+    f.hop = ((mine || f.celebrate > 0) && !reduced)
+      ? Math.abs(Math.sin(clock * 6.2)) * 26 * L.scale : f.hop * 0.88;
+
+    // Blowing too hard covers everyone's ears. It costs her nothing.
+    var wantShy = (micMine && hold.shrill) ? 1 : 0;
+    f.shy += (wantShy - f.shy) * clamp(dt * 9, 0, 1);
+    if (wantShy && clock > f.gigUntil) { f.gigUntil = clock + 2.4; giggle(); }
+
+    if (f.celebrate > 0) {
+      f.celebrate -= dt;
+      if (f.celebrate <= 0) { plant(f); }
+    } else {
+      if (micMine && !hold.shrill) {
+        f.growth = clamp(f.growth + growthRate() * dt, 0, 1);
+      } else if (tapMine) {
+        f.growth = clamp(f.growth + dt / 5.5, 0, 1);
+      }
+      if (f.growth >= 1) { finish(f); }
+    }
+
+    var dx = 0, dy = 0;
+    if (lookAt >= 0 && lookAt !== f.i) {
+      dx = clamp((L.xs[lookAt] - L.xs[f.i]) / 260, -1, 1) * 4.5;
+      dy = clamp((L.gy[lookAt] - L.gy[f.i]) / 320, -1, 1) * 3.5;
+    }
+    var k;
+    for (k = 0; k < f.looks.length; k++) {
+      f.looks[k].setAttribute('transform', 'translate(' + dx.toFixed(2) + ',' + dy.toFixed(2) + ')');
+    }
+    if (f.glow) {
+      f.glow.setAttribute('opacity',
+        f.pulse * (reduced ? 0.3 : (0.24 + 0.16 * Math.sin(clock * 2.4))));
+    }
+
+    paintFriend(f);
+    paintFlower(f);
+  }
+
+  function updateUI() {
+    if (micRing) {
+      var lv = clamp(MIC.smooth * 6, 0, 1);
+      micRing.setAttribute('opacity', MIC.state === 'on' ? (0.12 + lv * 0.6) : 0);
+      micRing.setAttribute('transform', 'scale(' + (0.86 + lv * 0.3) + ')');
+    }
+    var p = clamp(resetHold / RESET_HOLD, 0, 1);
+    if (resetRing) {
+      resetRing.setAttribute('stroke-dashoffset', resetCirc * (1 - p));
+    }
+    if (resetBig) {
+      resetBig.setAttribute('opacity', resetting ? 1 : 0);
+      if (bigRing) { bigRing.setAttribute('stroke-dashoffset', bigCirc * (1 - p)); }
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Frame loop
+  // ------------------------------------------------------------------
+  var lastFrame = 0, detectTick = 0, puffNext = 0;
+
+  function frame(now) {
+    var dt = lastFrame ? Math.min(0.05, (now - lastFrame) / 1000) : 0.016;
+    lastFrame = now;
+    clock += dt;
+
+    detectTick += dt;
+    if (detectTick >= 0.033) { listen(); updateHold(detectTick); detectTick = 0; }
+    MIC.smooth += (MIC.level - MIC.smooth) * clamp(dt * 9, 0, 1);
+    lookAt = computeLook();
+
+    if (resetting) {
+      resetHold += dt;
+      if (resetHold >= RESET_HOLD) { doReset(); }
+    }
+    if (cheatHeld && clock > cheatNext) {
+      cheatNext = clock + CHEAT_GAP;
+      cheatStep();
+    }
+
+    drainVis();
+    tuneTick(dt);
+    if (tune.playing && clock > tune.nextAt) {
+      if (tune.advance) {
+        nextTune();
+      } else {
+        tune.playing = false;
+        bee.set = false;
+        drawTuneStrip();
+      }
+    }
+    if (tunesOn() && !tune.playing) {
+      ask.idx = noteIndex(TUNES[tune.idx].notes[tune.pos] || 'B');
+    }
+    litUpStrip();
+    if (beeNode) {
+      var lerp = clamp(dt * 7, 0, 1);
+      if (bee.tx > bee.x + 2) { bee.face = 1; }
+      else if (bee.tx < bee.x - 2) { bee.face = -1; }
+      bee.x += (bee.tx - bee.x) * lerp;
+      bee.y += (bee.ty - bee.y) * lerp;
+      placeBee();
+    }
+
+    // Anything she plays that is not one of the three still stirs the
+    // grass, so the recorder never once makes nothing happen.
+    if (MIC.anyPitch && !MIC.note && clock > puffNext && !reduced) {
+      puffNext = clock + 0.4;
+      burst(rnd(L.W * 0.15, L.W * 0.85), L.gy[2] + 26, '#a9d68a', 5, 130);
+    }
+
+    // The garden no longer sings at her unprompted. It answers what she
+    // plays and what she taps, and the glowing signpost still says which
+    // note is wanted - but it does not interrupt to say it out loud.
+
+    var i, f;
+    for (i = 0; i < friends.length; i++) {
+      f = friends[i];
+      f.pulse += (((ask.idx === i && f.present) ? 1 : 0) - f.pulse) * clamp(dt * 4, 0, 1);
+      placeSign(f);
+      updateFriend(f, dt);
+    }
+    updateParts(dt);
+    updateUI();
+    requestAnimationFrame(frame);
+  }
+
+  // ------------------------------------------------------------------
+  // Input. Three targets the size of a third of the screen each, plus
+  // the microphone switch in the corner for me rather than for her.
+  // ------------------------------------------------------------------
+  svg.addEventListener('pointerdown', function (ev) {
+    initAudio();
+    keepAwake();
+    if (!firstTouch) { firstTouch = true; startMic(); }
+    var t = ev.target;
+    if (!t || !t.closest) { return; }
+    var ui = t.closest('[data-ui]');
+    if (ui) {
+      var which = ui.getAttribute('data-ui');
+      if (which === 'reset') { resetting = true; resetHold = 0; return; }
+      if (which === 'tune') { replayTune(); return; }
+      if (which === 'cheat') {
+        cheatStep();
+        cheatHeld = true;
+        cheatNext = clock + CHEAT_GAP * 1.5;
+        return;
+      }
+      if (which === 'mic') {
+        if (MIC.state === 'on') { stopMic(); }
+        else if (MIC.state !== 'asking') { startMic(); }
+      }
+      return;
+    }
+    // The animal, its signpost and its flower answer for themselves
+    // wherever they are actually drawn; the boxes underneath catch
+    // everything that lands on the bare ground around them.
+    var owner = t.closest('[data-friend]');
+    if (!owner) { return; }
+    var f = friends[+owner.getAttribute('data-friend')];
+    if (!f || !f.present) { return; }
+    sing(f, 1.2);
+    // With no ears, holding a friend does what holding a note would.
+    if (MIC.state !== 'on') { touchHold = f.i; }
+  });
+
+  function release() {
+    if (resetting) {
+      var p = resetHold / RESET_HOLD;
+      if (p >= 0.25 && p < 0.5) {
+        cheatStreak++;
+        if (cheatStreak >= 4 && !cheatOn) {
+          cheatOn = true;
+          [0, 4, 7].forEach(function (s, i) {
+            bell(0.02 + i * 0.07, 880 * Math.pow(2, s / 12), 0.22, 0.35);
+          });
+          drawUI();
+        }
+      } else {
+        cheatStreak = 0;
+      }
+    }
+    touchHold = -1; resetting = false; resetHold = 0; cheatHeld = false;
+  }
+  window.addEventListener('pointerup', release);
+  window.addEventListener('pointercancel', release);
+  svg.addEventListener('contextmenu', function (ev) { ev.preventDefault(); });
+
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) {
+      touchHold = -1;
+      wakeLock = null;   // the browser drops it for us on the way out
+      wakeAsking = false;
+    } else {
+      if (AC && AC.state === 'suspended') { AC.resume(); }
+      keepAwake();
+    }
+  });
+
+  var resizeTimer = 0;
+  window.addEventListener('resize', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(computeLayout, 120);
+  });
+  window.addEventListener('orientationchange', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(computeLayout, 220);
+  });
+  if (window.ResizeObserver) {
+    new window.ResizeObserver(function () {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(computeLayout, 120);
+    }).observe(document.documentElement);
+  }
+
+  load();
+  tune.idx = clamp(save.tune | 0, 0, TUNES.length - 1);
+  tune.pos = clamp(save.pos | 0, 0, TUNES[tune.idx].notes.length - 1);
+  buildFriends();
+  computeLayout();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
