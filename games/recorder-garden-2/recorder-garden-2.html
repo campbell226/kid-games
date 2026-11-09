@@ -1551,6 +1551,11 @@
     save.pos = 0;
     save.four = true;
     save.finished = false;
+    // Reset has to take the earned songs with it, or the selector keeps
+    // everything she had unlocked before.
+    save.best = 0;
+    save.trial = null;
+    menuOpen = false; pad = null; lock = null;
     tune.idx = 0; tune.pos = 0; tune.playing = false; tune.advance = true;
     tuneLast = null; tuneHeld = 0; tuneGiven = 0;
     visQ.length = 0;
