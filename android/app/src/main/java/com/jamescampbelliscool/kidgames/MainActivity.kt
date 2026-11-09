@@ -260,7 +260,15 @@ class MainActivity : Activity() {
         super.onResume()
         web.onResume()
         gpu.inFront(true)
-        Sync.maybeRun(this)
+        // When the sync brings something new, redraw the front door at once
+        // rather than waiting for the next launch. A game being played is
+        // left alone; it picks the change up next time it is opened.
+        Sync.maybeRun(this) {
+            runOnUiThread {
+                val here = web.url?.let(Uri::parse)
+                if (here != null && Site.isHome(here)) web.loadUrl(Site.HOME)
+            }
+        }
         if (!askedToPin) {
             askedToPin = true
             pin()

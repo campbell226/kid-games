@@ -46,6 +46,7 @@ class Site(private val context: Context) {
     // Whatever Sync has brought down since the app was built, else the copy
     // the app was built with.
     private fun read(path: String): ByteArray? {
+        if (Sync.isGone(context, path)) return null
         val synced = File(Sync.overlayDir(context), path)
         if (synced.isFile) {
             try { return synced.readBytes() } catch (e: IOException) { /* fall back to the bundled copy */ }

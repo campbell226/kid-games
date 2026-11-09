@@ -32,7 +32,7 @@ object Sync {
     // Launching the app or waking the screen asks again, but no more often
     // than this. When nothing has changed, the question is one tiny request
     // that GitHub does not count against its hourly allowance.
-    private const val GAP_MS = 2 * 60 * 1000L
+    private const val GAP_MS = 30 * 1000L
 
     private val running = AtomicBoolean(false)
     @Volatile private var lastTry = 0L
@@ -53,17 +53,30 @@ object Sync {
         val snapshot = snapshotId(context)
         if (readState(context).optString("snapshot") == snapshot) return
         overlayDir(context).deleteRecursively()
+        goneCache = null
         writeState(context, JSONObject().put("snapshot", snapshot).put("files", JSONObject()))
     }
 
-    fun maybeRun(context: Context) {
+    /** Paths main no longer has, which must stop being served even though the app was built with them. */
+    @Volatile private var goneCache: Set<String>? = null
+
+    fun isGone(context: Context, path: String): Boolean {
+        val gone = goneCache ?: run {
+            val arr = readState(context).optJSONArray("gone")
+            (0 until (arr?.length() ?: 0)).map { arr!!.getString(it) }.toSet().also { goneCache = it }
+        }
+        return path in gone
+    }
+
+    /** [onChanged] runs on a background thread, only when something was added, changed or removed. */
+    fun maybeRun(context: Context, onChanged: () -> Unit = {}) {
         val now = System.currentTimeMillis()
         if (now - lastTry < GAP_MS || !running.compareAndSet(false, true)) return
         lastTry = now
         val app = context.applicationContext
         thread(name = "sync", isDaemon = true) {
             try {
-                run(app)
+                if (run(app)) onChanged()
             } catch (e: Exception) {
                 // Offline, rate limited, or GitHub having a moment: keep what
                 // is here and try again next time.
@@ -74,7 +87,8 @@ object Sync {
         }
     }
 
-    private fun run(context: Context) {
+    /** True if the games on the phone are now different from before. */
+    private fun run(context: Context): Boolean {
         val state = readState(context)
         val held = state.optJSONObject("files") ?: JSONObject()
 
@@ -85,11 +99,11 @@ object Sync {
             "application/vnd.github.sha",
             state.optString("etag").ifEmpty { null },
         )
-        if (head.code == 304) return
+        if (head.code == 304) return false
         val commit = String(head.body).trim()
         if (commit == state.optString("commit")) {
             writeState(context, state.put("etag", head.etag ?: ""))
-            return
+            return false
         }
 
         // Every file in that commit, with the hash git knows it by.
@@ -104,10 +118,12 @@ object Sync {
         val staging = stagingDir(context)
         staging.deleteRecursively()
         val changed = sortedMapOf<String, String>()
+        val present = HashSet<String>()
         for (i in 0 until entries.length()) {
             val entry = entries.getJSONObject(i)
             val path = entry.getString("path")
             if (entry.getString("type") != "blob" || !inSite(path)) continue
+            present += path
             val sha = entry.getString("sha")
             if (sha == (held.optString(path).ifEmpty { null } ?: bundled[path])) continue
 
@@ -126,9 +142,27 @@ object Sync {
             if (!File(staging, path).renameTo(dest)) throw IOException("could not put $path in place")
             held.put(path, sha)
         }
-        writeState(context, state.put("files", held).put("commit", commit).put("etag", head.etag ?: ""))
+
+        // Anything the phone holds that main no longer has was deleted there.
+        val overlayHeld = held.keys().asSequence().toList()
+        val gone = (bundled.keys + overlayHeld).filter { it !in present }.toSortedSet()
+        val goneBefore = readState(context).optJSONArray("gone")
+            ?.let { a -> (0 until a.length()).map { a.getString(it) }.toSortedSet() } ?: sortedSetOf()
+        for (path in gone) {
+            File(overlay, path).delete()
+            held.remove(path)
+        }
+        val removalsChanged = gone != goneBefore
+
+        writeState(
+            context,
+            state.put("files", held).put("commit", commit).put("etag", head.etag ?: "")
+                .put("gone", org.json.JSONArray(gone.toList()))
+        )
+        goneCache = gone
         staging.deleteRecursively()
-        Log.i(TAG, "synced to $commit: ${changed.size} file(s) changed")
+        Log.i(TAG, "synced to $commit: ${changed.size} file(s) changed, ${gone.size} gone")
+        return changed.isNotEmpty() || removalsChanged
     }
 
     private class Reply(val code: Int, val body: ByteArray, val etag: String?)
