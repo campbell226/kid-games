@@ -124,7 +124,7 @@
     align-items: center; justify-content: center; padding: 0 .3em;
   }
   #cardZoom {
-    flex: none; width: 1.9em; height: 1.9em; border-radius: 50%; border: 0; padding: 0;
+    flex: none; width: 1.7em; height: 1.7em; font-size: inherit; border-radius: 50%; border: 0; padding: 0;
     background: #ffd54a; display: none; align-items: center; justify-content: center; cursor: pointer;
     box-shadow: 0 2px 6px rgba(0,0,0,0.3); animation: pulse 1.4s ease-in-out infinite;
   }
@@ -1660,7 +1660,739 @@
     draw: function (p) { var d = 'M200 512L200 532'; tube(p, d, 6, '#98791e', '#efd24d'); hitLine(p, d, 24); }
   });
 
-  //@@ITEMS6
+  // ==================================================================
+  // BRAIN AND NERVES
+  // ==================================================================
+  var NERV = ['#a8820a', '#f6d34a'];
+  function nerve(p, d, w) { return vessel(p, d, w, NERV); }
+  item('nerves', 'brain', {
+    n: 'Brain', f: 'Your brain thinks, remembers and controls your whole body.',
+    mount: 'head', c: [200, 74], act: 'think', snd: 'think', open: 'brain',
+    draw: function (p) {
+      blob(p, 'M200 42C174 34 150 46 148 66C140 80 150 98 172 100C182 106 196 106 200 100C204 106 218 106 228 100C250 98 260 80 252 66C250 46 226 34 200 42Z', '#f3a6c0', '#a8506a', 2.4);
+      el('path', { 'class': 'dt', d: 'M200 44L200 100M166 54C176 58 178 68 170 72M234 54C224 58 222 68 230 72M160 84C170 82 178 88 176 96M240 84C230 82 222 88 224 96M184 68C190 74 192 82 188 88M216 68C210 74 208 82 212 88', fill: 'none', stroke: '#c9708f', 'stroke-width': 3, 'stroke-linecap': 'round' }, p);
+      blob(p, 'M190 100L210 100L208 130L192 130Z', '#e0a8c0', '#a8506a', 2);
+    }
+  });
+  item('nerves', 'spinalcord', {
+    n: 'Spinal cord', f: 'Your spinal cord is a thick cable of nerves inside your backbone. Messages run up and down it.',
+    mount: 'torso', c: [200, 290], act: 'glow', snd: 'zap', open: 'vertebra',
+    draw: function (p) {
+      var d = 'M200 130L200 410';
+      tube(p, d, 7, '#a8920a', '#f3ec9e');
+      hitLine(p, d, 28);
+      var r = '';
+      for (var y = 226; y < 400; y += 12) { r += 'M200 ' + y + 'L' + (186 - (y > 300 ? 0 : 0)) + ' ' + (y + 6) + 'M200 ' + y + 'L' + 214 + ' ' + (y + 6); }
+      el('path', { d: r, fill: 'none', stroke: '#e6c44a', 'stroke-width': 1.8, 'stroke-linecap': 'round' }, p);
+      var t = 'M200 410C196 430 190 450 186 470M200 410C200 436 200 456 200 478M200 410C204 430 210 450 214 470';
+      el('path', { d: t, fill: 'none', stroke: '#e6c44a', 'stroke-width': 1.8, 'stroke-linecap': 'round' }, p);
+    }
+  });
+  item('nerves', 'vagus', {
+    n: 'Wandering nerve', alt: 'Vagus nerve', f: 'This long nerve wanders from your brain down to your heart, lungs and tummy. It tells them to relax.',
+    mount: 'torso', pair: true, c: [192, 280], act: 'glow', snd: 'zap', count: 2,
+    draw: function (p) { nerve(p, 'M194 132C190 160 190 196 192 230C194 262 196 300 200 340C202 366 212 380 226 384', 3.4); }
+  });
+  item('nerves', 'plexus', {
+    n: 'Shoulder nerves', alt: 'Brachial plexus', f: 'A bundle of nerves leaves your neck and fans out into your arm.',
+    mount: 'torso', pair: true, c: [160, 222], act: 'glow', snd: 'zap', count: 2,
+    draw: function (p) { nerve(p, 'M196 190C176 196 160 208 144 228M196 196C176 206 162 220 134 242M196 184C180 186 164 194 150 214', 3.8); }
+  });
+  item('nerves', 'armnerves', {
+    n: 'Arm nerves', f: 'Three big nerves run down your arm to your hand. Hit your funny bone and you feel one of them.',
+    mount: 'arm', limb: true, pair: true, c: [112, 290], act: 'glow', snd: 'zap', move: 'arm', count: 6,
+    draw: function (p) { nerve(p, 'M128 242C122 272 112 306 105 338M124 242C118 272 108 306 99 338M132 244C126 274 116 308 109 338', 3.4); }
+  });
+  item('nerves', 'forearmnerves', {
+    n: 'Forearm nerves', f: 'Nerves in your forearm carry messages to your hand and back.',
+    mount: 'fore', limb: true, pair: true, c: [95, 390], act: 'glow', snd: 'zap', move: 'elbow', count: 6,
+    draw: function (p) { nerve(p, 'M103 346C102 380 98 410 96 434M98 346C97 380 93 410 90 434M93 346C92 380 88 410 86 432', 3); }
+  });
+  item('nerves', 'handnerves', {
+    n: 'Finger nerves', f: 'Fingertips have lots of tiny nerve endings. That is why they feel so much.',
+    mount: 'hand', limb: true, pair: true, c: [90, 466], act: 'glow', snd: 'zap', move: 'hand', count: 10, open: 'skin',
+    draw: function (p) {
+      var d = '';
+      FING.forEach(function (a) { var r = a * Math.PI / 180; d += 'M90 440L' + f(90 + Math.sin(r) * 38) + ' ' + f(448 + Math.cos(r) * 38); });
+      d += 'M96 442L118 462';
+      nerve(p, d, 2.4);
+      FING.forEach(function (a) { var r = a * Math.PI / 180; dark(p, 'circle', { cx: f(90 + Math.sin(r) * 38), cy: f(448 + Math.cos(r) * 38), r: 3.2, fill: '#fff6b0', stroke: '#a8820a', 'stroke-width': 1 }); });
+    }
+  });
+  item('nerves', 'lumbarnerves', {
+    n: 'Lower back nerves', f: 'Nerves leave your lower back and join up to make the biggest nerve in your body.',
+    mount: 'torso', pair: true, c: [186, 450], act: 'glow', snd: 'zap', count: 2,
+    draw: function (p) { nerve(p, 'M200 420C190 440 182 470 176 500M200 410C192 430 186 450 182 476', 3.6); }
+  });
+  item('nerves', 'sciatic', {
+    n: 'Sciatic nerve', f: 'The sciatic nerve is the longest, thickest nerve you have. It runs all the way down your leg.',
+    mount: 'thigh', limb: true, pair: true, c: [166, 565], act: 'glow', snd: 'zap', move: 'legs', count: 2,
+    draw: function (p) { nerve(p, 'M176 500C170 540 166 580 161 624', 6.4); }
+  });
+  item('nerves', 'legnerves', {
+    n: 'Lower leg nerves', f: 'The sciatic nerve splits in two behind your knee.',
+    mount: 'shin', limb: true, pair: true, c: [158, 690], act: 'glow', snd: 'zap', move: 'knee', count: 4,
+    draw: function (p) { nerve(p, 'M161 628C160 670 158 710 156 740M161 628C150 660 146 700 144 738', 3.6); }
+  });
+  item('nerves', 'footnerves', {
+    n: 'Foot nerves', f: 'Your toes send messages about the ground to your brain, so you can balance.',
+    mount: 'foot', limb: true, pair: true, c: [136, 766], act: 'glow', snd: 'zap', move: 'foot', count: 10,
+    draw: function (p) {
+      var d = 'M152 745C148 756 144 762 140 764';
+      TOES.forEach(function (e) { d += 'M140 764L' + e[0] + ' ' + e[1]; });
+      nerve(p, d, 2.6);
+    }
+  });
+
+  // ==================================================================
+  // SENSES
+  // ==================================================================
+  item('senses', 'eyeballs', {
+    n: 'Eyeballs', f: 'Each eyeball sends pictures to your brain along a nerve.',
+    mount: 'head', pair: true, c: [172, 110], act: 'pupil', snd: 'blink', count: 2, open: 'eye',
+    draw: function (p) {
+      nerve(p, 'M184 106C192 98 196 92 200 88', 2.8);
+      el('circle', { cx: 172, cy: 110, r: 17, fill: '#fff', stroke: '#7c7c8c', 'stroke-width': 2 }, p);
+      el('circle', { cx: 172, cy: 110, r: 9.5, fill: '#4a8ed0' }, p);
+      el('circle', { cx: 172, cy: 110, r: 4.6, fill: '#16100c' }, p);
+      el('circle', { 'class': 'dt', cx: 168, cy: 106, r: 2.4, fill: '#fff' }, p);
+    }
+  });
+  item('senses', 'innerear', {
+    n: 'Inner ear', f: 'Inside your ear is a tiny snail shape that hears, and three loops that help you balance.',
+    mount: 'head', pair: true, c: [150, 108], act: 'wiggle', snd: 'wiggle', count: 2, open: 'ear',
+    draw: function (p) {
+      blob(p, 'M134 90C134 78 156 76 158 88C160 100 150 110 140 106C134 102 134 96 134 90Z', '#ecd8e8', '#8a5a8a', 2);
+      el('path', { d: 'M138 96C138 90 146 88 150 92C154 98 148 104 142 102C138 100 140 96 144 96', fill: 'none', stroke: '#8a5a8a', 'stroke-width': 2, 'stroke-linecap': 'round' }, p);
+      el('path', { d: 'M140 84C140 72 158 72 158 82M150 86C146 76 160 66 166 76', fill: 'none', stroke: '#8a5a8a', 'stroke-width': 3, 'stroke-linecap': 'round' }, p);
+      nerve(p, 'M158 98C170 100 184 96 196 92', 2.2);
+    }
+  });
+  item('senses', 'smell', {
+    n: 'Smell patch', alt: 'Olfactory bulb', f: 'Tiny smell sensors high in your nose send messages to your brain.',
+    mount: 'head', c: [200, 106], act: 'glow', snd: 'sniff', open: 'nose',
+    draw: function (p) {
+      blob(p, 'M184 94C180 86 192 82 196 90C198 96 190 100 184 94Z', '#f6d34a', '#a8820a', 2);
+      blob(p, 'M216 94C220 86 208 82 204 90C202 96 210 100 216 94Z', '#f6d34a', '#a8820a', 2);
+      nerve(p, 'M190 96L192 118M196 96L196 120M204 96L204 120M210 96L208 118', 1.8);
+      [[192, 118], [196, 120], [204, 120], [208, 118]].forEach(function (c) { el('circle', { cx: c[0], cy: c[1], r: 2.6, fill: '#c0364a' }, p); });
+    }
+  });
+  item('senses', 'taste', {
+    n: 'Taste buds', f: 'Thousands of taste buds on your tongue tell you if food is sweet, salty, sour or bitter.',
+    mount: 'head', c: [200, 164], act: 'wriggle', snd: 'giggle', open: 'mouth',
+    draw: function (p) {
+      blob(p, 'M178 158C184 150 216 150 222 158C226 170 214 180 200 180C186 180 174 170 178 158Z', '#ee7f93', '#a83a50', 2.2);
+      [[188, 160], [196, 156], [204, 156], [212, 160], [192, 168], [200, 164], [208, 168], [200, 174], [186, 168], [214, 168]].forEach(function (c) { el('circle', { cx: c[0], cy: c[1], r: 2, fill: '#ffe08a', stroke: '#a83a50', 'stroke-width': 0.8 }, p); });
+    }
+  });
+  item('senses', 'touch', {
+    n: 'Touch', f: 'Your skin can feel soft, rough, hot, cold and tickly. Your fingertips feel the most.',
+    mount: 'hand', limb: true, pair: true, c: [90, 480], act: 'wriggle', snd: 'giggle', move: 'hand', count: 10, open: 'skin',
+    draw: function (p) {
+      FING.forEach(function (a) {
+        var r = a * Math.PI / 180, x = 90 + Math.sin(r) * 36, y = 450 + Math.cos(r) * 36;
+        el('circle', { cx: f(x), cy: f(y), r: 6.5, fill: '#f7c89b', stroke: '#c98f66', 'stroke-width': 1.6 }, p);
+        el('path', { 'class': 'dt', d: 'M' + f(x - 3) + ' ' + f(y) + 'h6M' + f(x - 3) + ' ' + f(y - 2.5) + 'h6M' + f(x - 3) + ' ' + f(y + 2.5) + 'h6', stroke: '#c98f66', 'stroke-width': 0.9 }, p);
+      });
+    }
+  });
+
+  // ==================================================================
+  // CLOSE-UPS
+  // ==================================================================
+  function si(scn, id, o) { o['in'] = scn; return item(null, id, o); }
+  function wob(p, cx, cy, k, tr) { return { transform: 'translate(' + cx + ' ' + cy + ') scale(' + k + ') translate(' + (-cx) + ' ' + (-cy) + ')' }; }
+
+  // ---------- the heart, cut open ----------
+  newScene('heart', { n: 'Heart inside' });
+  (function () {
+    var WALL = '#e8788a', EDGE = '#7f1426', BL = '#5f7fd8', RD = '#e0405a';
+    function chamber(p, d, cx, cy, k, lum) {
+      blob(p, d, WALL, EDGE, 3);
+      el('path', { d: d, fill: lum, stroke: 'none', transform: 'translate(' + cx + ' ' + cy + ') scale(' + k + ') translate(' + (-cx) + ' ' + (-cy) + ')' }, p);
+      el('path', { 'class': 'dt', d: d, fill: 'none', stroke: '#fff', 'stroke-opacity': 0.25, 'stroke-width': 3, transform: 'translate(' + (cx - 4) + ' ' + (cy - 4) + ') scale(' + (k * 0.9) + ') translate(' + (-cx) + ' ' + (-cy) + ')' }, p);
+    }
+    var RA = 'M-98 -30C-98 -58 -66 -66 -42 -54C-26 -46 -16 -30 -14 -8L-14 20C-40 26 -84 26 -98 8Z';
+    var LA = 'M98 -30C98 -58 66 -66 42 -54C26 -46 16 -30 14 -8L14 20C40 26 84 26 98 8Z';
+    var RV = 'M-98 34C-66 40 -32 38 -12 32L-12 74C-12 116 -30 142 -46 152C-82 132 -112 92 -98 34Z';
+    var LV = 'M98 34C66 40 32 38 12 32L12 80C14 124 40 152 66 158C102 142 122 92 98 34Z';
+    SCN.heart.flows = [
+      { scene: 'heart', pts: [[-70, -150], [-70, -40], [-56, 0], [-56, 40], [-50, 90], [-24, 62], [-8, 24], [-8, -90], [-40, -130], [-80, -150]], col: '#9db8ff', n: 9, spd: 100, r: 4.4 },
+      { scene: 'heart', pts: [[150, -52], [98, -34], [56, -10], [56, 40], [64, 104], [32, 70], [10, 30], [10, -90], [60, -150], [112, -140], [140, -90], [140, -30]], col: '#ffb0bc', n: 10, spd: 100, r: 4.4 }
+    ];
+    SCN.heart.idle = function (now, TF) {
+      var ph = (now % 860) / 860, c = pulse(ph), a = pulse((ph + 0.12) % 1);
+      var vv = [0, 0, 0, 1 - 0.07 * c, 1 - 0.07 * c];
+      put(TF, 'rv', vv); put(TF, 'lv', [0, 0, 0, 1 - 0.09 * c, 1 - 0.09 * c]);
+      put(TF, 'ra', [0, 0, 0, 1 - 0.05 * a, 1 - 0.05 * a]); put(TF, 'la', [0, 0, 0, 1 - 0.05 * a, 1 - 0.05 * a]);
+      put(TF, 'doors1', [0, 0, 0, 1, 1 - 0.5 * Math.max(0, pulse((ph + 0.9) % 1))]);
+    };
+    // vessels first, so the chambers sit in front
+    si('heart', 'svc', { n: 'Upper big vein', alt: 'Superior vena cava', f: 'Blue blood from your head and arms comes in here.', c: [-70, -100], act: 'wriggle', snd: 'thump',
+      draw: function (p) { vessel(p, 'M-70 -156L-70 -56', 18, VEN); } });
+    si('heart', 'ivc', { n: 'Lower big vein', alt: 'Inferior vena cava', f: 'Blue blood from your tummy and legs comes in here.', c: [-130, 40], act: 'wriggle', snd: 'thump',
+      draw: function (p) { vessel(p, 'M-130 160L-130 -6C-130 -14 -112 -8 -96 -2', 18, VEN); } });
+    si('heart', 'pulmveins', { n: 'Lung veins', alt: 'Pulmonary veins', f: 'These bring fresh red blood back from your lungs.', c: [130, -34], act: 'wriggle', snd: 'thump',
+      draw: function (p) { vessel(p, 'M170 -16L96 -6M160 -56L96 -32', 12, ART); } });
+    si('heart', 'pulmart', { n: 'Lung artery', alt: 'Pulmonary artery', f: 'This tube takes blue blood to the lungs to get oxygen.', c: [-40, -100], act: 'wriggle', snd: 'thump',
+      draw: function (p) { vessel(p, 'M-8 44L-8 -80C-8 -118 -40 -140 -86 -150M-8 -100C10 -126 40 -140 60 -134', 15, VEN); } });
+    si('heart', 'aortaS', { n: 'Aorta', f: 'The aorta carries red blood from the heart to the whole body.', c: [60, -100], act: 'wriggle', snd: 'thump',
+      draw: function (p) { vessel(p, 'M12 44L12 -80C12 -144 100 -170 134 -106L142 -20', 16, ART); } });
+    si('heart', 'septum', { n: 'Wall in the middle', alt: 'Septum', f: 'A thick wall keeps blue blood and red blood apart.', c: [0, 80], act: 'stretch', snd: 'boop',
+      draw: function (p) { blob(p, 'M-13 30L13 30L13 90C13 124 38 148 62 160L-46 154C-28 140 -13 112 -13 78Z', '#c8586c', EDGE, 3); } });
+    si('heart', 'ra', { n: 'Right atrium', f: 'The right atrium catches blue blood coming back from your body.', c: [-56, -20], act: 'squeeze', snd: 'thump',
+      draw: function (p) { chamber(p, RA, -56, -20, 0.8, BL); } });
+    si('heart', 'la', { n: 'Left atrium', f: 'The left atrium catches fresh red blood from your lungs.', c: [56, -20], act: 'squeeze', snd: 'thump',
+      draw: function (p) { chamber(p, LA, 56, -20, 0.8, RD); } });
+    si('heart', 'rv', { n: 'Right ventricle', f: 'The right ventricle pumps blue blood to your lungs.', c: [-58, 92], act: 'squeeze', snd: 'thump',
+      draw: function (p) { chamber(p, RV, -58, 92, 0.78, BL); } });
+    si('heart', 'lv', { n: 'Left ventricle', f: 'The left ventricle is the strongest part. It pumps red blood all round your body.', c: [62, 100], act: 'squeeze', snd: 'thump',
+      draw: function (p) { chamber(p, LV, 62, 100, 0.66, RD); } });
+    function door(p, x, y, w) {
+      blob(p, 'M' + (x - w) + ' ' + y + 'L' + x + ' ' + (y + w * 0.9) + 'L' + (x + w) + ' ' + y + 'Z', '#fff3cf', '#a8923a', 2.2);
+      el('path', { 'class': 'dt', d: 'M' + x + ' ' + (y + w * 0.9) + 'L' + x + ' ' + (y + w * 1.5), stroke: '#a8923a', 'stroke-width': 1.6, 'stroke-linecap': 'round' }, p);
+    }
+    si('heart', 'doors1', { n: 'Heart doors', alt: 'Tricuspid and mitral valves', f: 'These doors open one way. They go lub when they shut.', c: [0, 30], act: 'shake', snd: 'tap', count: 2, pair: true,
+      draw: function (p) { door(p, -56, 24, 24); } });
+    si('heart', 'doors2', { n: 'Exit doors', alt: 'Pulmonary and aortic valves', f: 'These doors let blood out of the heart and stop it falling back. They go dub.', c: [0, 40], act: 'shake', snd: 'tap', count: 2,
+      draw: function (p) { door(p, -8, 28, 10); door(p, 12, 28, 10); } });
+  })();
+
+  // ---------- the lungs, with their lobes ----------
+  newScene('lung', { n: 'Lungs inside' });
+  (function () {
+    var LOB = ['#f5a9bb', '#f28aa5', '#ee7595', '#f5a9bb', '#ee7595'], EDGE = '#a8506a';
+    function lobe(id, n, f2, c, d, col, snd) {
+      si('lung', id, { n: n, f: f2, c: c, act: 'breathe', snd: snd || 'breath', open: 'alveoli',
+        draw: function (p) {
+          blob(p, d, col, EDGE, 3);
+          el('path', { 'class': 'dt', d: 'M' + (c[0] - 20) + ' ' + (c[1] - 10) + 'q10 -12 24 -6M' + (c[0] + 4) + ' ' + (c[1] + 14) + 'q12 -10 26 -2', fill: 'none', stroke: '#c97088', 'stroke-width': 2.5, 'stroke-linecap': 'round' }, p);
+        } });
+    }
+    lobe('lobeR1', 'Right top lobe', 'Your right lung has three parts, called lobes.', [-90, -60], 'M-14 -96C-56 -120 -122 -100 -152 -50C-158 -36 -158 -22 -156 -10L-90 -4C-60 -12 -30 -20 -14 -24Z', LOB[0]);
+    lobe('lobeR2', 'Right middle lobe', 'This is the smallest lobe, tucked in the middle.', [-90, 20], 'M-156 -10L-90 -4C-60 -12 -30 -20 -14 -24L-14 30C-50 32 -100 40 -164 54C-166 30 -164 10 -156 -10Z', LOB[1]);
+    lobe('lobeR3', 'Right bottom lobe', 'The bottom lobe sits on the diaphragm.', [-86, 90], 'M-164 54C-100 40 -50 32 -14 30L-14 96C-14 116 -30 130 -52 138C-86 150 -132 146 -150 124C-168 100 -170 76 -164 54Z', LOB[2]);
+    lobe('lobeL1', 'Left top lobe', 'Your left lung has two lobes. It is a bit smaller to make room for your heart.', [90, -50], 'M14 -96C56 -120 122 -100 152 -50C166 -16 168 24 160 46C110 52 56 40 28 6C16 -10 14 -50 14 -96Z', LOB[3]);
+    lobe('lobeL2', 'Left bottom lobe', 'Both lungs breathe in and out together.', [90, 96], 'M160 46C168 80 164 108 148 126C130 146 88 150 52 138C30 130 14 116 14 96L14 40C30 36 50 50 74 52C108 56 134 52 160 46Z', LOB[4]);
+    si('lung', 'bronchiS', { n: 'Air tubes', alt: 'Bronchi and bronchioles', f: 'The tubes branch again and again, down to tiny ones as thin as hair.', c: [0, -10], act: 'air', snd: 'whoosh', pair: true, open: 'alveoli',
+      draw: function (p) {
+        var d = 'M-8 -82C-22 -70 -50 -44 -74 -30M-74 -30L-110 -40M-74 -30L-96 -6M-96 -6L-126 4M-96 -6L-104 26M-74 -30L-66 8M-66 8L-84 38M-66 8L-46 30M-110 -40L-138 -58M-110 -40L-130 -24';
+        tube(p, d, 6, AIRC[0], AIRC[1]); hitLine(p, d, 24);
+      } });
+    si('lung', 'tracheaS', { n: 'Windpipe', alt: 'Trachea', f: 'Air comes down the windpipe. Rings of cartilage stop it from squashing flat.', c: [0, -140], act: 'air', snd: 'whoosh',
+      draw: function (p) {
+        var d = 'M0 -190L0 -76';
+        tube(p, d, 22, AIRC[0], AIRC[1]);
+        el('path', { 'class': 'ln dt', d: d, fill: 'none', stroke: '#5f8aa3', 'stroke-opacity': 0.7, 'stroke-width': 22, 'stroke-dasharray': '2.5 9' }, p);
+        hitLine(p, d, 34);
+      } });
+    SCN.lung.flows = [{ scene: 'lung', pts: [[0, -186], [0, -80], [-70, -30], [-100, 10]], col: '#d6f1ff', n: 5, osc: 4.2, spd: 0, r: 4 },
+      { scene: 'lung', pts: [[0, -186], [0, -80], [70, -30], [100, 20]], col: '#d6f1ff', n: 5, osc: 4.2, spd: 0, r: 4 }];
+    SCN.lung.idle = function (now, TF) {
+      var b = 0.5 - 0.5 * Math.cos(2 * Math.PI * flowT / 4.2);
+      ['lobeR1', 'lobeR2', 'lobeR3', 'lobeL1', 'lobeL2'].forEach(function (id) { put(TF, id, [0, 0, 0, 1 + 0.04 * b, 1 + 0.05 * b]); });
+    };
+  })();
+
+  // ---------- the tiniest air sacs ----------
+  newScene('alveoli', { n: 'Air sacs', bg: '#2a2447' });
+  (function () {
+    var POS = [[-94, 10], [-32, 46], [32, 8], [94, 44], [-62, 100], [4, 108], [66, 98]];
+    SCN.alveoli.flows = [
+      { scene: 'alveoli', pts: [[0, -186], [0, -90], [-32, -30], [-32, 40]], col: '#bff3ff', n: 5, spd: 55, r: 4 },
+      { scene: 'alveoli', pts: [[0, -90], [40, -40], [32, 8]], col: '#bff3ff', n: 3, spd: 45, r: 3.6 },
+      { scene: 'alveoli', pts: [[-32, 40], [-80, 76], [-130, 40], [-150, -20], [-60, -120]], col: '#ff7a8a', n: 6, spd: 45, r: 3.6 },
+      { scene: 'alveoli', pts: [[140, 100], [100, 140], [20, 160], [-60, 150], [-130, 120]], col: '#8aa0ff', n: 6, spd: 40, r: 3.6 }
+    ];
+    si('alveoli', 'bronchiole', { n: 'Tiny air tube', alt: 'Bronchiole', f: 'The last tiny tube. Air flows down it to the air sacs.', c: [0, -110], act: 'air', snd: 'whoosh',
+      draw: function (p) { var d = 'M0 -190L0 -86M0 -86L-30 -46M0 -86L34 -40'; tube(p, d, 15, AIRC[0], AIRC[1]); hitLine(p, d, 30); } });
+    si('alveoli', 'sacs', { n: 'Air sacs', alt: 'Alveoli', f: 'You have about 500 million air sacs. Oxygen goes through their thin walls into your blood.', c: [0, 60], act: 'breathe', snd: 'breath',
+      draw: function (p) {
+        POS.forEach(function (q) {
+          el('circle', { cx: q[0], cy: q[1], r: 42, fill: '#fbd5df', stroke: '#c76b86', 'stroke-width': 3 }, p);
+          el('circle', { 'class': 'dt', cx: q[0] - 10, cy: q[1] - 12, r: 9, fill: '#fff', 'fill-opacity': 0.55 }, p);
+        });
+      } });
+    si('alveoli', 'webs', { n: 'Blood web', alt: 'Capillaries', f: 'Tiny blood tubes wrap round each air sac. They pick up oxygen and drop off carbon dioxide.', c: [0, 60], act: 'wriggle', snd: 'thump',
+      draw: function (p) {
+        POS.forEach(function (q, i) {
+          var d = 'M' + (q[0] - 38) + ' ' + (q[1] - 8) + 'C' + (q[0] - 20) + ' ' + (q[1] - 40) + ' ' + (q[0] + 20) + ' ' + (q[1] - 40) + ' ' + (q[0] + 38) + ' ' + (q[1] - 8) +
+            'M' + (q[0] - 36) + ' ' + (q[1] + 14) + 'C' + (q[0] - 16) + ' ' + (q[1] + 40) + ' ' + (q[0] + 16) + ' ' + (q[1] + 40) + ' ' + (q[0] + 36) + ' ' + (q[1] + 14) +
+            'M' + (q[0] - 8) + ' ' + (q[1] - 38) + 'C' + (q[0] - 16) + ' ' + q[1] + ' ' + (q[0] - 12) + ' ' + (q[1] + 24) + ' ' + (q[0] - 4) + ' ' + (q[1] + 40);
+          el('path', { d: d, fill: 'none', stroke: i % 2 ? '#c0364a' : '#6a82d8', 'stroke-width': 4, 'stroke-linecap': 'round', 'class': 'ln' }, p);
+        });
+      } });
+  })();
+
+  // ---------- the brain, side on ----------
+  newScene('brain', { n: 'Brain', bg: '#1c2c52' });
+  (function () {
+    var EDGE = '#6a3a54';
+    function lobe(id, n, f2, c, d, col, snd, act) {
+      si('brain', id, { n: n, f: f2, c: c, act: act || 'think', snd: snd || 'think',
+        draw: function (p) {
+          blob(p, d, col, EDGE, 3);
+          var k = ''; for (var i = 0; i < 5; i++) { k += 'M' + (c[0] - 30 + i * 12) + ' ' + (c[1] - 10 + (i % 2) * 18) + 'q8 -10 16 0q8 10 14 -2'; }
+          el('path', { 'class': 'dt', d: k, fill: 'none', stroke: '#fff', 'stroke-opacity': 0.4, 'stroke-width': 3, 'stroke-linecap': 'round' }, p);
+        } });
+    }
+    SCN.brain.flows = [
+      { scene: 'brain', pts: [[-120, -60], [-60, -80], [-10, -90], [60, -90], [120, -60]], col: '#fff2a0', n: 4, spd: 80, r: 3.4 },
+      { scene: 'brain', pts: [[130, 0], [60, -20], [-10, -20], [-80, 10], [-150, 0]], col: '#fff2a0', n: 4, spd: 90, r: 3.4 },
+      { scene: 'brain', pts: [[20, 170], [24, 100], [-10, 20], [-60, -40], [-130, -60]], col: '#fff2a0', n: 4, spd: 90, r: 3.4 }
+    ];
+    SCN.brain.idle = function (now, TF) {
+      ['frontal', 'parietal', 'temporal', 'occipital'].forEach(function (id, i) { var s = 1 + 0.015 * Math.sin(now / 600 + i * 1.6); put(TF, id, [0, 0, 0, s, s]); });
+    };
+    si('brain', 'brainstem', { n: 'Brain stem', f: 'The brain stem keeps you breathing and your heart beating, even when you sleep.', c: [30, 120], act: 'wobble', snd: 'thump',
+      draw: function (p) { blob(p, 'M8 40L56 40L58 110L46 172L22 172L12 108Z', '#e0a8c0', EDGE, 3); el('path', { 'class': 'dt', d: 'M32 60L32 150', stroke: '#fff', 'stroke-opacity': 0.4, 'stroke-width': 3, 'stroke-linecap': 'round' }, p); } });
+    lobe('temporal', 'Hearing lobe', 'The temporal lobe helps you hear sounds, and remember them.', [-40, 40], 'M-150 38C-110 26 -60 6 -6 -12C40 -16 70 0 90 24C62 64 18 78 -30 70C-80 64 -128 56 -150 38Z', '#9fd4a3', 'ding');
+    lobe('frontal', 'Thinking lobe', 'The frontal lobe is for thinking, planning and deciding.', [-90, -50], 'M-176 8C-178 -54 -136 -104 -72 -116C-48 -120 -26 -112 -10 -100L-6 -16C-40 -8 -60 8 -70 26C-100 34 -152 40 -176 8Z', '#f4a6a6', 'think');
+    lobe('parietal', 'Touch lobe', 'The parietal lobe feels touch and helps you know where your body is.', [50, -66], 'M-10 -100C20 -124 90 -124 124 -88L112 -12C80 -24 40 -28 -6 -18Z', '#f6d98a', 'giggle');
+    lobe('occipital', 'Seeing lobe', 'The occipital lobe, at the back, turns signals from your eyes into pictures.', [132, -20], 'M124 -88C158 -64 172 -20 162 14C152 38 122 40 102 36L112 -12Z', '#9cc4f0', 'sparkle');
+    si('brain', 'cerebellum', { n: 'Balance part', alt: 'Cerebellum', f: 'The cerebellum keeps you steady when you walk, ride a bike or balance on one foot.', c: [112, 74], act: 'wobble', snd: 'boing',
+      draw: function (p) {
+        blob(p, 'M58 54C88 40 140 44 160 68C164 92 134 116 100 112C68 108 50 86 58 54Z', '#c9a6e8', EDGE, 3);
+        for (var i = 0; i < 5; i++) { el('path', { 'class': 'dt', d: 'M' + (66 + i * 4) + ' ' + (62 + i * 11) + 'Q108 ' + (56 + i * 11) + ' ' + (152 - i * 3) + ' ' + (68 + i * 10), fill: 'none', stroke: '#fff', 'stroke-opacity': 0.45, 'stroke-width': 2.6, 'stroke-linecap': 'round' }, p); }
+      } });
+  })();
+
+  // ---------- one nerve cell ----------
+  newScene('neuron', { n: 'Nerve cell', bg: '#1d2748' });
+  (function () {
+    var Y = ['#8a6a0a', '#f6d34a'];
+    SCN.neuron.flows = [
+      { scene: 'neuron', pts: [[-150, -70], [-100, -30], [-60, 0], [-10, 0], [60, 0], [110, 0], [150, 0]], col: '#fff6a8', n: 4, spd: 130, r: 4.5 },
+      { scene: 'neuron', pts: [[-170, 60], [-110, 30], [-60, 6]], col: '#fff6a8', n: 3, spd: 90, r: 3.6 }
+    ];
+    SCN.neuron.idle = function (now, TF) { put(TF, 'soma', [0, 0, 0, 1 + 0.03 * Math.sin(now / 400), 1 + 0.03 * Math.sin(now / 400)]); };
+    si('neuron', 'dendrites', { n: 'Branches', alt: 'Dendrites', f: 'The branches listen. They catch messages from other nerve cells.', c: [-130, 0], act: 'wriggle', snd: 'zap',
+      draw: function (p) {
+        var d = 'M-62 -8C-90 -30 -120 -50 -156 -74M-120 -50L-150 -40M-120 -50L-130 -86M-62 4C-100 10 -130 30 -176 62M-120 20L-134 56M-62 -2C-90 -4 -130 -8 -170 -12M-132 -6L-156 14';
+        tube(p, d, 5, Y[0], Y[1]); hitLine(p, d, 24);
+      } });
+    si('neuron', 'soma', { n: 'Cell body', alt: 'Soma', f: 'The cell body is the nerve cell’s control centre. The nucleus inside holds its instructions.', c: [-44, 0], act: 'squish', snd: 'blop',
+      draw: function (p) {
+        blob(p, 'M-84 -6C-84 -34 -50 -48 -26 -36C0 -26 4 10 -18 32C-40 52 -86 34 -84 -6Z', '#f4b96a', '#9a5a1a', 3);
+        el('circle', { cx: -44, cy: -4, r: 17, fill: '#7a4aa8', stroke: '#4a2a70', 'stroke-width': 2.4 }, p);
+        el('circle', { 'class': 'dt', cx: -49, cy: -9, r: 5, fill: '#c9a0e8' }, p);
+      } });
+    si('neuron', 'axon', { n: 'Long wire', alt: 'Axon', f: 'The axon is a long wire. Messages zip along it faster than a racing car.', c: [90, 0], act: 'glow', snd: 'zap',
+      draw: function (p) { var d = 'M0 0L150 0'; tube(p, d, 8, Y[0], Y[1]); hitLine(p, d, 28); } });
+    si('neuron', 'myelin', { n: 'Insulation', alt: 'Myelin sheath', f: 'Fatty insulation wraps the axon in sausage shapes. It makes messages go much faster.', c: [76, 0], act: 'squish', snd: 'boop',
+      draw: function (p) { for (var i = 0; i < 3; i++) { blob(p, 'M' + (4 + i * 48) + ' -13C' + (10 + i * 48) + ' -19 ' + (38 + i * 48) + ' -19 ' + (44 + i * 48) + ' -13L' + (44 + i * 48) + ' 13C' + (38 + i * 48) + ' 19 ' + (10 + i * 48) + ' 19 ' + (4 + i * 48) + ' 13Z', '#fdf3ea', '#c2a88e', 2.4); } } });
+    si('neuron', 'endfeet', { n: 'Little feet', alt: 'Axon terminals', f: 'At the end, the axon splits into little feet that pass the message on.', c: [166, 0], act: 'wriggle', snd: 'zap',
+      draw: function (p) { var d = 'M150 0C158 -10 166 -26 172 -42M150 0L170 0M150 0C158 10 166 26 172 42'; tube(p, d, 5, Y[0], Y[1]); [[172, -42], [170, 0], [172, 42]].forEach(function (c) { el('circle', { cx: c[0], cy: c[1], r: 8, fill: '#f6d34a', stroke: Y[0], 'stroke-width': 2 }, p); }); hitLine(p, d, 24); } });
+    si('neuron', 'chemicals', { n: 'Message dots', alt: 'Neurotransmitters', f: 'Tiny chemical dots carry the message across the gap to the next cell.', c: [180, 0], act: 'wriggle', snd: 'sparkle',
+      draw: function (p) { for (var i = 0; i < 9; i++) { el('circle', { cx: 168 + (i % 3) * 9, cy: -30 + Math.floor(i / 3) * 30, r: 3.4, fill: '#7fe0ff', stroke: '#2a8fb0', 'stroke-width': 1 }, p); } } });
+  })();
+
+  function wave(x0, x1, y, amp, n) { var a = []; for (var i = 0; i <= n; i++) { var x = x0 + (x1 - x0) * i / n; a.push([x, y + Math.sin(i * 1.3) * amp]); } return a; }
+  function spiral(cx, cy, r0, turns, n) {
+    var d = '';
+    for (var i = 0; i <= n; i++) {
+      var t = i / n, a = t * turns * 2 * Math.PI, r = r0 * (1 - 0.8 * t);
+      d += (i ? 'L' : 'M') + f(cx + Math.cos(a) * r) + ' ' + f(cy + Math.sin(a) * r);
+    }
+    return d;
+  }
+
+  // ---------- the ear ----------
+  newScene('ear', { n: 'Ear inside', bg: '#241c44' });
+  (function () {
+    SCN.ear.flows = [
+      { scene: 'ear', pts: wave(-196, -30, -4, 12, 14), col: '#b8f0ff', n: 5, spd: 120, r: 3.6 },
+      { scene: 'ear', pts: wave(-196, -30, 8, 12, 14), col: '#b8f0ff', n: 4, spd: 110, r: 3 },
+      { scene: 'ear', pts: [[130, 40], [160, 30], [196, 10]], col: '#fff6a8', n: 3, spd: 70, r: 3.6 }
+    ];
+    SCN.ear.idle = function (now, TF) {
+      var w = Math.sin(now / 55);
+      put(TF, 'eardrum', [0, 0, 0, 1 + 0.35 * w, 1]);
+      put(TF, 'malleus', [0, 0, 1.6 * w, 1, 1]); put(TF, 'incus', [0, 0, -1.6 * w, 1, 1]); put(TF, 'stapes', [0, 0, 2 * w, 1, 1]);
+    };
+    si('ear', 'eustachian', { n: 'Ear-to-throat tube', alt: 'Eustachian tube', f: 'This tube joins your ear to your throat. It pops when you yawn or go up a hill.', c: [0, 100], act: 'squish', snd: 'boop',
+      draw: function (p) { var d = 'M36 40C20 80 -10 120 -50 160'; tube(p, d, 14, '#a85a6a', '#f2b8c0'); hitLine(p, d, 28); } });
+    si('ear', 'canals', { n: 'Balance loops', alt: 'Semicircular canals', f: 'Three loops of liquid tell your brain when you spin, tip or tumble. That is how you balance.', c: [100, -70], act: 'wobble', snd: 'wiggle',
+      draw: function (p) {
+        [-20, 40, 100].forEach(function (a) { el('ellipse', { cx: 100, cy: -74, rx: 42, ry: 17, fill: 'none', stroke: '#7a5a9a', 'stroke-width': 11, transform: 'rotate(' + a + ' 100 -74)', 'class': 'ln' }, p); });
+        [-20, 40, 100].forEach(function (a) { el('ellipse', { cx: 100, cy: -74, rx: 42, ry: 17, fill: 'none', stroke: '#d9c2f0', 'stroke-width': 6, transform: 'rotate(' + a + ' 100 -74)', 'class': 'ln' }, p); });
+        hitLine(p, 'M60 -74L140 -74', 40);
+      } });
+    si('ear', 'cochlea', { n: 'Snail shell', alt: 'Cochlea', f: 'The cochlea is filled with liquid and tiny hairs. Sound makes them wiggle and they send messages to your brain.', c: [108, 50], act: 'wobble', snd: 'sparkle',
+      draw: function (p) { var d = spiral(108, 50, 48, 2.4, 70); tube(p, d, 15, '#a8506a', '#f2a0b8'); hitLine(p, d, 24); } });
+    si('ear', 'earnerve', { n: 'Hearing nerve', alt: 'Auditory nerve', f: 'This nerve carries sound messages to your brain.', c: [165, 30], act: 'glow', snd: 'zap',
+      draw: function (p) { var d = 'M130 44C150 36 170 28 196 12'; tube(p, d, 11, '#a8820a', '#f6d34a'); hitLine(p, d, 26); } });
+    si('ear', 'stapes', { n: 'Stirrup', alt: 'Stapes', f: 'The stirrup is the smallest bone in your whole body. It is about the size of a grain of rice.', c: [46, 12], act: 'shake', snd: 'tap',
+      draw: function (p) { el('path', { d: 'M36 4C34 22 52 26 54 10', fill: 'none', stroke: BONE_D, 'stroke-width': 9, 'stroke-linecap': 'round', 'class': 'ln' }, p); el('path', { d: 'M36 4C34 22 52 26 54 10', fill: 'none', stroke: BONE, 'stroke-width': 5, 'stroke-linecap': 'round', 'class': 'ln' }, p); bshape(p, 'ellipse', { cx: 58, cy: 12, rx: 3.5, ry: 11 }); } });
+    si('ear', 'incus', { n: 'Anvil', alt: 'Incus', f: 'The anvil passes the wobbles from the hammer to the stirrup.', c: [28, -12], act: 'shake', snd: 'tap',
+      draw: function (p) { bshape(p, 'path', { d: 'M18 -28C32 -38 44 -24 40 -8L36 4C32 8 28 6 28 2L28 -6C24 -10 20 -12 18 -16Z' }); } });
+    si('ear', 'malleus', { n: 'Hammer', alt: 'Malleus', f: 'The hammer is stuck to your eardrum. It taps when the drum wobbles.', c: [0, -14], act: 'shake', snd: 'tap',
+      draw: function (p) { bshape(p, 'path', { d: 'M-18 -4L8 -32C12 -38 22 -34 20 -26L-2 4C-8 8 -16 4 -18 -4Z' }); bshape(p, 'circle', { cx: 16, cy: -30, r: 7 }); } });
+    si('ear', 'eardrum', { n: 'Eardrum', f: 'Sound makes your eardrum wobble, just like a real drum.', c: [-22, 0], act: 'shake', snd: 'boop',
+      draw: function (p) { el('ellipse', { cx: -22, cy: 0, rx: 6, ry: 30, fill: '#f4c6c6', 'fill-opacity': 0.9, stroke: '#b06a6a', 'stroke-width': 2.4 }, p); } });
+    si('ear', 'canal', { n: 'Ear tunnel', alt: 'Ear canal', f: 'Sound travels down this tunnel. Earwax keeps it clean.', c: [-76, 0], act: 'stretch', snd: 'boop',
+      draw: function (p) { el('path', { d: 'M-128 -16L-22 -26L-22 26L-128 16Z', fill: '#c98f66', stroke: '#8a5a3a', 'stroke-width': 3, 'stroke-linejoin': 'round' }, p); el('path', { d: 'M-122 -8L-26 -16L-26 16L-122 8Z', fill: '#4a2a28' }, p); [[-90, -10], [-60, -12], [-90, 10], [-60, 12]].forEach(function (c) { el('circle', { 'class': 'dt', cx: c[0], cy: c[1], r: 3, fill: '#e8c060' }, p); }); } });
+    si('ear', 'pinna', { n: 'Outer ear', alt: 'Pinna', f: 'Your outer ear is shaped like a funnel to catch sounds.', c: [-160, -10], act: 'wiggle', snd: 'wiggle',
+      draw: function (p) {
+        el('path', { 'class': 'skf sko', 'stroke-width': 4, 'stroke-linejoin': 'round', d: 'M-130 -78C-152 -122 -200 -104 -194 -50C-190 -18 -170 8 -160 32C-152 50 -134 48 -128 30L-124 12L-124 -14Z' }, p);
+        el('path', { 'class': 'skd dt', d: 'M-136 -58C-152 -82 -176 -72 -172 -48C-170 -28 -154 -8 -146 14C-140 26 -134 22 -132 12Z' }, p);
+      } });
+  })();
+
+  // ---------- the mouth ----------
+  newScene('mouth', { n: 'Mouth', bg: '#5a1a2e' });
+  (function () {
+    var TW = '#fffdf4', TE = '#cbc3aa', XS = [14, 42, 72, 104, 130];
+    function ty(x, up) { var k = Math.pow(x / 140, 2) * 46; return up ? -44 - k : 44 + k; }
+    function tooth(p, x, up, kind) {
+      var w = [26, 24, 24, 30, 32][kind], h = [38, 34, 40, 32, 30][kind], y = ty(x, up), top = up ? y - h : y;
+      var g = el('g', { transform: 'translate(' + x + ' ' + f(y) + ') rotate(' + f((up ? 1 : -1) * x * 0.05) + ') translate(' + (-x) + ' ' + f(-y) + ')' }, p);
+      var d = kind === 2 ? 'M' + (x - w / 2) + ' ' + f(up ? y - h : y + h) + 'Q' + x + ' ' + f(up ? y - h - 8 : y + h + 8) + ' ' + (x + w / 2) + ' ' + f(up ? y - h : y + h) + 'L' + (x + w / 2 - 3) + ' ' + f(y) + 'L' + (x - w / 2 + 3) + ' ' + f(y) + 'Z'
+        : 'M' + (x - w / 2) + ' ' + f(y) + 'L' + (x - w / 2) + ' ' + f(up ? y - h + 6 : y + h - 6) + 'Q' + (x - w / 2) + ' ' + f(up ? y - h : y + h) + ' ' + (x - w / 2 + 6) + ' ' + f(up ? y - h : y + h) + 'L' + (x + w / 2 - 6) + ' ' + f(up ? y - h : y + h) + 'Q' + (x + w / 2) + ' ' + f(up ? y - h : y + h) + ' ' + (x + w / 2) + ' ' + f(up ? y - h + 6 : y + h - 6) + 'L' + (x + w / 2) + ' ' + f(y) + 'Z';
+      blob(g, d, TW, TE, 2.4);
+      el('path', { 'class': 'dt', d: 'M' + (x - w / 4) + ' ' + f(up ? y - h + 8 : y + h - 8) + 'L' + (x - w / 4) + ' ' + f(up ? y - h * 0.55 : y + h * 0.55), stroke: '#fff', 'stroke-width': 3, 'stroke-linecap': 'round', opacity: 0.8 }, g);
+    }
+    function teeth(p, kinds) { [1, -1].forEach(function (sg) { kinds.forEach(function (k) { [true, false].forEach(function (up) { tooth(p, sg * XS[k], up, k); }); }); }); }
+    SCN.mouth.idle = function (now, TF) { put(TF, 'tongueM', [0, 0, 0, 1 + 0.02 * Math.sin(now / 700), 1 + 0.03 * Math.sin(now / 560)]); };
+    si('mouth', 'uvula', { n: 'Dangly bit', alt: 'Uvula', f: 'The uvula hangs at the back of your throat. It helps with swallowing and talking.', c: [0, -20], act: 'swallow', snd: 'gulp',
+      draw: function (p) { blob(p, 'M-9 -80L9 -80C11 -52 7 -26 0 -20C-7 -26 -11 -52 -9 -80Z', '#e87f8f', '#8a2a3a', 2.4); } });
+    si('mouth', 'tonsils', { n: 'Tonsils', f: 'Tonsils are at the back of your throat. They help to catch germs.', c: [66, -4], act: 'squish', snd: 'blop', pair: true, count: 2,
+      draw: function (p) { blob(p, 'M-84 -34C-96 -34 -100 -12 -90 0C-80 10 -66 -2 -68 -20C-68 -30 -76 -34 -84 -34Z', '#e87f8f', '#8a2a3a', 2.4); el('circle', { 'class': 'dt', cx: -84, cy: -16, r: 3, fill: '#c05a6a' }, p); } });
+    si('mouth', 'tongueM', { n: 'Tongue', f: 'Your tongue is a strong muscle covered in thousands of taste buds.', c: [0, 40], act: 'wriggle', snd: 'giggle',
+      draw: function (p) {
+        blob(p, 'M-72 34C-72 -16 72 -16 72 34C72 92 42 134 0 134C-42 134 -72 92 -72 34Z', '#ee7f93', '#a83a50', 3.5);
+        el('path', { 'class': 'dt', d: 'M0 -4L0 100', stroke: '#c0506a', 'stroke-width': 3, 'stroke-linecap': 'round' }, p);
+        for (var i = 0; i < 26; i++) { dark(p, 'circle', { cx: f(Math.sin(i * 2.4) * 46), cy: f(24 + (i * 37) % 90), r: 3, fill: '#f8b6c4' }); }
+        for (var j = 0; j < 8; j++) { dark(p, 'circle', { cx: f(Math.sin(j * 3.1) * 40), cy: f(34 + j * 11), r: 2.2, fill: '#ffe08a', stroke: '#a83a50', 'stroke-width': 0.8 }); }
+      } });
+    si('mouth', 'gums', { n: 'Gums', f: 'Gums hold your teeth in place. Brushing keeps them healthy.', c: [0, -64], act: 'squish', snd: 'boop',
+      draw: function (p) {
+        el('path', { d: 'M-160 -34C-170 -150 170 -150 160 -34L120 -30C120 -96 -120 -96 -120 -30Z', fill: '#f090a0', stroke: '#a83a50', 'stroke-width': 3, 'stroke-linejoin': 'round' }, p);
+        el('path', { d: 'M-160 34C-170 150 170 150 160 34L120 30C120 96 -120 96 -120 30Z', fill: '#f090a0', stroke: '#a83a50', 'stroke-width': 3, 'stroke-linejoin': 'round' }, p);
+      } });
+    si('mouth', 'incisors', { n: 'Front teeth', alt: 'Incisors', f: 'Your front teeth are sharp and flat. They bite and cut food.', c: [0, 0], act: 'chatter', snd: 'chatter', count: 8, open: 'tooth',
+      draw: function (p) { teeth(p, [0, 1]); } });
+    si('mouth', 'canines', { n: 'Pointy teeth', alt: 'Canines', f: 'Your pointy teeth tear food, like a lion’s fangs.', c: [0, 0], act: 'chatter', snd: 'chatter', count: 4, open: 'tooth',
+      draw: function (p) { teeth(p, [2]); } });
+    si('mouth', 'molars', { n: 'Back teeth', alt: 'Molars', f: 'Your wide back teeth squash and grind food.', c: [0, 0], act: 'chatter', snd: 'chatter', count: 8, open: 'tooth',
+      draw: function (p) { teeth(p, [3, 4]); } });
+  })();
+
+  // ---------- inside a tooth ----------
+  newScene('tooth', { n: 'Tooth inside', bg: '#2b1f3e' });
+  (function () {
+    var OUT = 'M-75 -50C-80 -110 -60 -150 -30 -150C-10 -150 -5 -128 0 -128C5 -128 10 -150 30 -150C60 -150 80 -110 75 -50C74 0 66 70 50 130C44 150 30 150 26 130C20 90 12 40 0 10C-12 40 -20 90 -26 130C-30 150 -44 150 -50 130C-66 70 -74 0 -75 -50Z';
+    SCN.tooth.flows = [
+      { scene: 'tooth', pts: [[-20, 160], [-24, 90], [-20, 0], [-10, -70]], col: '#ff7a8a', n: 4, spd: 40, r: 3.4 },
+      { scene: 'tooth', pts: [[24, 160], [24, 90], [20, 0], [10, -70]], col: '#ff7a8a', n: 4, spd: 40, r: 3.4 }
+    ];
+    si('tooth', 'jawbone', { n: 'Jaw bone', f: 'Strong bone holds the roots of your teeth firmly.', c: [0, 120], act: 'rattle', snd: 'clack',
+      draw: function (p) {
+        bshape(p, 'path', { d: 'M-196 -14C-120 -8 -90 -10 -72 -12C-74 40 -64 100 -48 140C-40 156 -30 156 -26 140C-20 100 -12 54 0 24C12 54 20 100 26 140C30 156 40 156 48 140C64 100 74 40 72 -12C90 -10 120 -8 196 -14L196 196L-196 196Z', fill: '#efe1c0', stroke: BONE_D, 'stroke-width': 3 });
+        for (var i = 0; i < 14; i++) { dark(p, 'circle', { cx: f(-170 + (i * 57) % 340), cy: f(30 + (i * 41) % 150), r: 3 + (i % 3), fill: '#d8c79e' }); }
+      } });
+    si('tooth', 'dentine', { n: 'Tooth middle', alt: 'Dentine', f: 'Under the shiny white is a layer of dentine. It is a bit softer, and yellowish.', c: [0, 0], act: 'squish', snd: 'boop',
+      draw: function (p) { blob(p, OUT, '#f3dd98', '#b59a45', 3); } });
+    si('tooth', 'pulp', { n: 'Tooth nerve', alt: 'Pulp', f: 'The soft middle has a nerve and blood tubes. That is why teeth can feel hot and cold.', c: [0, -50], act: 'glow', snd: 'zap',
+      draw: function (p) {
+        blob(p, 'M-36 -66C-38 -102 -18 -110 0 -104C18 -110 38 -102 36 -66C34 -44 22 -34 16 -20L8 -20L0 -34L-8 -20L-16 -20C-22 -34 -34 -44 -36 -66Z', '#f6a0b6', '#b8506a', 2.4);
+        var c1 = 'M-12 -22C-16 20 -22 80 -24 140', c2 = 'M12 -22C16 20 22 80 24 140';
+        tube(p, c1 + c2, 9, '#b8506a', '#f6a0b6');
+        el('path', { 'class': 'dt', d: 'M-14 -60C-14 -20 -20 60 -22 140M-8 -60C-8 -20 -14 60 -16 140', fill: 'none', stroke: '#d9364f', 'stroke-width': 2 }, p);
+        el('path', { 'class': 'dt', d: 'M14 -60C14 -20 20 60 22 140M8 -60C8 -20 14 60 16 140', fill: 'none', stroke: '#f6d34a', 'stroke-width': 2 }, p);
+        hitLine(p, 'M0 -90L0 130', 40);
+      } });
+    si('tooth', 'gumT', { n: 'Gum', f: 'The gum hugs the neck of your tooth and keeps germs out.', c: [-110, -34], act: 'squish', snd: 'boop', pair: true, count: 2,
+      draw: function (p) { blob(p, 'M-196 -62C-150 -66 -104 -64 -78 -54L-72 -14C-100 -6 -150 -8 -196 -14Z', '#f090a0', '#a83a50', 3); shine(p, 'M-170 -48C-140 -52 -110 -52 -90 -46', 3, 0.5); } });
+    si('tooth', 'enamel', { n: 'Enamel', f: 'Enamel is the hardest thing in your body. It is a shiny coat that guards your tooth.', c: [0, -120], act: 'glow', snd: 'sparkle',
+      draw: function (p) {
+        var d = 'M-75 -50C-80 -110 -60 -150 -30 -150C-10 -150 -5 -128 0 -128C5 -128 10 -150 30 -150C60 -150 80 -110 75 -50';
+        tube(p, d, 20, '#c9c2aa', '#fffef6'); hitLine(p, d, 30);
+        el('path', { 'class': 'dt', d: 'M-62 -76C-64 -104 -54 -128 -38 -134', fill: 'none', stroke: '#fff', 'stroke-width': 5, 'stroke-linecap': 'round' }, p);
+      } });
+  })();
+
+  // ---------- the kidney, cut in half ----------
+  newScene('kidney', { n: 'Kidney inside', bg: '#2a1f38' });
+  (function () {
+    var BEAN = 'M-20 -150C70 -160 150 -90 140 10C132 100 70 160 -10 150C-70 140 -90 90 -60 50C-80 30 -90 -10 -60 -40C-86 -80 -80 -140 -20 -150Z';
+    SCN.kidney.flows = [
+      { scene: 'kidney', pts: [[-196, -52], [-130, -30], [-70, -10], [-30, -10]], col: '#ff7a8a', n: 4, spd: 60, r: 3.8 },
+      { scene: 'kidney', pts: [[-30, 20], [-70, 16], [-130, 24], [-196, 34]], col: '#8aa0ff', n: 4, spd: 60, r: 3.8 },
+      { scene: 'kidney', pts: [[30, -40], [0, -10], [-30, 6], [-60, 10], [-96, 40], [-108, 100], [-102, 170]], col: '#f6d93a', n: 5, spd: 40, r: 3.6 }
+    ];
+    SCN.kidney.idle = function (now, TF) { var s = 1 + 0.018 * Math.sin(now / 500); put(TF, 'cortex', [0, 0, 0, s, s]); };
+    si('kidney', 'cortex', { n: 'Kidney skin', alt: 'Cortex', f: 'The outer layer of the kidney is full of tiny filters. Each kidney has about a million.', c: [60, 0], act: 'squeeze', snd: 'blop', open: 'nephron',
+      draw: function (p) { blob(p, BEAN, '#b8505e', '#6e2432', 4); shine(p, 'M0 -134C60 -138 120 -100 130 -40', 5, 0.3); } });
+    si('kidney', 'pyramids', { n: 'Wee-making cones', alt: 'Medulla', f: 'These cones collect wee from all the little filters and funnel it to the middle.', c: [40, 0], act: 'wobble', snd: 'blop', open: 'nephron',
+      draw: function (p) {
+        [[-2, -90, 14, -30], [70, -80, 44, -26], [112, -22, 56, -8], [100, 50, 50, 20], [50, 104, 26, 36], [-14, 96, 2, 30], [-14, -90, 0, -30]].forEach(function (q) {
+          var d = 'M' + q[0] + ' ' + q[1] + 'L' + (q[0] + (q[1] < 0 ? 20 : -6)) + ' ' + (q[1] + 8) + 'L' + q[2] + ' ' + q[3] + 'Z';
+          blob(p, d, '#8a2f45', '#5a1a2a', 2.4);
+        });
+        [[-2, -90, 14, -30], [112, -22, 56, -8], [50, 104, 26, 36]].forEach(function (q) { el('path', { 'class': 'dt', d: 'M' + (q[0] + 10) + ' ' + (q[1] + 8) + 'L' + (q[2] + 8) + ' ' + q[3], stroke: '#d98a9a', 'stroke-width': 2, 'stroke-dasharray': '3 4' }, p); });
+      } });
+    si('kidney', 'pelvisK', { n: 'Wee collector', alt: 'Renal pelvis', f: 'Wee gathers here, in the middle, before it heads for the bladder.', c: [0, 4], act: 'fill', snd: 'drip',
+      draw: function (p) { blob(p, 'M-70 6C-40 -34 28 -50 50 -20C60 0 40 30 10 24C-10 20 -30 34 -70 6Z', '#f3dd5a', '#a08a1f', 3); shine(p, 'M-40 -4C-20 -22 10 -30 30 -20', 3, 0.6); } });
+    si('kidney', 'ureterK', { n: 'Wee tube', alt: 'Ureter', f: 'Wee leaves down this tube to the bladder.', c: [-96, 100], act: 'wriggle', snd: 'drip',
+      draw: function (p) { var d = 'M-50 12C-90 34 -112 90 -104 190'; tube(p, d, 15, '#a08a1f', '#f3dd5a'); hitLine(p, d, 28); } });
+    si('kidney', 'renalA', { n: 'Kidney artery', f: 'Red blood arrives to be cleaned.', c: [-130, -34], act: 'wriggle', snd: 'thump',
+      draw: function (p) { vessel(p, 'M-196 -54L-110 -34C-90 -28 -70 -20 -40 -14', 12, ART); } });
+    si('kidney', 'renalV', { n: 'Kidney vein', f: 'Clean blood leaves in this vein.', c: [-130, 30], act: 'wriggle', snd: 'thump',
+      draw: function (p) { vessel(p, 'M-196 36L-110 24C-90 20 -70 14 -40 14', 12, VEN); } });
+  })();
+
+  // ---------- a tiny filter ----------
+  newScene('nephron', { n: 'Tiny filter', bg: '#2a2040' });
+  (function () {
+    SCN.nephron.flows = [
+      { scene: 'nephron', pts: [[-196, -130], [-150, -116], [-120, -100]], col: '#ff7a8a', n: 3, spd: 40, r: 3.4 },
+      { scene: 'nephron', pts: [[-100, -88], [-70, -100], [-40, -80], [-60, -20], [-70, 40], [-100, 100]], col: '#8aa0ff', n: 4, spd: 40, r: 3.2 },
+      { scene: 'nephron', pts: [[-120, -42], [-130, -20], [-110, 0], [-124, 24], [-116, 56], [-80, 150], [-30, 150], [-4, 60], [30, 30], [60, -10], [70, -50], [90, -70], [90, 40], [90, 170]], col: '#f6d93a', n: 8, spd: 50, r: 3.2 }
+    ];
+    var TB = ['#a08a1f', '#f3dd5a'];
+    si('nephron', 'collect', { n: 'Collecting pipe', alt: 'Collecting duct', f: 'Wee from many filters runs into one big pipe.', c: [90, 40], act: 'wriggle', snd: 'drip',
+      draw: function (p) { var d = 'M60 -10C68 -50 90 -70 90 -70L90 180'; tube(p, d, 16, TB[0], TB[1]); hitLine(p, d, 28); } });
+    si('nephron', 'loopH', { n: 'Long loop', alt: 'Loop of Henle', f: 'The tube makes a long loop. It saves water your body needs, so you do not dry out.', c: [-46, 100], act: 'wriggle', snd: 'drip',
+      draw: function (p) { var d = 'M-116 56L-80 150L-30 150L-4 60L30 30'; tube(p, d, 12, TB[0], TB[1]); hitLine(p, d, 26); } });
+    si('nephron', 'tubuleP', { n: 'Twisty tube', alt: 'Proximal tubule', f: 'The twisty tube takes back the good stuff your body wants to keep, like sugar and water.', c: [-122, -16], act: 'wriggle', snd: 'drip',
+      draw: function (p) { var d = 'M-120 -42C-150 -26 -96 -6 -122 12C-150 30 -100 44 -116 56'; tube(p, d, 12, TB[0], TB[1]); hitLine(p, d, 26); } });
+    si('nephron', 'tubuleD', { n: 'Finishing tube', alt: 'Distal tubule', f: 'This tube does the last bit of fine-tuning.', c: [50, 0], act: 'wriggle', snd: 'drip',
+      draw: function (p) { var d = 'M30 30C56 24 44 -4 66 -12C84 -20 66 -40 84 -64'; tube(p, d, 11, TB[0], TB[1]); hitLine(p, d, 26); } });
+    si('nephron', 'capsule', { n: 'Filter cup', alt: 'Bowman’s capsule', f: 'Blood is squeezed against this cup. Water and waste go through. Blood cells stay in.', c: [-120, -92], act: 'squeeze', snd: 'blop',
+      draw: function (p) { blob(p, 'M-120 -148C-158 -148 -170 -112 -158 -84C-150 -62 -134 -48 -120 -44C-106 -48 -90 -62 -82 -84C-70 -112 -82 -148 -120 -148Z', '#f3dd5a', '#a08a1f', 3.5); shine(p, 'M-148 -112C-146 -130 -134 -138 -122 -138', 4, 0.6); } });
+    si('nephron', 'glomerulus', { n: 'Blood ball', alt: 'Glomerulus', f: 'A tiny ball of blood tubes is the filter. It cleans your blood.', c: [-120, -96], act: 'wobble', snd: 'thump',
+      draw: function (p) {
+        el('circle', { cx: -120, cy: -96, r: 32, fill: '#e0405a', stroke: '#7f1426', 'stroke-width': 3 }, p);
+        el('path', { 'class': 'dt', d: 'M-140 -110C-120 -130 -98 -108 -120 -96C-142 -84 -112 -62 -98 -84M-136 -84C-120 -96 -146 -112 -128 -118', fill: 'none', stroke: '#ffb0bc', 'stroke-width': 3, 'stroke-linecap': 'round' }, p);
+        vessel(p, 'M-196 -134L-150 -118', 9, ART); vessel(p, 'M-100 -86C-70 -100 -50 -82 -54 -50', 7, VEN);
+      } });
+  })();
+
+  // ---------- the stomach, cut open ----------
+  newScene('stomach', { n: 'Stomach inside', bg: '#3a2030' });
+  (function () {
+    var ST = 'M-30 -150C20 -176 110 -150 140 -70C170 6 156 100 100 140C50 176 -34 166 -80 124C-110 94 -110 60 -76 54C-44 54 -34 36 -34 4C-34 -44 -66 -80 -30 -150Z';
+    SCN.stomach.flows = [
+      { scene: 'stomach', pts: [[-56, -196], [-48, -140], [-20, -90], [30, -50], [80, -10], [100, 50], [60, 100], [0, 110], [-60, 100], [-100, 90]], col: '#ffc58a', n: 7, spd: 40, r: 4 },
+      { scene: 'stomach', pts: [[110, -40], [80, 20], [40, 60], [-10, 70]], col: '#caff7a', n: 4, spd: 30, r: 3 }
+    ];
+    SCN.stomach.idle = function (now, TF) { var s = 0.03 * Math.sin(now / 500); put(TF, 'mush', [0, 0, 0, 1 + s, 1 - s]); put(TF, 'smwall', [0, 0, 0, 1 - s * 0.4, 1 + s * 0.4]); };
+    si('stomach', 'oesTop', { n: 'Food pipe door', alt: 'Cardiac sphincter', f: 'A ring of muscle lets food in and keeps it from coming back up.', c: [-48, -150], act: 'squeeze', snd: 'gulp',
+      draw: function (p) { var d = 'M-62 -196L-46 -138'; tube(p, d, 17, '#a64343', '#e8908c'); el('ellipse', { cx: -46, cy: -140, rx: 20, ry: 8, fill: 'none', stroke: '#7f2a2a', 'stroke-width': 5 }, p); hitLine(p, d, 30); } });
+    si('stomach', 'smwall', { n: 'Stomach muscle', f: 'The stomach wall has three layers of muscle. They squeeze and churn your food.', c: [60, 90], act: 'squeeze', snd: 'gurgle',
+      draw: function (p) { blob(p, ST, '#f0a56f', '#a85b2a', 6); el('path', { 'class': 'dt', d: 'M110 -120C150 -60 150 40 110 110M90 -130C140 -70 140 50 100 124', fill: 'none', stroke: '#c97a3e', 'stroke-width': 3 }, p); } });
+    si('stomach', 'mucus', { n: 'Slimy coat', alt: 'Mucus', f: 'A slimy coat protects the stomach from its own strong juices.', c: [-60, 80], act: 'wobble', snd: 'squelch',
+      draw: function (p) { el('path', { d: ST, fill: '#f9c9a0', stroke: '#fbe3c8', 'stroke-width': 8, transform: 'translate(0 0) scale(0.92) translate(0 8)', 'stroke-opacity': 0.9 }, p); } });
+    si('stomach', 'rugae', { n: 'Folds', alt: 'Rugae', f: 'Folds let your stomach stretch like a balloon when you have eaten lots.', c: [60, 80], act: 'stretch', snd: 'boop',
+      draw: function (p) { var d = ''; for (var i = 0; i < 6; i++) { d += 'M' + (-20 + i * 24) + ' ' + (-80 + i * 24) + 'q16 20 8 44q-8 22 8 40'; } d += 'M-70 70q20 -16 40 0q20 16 40 0'; el('path', { d: d, fill: 'none', stroke: '#d9824a', 'stroke-width': 8, 'stroke-linecap': 'round', opacity: 0.8, 'class': 'ln' }, p); } });
+    si('stomach', 'mush', { n: 'Food soup', alt: 'Chyme', f: 'After a few hours your food is a thick soup, ready for the small intestine.', c: [50, 50], act: 'squish', snd: 'squelch',
+      draw: function (p) { blob(p, 'M10 -50C60 -70 120 -20 116 40C112 100 60 124 14 110C-30 98 -50 60 -34 20C-20 -14 -16 -34 10 -50Z', '#e8b060', '#a8782a', 2.4); [[40, 0], [80, 30], [30, 60], [70, 80], [0, 30]].forEach(function (c) { dark(p, 'circle', { cx: c[0], cy: c[1], r: 7, fill: '#d49a48' }); }); } });
+    si('stomach', 'acid', { n: 'Stomach juice', alt: 'Stomach acid', f: 'Strong juice breaks your food down and kills germs.', c: [90, 20], act: 'wobble', snd: 'drip',
+      draw: function (p) { [[100, -40], [124, 10], [96, 60], [70, 100], [30, 90], [112, 80], [60, -30]].forEach(function (c, i) { el('path', { d: 'M' + c[0] + ' ' + (c[1] - 9) + 'C' + (c[0] + 8) + ' ' + (c[1] - 1) + ' ' + (c[0] + 8) + ' ' + (c[1] + 6) + ' ' + c[0] + ' ' + (c[1] + 7) + 'C' + (c[0] - 8) + ' ' + (c[1] + 6) + ' ' + (c[0] - 8) + ' ' + (c[1] - 1) + ' ' + c[0] + ' ' + (c[1] - 9) + 'Z', fill: '#b8e84a', stroke: '#6a9a1a', 'stroke-width': 1.6 }, p); }); } });
+    si('stomach', 'pylorusS', { n: 'Exit door', alt: 'Pylorus', f: 'A ring of muscle lets the food soup out a little at a time.', c: [-100, 106], act: 'squeeze', snd: 'blop',
+      draw: function (p) { var d = 'M-92 100L-140 112'; tube(p, d, 20, '#a85b2a', '#f0a56f'); el('ellipse', { cx: -92, cy: 100, rx: 8, ry: 18, fill: 'none', stroke: '#7a3a1a', 'stroke-width': 5, transform: 'rotate(-14 -92 100)' }, p); hitLine(p, d, 30); } });
+  })();
+
+  // ---------- the gut wall, with its villi ----------
+  newScene('villi', { n: 'Gut lining', bg: '#2a2038' });
+  (function () {
+    var XS2 = [-140, -70, 0, 70, 140];
+    SCN.villi.flows = [
+      { scene: 'villi', pts: [[-190, -90], [-90, -110], [10, -80], [100, -110], [190, -90]], col: '#ffc86a', n: 8, spd: 40, r: 3.6 },
+      { scene: 'villi', pts: [[-140, -20], [-130, 40], [-120, 100]], col: '#ffc86a', n: 3, spd: 26, r: 3 },
+      { scene: 'villi', pts: [[0, -20], [8, 40], [14, 100]], col: '#ffc86a', n: 3, spd: 26, r: 3 },
+      { scene: 'villi', pts: [[140, -20], [132, 40], [126, 100]], col: '#ffc86a', n: 3, spd: 26, r: 3 }
+    ];
+    SCN.villi.idle = function (now, TF) { var w = Math.sin(now / 700); put(TF, 'villiF', [0, 0, 1.4 * w, 1, 1]); };
+    si('villi', 'wallV', { n: 'Gut wall', f: 'Muscles in the wall squeeze the food along.', c: [0, 150], act: 'squeeze', snd: 'gurgle',
+      draw: function (p) { blob(p, 'M-196 100C-100 112 100 112 196 100L196 196L-196 196Z', '#f09aae', '#a8405c', 3); el('path', { d: 'M-196 140C-100 152 100 152 196 140M-196 172C-100 184 100 184 196 172', fill: 'none', stroke: '#c0506a', 'stroke-width': 4, opacity: 0.6 }, p); } });
+    si('villi', 'villiF', { n: 'Little fingers', alt: 'Villi', f: 'The lining is covered in tiny fingers called villi. They soak up the goodness from your food.', c: [0, 40], act: 'wriggle', snd: 'gulp',
+      draw: function (p) { XS2.forEach(function (x) { blob(p, 'M' + (x - 24) + ' 108C' + (x - 26) + ' 60 ' + (x - 24) + ' 10 ' + x + ' -20C' + (x + 24) + ' 10 ' + (x + 26) + ' 60 ' + (x + 24) + ' 108Z', '#f7b0c0', '#a8405c', 3); }); } });
+    si('villi', 'villiCap', { n: 'Blood tubes', alt: 'Capillaries', f: 'Each finger has tiny blood tubes inside. Goodness from your food passes into the blood.', c: [0, 40], act: 'wriggle', snd: 'thump',
+      draw: function (p) { XS2.forEach(function (x) { tube(p, 'M' + (x - 8) + ' 108C' + (x - 12) + ' 50 ' + (x - 8) + ' 0 ' + x + ' -4C' + (x + 8) + ' 0 ' + (x + 12) + ' 50 ' + (x + 8) + ' 108', 7, '#7f1426', '#e0405a'); }); } });
+    si('villi', 'lacteal', { n: 'Fat tube', alt: 'Lacteal', f: 'A creamy tube in each finger carries away fat.', c: [0, 40], act: 'wriggle', snd: 'boop',
+      draw: function (p) { XS2.forEach(function (x) { tube(p, 'M' + x + ' 106L' + x + ' 6', 6, '#c8b070', '#fff6d8'); }); } });
+    si('villi', 'foodbits', { n: 'Food goodness', alt: 'Nutrients', f: 'Your food has been broken into tiny bits. They are small enough to go through the gut wall.', c: [0, -100], act: 'wobble', snd: 'blop',
+      draw: function (p) { [[-160, -110], [-110, -80], [-50, -120], [20, -90], [70, -130], [120, -86], [170, -120], [-20, -150], [-100, -140], [150, -60], [-170, -60], [90, -50]].forEach(function (c, i) { el('circle', { cx: c[0], cy: c[1], r: 6 + (i % 3) * 2, fill: i % 2 ? '#ffc86a' : '#a8e060', stroke: '#8a5a1a', 'stroke-width': 1.5 }, p); }); } });
+  })();
+
+  // ---------- skin, in slices ----------
+  newScene('skin', { n: 'Skin inside', bg: '#2c2440' });
+  (function () {
+    SCN.skin.flows = [
+      { scene: 'skin', pts: [[70, -150], [66, -170], [64, -190]], col: '#bfe8ff', n: 3, spd: 22, r: 3.4 },
+      { scene: 'skin', pts: [[-196, -20], [-120, -10], [-40, -24], [60, -14], [196, -24]], col: '#ff7a8a', n: 7, spd: 60, r: 3.4 }
+    ];
+    SCN.skin.idle = function (now, TF) { put(TF, 'hairS', [0, 0, 1.5 * Math.sin(now / 900), 1, 1]); };
+    si('skin', 'fatlayer', { n: 'Cosy fat', alt: 'Fat layer', f: 'A layer of fat keeps you warm and cushions your bones.', c: [0, 90], act: 'squish', snd: 'blop',
+      draw: function (p) { blob(p, 'M-196 56C-100 66 100 66 196 56L196 130C100 140 -100 140 -196 130Z', '#fbe9a0', '#c8a840', 3); for (var i = 0; i < 12; i++) { el('circle', { 'class': 'dt', cx: -170 + i * 31, cy: 80 + (i % 3) * 18, r: 12, fill: '#fff4c0', stroke: '#e0c860', 'stroke-width': 1.5 }, p); } } });
+    si('skin', 'musclesS', { n: 'Muscle below', f: 'Under your skin and fat are your muscles.', c: [0, 160], act: 'flex', snd: 'boop',
+      draw: function (p) { blob(p, 'M-196 130C-100 140 100 140 196 130L196 196L-196 196Z', '#d65a68', '#7d2433', 3); el('path', { 'class': 'dt', d: 'M-196 156L196 156M-196 180L196 180', stroke: '#f3a0a8', 'stroke-width': 3 }, p); } });
+    si('skin', 'dermis', { n: 'Inner skin', alt: 'Dermis', f: 'The inner layer of skin holds your hair roots, nerves, blood tubes and sweat glands.', c: [0, -20], act: 'squish', snd: 'boop',
+      draw: function (p) { blob(p, 'M-196 -112C-100 -104 100 -104 196 -112L196 56C100 66 -100 66 -196 56Z', '#f7b8a0', '#c0705a', 3); } });
+    si('skin', 'epidermis', { n: 'Outer skin', alt: 'Epidermis', f: 'The top layer of skin is waterproof. It keeps germs out and the water in.', c: [0, -135], act: 'squish', snd: 'boop',
+      draw: function (p) { blob(p, 'M-196 -150C-100 -144 100 -144 196 -150L196 -112C100 -104 -100 -104 -196 -112Z', '#e8a882', '#a8603a', 3); for (var i = 0; i < 14; i++) { el('path', { 'class': 'dt', d: 'M' + (-190 + i * 28) + ' -150q10 -10 20 0', fill: '#f4c4a4', stroke: '#c88a62', 'stroke-width': 2 }, p); } } });
+    si('skin', 'skinvessels', { n: 'Skin blood tubes', f: 'Blood in your skin keeps it warm. It makes you go pink when you run.', c: [0, -20], act: 'wriggle', snd: 'thump',
+      draw: function (p) { vessel(p, 'M-196 -20C-120 -10 -40 -26 60 -14C120 -6 160 -24 196 -24', 9, ART); vessel(p, 'M-196 14C-100 26 0 8 100 22C150 28 180 18 196 16', 8, VEN); } });
+    si('skin', 'touchnerve', { n: 'Touch sensor', alt: 'Nerve ending', f: 'Tiny sensors feel touch, heat, cold and pain, and tell your brain.', c: [120, -40], act: 'glow', snd: 'zap',
+      draw: function (p) { nerve(p, 'M196 60C170 20 140 -20 124 -70', 5); blob(p, 'M124 -70C112 -78 108 -96 120 -104C132 -104 140 -90 134 -76Z', '#fff6b0', '#a8820a', 2.4); hitLine(p, 'M170 20L124 -70', 30); } });
+    si('skin', 'sweat', { n: 'Sweat gland', f: 'When you get hot, sweat comes out through tiny holes. It cools you down.', c: [64, -20], act: 'squish', snd: 'drip',
+      draw: function (p) { var d = 'M64 -150C60 -120 68 -100 64 -80'; tube(p, d, 6, '#5a8aa8', '#bfe8ff'); el('path', { d: 'M64 -80C40 -72 40 -50 64 -52C88 -54 88 -30 64 -32C40 -34 44 -12 66 -14', fill: 'none', stroke: '#5a8aa8', 'stroke-width': 12, 'stroke-linecap': 'round' }, p); el('path', { d: 'M64 -80C40 -72 40 -50 64 -52C88 -54 88 -30 64 -32C40 -34 44 -12 66 -14', fill: 'none', stroke: '#bfe8ff', 'stroke-width': 7, 'stroke-linecap': 'round' }, p); hitLine(p, 'M64 -150L64 -14', 36); } });
+    si('skin', 'oilgland', { n: 'Oil gland', f: 'This little gland makes oil to keep your skin and hair soft.', c: [-36, -56], act: 'squish', snd: 'blop',
+      draw: function (p) { blob(p, 'M-40 -76C-30 -84 -16 -76 -18 -60C-20 -46 -38 -44 -44 -56C-46 -64 -46 -72 -40 -76Z', '#fbe28a', '#b8982a', 2.4); } });
+    si('skin', 'goose', { n: 'Goosebump muscle', f: 'A tiny muscle pulls your hair upright when you are cold or scared. That makes goosebumps.', c: [-56, -70], act: 'flex', snd: 'boop',
+      draw: function (p) { spindle(p, -74, -4, -52, -112, 8, 0.5); } });
+    si('skin', 'hairS', { n: 'Hair', f: 'Each hair grows from a root deep in your skin.', c: [-72, -90], act: 'wobble', snd: 'swish',
+      draw: function (p) { var d = 'M-74 -194C-78 -140 -68 -60 -72 0'; el('path', { d: d, fill: 'none', stroke: 'var(--hair)', 'stroke-width': 9, 'stroke-linecap': 'round', 'class': 'hrs' }, p); blob(p, 'M-92 4C-98 -14 -66 -22 -56 -2C-52 14 -64 22 -78 20C-88 18 -92 12 -92 4Z', '#fbe6e0', '#c0705a', 2.6); hitLine(p, d, 30); } });
+  })();
+
+  // ---------- inside a bone ----------
+  newScene('bone', { n: 'Bone inside', bg: '#2a2438' });
+  (function () {
+    SCN.bone.flows = [{ scene: 'bone', pts: [[-196, 90], [-150, 40], [-110, 10], [-70, 6]], col: '#ff7a8a', n: 4, spd: 40, r: 3.6 }];
+    SCN.bone.idle = function (now, TF) { var s = 1 + 0.02 * Math.sin(now / 700); put(TF, 'marrowB', [0, 0, 0, s, s]); };
+    si('bone', 'periost', { n: 'Bone skin', alt: 'Periosteum', f: 'A tough skin wraps the outside of the bone. It has blood tubes and nerves, and helps broken bones mend.', c: [0, -165], act: 'glow', snd: 'boop',
+      draw: function (p) { el('circle', { cx: 0, cy: 0, r: 168, fill: 'none', stroke: '#c9a06a', 'stroke-width': 10 }, p); el('circle', { 'class': 'dt', cx: 0, cy: 0, r: 168, fill: 'none', stroke: '#f0d0a0', 'stroke-width': 4, 'stroke-dasharray': '30 12' }, p); hitLine(p, 'M-168 0A168 168 0 0 1 168 0', 16); } });
+    si('bone', 'compact', { n: 'Hard bone', alt: 'Compact bone', f: 'The outside of a bone is very hard and strong. It is built from tiny tubes packed together.', c: [0, -125], act: 'rattle', snd: 'clack',
+      draw: function (p) {
+        blob(p, 'M0 -160A160 160 0 1 1 -0.1 -160Z', '#f4ecd6', BONE_D, 3);
+        el('circle', { cx: 0, cy: 0, r: 104, fill: '#d8cba8', stroke: 'none' }, p);
+        [[-100, -90], [0, -130], [100, -80], [130, 20], [90, 100], [-20, 130], [-110, 70], [-136, -10]].forEach(function (c) {
+          el('circle', { 'class': 'dt', cx: c[0], cy: c[1], r: 20, fill: 'none', stroke: '#bba983', 'stroke-width': 2.4 }, p);
+          el('circle', { 'class': 'dt', cx: c[0], cy: c[1], r: 11, fill: 'none', stroke: '#bba983', 'stroke-width': 2.4 }, p);
+          el('circle', { 'class': 'dt', cx: c[0], cy: c[1], r: 4.5, fill: '#c0364a' }, p);
+        });
+      } });
+    si('bone', 'spongy', { n: 'Light bone', alt: 'Spongy bone', f: 'Inside, bone is like a sponge. It is light but still strong.', c: [0, 0], act: 'rattle', snd: 'clack',
+      draw: function (p) {
+        el('circle', { cx: 0, cy: 0, r: 104, fill: '#f4ecd6', stroke: BONE_D, 'stroke-width': 3 }, p);
+        var d = ''; for (var i = 0; i < 26; i++) { var a = i * 0.9, r1 = 40 + (i * 13) % 56, r2 = 30 + (i * 29) % 70; d += 'M' + f(Math.cos(a) * r1) + ' ' + f(Math.sin(a) * r1) + 'L' + f(Math.cos(a + 1.6) * r2) + ' ' + f(Math.sin(a + 1.6) * r2); }
+        el('path', { d: d, fill: 'none', stroke: '#bba983', 'stroke-width': 5, 'stroke-linecap': 'round', 'class': 'ln' }, p);
+      } });
+    si('bone', 'marrowB', { n: 'Bone marrow', f: 'In the middle of some bones is marrow. It makes new blood cells every day.', c: [0, 0], act: 'wobble', snd: 'blop',
+      draw: function (p) {
+        blob(p, 'M0 -58C34 -58 58 -30 56 6C54 40 26 60 -6 58C-40 56 -60 26 -56 -8C-52 -40 -28 -58 0 -58Z', '#f2c06a', '#a8782a', 3);
+        [[-20, -20, '#e0405a'], [14, -24, '#e0405a'], [24, 14, '#e0405a'], [-12, 22, '#e0405a'], [-34, 6, '#fff'], [4, -2, '#e0405a'], [30, -2, '#e0405a']].forEach(function (c) { dark(p, 'circle', { cx: c[0], cy: c[1], r: c[2] === '#fff' ? 9 : 6, fill: c[2], stroke: '#7f1426', 'stroke-width': 1.2 }); });
+      } });
+    si('bone', 'bonevessel', { n: 'Bone blood tube', f: 'Blood tubes bring food and oxygen to the living bone.', c: [-100, 20], act: 'wriggle', snd: 'thump',
+      draw: function (p) { vessel(p, 'M-196 90C-150 40 -110 10 -70 6', 9, ART); } });
+  })();
+
+  // ---------- inside a muscle ----------
+  newScene('muscle', { n: 'Muscle inside', bg: '#2e1f34' });
+  (function () {
+    SCN.muscle.idle = function (now, TF) { var c = 0.5 - 0.5 * Math.cos(now / 700), k = 1 - 0.12 * c; put(TF, 'fibres', [0, 0, 0, k, 1 + 0.12 * c]); put(TF, 'myofibril', [0, 0, 0, k, 1]); };
+    si('muscle', 'tendonM', { n: 'Tendon', f: 'Strong tough rope called a tendon joins muscle to bone.', c: [170, 0], act: 'stretch', snd: 'boop',
+      draw: function (p) { blob(p, 'M120 -40C150 -30 180 -16 196 -10L196 10C180 16 150 30 120 40Z', '#f3e6cd', '#b9a98a', 3); el('path', { 'class': 'dt', d: 'M126 -20L192 -4M126 0L194 0M126 20L192 4', stroke: '#d4c4a4', 'stroke-width': 2 }, p); } });
+    si('muscle', 'fibres', { n: 'Muscle fibres', f: 'A muscle is made of long thin cells called fibres. They all pull together.', c: [-20, 0], act: 'flex', snd: 'boop',
+      draw: function (p) {
+        for (var i = 0; i < 5; i++) {
+          var y = -96 + i * 48;
+          blob(p, 'M-160 ' + (y - 18) + 'C-60 ' + (y - 28) + ' 60 ' + (y - 28) + ' 124 ' + (y - 10) + 'L124 ' + (y + 10) + 'C60 ' + (y + 28) + ' -60 ' + (y + 28) + ' -160 ' + (y + 18) + 'Z', i % 2 ? '#d65a68' : '#e07a86', '#7d2433', 2.6);
+        }
+      } });
+    si('muscle', 'myofibril', { n: 'Stripes', alt: 'Myofibrils', f: 'Inside each fibre are stripes of tiny threads. They slide past each other and shorten the muscle.', c: [-20, 0], act: 'squeeze', snd: 'boop',
+      draw: function (p) { for (var i = 0; i < 5; i++) { var y = -96 + i * 48; for (var x = -150; x < 110; x += 20) { el('path', { 'class': 'dt', d: 'M' + x + ' ' + (y - 14) + 'L' + x + ' ' + (y + 14), stroke: '#7d2433', 'stroke-width': 4, 'stroke-opacity': 0.55, 'stroke-linecap': 'round' }, p); el('path', { 'class': 'dt', d: 'M' + (x + 8) + ' ' + (y - 9) + 'L' + (x + 8) + ' ' + (y + 9), stroke: '#fff', 'stroke-width': 2, 'stroke-opacity': 0.5 }, p); } } } });
+    si('muscle', 'nerveM', { n: 'Muscle nerve', f: 'A nerve tells the muscle when to squeeze.', c: [-100, -150], act: 'glow', snd: 'zap',
+      draw: function (p) { nerve(p, 'M-196 -150C-150 -150 -100 -140 -70 -112', 6); blob(p, 'M-70 -112C-80 -122 -60 -128 -54 -116C-52 -106 -62 -102 -70 -112Z', '#fff6b0', '#a8820a', 2); } });
+    SCN.muscle.flows = [{ scene: 'muscle', pts: [[-196, -150], [-150, -150], [-100, -140], [-66, -114]], col: '#fff6a8', n: 3, spd: 90, r: 3.6 }];
+  })();
+
+  // ---------- blood, close up ----------
+  newScene('blood', { n: 'Blood', bg: '#7a1f35' });
+  (function () {
+    SCN.blood.idle = function (now, TF) {
+      ['rbcA', 'rbcB'].forEach(function (id, i) { put(TF, id, [Math.sin(now / 900 + i * 2) * 10, Math.cos(now / 1100 + i) * 4, 4 * Math.sin(now / 700 + i), 1, 1]); });
+      put(TF, 'wbc', [Math.sin(now / 1300) * 8, 0, 0, 1 + 0.04 * Math.sin(now / 300), 1 - 0.04 * Math.sin(now / 300)]);
+    };
+    SCN.blood.flows = [{ scene: 'blood', pts: [[-196, -30], [196, -30]], col: 'rgba(255,230,200,0.7)', n: 8, spd: 60, r: 2.5 }, { scene: 'blood', pts: [[-196, 70], [196, 70]], col: 'rgba(255,230,200,0.7)', n: 8, spd: 50, r: 2.5 }];
+    function rbc(p, x, y, r, rot) {
+      var g = el('g', { transform: 'translate(' + x + ' ' + y + ') rotate(' + rot + ')' }, p);
+      el('ellipse', { cx: 0, cy: 0, rx: r, ry: r * 0.72, fill: '#d9364f', stroke: '#8a1428', 'stroke-width': 2.4 }, g);
+      el('ellipse', { 'class': 'dt', cx: 0, cy: 0, rx: r * 0.5, ry: r * 0.34, fill: '#b82840', opacity: 0.8 }, g);
+    }
+    si('blood', 'wallB', { n: 'Blood tube wall', f: 'Blood flows inside tubes called blood vessels.', c: [0, -150], act: 'wobble', snd: 'thump', pair: true,
+      draw: function (p) { blob(p, 'M-196 -196L196 -196L196 -128C100 -138 -100 -138 -196 -128Z', '#e07a8a', '#8a2a40', 3); } });
+    si('blood', 'plasmaB', { n: 'Plasma', f: 'Blood is mostly a yellowish liquid called plasma. Everything else floats in it.', c: [0, 0], act: 'wobble', snd: 'blop',
+      draw: function (p) { el('rect', { x: -196, y: -128, width: 392, height: 256, fill: '#f8d89a', 'fill-opacity': 0.55 }, p); } });
+    si('blood', 'platelets', { n: 'Platelets', f: 'Platelets rush to a cut and clump together to plug the hole.', c: [60, 60], act: 'wiggle', snd: 'sparkle',
+      draw: function (p) { [[60, 60], [-40, 100], [130, -60], [-120, 20], [20, -90], [-60, -100]].forEach(function (c) { blob(p, 'M' + c[0] + ' ' + (c[1] - 9) + 'C' + (c[0] + 12) + ' ' + (c[1] - 8) + ' ' + (c[0] + 12) + ' ' + (c[1] + 8) + ' ' + c[0] + ' ' + (c[1] + 9) + 'C' + (c[0] - 12) + ' ' + (c[1] + 8) + ' ' + (c[0] - 12) + ' ' + (c[1] - 8) + ' ' + c[0] + ' ' + (c[1] - 9) + 'Z', '#f6e08a', '#a8902a', 2); }); } });
+    si('blood', 'wbc', { n: 'White blood cell', f: 'White blood cells are your body’s guards. They chase germs and gobble them up.', c: [-40, 10], act: 'squish', snd: 'blop',
+      draw: function (p) { blob(p, 'M-40 -34C-8 -48 28 -24 24 12C20 44 -16 56 -44 38C-70 20 -70 -18 -40 -34Z', '#f4f1fa', '#8a7ab0', 3); el('path', { d: 'M-34 -8C-20 -20 -4 -8 -12 4C-20 14 -34 10 -34 -8M-4 6C6 -4 18 6 10 16C2 22 -8 18 -4 6', fill: '#8a6ac8', stroke: '#4a2a88', 'stroke-width': 2 }, p); [[-26, 30], [8, -26], [18, 28]].forEach(function (c) { dark(p, 'circle', { cx: c[0], cy: c[1], r: 3, fill: '#c8b8e8' }); }); } });
+    si('blood', 'rbcA', { n: 'Red blood cells', f: 'Red blood cells carry oxygen all round your body. Each one is shaped like a doughnut with no hole.', c: [-120, -60], act: 'wobble', snd: 'blop', count: 6,
+      draw: function (p) { rbc(p, -130, -70, 36, -20); rbc(p, 60, -70, 34, 15); rbc(p, 140, 20, 32, -10); } });
+    si('blood', 'rbcB', { n: 'More red cells', alt: 'Erythrocytes', f: 'You make about two million new red blood cells every second.', c: [40, 70], act: 'wobble', snd: 'blop', count: 6,
+      draw: function (p) { rbc(p, -90, 80, 34, 20); rbc(p, 30, 80, 36, -15); rbc(p, 110, -20, 30, 25); } });
+  })();
+
+  // ---------- a knee ----------
+  newScene('joint', { n: 'Knee inside', bg: '#1f2c4a' });
+  (function () {
+    SCN.joint.idle = function (now, TF) { var s = 0.02 * Math.sin(now / 800); put(TF, 'menisci', [0, 0, 0, 1 + s, 1 - s]); };
+    si('joint', 'capsule', { n: 'Joint bag', alt: 'Joint capsule', f: 'A bag of slippery liquid fills the joint, like oil in a machine.', c: [0, 0], act: 'wobble', snd: 'blop',
+      draw: function (p) { blob(p, 'M-92 -60C-110 -20 -110 20 -92 60L92 60C110 20 110 -20 92 -60Z', '#9fd8f0', '#4a90b8', 3); el('path', { 'class': 'dt', d: 'M-80 -40C-90 0 -84 30 -76 48', fill: 'none', stroke: '#fff', 'stroke-opacity': 0.6, 'stroke-width': 5, 'stroke-linecap': 'round' }, p); } });
+    si('joint', 'femurK', { n: 'Thigh bone end', alt: 'Femur', f: 'The rounded end of your thigh bone rolls on top of your shin bone.', c: [0, -120], act: 'rattle', snd: 'clack',
+      draw: function (p) { bshape(p, 'path', { d: 'M-44 -196L44 -196C48 -150 50 -110 78 -80C96 -62 84 -22 40 -26C20 -28 6 -22 0 -16C-6 -22 -20 -28 -40 -26C-84 -22 -96 -62 -78 -80C-50 -110 -48 -150 -44 -196Z' }); } });
+    si('joint', 'cartilageK', { n: 'Cartilage', f: 'Smooth bendy cartilage covers the bone ends so they glide without grinding.', c: [0, -20], act: 'squish', snd: 'boop',
+      draw: function (p) { el('path', { d: 'M-84 -34C-62 -14 -22 -18 0 -8C22 -18 62 -14 84 -34L84 -26C62 -6 22 -10 0 0C-22 -10 -62 -6 -84 -26Z', fill: '#bfe9fa', stroke: '#5a9ab8', 'stroke-width': 3, 'stroke-linejoin': 'round' }, p); el('path', { d: 'M-80 50C-50 40 -20 42 0 46C20 42 50 40 80 50L80 56C50 46 20 48 0 52C-20 48 -50 46 -80 56Z', fill: '#bfe9fa', stroke: '#5a9ab8', 'stroke-width': 3, 'stroke-linejoin': 'round' }, p); } });
+    si('joint', 'menisci', { n: 'Cushions', alt: 'Menisci', f: 'Two moon-shaped cushions sit between the bones and soak up bumps when you jump.', c: [0, 10], act: 'squish', snd: 'boop', pair: true, count: 2,
+      draw: function (p) { blob(p, 'M-86 4C-66 -10 -30 -6 -14 8C-34 26 -66 28 -86 14Z', '#f6e8c8', '#a89868', 2.6); } });
+    si('joint', 'ligaments', { n: 'Joint ropes', alt: 'Ligaments', f: 'Strong ropes called ligaments cross inside your knee. They stop your bones sliding out of place.', c: [0, 10], act: 'stretch', snd: 'boop',
+      draw: function (p) { var d = 'M-14 -16L16 50M14 -16L-16 50'; el('path', { d: d, stroke: '#9a7a4a', 'stroke-width': 13, 'stroke-linecap': 'round', fill: 'none', 'class': 'ln' }, p); el('path', { d: d, stroke: '#f3e6cd', 'stroke-width': 8, 'stroke-linecap': 'round', fill: 'none', 'class': 'ln' }, p); el('path', { 'class': 'dt', d: 'M-12 -10L10 34M12 -10L-10 34', stroke: '#c8b88a', 'stroke-width': 1.6, fill: 'none' }, p); hitLine(p, d, 28); } });
+    si('joint', 'tibiaK', { n: 'Shin bone end', alt: 'Tibia', f: 'The flat top of your shin bone carries your weight.', c: [0, 120], act: 'rattle', snd: 'clack',
+      draw: function (p) { bshape(p, 'path', { d: 'M-84 58C-50 48 -20 50 0 54C20 50 50 48 84 58L90 82C70 100 56 120 50 196L-50 196C-56 120 -70 100 -90 82Z' }); } });
+  })();
+
+  // ---------- a stack of backbones ----------
+  newScene('vertebra', { n: 'Backbone inside', bg: '#1f2c4a' });
+  (function () {
+    var YS = [-150, -30, 90];
+    SCN.vertebra.flows = [{ scene: 'vertebra', pts: [[60, 190], [60, -190]], col: '#fff6a8', n: 5, spd: 100, r: 4 }, { scene: 'vertebra', pts: [[60, -100], [-40, -110], [-130, -130], [-196, -140]], col: '#fff6a8', n: 3, spd: 80, r: 3.2 }];
+    SCN.vertebra.idle = function (now, TF) { var s = 0.04 * Math.sin(now / 600); put(TF, 'discV', [0, 0, 0, 1 + s, 1 - s]); };
+    si('vertebra', 'archV', { n: 'Back arch', alt: 'Spinous process', f: 'The back of each bone makes a ring that guards the cord. You can feel the bumps down your back.', c: [100, 0], act: 'rattle', snd: 'clack',
+      draw: function (p) { YS.forEach(function (y) { bshape(p, 'path', { d: 'M-24 ' + (y + 6) + 'C10 ' + (y - 10) + ' 40 ' + (y - 10) + ' 76 ' + (y + 10) + 'L170 ' + (y + 34) + 'L170 ' + (y + 50) + 'L76 ' + (y + 54) + 'C40 ' + (y + 70) + ' 10 ' + (y + 70) + ' -24 ' + (y + 66) + 'Z' }); }); } });
+    si('vertebra', 'cordV', { n: 'Spinal cord', f: 'Your spinal cord runs through the tunnel in your backbones.', c: [60, 0], act: 'glow', snd: 'zap',
+      draw: function (p) { var d = 'M60 -196L60 196'; tube(p, d, 26, '#a8920a', '#f3ec9e'); el('path', { 'class': 'dt', d: 'M54 -190L54 190M66 -190L66 190', stroke: '#fff', 'stroke-opacity': 0.5, 'stroke-width': 2 }, p); hitLine(p, d, 40); } });
+    si('vertebra', 'rootsV', { n: 'Nerve branches', f: 'Nerves branch out from the cord between the bones. They go to every part of your body.', c: [-60, -70], act: 'glow', snd: 'zap', pair: true,
+      draw: function (p) { [-92, 28].forEach(function (y) { nerve(p, 'M50 ' + (y + 12) + 'C-10 ' + (y + 10) + ' -70 ' + (y + 10) + ' -150 ' + (y - 20) + 'M-70 ' + (y + 10) + 'L-110 ' + (y + 40), 7); }); } });
+    si('vertebra', 'discV', { n: 'Cushion', alt: 'Disc', f: 'Soft discs between your backbones act like jelly cushions.', c: [-70, -80], act: 'squish', snd: 'boop', count: 2,
+      draw: function (p) { [-92, 28].forEach(function (y) { bshape(p, 'path', { d: 'M-104 ' + (y + 8) + 'C-80 ' + (y + 2) + ' -30 ' + (y + 2) + ' -4 ' + (y + 8) + 'L-4 ' + (y + 26) + 'C-30 ' + (y + 32) + ' -80 ' + (y + 32) + ' -104 ' + (y + 26) + 'Z', fill: '#9fb7cf', stroke: '#5f7d99', 'stroke-width': 2.6 }); }); } });
+    si('vertebra', 'bodyV', { n: 'Backbone', alt: 'Vertebra', f: 'Each backbone is a block of bone. You have 33 of them stacked in your spine.', c: [-60, 0], act: 'rattle', snd: 'clack',
+      draw: function (p) { YS.forEach(function (y) { bshape(p, 'path', { d: 'M-108 ' + (y + 6) + 'C-80 ' + (y - 8) + ' -30 ' + (y - 8) + ' -4 ' + (y + 6) + 'L-4 ' + (y + 66) + 'C-30 ' + (y + 80) + ' -80 ' + (y + 80) + ' -108 ' + (y + 66) + 'Z' }); }); } });
+  })();
+
+  // ---------- inside your nose ----------
+  newScene('nose', { n: 'Nose inside', bg: '#2a2044' });
+  (function () {
+    SCN.nose.flows = [
+      { scene: 'nose', pts: [[-196, 110], [-150, 90], [-100, 40], [-30, -10], [40, -50], [60, -70]], col: '#b8f070', n: 6, spd: 60, r: 3.6 },
+      { scene: 'nose', pts: [[60, -80], [60, -130], [58, -196]], col: '#fff6a8', n: 3, spd: 70, r: 3.4 }
+    ];
+    SCN.nose.idle = function (now, TF) { var s = 0.03 * Math.sin(now / 500); put(TF, 'bulbN', [0, 0, 0, 1 + s, 1 + s]); };
+    si('nose', 'bulbN', { n: 'Smell centre', alt: 'Olfactory bulb', f: 'Smell messages arrive at the smell centre, just under your brain.', c: [60, -170], act: 'glow', snd: 'sparkle',
+      draw: function (p) { blob(p, 'M30 -176C30 -200 90 -200 90 -176C90 -156 70 -150 60 -150C48 -150 30 -158 30 -176Z', '#f6d34a', '#a8820a', 3); } });
+    si('nose', 'smellnerve', { n: 'Smell nerve', f: 'Tiny nerve threads go up through little holes in the skull.', c: [60, -110], act: 'glow', snd: 'zap',
+      draw: function (p) { var d = 'M30 -82L34 -150M46 -80L48 -150M60 -80L60 -150M74 -80L72 -150M88 -80L86 -150'; tube(p, d, 3.4, '#a8820a', '#f6d34a'); hitLine(p, d, 24); } });
+    si('nose', 'smellpatch', { n: 'Smell sensors', alt: 'Smell receptors', f: 'High in your nose, millions of sensors catch smells. You can tell about a trillion different ones apart!', c: [60, -76], act: 'wiggle', snd: 'sparkle',
+      draw: function (p) { blob(p, 'M20 -86C40 -94 80 -94 100 -86L100 -70C80 -62 40 -62 20 -70Z', '#c9a0f0', '#6a3a9a', 2.6); for (var i = 0; i < 9; i++) { el('path', { d: 'M' + (28 + i * 8) + ' -70L' + (28 + i * 8) + ' -58', stroke: '#6a3a9a', 'stroke-width': 3, 'stroke-linecap': 'round' }, p); } } });
+    si('nose', 'turbinates', { n: 'Nose folds', alt: 'Turbinates', f: 'Curly folds warm and wet the air before it goes to your lungs.', c: [-10, 0], act: 'stretch', snd: 'sniff',
+      draw: function (p) { ['M-80 -30C-30 -50 40 -46 90 -20', 'M-90 10C-30 -10 50 -6 110 20', 'M-80 50C-30 30 40 34 80 56'].forEach(function (d) { tube(p, d, 15, '#b0605a', '#f4b9b0'); }); } });
+    si('nose', 'hairsN', { n: 'Nose hairs', f: 'Little hairs at the front trap dust before it gets in.', c: [-150, 70], act: 'wiggle', snd: 'wiggle',
+      draw: function (p) { var d = ''; for (var i = 0; i < 9; i++) { d += 'M' + (-170 + i * 9) + ' ' + (96 - i * 4) + 'L' + (-160 + i * 9) + ' ' + (60 - i * 4); } el('path', { d: d, stroke: 'var(--hair)', 'stroke-width': 3, 'stroke-linecap': 'round', fill: 'none', 'class': 'hrs' }, p); hitLine(p, 'M-170 96L-100 66', 30); } });
+    si('nose', 'noseWall', { n: 'Nose tunnel', alt: 'Nasal cavity', f: 'A wet slimy lining catches germs and dust. It makes bogeys, too.', c: [-40, 100], act: 'squish', snd: 'sniff',
+      draw: function (p) { el('path', { d: 'M-196 130C-150 120 -60 80 20 80C70 80 110 92 140 120L140 150C100 130 60 126 20 126C-60 126 -150 150 -196 170Z', fill: '#f4b9b0', stroke: '#b0605a', 'stroke-width': 3, 'stroke-linejoin': 'round' }, p); el('path', { d: 'M-196 -60C-170 -80 -110 -100 -40 -100C20 -100 120 -100 146 -60L146 -120L-196 -120Z', fill: '#f4b9b0', stroke: '#b0605a', 'stroke-width': 3, 'stroke-linejoin': 'round', opacity: 0.0 }, p); } });
+  })();
+
+  // a few parts that open close-ups, named here once every close-up exists
+  [['spine', 'vertebra'], ['cervical', 'vertebra'], ['thoracic', 'vertebra'], ['lumbar', 'vertebra'], ['discs', 'vertebra'],
+   ['femur', 'bone'], ['humerus', 'bone'], ['tibia', 'bone'], ['tibiafine', 'bone'], ['radius', 'bone'], ['ulna', 'bone'], ['forearm', 'bone'],
+   ['biceps', 'muscle'], ['quads', 'muscle'], ['triceps', 'muscle'], ['calf', 'muscle'], ['abs', 'muscle'], ['pecs', 'muscle'], ['deltoid', 'muscle'], ['forearmmuscles', 'muscle'],
+   ['kneecap', 'joint'], ['brain', 'brain'], ['sinuses', 'nose']
+  ].forEach(function (q) { if (ITEMS[q[0]] && q[1]) { ITEMS[q[0]].open = q[1]; } });
+
+  //@@ITEMS10
 
   // mount every item into the figure, or into its close-up
   function drawPiece(parent, it) {
@@ -1961,6 +2693,7 @@
     var t = reduced ? 0 : flowT;
     cx2.save();
     cx2.beginPath(); cx2.rect(area.x, area.y, area.w, area.h); cx2.clip();
+    if (scene) { cx2.beginPath(); cx2.arc(view.tx + anc.x * view.s, view.ty + anc.y * view.s, 194 * BK * view.s, 0, 6.3); cx2.clip(); }
     if (flowsOn()) {
       for (i = 0; i < FLOWS.length; i++) {
         fl = FLOWS[i];
@@ -2207,7 +2940,7 @@
   function applyView() { bodyG.setAttribute('transform', 'translate(' + f(view.tx) + ' ' + f(view.ty) + ') scale(' + f(view.s) + ')'); }
 
   function setLod() {
-    var want = !scene && viewTo.s >= baseScale() * 2.1;
+    var want = !scene && viewTo.s >= baseScale() * 1.9;
     if (want !== z1) { z1 = want; applyClass(); }
   }
   function goView(t, jump) {
@@ -2337,7 +3070,7 @@
     var r;
     if (inf.z) { r = s ? [400 - inf.z[2], inf.z[1], 400 - inf.z[0], inf.z[3]] : inf.z.slice(); }
     else {
-      var cx = node.__c[0], cy = node.__c[1], h = Math.max(200, Math.max(it.bb.w, it.bb.h) * 1.7) / 2;
+      var cx = node.__c[0], cy = node.__c[1], h = clamp(Math.max(it.bb.w, it.bb.h) * 0.55, 90, 170);
       r = [cx - h, cy - h, cx + h, cy + h];
     }
     sfx('zoomin');
@@ -2751,7 +3484,32 @@
     }
   };
 
-  //@@STORIES
+  // nerves: little sparks climb to the brain all the time
+  (function () {
+    var Y = '#fff4a0';
+    function nf(pts, n, spd) { return { sys: 'nerves', pts: pts, col: Y, n: n || 3, spd: spd || 100, r: 2.8 }; }
+    both(nf(0, 3, 110), [[86, 478], [92, 432], [102, 340], [124, 244], [150, 222], [196, 200], [200, 150], [200, 96]]);
+    both(nf(0, 3, 110), [[120, 770], [158, 744], [160, 640], [163, 580], [172, 506], [186, 470], [200, 410], [200, 300], [200, 150], [200, 96]]);
+    flow(nf([[200, 96], [200, 150], [200, 300], [200, 410]], 4, 130));
+  })();
+  STORY.nerves = {
+    icon: 'zap',
+    go: function () {
+      sfx('zap');
+      // a touch on the fingertip runs up the arm to the brain, then a message comes back down to the leg
+      var up = prep({ pts: [[86, 482], [90, 450], [92, 432], [102, 340], [124, 244], [150, 222], [196, 200], [200, 150], [200, 96]], r: 4.6, dur: 2600, glow: true, col: '#fff6a0' });
+      up.done = function () {
+        sfx('think'); motions.push({ item: 'brain', kind: 'think', t0: performance.now(), dur: FXDUR.think });
+        var down = prep({ pts: [[200, 96], [200, 150], [200, 300], [200, 410], [186, 470], [176, 500], [163, 580], [160, 640], [158, 740], [140, 764]], r: 4.6, dur: 2800, glow: true, col: '#fff6a0' });
+        down.done = function () { sfx('boing'); motions.push({ fn: MOT.legs, t0: performance.now(), dur: 1400, side: 0 }); kick(); };
+        down.t0 = performance.now(); runners.push(down);
+      };
+      up.t0 = performance.now(); runners.push(up);
+      motions.push({ fn: MOT.hand, t0: performance.now(), dur: 900, side: 0 });
+      while (runners.length > 8) { runners.shift(); }
+      kick();
+    }
+  };
 
   // ------------------------------------------------------------------
   // Input
