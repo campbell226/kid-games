@@ -2451,20 +2451,20 @@
   // z is the box the camera zooms to, open names the close-up.
   // ------------------------------------------------------------------
   var PARTS = {
-    hair:      { n: 'Hair', f: 'Hair keeps your head warm.', snd: 'swish', dur: 900, c: [200, 50], z: [90, 0, 310, 170] },
-    head:      { n: 'Head', f: 'Your head holds your brain, eyes, ears, nose and mouth.', snd: 'boop', dur: 1200, c: [200, 105], z: [90, -5, 310, 235] },
+    hair:      { n: 'Hair', f: 'Hair keeps your head warm.', snd: 'swish', dur: 900, c: [200, 50], z: [90, 0, 310, 170], open: 'skin' },
+    head:      { n: 'Head', f: 'Your head holds your brain, eyes, ears, nose and mouth.', snd: 'boop', dur: 1200, c: [200, 105], z: [90, -5, 310, 235], open: 'brain' },
     eyes:      { n: 'Eyes', f: 'Your eyes catch light so you can see.', snd: 'blink', dur: 1700, count: 2, c: [172, 110], z: [130, 60, 270, 160], open: 'eye' },
     ears:      { n: 'Ears', f: 'Your ears catch sounds and help you balance.', snd: 'wiggle', dur: 1100, count: 2, c: [131, 108], z: [95, 60, 215, 160], open: 'ear' },
     nose:      { n: 'Nose', f: 'Your nose helps you smell and taste.', snd: 'sniff', dur: 900, c: [200, 130], z: [150, 70, 250, 180], open: 'nose' },
     mouth:     { n: 'Mouth', f: 'Your mouth is for eating, talking and smiling.', snd: 'ahh', dur: 1200, c: [200, 160], z: [140, 100, 260, 210], open: 'mouth' },
-    neck:      { n: 'Neck', f: 'Your neck holds your head up and lets it turn.', snd: 'boop', dur: 1300, c: [200, 185], z: [110, 120, 290, 280] },
+    neck:      { n: 'Neck', f: 'Your neck holds your head up and lets it turn.', snd: 'boop', dur: 1300, c: [200, 185], z: [110, 120, 290, 280], open: 'vertebra' },
     shoulders: { n: 'Shoulders', f: 'Shoulders let your arms swing all the way round.', snd: 'swish', dur: 800, count: 2, c: [128, 228], z: [50, 160, 210, 330] },
     arm:       { n: 'Arm', f: 'Your arms can reach, lift and wave.', snd: 'swish', dur: 1900, count: 2, c: [112, 300], z: [30, 190, 200, 480], open: 'skin' },
     elbow:     { n: 'Elbow', f: 'Your elbow is where your arm bends.', snd: 'boop', dur: 1400, count: 2, c: [98, 342], z: [30, 270, 170, 420] },
     hand:      { n: 'Hand', f: 'Each hand has five fingers.', snd: 'wiggle', dur: 1500, count: 2, c: [90, 458], z: [30, 395, 150, 505], open: 'skin' },
-    tummy:     { n: 'Tummy', f: 'Your tummy holds your stomach and intestines.', snd: 'giggle', dur: 1500, c: [200, 380], z: [80, 270, 320, 540] },
-    legs:      { n: 'Leg', f: 'Strong legs help you run and jump.', snd: 'swish', dur: 1400, count: 2, c: [163, 620], z: [95, 480, 235, 800] },
-    knee:      { n: 'Knee', f: 'Your knees bend so you can sit and kneel.', snd: 'boop', dur: 1300, count: 2, c: [160, 628], z: [90, 550, 230, 710] },
+    tummy:     { n: 'Tummy', f: 'Your tummy holds your stomach and intestines.', snd: 'giggle', dur: 1500, c: [200, 380], z: [80, 270, 320, 540], open: 'stomach' },
+    legs:      { n: 'Leg', f: 'Strong legs help you run and jump.', snd: 'swish', dur: 1400, count: 2, c: [163, 620], z: [95, 480, 235, 800], open: 'muscle' },
+    knee:      { n: 'Knee', f: 'Your knees bend so you can sit and kneel.', snd: 'boop', dur: 1300, count: 2, c: [160, 628], z: [90, 550, 230, 710], open: 'joint' },
     feet:      { n: 'Foot', f: 'Your feet carry you everywhere.', snd: 'tap', dur: 1300, count: 2, c: [146, 766], z: [70, 700, 230, 800] }
   };
   function info(id) { return PARTS[id] || ITEMS[id]; }
@@ -2859,7 +2859,7 @@
 
   function place(b, x, y, w) { b.style.left = Math.round(x) + 'px'; b.style.top = Math.round(y) + 'px'; b.style.width = b.style.height = Math.round(w) + 'px'; }
 
-  function layout(animate) {
+  function layout(animate, keep) {
     W = window.innerWidth || 800; H = window.innerHeight || 600;
     land = W >= H * 1.05;
     stage.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
@@ -2920,7 +2920,7 @@
     UI.again.style.left = (panel.x + panel.w / 2 - 48) + 'px'; UI.again.style.top = (panel.y + panel.h / 2 - 30) + 'px';
     UI.again.style.position = 'fixed';
 
-    goView(currentTarget(), !animate);
+    if (!keep) { goView(currentTarget(), !animate); }
     layoutTray();
   }
 
@@ -3105,10 +3105,12 @@
     }
     sfx('zoomin'); say(SCN[id].n); tip(SCN[id].n);
     if (SCN[id].enter) { SCN[id].enter(); }
+    refreshDots();
+    layout(true, true);
     if (mode === 'build') { startBuild(); }
-    layout(true);
     kick();
   }
+  function refreshDots() { UI.dots.style.display = (sys === 'body' && mode === 'explore' && !scene) ? 'flex' : 'none'; }
   function closeScene() {
     if (!scene) { return; }
     if (mode === 'build' && B) { endBuild(); }
@@ -3131,8 +3133,9 @@
         tweens.push({ t0: performance.now(), dur: 380, fn: function (q) { var e = 1 - sm(q); setBubble(BK * (0.3 + 0.7 * e), e); }, done: done });
       }
     }
+    refreshDots();
+    layout(true, true);
     if (mode === 'build') { startBuild(); }
-    layout(true);
     kick();
   }
 
