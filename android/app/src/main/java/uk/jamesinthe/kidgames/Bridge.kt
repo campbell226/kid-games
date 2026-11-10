@@ -1,4 +1,4 @@
-package com.jamescampbelliscool.kidgames
+package uk.jamesinthe.kidgames
 
 import android.os.Handler
 import android.os.Looper

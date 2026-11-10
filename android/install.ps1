@@ -48,5 +48,5 @@ if ($LASTEXITCODE) { throw 'The build failed.' }
 $apk = Join-Path $PSScriptRoot 'app\build\outputs\apk\debug\app-debug.apk'
 & $adb -s $target install -r $apk
 if ($LASTEXITCODE) { throw 'The install failed.' }
-& $adb -s $target shell am start -n com.jamescampbelliscool.kidgames/.MainActivity | Out-Null
+& $adb -s $target shell am start -n uk.jamesinthe.kidgames/.MainActivity | Out-Null
 Write-Host "Kid Games is on $target."

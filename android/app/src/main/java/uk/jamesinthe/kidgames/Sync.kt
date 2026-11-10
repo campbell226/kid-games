@@ -1,4 +1,4 @@
-package com.jamescampbelliscool.kidgames
+package uk.jamesinthe.kidgames
 
 import android.content.Context
 import android.net.Uri

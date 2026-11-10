@@ -5,13 +5,13 @@ plugins {
 }
 
 android {
-    namespace = "com.jamescampbelliscool.kidgames"
+    namespace = "uk.jamesinthe.kidgames"
     compileSdk {
         version = release(37)
     }
 
     defaultConfig {
-        applicationId = "com.jamescampbelliscool.kidgames"
+        applicationId = "uk.jamesinthe.kidgames"
         // Wireless debugging, which is how this reaches a phone, starts at Android 11.
         minSdk = 30
         targetSdk = 37
