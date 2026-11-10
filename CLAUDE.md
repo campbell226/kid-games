@@ -57,6 +57,14 @@ Stargazing's 72 lines of Dad's voice, in `games/stargazing/sounds/`,
 work the same way. They were cut from eight long recordings, which are
 in commit 6f2b3ce.
 
+Inside Me's 270 part names, in `games/inside-me/sounds/`, are Dad's voice
+too, cut from one recording (commit 173fac6, `Take A.m4a`; the script he
+read from is in 331e12f). The low-cut at 130 Hz matters: the room had a
+rumble below 200 Hz. Cuts start 0.2 s before the sound, because a tight
+cut turned "ten" into "en". Unlike the others it has no synthesised
+fallback and no text-to-speech: a name with no clip, a fact, or a clip
+that won't play is simply shown as text. Names map to files by `slug()`.
+
 Hoot's Postcards' hellos, in `games/hoots-postcards/sounds/`, are the
 one set that isn't ours: real speakers from Wikimedia Commons, mostly
 Lingua Libre, under CC0, CC BY or CC BY-SA. `sounds/CREDITS.md` names

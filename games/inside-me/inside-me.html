@@ -277,8 +277,7 @@
 
   // ------------------------------------------------------------------
   // Sound. Everything is synthesised, so the game is never silent and
-  // never waits on a download. Names are spoken by the device's own
-  // speech if it has any.
+  // never waits on a download. Names are voiced by the recordings below.
   // ------------------------------------------------------------------
   var AC = null, master = null, noiseBuf = null;
   var muted = store('muted') === '1';
@@ -411,30 +410,111 @@
     } catch (e) { /* audio is a bonus */ }
   }
 
-  var speechOk = 'speechSynthesis' in window && typeof window.SpeechSynthesisUtterance === 'function';
-  var spT = 0, spTimer = null, spText = '', spVoice = null;
-  function pickVoice() {
-    if (spVoice) { return spVoice; }
-    try {
-      var vs = window.speechSynthesis.getVoices() || [];
-      for (var i = 0; i < vs.length; i++) { if (/en[-_]GB/i.test(vs[i].lang)) { spVoice = vs[i]; break; } }
-    } catch (e) { /* none */ }
-    return spVoice;
+  // ------------------------------------------------------------------
+  // The voice. A real person said each name once; the clips sit in
+  // sounds/, one per name, named by slug(). A name with no clip (or a
+  // clip that will not load or play) is simply not spoken: the words are
+  // always on screen, so there is no text-to-speech and nothing breaks.
+  // ------------------------------------------------------------------
+  var HAVE = {};
+  [
+    'me', 'bones', 'muscles', 'heart-and-blood', 'breathing', 'food', 'wee', 'brain-and-nerves', 'senses',
+    'shoulder-blade', 'spine', 'discs', 'neck-bones', 'chest-bones', 'lower-back-bones', 'sacrum', 'ribs',
+    'true-ribs', 'false-ribs', 'floating-ribs', 'rib-cartilage', 'breastbone', 'collarbone', 'pelvis', 'skull',
+    'jaw', 'upper-arm-bone', 'forearm-bones', 'radius', 'ulna', 'hand-bones', 'wrist-bones', 'palm-bones',
+    'finger-bones', 'thigh-bone', 'kneecap', 'shin-bone', 'tibia', 'fibula', 'foot-bones', 'ankle-bones',
+    'foot-long-bones', 'toe-bones', 'neck-muscle', 'trapezius', 'chest-muscle', 'tummy-muscles',
+    'side-tummy-muscles', 'shoulder-muscle', 'back-of-arm-muscle', 'biceps', 'forearm-muscles', 'thigh-muscles',
+    'sartorius', 'shin-muscle', 'calf-muscle', 'forehead-muscle', 'eye-muscle-ring', 'chewing-muscle',
+    'smile-muscle', 'lip-muscle', 'eye', 'eye-muscles', 'white-of-the-eye', 'eye-jelly', 'retina', 'optic-nerve',
+    'lens', 'iris', 'cornea', 'eyelid', 'heart', 'aorta', 'big-veins', 'lung-blood-tubes', 'neck-blood-tubes',
+    'shoulder-blood-tubes', 'face-blood-tubes', 'arm-blood-tubes', 'forearm-blood-tubes', 'hand-blood-tubes',
+    'leg-blood-tubes', 'shin-blood-tubes', 'foot-blood-tubes', 'sinuses', 'nose-inside', 'throat', 'voice-box',
+    'windpipe', 'lungs', 'air-tubes', 'diaphragm', 'spit-glands', 'tongue', 'teeth', 'food-pipe', 'liver',
+    'gall-bladder', 'pancreas', 'stomach', 'small-intestine', 'duodenum', 'jejunum', 'ileum', 'large-intestine',
+    'caecum', 'rising-colon', 'across-colon', 'falling-colon', 's-shaped-colon', 'rectum', 'adrenal-glands',
+    'kidneys', 'kidney-blood-tubes', 'wee-tubes', 'bladder', 'wee-tube-out', 'brain', 'spinal-cord',
+    'wandering-nerve', 'shoulder-nerves', 'arm-nerves', 'forearm-nerves', 'finger-nerves', 'lower-back-nerves',
+    'sciatic-nerve', 'lower-leg-nerves', 'foot-nerves', 'eyeballs', 'inner-ear', 'smell-patch', 'taste-buds',
+    'touch', 'heart-inside', 'upper-big-vein', 'lower-big-vein', 'lung-veins', 'lung-artery', 'wall-in-the-middle',
+    'right-atrium', 'left-atrium', 'right-ventricle', 'left-ventricle', 'heart-doors', 'exit-doors', 'lungs-inside',
+    'air-sacs', 'tiny-air-tube', 'blood-web', 'brain-stem', 'balance-part', 'nerve-cell', 'branches', 'cell-body',
+    'long-wire', 'insulation', 'little-feet', 'message-dots', 'ear-inside', 'ear-to-throat-tube', 'balance-loops',
+    'snail-shell', 'hearing-nerve', 'stirrup', 'anvil', 'hammer', 'eardrum', 'ear-tunnel', 'outer-ear', 'mouth',
+    'dangly-bit', 'tonsils', 'gums', 'front-teeth', 'pointy-teeth', 'back-teeth', 'tooth-inside', 'jaw-bone',
+    'tooth-middle', 'tooth-nerve', 'gum', 'enamel', 'kidney-inside', 'kidney-skin', 'wee-making-cones',
+    'wee-collector', 'wee-tube', 'kidney-artery', 'kidney-vein', 'tiny-filter', 'collecting-pipe', 'long-loop',
+    'twisty-tube', 'finishing-tube', 'filter-cup', 'blood-ball', 'stomach-inside', 'food-pipe-door',
+    'stomach-muscle', 'slimy-coat', 'folds', 'food-soup', 'stomach-juice', 'exit-door', 'gut-lining', 'gut-wall',
+    'little-fingers', 'blood-tubes', 'fat-tube', 'food-goodness', 'skin-inside', 'cosy-fat', 'muscle-below',
+    'inner-skin', 'outer-skin', 'skin-blood-tubes', 'touch-sensor', 'sweat-gland', 'oil-gland', 'goosebump-muscle',
+    'hair', 'bone-inside', 'bone-skin', 'hard-bone', 'light-bone', 'bone-marrow', 'bone-blood-tube', 'muscle-inside',
+    'tendon', 'muscle-fibres', 'stripes', 'muscle-nerve', 'blood', 'blood-tube-wall', 'plasma', 'platelets',
+    'white-blood-cell', 'red-blood-cells', 'more-red-cells', 'knee-inside', 'joint-bag', 'thigh-bone-end',
+    'cartilage', 'cushions', 'joint-ropes', 'shin-bone-end', 'backbone-inside', 'back-arch', 'nerve-branches',
+    'cushion', 'backbone', 'smell-centre', 'smell-nerve', 'smell-sensors', 'nose-folds', 'nose-hairs', 'nose-tunnel',
+    'head', 'eyes', 'ears', 'nose', 'neck', 'shoulders', 'arm', 'elbow', 'hand', 'tummy', 'leg', 'knee', 'foot',
+  ].forEach(function (s) { HAVE[s] = true; });
+  function slug(t) {
+    return String(t).toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   }
+  var CLIPS = {}, unlocked = false, speaking = null, spT = 0, spTimer = null, spName = '';
+  function clipFor(s) {
+    var a = CLIPS[s];
+    if (!a) {
+      a = new window.Audio('sounds/' + s + '.mp3');
+      a.preload = 'auto';
+      a.addEventListener('error', function () { a.broken = true; });
+      CLIPS[s] = a;
+    }
+    return a;
+  }
+  // A phone will not play a sound no finger asked for. On the first touch
+  // every clip is started and stopped once, muted, a few at a time so a
+  // phone is not asked to open 270 files in the same instant.
+  function unlockClips() {
+    if (unlocked) { return; }
+    unlocked = true;
+    var keys = Object.keys(HAVE), k = 0;
+    function one(a) {
+      a.muted = true;
+      var p;
+      try { p = a.play(); } catch (e) { a.muted = false; return; }
+      if (p && p.then) {
+        p.then(function () {
+          a.pause();
+          try { a.currentTime = 0; } catch (e1) { /* not loaded yet */ }
+          a.muted = false;
+        }, function () { a.muted = false; });
+      } else { a.pause(); a.muted = false; }
+    }
+    (function next() {
+      for (var n = 0; n < 8 && k < keys.length; n++, k++) { one(clipFor(keys[k])); }
+      if (k < keys.length) { setTimeout(next, 80); }
+    })();
+  }
+  function stopSpeech() {
+    if (spTimer) { clearTimeout(spTimer); spTimer = null; }
+    if (speaking) { try { speaking.pause(); speaking.currentTime = 0; } catch (e) { /* fine */ } speaking = null; }
+  }
+  // One voice at a time, and never faster than a person could say it: a
+  // flurry of taps says only the last name once things settle.
   function say(text) {
-    if (muted || !speechOk) { return; }
-    spText = text;
+    var s = slug(text);
+    if (muted || !HAVE[s]) { return; }
+    spName = s;
     var wait = Math.max(0, 650 - (Date.now() - spT));
     if (spTimer) { clearTimeout(spTimer); }
     spTimer = setTimeout(function () {
       spTimer = null; spT = Date.now();
-      try {
-        window.speechSynthesis.cancel();
-        var u = new window.SpeechSynthesisUtterance(spText);
-        u.lang = 'en-GB'; u.rate = 0.9; u.pitch = 1.05;
-        var v = pickVoice(); if (v) { u.voice = v; }
-        window.speechSynthesis.speak(u);
-      } catch (e) { /* no speech here */ }
+      var a = clipFor(spName);
+      if (a.broken) { return; }
+      if (speaking && speaking !== a) { try { speaking.pause(); speaking.currentTime = 0; } catch (e) { /* fine */ } }
+      speaking = a;
+      try { a.currentTime = 0; } catch (e1) { /* it starts from wherever it is */ }
+      var p;
+      try { p = a.play(); } catch (e2) { return; }
+      if (p && p['catch']) { p['catch'](function () { /* the words are on screen */ }); }
     }, wait);
   }
 
@@ -3045,8 +3125,7 @@
     if (sel.id === id && now - sel.t < 350) { return; }
     sel = { id: id, t: now, node: node, side: s };
     if (mode === 'explore') { showCard(id, node); } else { tip(inf.n); }
-    var text = inf.n + (factsOn ? '. ' + inf.f : '');
-    say(text);
+    say(inf.n);
     sfx(inf.snd);
     startMotion(id, s, now);
     if (inf.tap) { inf.tap(node, s); }
@@ -3462,7 +3541,7 @@
   STORY.tummy = {
     icon: 'apple',
     go: function () {
-      sfx('munch'); say('Yum');
+      sfx('munch');
       var sp = [[200, 160], [205, 172], [205, 236], [208, 288], [220, 318], [227, 342], [250, 362], [244, 388], [208, 392], [186, 404], [176, 418], [200, 430]];
       var i;
       for (i = 0; i < 6; i++) { var y = 432 + i * 9; sp.push(i % 2 ? [168, y + 2] : [232, y + 2]); sp.push(i % 2 ? [232, y + 9] : [168, y + 9]); }
@@ -3523,7 +3602,7 @@
       UI.menu.style.display = 'none';
     }
     if (!b) { return; }
-    ensureAudio();
+    ensureAudio(); unlockClips();
     var act = b.getAttribute('data-act');
     if (act) {
       if (act === 'sys') { UI.menu.style.display = UI.menu.style.display === 'grid' ? 'none' : 'grid'; sfx('pick'); }
@@ -3532,7 +3611,7 @@
       else if (act === 'story') { if (STORY[sys]) { STORY[sys].go(); } }
       else if (act === 'sound') {
         muted = !muted; store('muted', muted ? '1' : '0');
-        if (muted) { try { window.speechSynthesis.cancel(); } catch (x) { /* none */ } }
+        if (muted) { stopSpeech(); }
         refreshToggles();
       } else if (act === 'facts') {
         factsOn = !factsOn; store('facts', factsOn ? '1' : '0'); refreshToggles();
@@ -3557,7 +3636,7 @@
   }
 
   stage.addEventListener('pointerdown', function (e) {
-    ensureAudio();
+    ensureAudio(); unlockClips();
     var t = e.target;
     look.tx = clamp((e.clientX - (view.tx + 200 * view.s)) / (area.w / 2), -1, 1);
     look.ty = clamp((e.clientY - (view.ty + 100 * view.s)) / (area.h / 2), -1, 1);
