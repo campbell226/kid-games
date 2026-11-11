@@ -3371,7 +3371,9 @@
     drag = null;
     var it = ITEMS[pc.id];
     var bp = toBody(pc.x, pc.y);
-    var R = clamp(it.rad, 30, 80) * (it['in'] ? BK : 1), d = 1e9;
+    // Forgiving drop: a bit wider than the organ, and never smaller than ~60 screen px
+    // (a small or zoomed-out screen made the target tiny).
+    var R = Math.max(clamp(it.rad, 30, 80) * (it['in'] ? BK : 1) * 1.25, 60 / view.s), d = 1e9;
     it.nodes.forEach(function (n) {
       var c = it['in'] ? [anc.x + n.__c[0] * BK, anc.y + n.__c[1] * BK] : n.__c;
       d = Math.min(d, Math.hypot(bp[0] - c[0], bp[1] - c[1]));
@@ -3642,6 +3644,9 @@
     look.ty = clamp((e.clientY - (view.ty + 100 * view.s)) / (area.h / 2), -1, 1);
     kick();
     var pcEl = t.closest ? t.closest('.pc') : null;
+    // A drag whose finger-up was never seen (touch screens drop events) must not
+    // block every later pick-up: finish it where it is, then carry on.
+    if (drag && e.pointerId !== drag.pid) { endDrag({ pointerId: drag.pid }); }
     if (pcEl && B) {
       var pid = pcEl.getAttribute('data-piece');
       for (var i = 0; i < B.slots.length; i++) { if (B.slots[i] && B.slots[i].id === pid) { startDrag(B.slots[i], e); return; } }
@@ -3684,6 +3689,11 @@
     if (!p.moved && was === 1 && e.type === 'pointerup') { tapAt(p); }
   }
   stage.addEventListener('pointerup', pend);
+  // Backstops: if capture is lost or the finger lifts off the stage, still end the drag.
+  stage.addEventListener('lostpointercapture', function (e) { if (drag && e.pointerId === drag.pid) { endDrag(e); } });
+  window.addEventListener('pointerup', function (e) { if (drag && e.pointerId === drag.pid) { endDrag(e); } });
+  window.addEventListener('pointercancel', function (e) { if (drag && e.pointerId === drag.pid) { endDrag(e); } });
+  window.addEventListener('blur', function () { if (drag) { endDrag({ pointerId: drag.pid }); } });
   stage.addEventListener('pointercancel', function (e) { if (drag) { endDrag(e); return; } delete ptr[e.pointerId]; np = ptrIds().length; });
   stage.addEventListener('wheel', function (e) {
     if (!gesturesOn()) { return; }
