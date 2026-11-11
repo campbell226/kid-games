@@ -3374,10 +3374,16 @@
     // Forgiving drop: a bit wider than the organ, and never smaller than ~60 screen px
     // (a small or zoomed-out screen made the target tiny).
     var R = Math.max(clamp(it.rad, 30, 80) * (it['in'] ? BK : 1) * 1.25, 60 / view.s), d = 1e9;
+    var cx = 0, cy = 0;
     it.nodes.forEach(function (n) {
       var c = it['in'] ? [anc.x + n.__c[0] * BK, anc.y + n.__c[1] * BK] : n.__c;
       d = Math.min(d, Math.hypot(bp[0] - c[0], bp[1] - c[1]));
+      cx += c[0]; cy += c[1];
     });
+    // A left-and-right pair (arms, cheeks, ...) is drawn in the tray as one piece, so
+    // children aim its middle at the middle of the body, which is between the two
+    // places. Dropping on that middle counts too.
+    if (it.nodes.length > 1) { d = Math.min(d, Math.hypot(bp[0] - cx / it.nodes.length, bp[1] - cy / it.nodes.length)); }
     var overBody = pc.x > area.x && pc.x < area.x + area.w && pc.y > area.y && pc.y < area.y + area.h;
     if (moved && d <= R) { locate(pc, it); return; }
     if (moved && overBody) {
