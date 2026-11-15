@@ -6,20 +6,21 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
-<meta name="theme-color" content="#141d3a">
+<meta name="theme-color" content="#101a3c">
 <title>Drum Mouse</title>
 <style>
   * { box-sizing: border-box; }
   html, body {
     margin: 0; padding: 0; height: 100%;
-    background: #141d3a;
+    background: #101a3c;
     overflow: hidden;
     touch-action: manipulation;
     overscroll-behavior: none;
     -webkit-user-select: none; user-select: none;
     -webkit-tap-highlight-color: transparent;
   }
-  #stage { display: block; width: 100vw; height: 100vh; width: 100dvw; height: 100dvh; }
+  #stage { position: fixed; left: 0; top: 0; display: block; width: 100vw; height: 100vh; width: 100dvw; height: 100dvh; }
+  #fx { position: fixed; left: 0; top: 0; pointer-events: none; z-index: 5; }
   .hit { fill: transparent; cursor: pointer; }
   #mic {
     position: fixed; top: 6px; right: 6px; z-index: 30;
@@ -86,88 +87,101 @@
 })();
 </script>
 
-<svg id="stage" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 760" preserveAspectRatio="xMidYMid slice" aria-label="Drum Mouse">
+<svg id="stage" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 640" preserveAspectRatio="xMidYMid meet" aria-label="Drum Mouse">
   <defs>
     <linearGradient id="dm-sky" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#141d3a"/><stop offset="1" stop-color="#3a2f66"/>
+      <stop offset="0" stop-color="#0d1636"/><stop offset="0.55" stop-color="#26285c"/><stop offset="1" stop-color="#433a78"/>
     </linearGradient>
-    <linearGradient id="dm-wood" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#cf9459"/><stop offset="1" stop-color="#8a5a2c"/>
+    <linearGradient id="dm-grass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#244a3f"/><stop offset="1" stop-color="#16302a"/>
     </linearGradient>
+    <radialGradient id="dm-halo" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff6d8" stop-opacity="0.5"/><stop offset="0.45" stop-color="#fff6d8" stop-opacity="0.14"/><stop offset="1" stop-color="#fff6d8" stop-opacity="0"/>
+    </radialGradient>
     <radialGradient id="dm-spot" cx="0.5" cy="0.5" r="0.5">
-      <stop offset="0" stop-color="#fff3c2" stop-opacity="0.38"/><stop offset="1" stop-color="#fff3c2" stop-opacity="0"/>
+      <stop offset="0" stop-color="#ffe7a8" stop-opacity="0.22"/><stop offset="1" stop-color="#ffe7a8" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="dm-shell" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#a8323f"/><stop offset="0.5" stop-color="#e0586a"/><stop offset="1" stop-color="#a8323f"/>
+    <linearGradient id="dm-woodL" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#7a3519"/><stop offset="0.45" stop-color="#c8693a"/><stop offset="1" stop-color="#7a3519"/>
     </linearGradient>
-    <radialGradient id="dm-skin" cx="0.5" cy="0.45" r="0.6">
-      <stop offset="0" stop-color="#fff8e4"/><stop offset="1" stop-color="#efdcae"/>
+    <linearGradient id="dm-woodR" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#1f4f86"/><stop offset="0.45" stop-color="#3f86c9"/><stop offset="1" stop-color="#1f4f86"/>
+    </linearGradient>
+    <radialGradient id="dm-skin" cx="0.5" cy="0.4" r="0.6">
+      <stop offset="0" stop-color="#fff6e0"/><stop offset="1" stop-color="#e6cc9c"/>
     </radialGradient>
+    <mask id="dm-moonmask" maskUnits="userSpaceOnUse" x="-300" y="-300" width="600" height="600">
+      <circle id="dm-moonlit" cx="0" cy="0" r="40" fill="#fff"/>
+      <circle id="dm-moonshade" cx="14" cy="-4" r="41" fill="#000"/>
+    </mask>
   </defs>
 
-  <rect id="bg" x="-3000" y="-3000" width="7000" height="7000" fill="url(#dm-sky)"/>
-  <g id="scene">
-    <rect x="-3000" y="560" width="7000" height="3000" fill="url(#dm-wood)"/>
-    <rect x="-3000" y="560" width="7000" height="8" fill="#6b431f"/>
-    <circle cx="350" cy="330" r="360" fill="url(#dm-spot)"/>
+  <g id="scene"></g>
+  <g id="stars"></g>
+  <g id="creatures"></g>
 
-    <!-- the mouse, behind the drum -->
-    <g id="mouse" transform="translate(350,400) scale(1.5)">
-      <g id="body">
-        <path d="M 40 -40 Q 96 -34 88 -96" stroke="#e3b7c2" stroke-width="9" fill="none" stroke-linecap="round"/>
-        <ellipse cx="0" cy="-58" rx="46" ry="48" fill="#bab7c6"/>
-        <ellipse cx="0" cy="-48" rx="26" ry="30" fill="#ded9e6"/>
-        <g id="head">
-          <circle cx="-33" cy="-138" r="28" fill="#bab7c6"/>
-          <circle cx="33" cy="-138" r="28" fill="#bab7c6"/>
-          <circle cx="-33" cy="-138" r="18" fill="#f0b7c3"/>
-          <circle cx="33" cy="-138" r="18" fill="#f0b7c3"/>
-          <ellipse cx="0" cy="-112" rx="35" ry="31" fill="#bab7c6"/>
-          <path d="M -66 -96 L -26 -92" stroke="#efeaf2" stroke-width="3" stroke-linecap="round"/>
-          <path d="M 66 -96 L 26 -92" stroke="#efeaf2" stroke-width="3" stroke-linecap="round"/>
-          <path d="M -64 -106 L -26 -100" stroke="#efeaf2" stroke-width="3" stroke-linecap="round"/>
-          <path d="M 64 -106 L 26 -100" stroke="#efeaf2" stroke-width="3" stroke-linecap="round"/>
-          <ellipse cx="0" cy="-94" rx="9" ry="7" fill="#e88fa2"/>
-          <g id="eyeL"><ellipse cx="-15" cy="-120" rx="11" ry="11" fill="#fff"/><circle id="pupL" cx="-15" cy="-119" r="6" fill="#22203a"/><circle id="shL" cx="-13" cy="-123" r="2" fill="#fff"/></g>
-          <g id="eyeR"><ellipse cx="15" cy="-120" rx="11" ry="11" fill="#fff"/><circle id="pupR" cx="15" cy="-119" r="6" fill="#22203a"/><circle id="shR" cx="17" cy="-123" r="2" fill="#fff"/></g>
-          <path id="smile" d="M -12 -84 Q 0 -76 12 -84 Q 0 -80 -12 -84 Z" fill="#6d6a7a" stroke="#6d6a7a" stroke-width="2" stroke-linejoin="round"/>
-          <path id="grin" d="M -13 -84 Q 0 -66 13 -84 Z" fill="#6d3a46" stroke="#6d6a7a" stroke-width="2" stroke-linejoin="round" opacity="0"/>
+  <g id="dm-mouse">
+    <ellipse cx="0" cy="80" rx="215" ry="17" fill="#000" opacity="0.3"/>
+    <g id="dm-body">
+      <path d="M 40 -40 Q 122 -30 128 -104 Q 132 -134 106 -140" stroke="#e3b7c2" stroke-width="9" fill="none" stroke-linecap="round"/>
+      <ellipse cx="0" cy="-70" rx="56" ry="62" fill="#bab7c6"/>
+      <ellipse cx="0" cy="-62" rx="33" ry="40" fill="#ded9e6"/>
+      <g id="dm-head">
+        <g id="dm-earL"><circle cx="-42" cy="-176" r="33" fill="#bab7c6"/><circle cx="-42" cy="-176" r="22" fill="#f0b7c3"/></g>
+        <g id="dm-earR"><circle cx="42" cy="-176" r="33" fill="#bab7c6"/><circle cx="42" cy="-176" r="22" fill="#f0b7c3"/></g>
+        <ellipse cx="0" cy="-138" rx="47" ry="41" fill="#bab7c6"/>
+        <g stroke="#efeaf2" stroke-width="3" stroke-linecap="round">
+          <path d="M -76 -126 L -34 -122"/><path d="M -74 -112 L -34 -116"/>
+          <path d="M 76 -126 L 34 -122"/><path d="M 74 -112 L 34 -116"/>
         </g>
+        <ellipse cx="-28" cy="-121" rx="9" ry="6" fill="#f3a9bb" opacity="0.65"/>
+        <ellipse cx="28" cy="-121" rx="9" ry="6" fill="#f3a9bb" opacity="0.65"/>
+        <g id="dm-eyeL"><ellipse cx="-17" cy="-148" rx="12" ry="13" fill="#fff"/><g id="dm-puL"><circle cx="-17" cy="-147" r="7" fill="#22203a"/><circle cx="-14.5" cy="-150" r="2.4" fill="#fff"/></g></g>
+        <g id="dm-eyeR"><ellipse cx="17" cy="-148" rx="12" ry="13" fill="#fff"/><g id="dm-puR"><circle cx="17" cy="-147" r="7" fill="#22203a"/><circle cx="19.5" cy="-150" r="2.4" fill="#fff"/></g></g>
+        <g id="dm-brows" stroke="#8d8a9c" stroke-width="4" fill="none" stroke-linecap="round">
+          <path d="M -28 -168 Q -18 -174 -8 -169"/><path d="M 28 -168 Q 18 -174 8 -169"/>
+        </g>
+        <ellipse cx="0" cy="-124" rx="9" ry="7" fill="#e88fa2"/>
+        <path id="dm-mSmile" d="M -11 -112 Q 0 -104 11 -112" stroke="#6d6a7a" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+        <path id="dm-mGrin" d="M -15 -114 Q 0 -93 15 -114 Z" fill="#6d3a46" stroke="#6d6a7a" stroke-width="2.4" stroke-linejoin="round" opacity="0"/>
+        <ellipse id="dm-mOoh" cx="0" cy="-108" rx="6" ry="8" fill="#6d3a46" opacity="0"/>
       </g>
     </g>
 
-    <!-- the drum -->
-    <g id="drum">
-      <ellipse cx="350" cy="566" rx="214" ry="22" fill="#000" opacity="0.22"/>
-      <path d="M 140 450 L 140 520 Q 140 560 350 560 Q 560 560 560 520 L 560 450 Z" fill="url(#dm-shell)"/>
-      <path d="M 140 470 L 175 520 L 210 470 L 245 523 L 280 472 L 315 526 L 350 473 L 385 526 L 420 472 L 455 523 L 490 470 L 525 520 L 560 470"
-            fill="none" stroke="#fff3d6" stroke-width="7" stroke-linejoin="round" stroke-linecap="round" opacity="0.85"/>
-      <ellipse cx="350" cy="450" rx="210" ry="60" fill="#e6b441"/>
-      <ellipse cx="350" cy="450" rx="198" ry="52" fill="url(#dm-skin)"/>
-      <ellipse id="ripple" cx="350" cy="450" rx="100" ry="26" fill="none" stroke="#e0586a" stroke-width="7" opacity="0"/>
-      <ellipse id="glow" cx="350" cy="450" rx="218" ry="66" fill="none" stroke="#7bf0a4" stroke-width="11" opacity="0"/>
+    <g id="dm-drL">
+      <path d="M -188 -36 L -170 66 Q -98 84 -24 66 L -6 -36 Z" fill="url(#dm-woodL)"/>
+      <path d="M -184 -6 Q -97 12 -10 -6" stroke="#5e2a12" stroke-width="7" fill="none"/>
+      <path d="M -175 46 Q -97 64 -19 46" stroke="#5e2a12" stroke-width="7" fill="none"/>
+      <g fill="#e8c46a"><circle cx="-160" cy="-4" r="4"/><circle cx="-128" cy="3" r="4"/><circle cx="-97" cy="5" r="4"/><circle cx="-66" cy="3" r="4"/><circle cx="-34" cy="-4" r="4"/></g>
+      <ellipse cx="-97" cy="-36" rx="92" ry="26" fill="#4e2410"/>
+      <ellipse cx="-97" cy="-38" rx="85" ry="22" fill="url(#dm-skin)"/>
+      <ellipse id="dm-ripL" cx="-97" cy="-38" rx="40" ry="10" fill="none" stroke="#c98b5a" stroke-width="4" opacity="0"/>
+      <ellipse id="dm-glowL" cx="-97" cy="-36" rx="100" ry="31" fill="none" stroke="#7bf0a4" stroke-width="8" opacity="0"/>
+    </g>
+    <rect x="-12" y="4" width="36" height="22" rx="5" fill="#4e2410"/>
+    <g id="dm-drR">
+      <path d="M 20 -28 L 34 60 Q 95 76 156 60 L 170 -28 Z" fill="url(#dm-woodR)"/>
+      <path d="M 24 0 Q 95 16 166 0" stroke="#163a63" stroke-width="7" fill="none"/>
+      <path d="M 31 42 Q 95 57 159 42" stroke="#163a63" stroke-width="7" fill="none"/>
+      <g fill="#e8c46a"><circle cx="46" cy="5" r="4"/><circle cx="70" cy="10" r="4"/><circle cx="95" cy="12" r="4"/><circle cx="120" cy="10" r="4"/><circle cx="144" cy="5" r="4"/></g>
+      <ellipse cx="95" cy="-28" rx="76" ry="22" fill="#163a63"/>
+      <ellipse cx="95" cy="-30" rx="69" ry="18" fill="url(#dm-skin)"/>
+      <ellipse id="dm-ripR" cx="95" cy="-30" rx="32" ry="8" fill="none" stroke="#c98b5a" stroke-width="4" opacity="0"/>
+      <ellipse id="dm-glowR" cx="95" cy="-28" rx="84" ry="27" fill="none" stroke="#7bf0a4" stroke-width="8" opacity="0"/>
     </g>
 
-    <!-- paws and sticks, in front of the drum -->
-    <g id="arms">
-      <g id="armL"><line id="aL" stroke="#9592a4" stroke-width="24" stroke-linecap="round"/><line id="sL" stroke="#e8c78a" stroke-width="8" stroke-linecap="round"/><circle id="hL" r="19" fill="#bab7c6" stroke="#9592a4" stroke-width="3"/></g>
-      <g id="armR"><line id="aR" stroke="#9592a4" stroke-width="24" stroke-linecap="round"/><line id="sR" stroke="#e8c78a" stroke-width="8" stroke-linecap="round"/><circle id="hR" r="19" fill="#bab7c6" stroke="#9592a4" stroke-width="3"/></g>
+    <line id="dm-armL" x1="-44" y1="-92" x2="-90" y2="-60" stroke="#9592a4" stroke-width="22" stroke-linecap="round"/>
+    <line id="dm-armR" x1="44" y1="-92" x2="88" y2="-52" stroke="#9592a4" stroke-width="22" stroke-linecap="round"/>
+    <circle id="dm-pawL" cx="-90" cy="-60" r="17" fill="#c4c1cf" stroke="#9592a4" stroke-width="3"/>
+    <circle id="dm-pawR" cx="88" cy="-52" r="17" fill="#c4c1cf" stroke="#9592a4" stroke-width="3"/>
+
+    <g id="dm-play">
+      <circle cx="0" cy="-34" r="50" fill="#3fbf6c" stroke="#fff" stroke-width="7"/>
+      <path d="M -14 -58 L -14 -10 L 26 -34 Z" fill="#fff" stroke="#fff" stroke-width="6" stroke-linejoin="round"/>
     </g>
-
-    <!-- the rhythm, as dots spaced out in time -->
-    <g id="dots"></g>
-
-    <!-- start cue: only until the first tap -->
-    <g id="play">
-      <circle cx="350" cy="450" r="62" fill="#3fbf6c" stroke="#fff" stroke-width="7"/>
-      <path d="M 334 422 L 334 478 L 382 450 Z" fill="#fff" stroke="#fff" stroke-width="6" stroke-linejoin="round"/>
-    </g>
-
-    <g id="pops"></g>
-    <rect id="hitbox" class="hit" x="120" y="380" width="460" height="200" rx="60"/>
   </g>
-  <g id="hud"></g>
 </svg>
+<canvas id="fx"></canvas>
 
 <div id="who" style="position:fixed;top:6px;right:76px;z-index:30;display:flex;gap:4px;padding:3px;border-radius:20px;background:rgba(255,255,255,0.72);box-shadow:0 1px 5px rgba(0,0,0,0.25);">
   <button id="whoMouse" aria-label="Mouse plays, you copy" style="width:56px;height:56px;padding:0;line-height:0;border:0;border-radius:17px;cursor:pointer;-webkit-tap-highlight-color:transparent;">
@@ -204,11 +218,44 @@
 <script>
 (function () {
   'use strict';
+  // ==================================================================
+  // Drum Mouse: wake the forest.
+  //
+  // The mouse plays a one-bar call on two bongos, the child answers in
+  // the next bar, then the band grooves for a bar while the result lands.
+  // Every good answer wakes one more sleeping creature, and each one that
+  // wakes joins the band with its own part, so playing well is heard as
+  // the song getting bigger. Five awake is a finale, then they all go
+  // back to sleep, the moon gets fuller and the next night is a touch
+  // trickier. Nothing ever goes wrong: a miss just gets the same call
+  // again, and three in a row bring an easier one.
+  //
+  // There is a steady pulse throughout and the tempo never changes.
+  // Difficulty is the patterns only.
+  // ==================================================================
   var NS = 'http://www.w3.org/2000/svg';
   function $(id) { return document.getElementById(id); }
   function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
   function lerp(a, b, t) { return a + (b - a) * t; }
-  function nowMs() { return performance.now(); }
+  function f1(v) { return (Math.round(v * 10) / 10).toString(); }
+  function setA(el, k, v) {
+    var c = el._a || (el._a = {});
+    if (c[k] !== v) { c[k] = v; el.setAttribute(k, v); }
+  }
+  function mk(tag, attrs, parent) {
+    var n = document.createElementNS(NS, tag);
+    if (attrs) { for (var k in attrs) { n.setAttribute(k, attrs[k]); } }
+    if (parent) { parent.appendChild(n); }
+    return n;
+  }
+  function seeded(s) {
+    return function () {
+      s |= 0; s = (s + 0x6D2B79F5) | 0;
+      var t = Math.imul(s ^ (s >>> 15), 1 | s);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
 
   var reduceQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
   var reduced = reduceQuery.matches;
@@ -217,101 +264,298 @@
   }
 
   // ------------------------------------------------------------------
-  // Saved level
+  // Saved: how many nights have been finished (the moon), and who leads.
   // ------------------------------------------------------------------
-  var KEY = 'drum-mouse-v1';
-  var lvl = 0, wins = 0, stars = 0;
-  var leader = 'mouse';   // 'mouse': the child copies the mouse. 'child': the mouse copies the child.
+  var KEY = 'drum-mouse-v2';
+  var lvl = 0, leader = 'mouse';
   try {
-    var saved = JSON.parse(localStorage.getItem(KEY) || '{}');
-    if (typeof saved.lvl === 'number') { lvl = clamp(saved.lvl | 0, 0, 4); }
+    var saved = JSON.parse(localStorage.getItem(KEY) || 'null');
+    if (!saved) { saved = JSON.parse(localStorage.getItem('drum-mouse-v1') || '{}'); saved.lvl = 0; }
+    if (typeof saved.lvl === 'number') { lvl = clamp(saved.lvl | 0, 0, 99); }
     if (saved.leader === 'child') { leader = 'child'; }
   } catch (e) {}
   function save() { try { localStorage.setItem(KEY, JSON.stringify({ lvl: lvl, leader: leader })); } catch (e) {} }
 
   // ------------------------------------------------------------------
-  // Sound. Everything is synthesised, so it can never be silent.
-  // One drum voice at a time: a new hit cuts the last one short.
+  // Time. One bar is eight steps (quavers) at 84 crotchets a minute.
   // ------------------------------------------------------------------
-  var AC = null, master = null, noiseBuf = null, lastDrum = null;
+  var BPM = 84, STEP = 60 / BPM / 2, BAR = STEP * 8, LOOK = 0.16;
+  var TOL = STEP * 0.42;        // how far off a hit can be and still count
+  var MIN_GAP = 0.07;           // hits closer than this are one hit
+  var MAX_HITS = 12;            // most hits that count in one bar
+  var PAD_VOL = 0.045;
+
+  // C, A minor, F, G, round and round. Everything else sits on top.
+  var CH = [[48, 52, 55], [45, 48, 52], [41, 45, 48], [43, 47, 50]];
+  var ROOT = [48, 45, 41, 43];
+  var HOO = [[67, 64], [64, 60], [65, 60], [67, 62]];
+  var TING = [[84, 88, 91, 96], [81, 84, 88, 93], [81, 84, 89, 93], [79, 83, 86, 91]];
+  function mtof(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+
+  // Patterns, as the steps of the bar that get a hit. Harder by more
+  // notes, then quavers, then gaps and off-beats. Never by speed.
+  var POOLS = [
+    [[0, 4], [0, 2, 4], [0, 4, 6], [0, 2, 4, 6], [0, 2, 6]],
+    [[0, 1, 2], [0, 2, 3, 4], [0, 1, 4], [0, 4, 5, 6], [0, 2, 4, 5]],
+    [[0, 3, 4], [0, 3, 6], [0, 2, 3, 6], [0, 1, 3, 4], [0, 3, 4, 6]],
+    [[0, 1, 2, 4, 6], [0, 1, 3, 4, 6], [0, 2, 3, 5, 6], [0, 3, 5, 6], [0, 1, 2, 3, 4]],
+    [[0, 1, 2, 3, 4, 6], [0, 2, 3, 4, 5, 6], [2, 3, 4, 6], [0, 1, 3, 5, 6], [0, 3, 4, 5, 6]]
+  ];
+
+  // ------------------------------------------------------------------
+  // Sound. All synthesised, so the game can never be silent.
+  // ------------------------------------------------------------------
+  var AC = null, master = null, noiseBuf = null, pad = null;
 
   function initAudio() {
     if (AC) { if (AC.state === 'suspended') { AC.resume(); } return; }
     var Ctx = window.AudioContext || window.webkitAudioContext;
     if (!Ctx) { return; }
-    AC = new Ctx();
+    try { AC = new Ctx({ latencyHint: 'interactive' }); } catch (e) { AC = new Ctx(); }
     var comp = AC.createDynamicsCompressor();
-    comp.threshold.setValueAtTime(-16, AC.currentTime);
-    comp.ratio.setValueAtTime(6, AC.currentTime);
+    comp.threshold.setValueAtTime(-14, AC.currentTime);
+    comp.ratio.setValueAtTime(5, AC.currentTime);
+    comp.attack.setValueAtTime(0.003, AC.currentTime);
+    comp.release.setValueAtTime(0.2, AC.currentTime);
     master = AC.createGain();
-    master.gain.setValueAtTime(0.7, AC.currentTime);
+    master.gain.setValueAtTime(0.62, AC.currentTime);
     master.connect(comp); comp.connect(AC.destination);
-    var n = Math.floor(AC.sampleRate * 0.2);
+    var n = Math.floor(AC.sampleRate * 1.0);
     noiseBuf = AC.createBuffer(1, n, AC.sampleRate);
     var d = noiseBuf.getChannelData(0);
     for (var i = 0; i < n; i++) { d[i] = Math.random() * 2 - 1; }
+    buildPad();
     if (AC.state === 'suspended') { AC.resume(); }
   }
 
-  function drumSound(side) {
-    if (!AC) { return; }
-    var t = AC.currentTime + 0.004;
-    if (lastDrum) {
-      lastDrum.gain.cancelScheduledValues(t);
-      lastDrum.gain.setTargetAtTime(0, t, 0.015);
+  // A soft warm chord that never stops while the band plays. It has no
+  // attack anywhere, so the microphone never mistakes it for a hit.
+  function buildPad() {
+    var lp = AC.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 820; lp.Q.value = 0.4;
+    var g = AC.createGain(); g.gain.value = 0;
+    var oscs = [];
+    for (var i = 0; i < 3; i++) {
+      var o = AC.createOscillator();
+      o.type = 'sawtooth'; o.frequency.value = mtof(CH[0][i]); o.detune.value = (i - 1) * 7;
+      o.connect(lp); o.start(); oscs.push(o);
     }
-    var o = AC.createOscillator(), g = AC.createGain();
-    var f0 = side > 0 ? 200 : 172;
-    o.type = 'sine';
-    o.frequency.setValueAtTime(f0 * 1.9, t);
-    o.frequency.exponentialRampToValueAtTime(f0 * 0.55, t + 0.17);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.linearRampToValueAtTime(0.95, t + 0.004);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.34);
-    o.connect(g); g.connect(master);
-    o.start(t); o.stop(t + 0.36);
-    var s = AC.createBufferSource(), bp = AC.createBiquadFilter(), ng = AC.createGain();
-    s.buffer = noiseBuf;
-    bp.type = 'bandpass'; bp.frequency.setValueAtTime(1900, t);
-    ng.gain.setValueAtTime(0.32, t);
-    ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
-    s.connect(bp); bp.connect(ng); ng.connect(g);
-    s.start(t); s.stop(t + 0.06);
-    lastDrum = g;
+    var lfo = AC.createOscillator(), lg = AC.createGain();
+    lfo.frequency.value = 0.11; lg.gain.value = 220;
+    lfo.connect(lg); lg.connect(lp.frequency); lfo.start();
+    lp.connect(g); g.connect(master);
+    pad = { oscs: oscs, g: g };
+  }
+  function padChord(ch, t) {
+    if (!pad) { return; }
+    for (var i = 0; i < 3; i++) { pad.oscs[i].frequency.setTargetAtTime(mtof(ch[i]), t, 0.06); }
+  }
+  function padLevel(v, t, tc) {
+    if (!pad) { return; }
+    pad.g.gain.cancelScheduledValues(t);
+    pad.g.gain.setTargetAtTime(v, t, tc);
   }
 
-  function note(f, t0, dur, type, vol) {
+  // Sounds we made ourselves, so the microphone can ignore them.
+  var masks = [];
+  function addMask(t) {
+    masks.push({ a: t - 0.03, b: t + 0.26 });
+    if (masks.length > 48) { masks.splice(0, masks.length - 48); }
+  }
+  function masked(h) {
+    for (var i = masks.length - 1; i >= 0; i--) { if (h >= masks[i].a && h <= masks[i].b) { return true; } }
+    return false;
+  }
+
+  function envG(t, peak, a, d, dest) {
+    var g = AC.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), t + a);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + a + d);
+    g.connect(dest || master);
+    return g;
+  }
+  function osc(type, f, t, end, dest) {
+    var o = AC.createOscillator();
+    o.type = type; o.frequency.setValueAtTime(f, t);
+    o.connect(dest); o.start(t); o.stop(end);
+    return o;
+  }
+  function noise(t, dur, dest) {
+    var s = AC.createBufferSource();
+    s.buffer = noiseBuf; s.connect(dest);
+    s.start(t, Math.random() * 0.6); s.stop(t + dur);
+    return s;
+  }
+
+  // At most four drum voices at once: a fifth cuts the oldest short.
+  var drumVoices = [];
+  function voiceBus(t, dur) {
+    var now = AC.currentTime, keep = [], i;
+    for (i = 0; i < drumVoices.length; i++) { if (drumVoices[i].end > now) { keep.push(drumVoices[i]); } }
+    drumVoices = keep;
+    if (drumVoices.length >= 4) {
+      var old = drumVoices.shift(), at = Math.max(now, t - 0.005);
+      old.g.gain.cancelScheduledValues(at);
+      old.g.gain.setTargetAtTime(0, at, 0.012);
+    }
+    var g = AC.createGain(); g.gain.value = 1; g.connect(master);
+    drumVoices.push({ g: g, end: t + dur });
+    return g;
+  }
+
+  function sBongo(side, t, v) {
     if (!AC) { return; }
-    var t = AC.currentTime + t0;
-    var o = AC.createOscillator(), g = AC.createGain();
-    o.type = type || 'triangle';
-    o.frequency.setValueAtTime(f, t);
+    v = v || 1;
+    var low = side === 'low', f = low ? 172 : 268, dur = low ? 0.5 : 0.36;
+    var bus = voiceBus(t, dur);
+    var o = AC.createOscillator(), g = envG(t, 0.78 * v, 0.003, dur, bus);
+    o.type = 'sine';
+    o.frequency.setValueAtTime(f * 1.55, t);
+    o.frequency.exponentialRampToValueAtTime(f, t + 0.025);
+    o.frequency.exponentialRampToValueAtTime(f * 0.93, t + dur);
+    o.connect(g); o.start(t); o.stop(t + dur + 0.03);
+    osc('sine', f * 2.3, t, t + 0.12, envG(t, 0.2 * v, 0.002, 0.09, bus));
+    var bp = AC.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.setValueAtTime(f * 9, t); bp.Q.setValueAtTime(0.9, t);
+    bp.connect(envG(t, 0.42 * v, 0.002, 0.035, bus));
+    noise(t, 0.06, bp);
+    addMask(t);
+  }
+  function sTick(t, v) {
+    osc('sine', 1480, t, t + 0.06, envG(t, 0.075 * v, 0.002, 0.035));
+    osc('sine', 2210, t, t + 0.04, envG(t, 0.03 * v, 0.002, 0.02));
+    addMask(t);
+  }
+  function sKick(t, v) {
+    var o = AC.createOscillator(), g = envG(t, 0.85 * v, 0.004, 0.32);
+    o.type = 'sine';
+    o.frequency.setValueAtTime(150, t);
+    o.frequency.exponentialRampToValueAtTime(48, t + 0.13);
+    o.connect(g); o.start(t); o.stop(t + 0.36);
+    var lp = AC.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2600;
+    lp.connect(envG(t, 0.25 * v, 0.001, 0.012));
+    noise(t, 0.02, lp);
+    addMask(t);
+  }
+  function sShake(t, acc, v) {
+    var hp = AC.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 5600;
+    hp.connect(envG(t, (acc ? 0.17 : 0.085) * v, 0.008, acc ? 0.07 : 0.045));
+    noise(t, 0.1, hp);
+    addMask(t);
+  }
+  function sBass(t, m, v) {
+    var f = mtof(m), lp = AC.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.setValueAtTime(700, t); lp.frequency.exponentialRampToValueAtTime(260, t + 0.4);
+    var g = envG(t, 0.42 * v, 0.008, 0.44);
+    lp.connect(g);
+    var o = AC.createOscillator(); o.type = 'triangle';
+    o.frequency.setValueAtTime(f * 1.06, t); o.frequency.exponentialRampToValueAtTime(f, t + 0.035);
+    o.connect(lp); o.start(t); o.stop(t + 0.5);
+    osc('sine', f, t, t + 0.5, lp);
+    addMask(t);
+  }
+  function sHoo(t, m, v) {
+    var f = mtof(m), dur = 0.46;
+    var g = AC.createGain();
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.linearRampToValueAtTime(vol || 0.3, t + 0.012);
+    g.gain.linearRampToValueAtTime(0.2 * v, t + 0.07);
+    g.gain.setValueAtTime(0.2 * v, t + dur * 0.55);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(master);
-    o.start(t); o.stop(t + dur + 0.02);
+    g.connect(master);
+    var o = AC.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(f * 0.93, t); o.frequency.exponentialRampToValueAtTime(f, t + 0.09);
+    var lfo = AC.createOscillator(), lg = AC.createGain();
+    lfo.frequency.value = 5.2; lg.gain.value = f * 0.012;
+    lfo.connect(lg); lg.connect(o.frequency); lfo.start(t); lfo.stop(t + dur + 0.05);
+    o.connect(g); o.start(t); o.stop(t + dur + 0.05);
+    var lp = AC.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1300;
+    lp.connect(envG(t, 0.025 * v, 0.05, 0.3));
+    noise(t, 0.4, lp);
+    addMask(t);
   }
-  function cheerSound(big) {
-    var f = [523, 659, 784, 1047, 1319];
-    var n = big ? 5 : 3;
-    for (var i = 0; i < n; i++) { note(f[i], i * 0.11, 0.3, 'triangle', 0.28); }
+  function sTing(t, m, v) {
+    var f = mtof(m);
+    osc('sine', f, t, t + 0.7, envG(t, 0.075 * v, 0.003, 0.6));
+    osc('sine', f * 2.76, t, t + 0.25, envG(t, 0.02 * v, 0.002, 0.2));
+    addMask(t);
   }
-  function againSound() {   // a little questioning squeak
-    note(620, 0, 0.12, 'triangle', 0.22);
-    note(840, 0.11, 0.2, 'triangle', 0.22);
+  function sCrash(t, v) {
+    var hp = AC.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 3200;
+    hp.connect(envG(t, 0.22 * v, 0.004, 1.5));
+    noise(t, 1.0, hp);
+    noise(t + 0.9, 0.9, hp);
+    addMask(t);
+  }
+  function sChime(t, big) {
+    var ns = big ? [72, 76, 79, 84, 88] : [79, 84];
+    for (var i = 0; i < ns.length; i++) { sTing(t + i * 0.065, ns[i] + 12, big ? 1.5 : 1.0); }
+  }
+  function sSnore(t) {
+    var lp = AC.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 420; lp.Q.value = 4;
+    var g = AC.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.35, t + 0.45);
+    g.gain.linearRampToValueAtTime(0.0001, t + 0.7);
+    lp.connect(g); g.connect(master);
+    noise(t, 0.75, lp);
+    var o = AC.createOscillator(), og = AC.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(980, t + 0.75); o.frequency.exponentialRampToValueAtTime(620, t + 1.1);
+    og.gain.setValueAtTime(0.0001, t + 0.75);
+    og.gain.linearRampToValueAtTime(0.05, t + 0.8);
+    og.gain.exponentialRampToValueAtTime(0.0001, t + 1.12);
+    o.connect(og); og.connect(master); o.start(t + 0.75); o.stop(t + 1.15);
+    addMask(t); addMask(t + 0.4); addMask(t + 0.8);
+  }
+  function sYawn(t, f) {
+    var o = AC.createOscillator(), g = AC.createGain();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(f, t); o.frequency.linearRampToValueAtTime(f * 1.25, t + 0.15);
+    o.frequency.exponentialRampToValueAtTime(f * 0.6, t + 0.6);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.07, t + 0.1);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.62);
+    var lp = AC.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900;
+    o.connect(lp); lp.connect(g); g.connect(master);
+    o.start(t); o.stop(t + 0.65);
   }
 
   // ------------------------------------------------------------------
-  // The ears. Same settings as Recorder Garden: all the speech cleaning
-  // is switched off, because it is aimed squarely at deleting a tap.
-  // Hits are sudden jumps in loudness above the room's own level.
+  // Clocks. "Heard time" is the audio clock as it reaches the ear, so a
+  // tap is judged against what the child actually heard, not against
+  // what was queued a moment earlier.
   // ------------------------------------------------------------------
-  var MIC = { state: 'off', stream: null, src: null, analyser: null, buf: null,
-              level: 0, prev: 0, floor: 0.004, lastOn: -1e9, deaf: 0, flash: -1e9 };
+  function heardAt(p) {
+    if (!AC) { return p / 1000; }
+    if (AC.getOutputTimestamp) {
+      var ts = AC.getOutputTimestamp();
+      if (ts && ts.contextTime > 0 && ts.performanceTime > 0) {
+        return ts.contextTime + (p - ts.performanceTime) / 1000;
+      }
+    }
+    return AC.currentTime - (AC.outputLatency || 0) - (AC.baseLatency || 0) - (performance.now() - p) / 1000;
+  }
+  function heardNow() { return heardAt(performance.now()); }
 
+  // Visual events, fired when their moment is heard.
+  var visQ = [];
+  function vis(t, fn) { visQ.push({ t: t, fn: fn }); }
+  function drainVis(H) {
+    for (var i = 0; i < visQ.length;) {
+      if (visQ[i].t <= H) { var e = visQ.splice(i, 1)[0]; e.fn(); } else { i++; }
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // The ears. Same settings as Recorder Garden: the browser's speech
+  // cleaning is all switched off, because it is aimed squarely at
+  // deleting a tap. A hit is a sudden jump in loudness above the room.
+  // It only listens in the child's bar, which is a quiet break.
+  // ------------------------------------------------------------------
+  var MIC = { state: 'off', stream: null, analyser: null, buf: null,
+              level: 0, prev: 0, floor: 0.004, lastOn: -1e9, flash: -1e9, waitHits: [] };
   function micPossible() { return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia); }
-
   function startMic() {
     if (!AC || MIC.state === 'on' || MIC.state === 'asking') { return; }
     if (!micPossible()) { MIC.state = 'blocked'; return; }
@@ -320,19 +564,19 @@
       audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 }
     }).then(function (stream) {
       MIC.stream = stream;
-      MIC.src = AC.createMediaStreamSource(stream);
+      var src = AC.createMediaStreamSource(stream);
       var hp = AC.createBiquadFilter();
       hp.type = 'highpass'; hp.frequency.setValueAtTime(150, AC.currentTime);
       var an = AC.createAnalyser();
       an.fftSize = 1024; an.smoothingTimeConstant = 0;
-      MIC.src.connect(hp); hp.connect(an);
+      src.connect(hp); hp.connect(an);
       MIC.analyser = an;
       MIC.buf = new Float32Array(an.fftSize);
       MIC.state = 'on';
     })['catch'](function () { MIC.state = 'blocked'; });
   }
-
-  function listen(t) {
+  var MIC_LAG = 0.045;   // a first guess at the microphone's own delay
+  function listen(P, H) {
     if (MIC.state !== 'on' || !MIC.analyser) { MIC.level = 0; return; }
     var buf = MIC.buf, n = buf.length, i, s = 0, mean = 0, from = n - 480;
     MIC.analyser.getFloatTimeDomainData(buf);
@@ -342,445 +586,1100 @@
     var e = Math.sqrt(s / 480);
     MIC.level = e;
     var thr = Math.max(0.015, MIC.floor * 3.5);
-    var listening = (state === 'turn' || state === 'free') && t >= MIC.deaf;
-    if (listening && e > thr && e > MIC.prev * 1.25 && t - MIC.lastOn > 110) {
-      MIC.lastOn = t; MIC.flash = t;
-      onHit('mic', t);
+    if (e > thr && e > MIC.prev * 1.25 && P - MIC.lastOn > 110) {
+      MIC.lastOn = P;
+      var hm = H - MIC_LAG;
+      if (P - lastTapP > 250 && !masked(hm)) { micHit(hm, P); }
     } else if (e < thr) {
       MIC.floor += (e - MIC.floor) * 0.02;
     }
     MIC.prev = e;
   }
+  function micHit(hm, P) {
+    if (state === 'wait') {
+      // Two bangs close together wake it up again; one stray noise does not.
+      MIC.waitHits.push(P);
+      while (MIC.waitHits.length && P - MIC.waitHits[0] > 1500) { MIC.waitHits.shift(); }
+      if (MIC.waitHits.length >= 2) { MIC.waitHits = []; MIC.flash = P; seqStart(); }
+      return;
+    }
+    if (state !== 'play') { return; }
+    var b = listenBarAt(hm - off.mic);
+    if (!b) { return; }
+    MIC.flash = P;
+    childHit('mic', 'low', hm);
+  }
 
   // ------------------------------------------------------------------
-  // Patterns, in beats. They get harder by length, then by mixing long
-  // and short, then by rests. Never by speed.
+  // Game state
   // ------------------------------------------------------------------
-  var POOLS = [
-    [[0, 1], [0, 2], [0, 1, 2]],
-    [[0, 1, 2], [0, 1, 2, 3], [0, 2, 3]],
-    [[0, 0.5, 1, 2], [0, 1, 1.5, 2], [0, 1, 1.5, 2.5], [0, 0.5, 1, 1.5]],
-    [[0, 1, 3], [0, 1, 2, 4], [0, 0.5, 1, 3], [0, 2, 3, 4]],
-    [[0, 0.5, 1, 2, 3], [0, 1, 1.5, 2, 3], [0, 0.5, 1, 1.5, 2.5, 3], [0, 1, 1.5, 2, 2.5, 4], [0, 0.5, 1, 3, 3.5, 4]]
-  ];
-  var SPB = 520;           // ms per beat
-  var MIN_GAP = 90;        // hits closer than this are one hit
-  var MAX_HITS = 12;
+  var state = 'idle';          // idle | play | wait
+  var seq = { on: false, t: 0, s: 0, bar: null, todo: [], no: 0 };
+  var bars = [];               // recent bars, for the visuals
+  var lastCall = null, lastListen = null, pendingJudge = null;
+  var lastProgress = true, tries = 0, silent = 0, lastPat = null;
+  var hits = [], lastHitH = -1e9, lastTapP = -1e9;
+  var off = { tap: 0.0, mic: 0.02 };   // learnt lateness, per kind of hit
+  var mood = null;                     // the mouse's reaction to an answer
+  var strikes = [];                    // the mouse's own hits, for its paws
+  var ripP = { low: -1e9, high: -1e9 };
+  var earP = -1e9, moonP = 0, moonGlowP = -1e9;
 
-  var lastPick = null;
-  function pickPattern() {
-    var pool = POOLS[lvl], p, tries = 0;
-    do { p = pool[Math.floor(Math.random() * pool.length)]; tries++; } while (p === lastPick && tries < 8);
-    lastPick = p;
+  function patLevel() { return Math.min(lvl, POOLS.length - 1); }
+
+  function choosePattern() {
+    if (lastCall && lastCall.pat && !lastProgress && tries < 3) { return lastCall.pat; }
+    var pool, p, guard = 0;
+    if (tries >= 3) {
+      tries = 0;
+      if (patLevel() === 0) { return [0, 4]; }
+      pool = POOLS[patLevel() - 1];
+      return pool[Math.floor(Math.random() * 2)];
+    }
+    pool = POOLS[patLevel()];
+    do { p = pool[Math.floor(Math.random() * pool.length)]; guard++; } while (p === lastPat && guard < 8);
+    lastPat = p;
     return p;
   }
 
-  // ------------------------------------------------------------------
-  // State
-  // ------------------------------------------------------------------
-  var state = 'idle';   // idle | demo | turn | free | cheer | again
-  var gen = 0, queue = [];
-  var cur = null;       // the pattern being copied (beats)
-  var round = 0, misses = 0;
-  var hits = [], lastHitT = -1e9, lastTap = -1e9, turnStart = 0, judgeAt = 0;
-  var side = 1, pawT = [-1e9, -1e9], nodT = -1e9, rippleT = -1e9, cheerT = -1e9, againT = -1e9;
-  var ready = 0, dots = [], popList = [], mimicMs = null;
+  function sideFor(s) { return (s % 4 === 0) ? 'low' : 'high'; }
 
-  function later(ms, fn) { queue.push({ t: nowMs() + ms, g: gen, fn: fn }); }
-  function reset() { gen++; queue.length = 0; }
+  function nextKinds() {
+    if (awakeCount() >= CR.length) { return ['finale', 'finale', 'lullaby']; }
+    return leader === 'mouse' ? ['call', 'answer', 'groove'] : ['child', 'echo', 'groove'];
+  }
 
-  function setDots(beats) {
-    dots = [];
-    var span = Math.max(1, beats[beats.length - 1]);
-    for (var i = 0; i < beats.length; i++) {
-      dots.push({ x: 90 + 520 * (beats[i] / span), lit: 0, t: -1e9 });
+  function seqStart() {
+    if (!AC) { return; }
+    state = 'play'; silent = 0;
+    seq.on = true; seq.s = 0; seq.t = AC.currentTime + 0.15;
+    seq.todo = ['groove'];
+    padLevel(PAD_VOL, AC.currentTime, 0.5);
+  }
+  function seqStop(t) {
+    seq.on = false;
+    state = 'wait';
+    padLevel(0, Math.max(AC.currentTime, t || 0), 0.8);
+  }
+
+  function scheduler() {
+    if (!AC || !seq.on) { return; }
+    var now = AC.currentTime;
+    if (seq.t < now - 0.12) { seqStop(now); return; }   // we were asleep: start afresh on the next tap
+    while (seq.on && seq.t < now + LOOK) {
+      if (seq.s === 0) { beginBar(seq.t); }
+      playStep(seq.bar, seq.s, seq.t);
+      seq.s++; seq.t += STEP;
+      if (seq.s === 8) { seq.s = 0; endBar(seq.bar); }
+    }
+  }
+  setInterval(scheduler, 25);
+
+  function beginBar(t) {
+    if (!seq.todo.length) { seq.todo = nextKinds(); }
+    var kind = seq.todo.shift();
+    var b = { kind: kind, start: t, no: seq.no, c: seq.no % 4, count: 0 };
+    seq.no++;
+    if (kind === 'call') { b.pat = choosePattern(); lastCall = b; }
+    else if (kind === 'answer') { b.target = lastCall ? lastCall.pat : [0, 4]; lastListen = b; pendingJudge = b; }
+    else if (kind === 'child') { lastListen = b; pendingJudge = b; }
+    else if (kind === 'echo') { b.src = lastListen; }
+    else if (kind === 'groove') { b.after = pendingJudge; pendingJudge = null; }
+    else if (kind === 'finale') { b.idx = (seq.bar && seq.bar.kind === 'finale') ? 1 : 0; }
+    seq.bar = b;
+    bars.push(b);
+    if (bars.length > 8) { bars.shift(); }
+    // The child's bar clears half a step early, so a hit right on (or just
+    // before) its first beat is not wiped off the stars.
+    vis(kind === 'child' ? t - 0.5 * STEP : t, function () { barVisual(b); });
+  }
+
+  function endBar(b) {
+    if (b.kind === 'lullaby') {
+      lvl++; save();
+      for (var i = 0; i < CR.length; i++) { CR[i].awake = false; CR[i].stirred = false; CR[i].joinT = 1e9; }
+      lastProgress = true; tries = 0;
+      seq.todo = ['groove'];
+    }
+    if (b.kind === 'groove' && silent >= 2) { silent = 0; seqStop(b.start + BAR); }
+  }
+
+  function playStep(b, s, t) {
+    var brk = b.kind === 'answer' || b.kind === 'child';
+    var c = b.c;
+    if (s === 0) { padChord(CH[c], t); }
+
+    // The pulse: a soft click on every crotchet, dropped in the child's
+    // bar when the microphone is listening.
+    var rabbitOn = CR[0].awake && t >= CR[0].joinT;
+    if (s % 2 === 0 && !(brk && MIC.state === 'on') && (brk || !rabbitOn) && b.kind !== 'lullaby') {
+      sTick(t, s === 0 ? 1 : 0.7);
+    }
+
+    // The band, everyone who is awake
+    if (!brk && b.kind !== 'lullaby') {
+      var bv = (b.kind === 'call' || b.kind === 'echo') ? 0.72 : (b.kind === 'finale' ? 1.1 : 1);
+      for (var i = 0; i < CR.length; i++) {
+        if (CR[i].awake && t >= CR[i].joinT) { crPlays(CR[i], s, t, b, bv); }
+      }
+    }
+
+    if (b.kind === 'call' && b.pat.indexOf(s) >= 0) {
+      mouseHit(sideFor(s), t, 0.95, s);
+    } else if (b.kind === 'echo' && b.src) {
+      var e = echoAt(b.src, s);
+      if (e) { mouseHit(e, t, 0.95, s); }
+    } else if (b.kind === 'finale') {
+      var fp = b.idx === 0 ? [0, 2, 3, 4, 6, 7] : [0, 1, 2, 3, 4, 5, 6, 7];
+      if (fp.indexOf(s) >= 0) { mouseHit(s % 2 ? 'high' : 'low', t, 0.9, null); }
+      if (s === 0) { sCrash(t, b.idx === 0 ? 1 : 0.7); }
+      if (b.idx === 0 && s === 0) { vis(t, finaleBurst); }
+      (function (s) { vis(t, function () { starChase(s); }); })(s);
+    } else if (b.kind === 'lullaby') {
+      if (s === 0) { sCrash(t, 0.35); }
+      if (s % 2 === 0) { sTing(t, [91, 88, 86, 84][s / 2], 1.6); }
+      if (s >= 1 && s <= 5) {
+        var cr = CR[s - 1];
+        sYawn(t, 300 + s * 40);
+        (function (cr) { vis(t, function () { setVis(cr, 'asleep'); }); })(cr);
+      }
+      if (s === 6) { vis(t, function () { moonGlowP = performance.now(); }); sChime(t + STEP * 0.5, true); }
+    } else if (b.kind === 'groove') {
+      if (s === 2 && b.after && !b.after.dead) { verdict(b.after, t); }
+      if (s === 6) { vis(t, fadeStars); }
     }
   }
 
-  function strike(silent) {
-    var t = nowMs();
-    side = -side;
-    pawT[side > 0 ? 1 : 0] = t;
-    rippleT = t; nodT = t;
-    if (!silent) { drumSound(side); }
+  function mouseHit(side, t, v, step) {
+    sBongo(side, t, v);
+    strikes.push({ side: side, t: t });
+    if (strikes.length > 24) { strikes.shift(); }
+    vis(t, function () { ripP[side] = performance.now(); if (step !== null) { starGold(step); } });
   }
 
-  // The mouse plays a list of offsets (ms). Calls done() when it finishes.
-  function mousePlays(offsets, done) {
-    state = 'demo';
-    MIC.deaf = nowMs() + 1e9;
-    var lead = 900, i;
-    for (i = 0; i < offsets.length; i++) {
-      (function (i) {
-        later(lead + offsets[i], function () {
-          strike(false);
-          if (dots[i]) { dots[i].lit = 1; dots[i].t = nowMs(); }
-        });
-      })(i);
+  function crPlays(cr, s, t, b, v) {
+    var c = b.c, fin = b.kind === 'finale';
+    switch (cr.id) {
+      case 'rabbit':
+        if (s === 0 || s === 4 || (fin && (s === 6 || s === 3))) { sKick(t, (s === 0 ? 1 : 0.85) * v); act(cr, t, -1); }
+        break;
+      case 'hedgehog':
+        sShake(t, s % 2 === 0, v);
+        if (s % 2 === 0) { act(cr, t, -1); }
+        break;
+      case 'frog':
+        if (s === 0 || s === 3 || s === 6) {
+          sBass(t, s === 0 ? ROOT[c] : (s === 3 ? ROOT[c] + 12 : ROOT[c] + 7), v);
+          act(cr, t, -1);
+        }
+        break;
+      case 'owl':
+        if (s === 4 || s === 6 || (fin && s === 1)) { sHoo(t, HOO[c][s === 6 ? 1 : 0], v); act(cr, t, -1); }
+        break;
+      case 'flower':
+        if (s % 2 === 1 || fin) { var k = fin ? s % 4 : (s - 1) / 2; sTing(t, TING[c][k], v * (fin ? 0.8 : 1)); act(cr, t, k); }
+        break;
     }
-    later(lead + offsets[offsets.length - 1] + 500, function () {
-      MIC.deaf = nowMs() + 300;
-      done();
+  }
+  function act(cr, t, fly) {
+    vis(t, function () { cr.actP = performance.now(); if (fly >= 0) { flyFlash(fly); } });
+  }
+
+  // A creature's own sound, when it is tapped, or says hello on waking.
+  function crSolo(cr, t, v) {
+    switch (cr.id) {
+      case 'rabbit': sKick(t, v); sKick(t + 0.16, v * 0.8); break;
+      case 'hedgehog': sShake(t, true, v); sShake(t + 0.08, false, v); sShake(t + 0.16, true, v); break;
+      case 'frog': sBass(t, 48, v); sBass(t + 0.18, 55, v * 0.8); break;
+      case 'owl': sHoo(t, 67, v); sHoo(t + 0.36, 64, v); break;
+      case 'flower': for (var i = 0; i < 4; i++) { sTing(t + i * 0.07, TING[0][i], v); } break;
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Hits from the child, by tap or by microphone. Times are heard time.
+  // ------------------------------------------------------------------
+  function listenBarAt(x) {
+    var b = lastListen;
+    if (!b || b.dead) { return null; }
+    return (x >= b.start - 0.5 * STEP && x < b.start + 7.5 * STEP) ? b : null;
+  }
+
+  function childHit(src, side, h) {
+    if (h - lastHitH < MIN_GAP) { return; }
+    lastHitH = h;
+    earP = performance.now();
+    var adj = h - off[src];
+    var b = state === 'play' ? listenBarAt(adj) : null;
+    if (b) {
+      if (b.count >= MAX_HITS) { return; }
+      b.count++;
+      starGreen(clamp(Math.round((adj - b.start) / STEP), 0, 7));
+    }
+    hits.push({ h: h, src: src, side: side });
+    while (hits.length && hits[0].h < h - 14) { hits.shift(); }
+  }
+
+  function hitsBetween(a, b) {
+    var out = [];
+    for (var i = 0; i < hits.length; i++) {
+      var x = hits[i].h - off[hits[i].src];
+      if (x >= a && x < b) { out.push({ a: x, src: hits[i].src, side: hits[i].side }); }
+    }
+    return out;
+  }
+
+  function matchSet(E, A) {
+    var used = [], n = 0, errs = [], steps = [], i, j;
+    for (i = 0; i < E.length; i++) {
+      var bj = -1, bd = TOL;
+      for (j = 0; j < A.length; j++) {
+        if (used[j]) { continue; }
+        var d = Math.abs(A[j].a - E[i].t);
+        if (d <= bd) { bd = d; bj = j; }
+      }
+      if (bj >= 0) { used[bj] = 1; n++; errs.push({ e: A[bj].a - E[i].t, src: A[bj].src }); steps.push(E[i].s); }
+    }
+    var lo = E[0].t - 0.6 * STEP, hi = E[E.length - 1].t + 0.6 * STEP, extra = 0;
+    for (j = 0; j < A.length; j++) { if (!used[j] && A[j].a >= lo && A[j].a <= hi) { extra++; } }
+    return { n: n, extra: extra, errs: errs, steps: steps };
+  }
+
+  // Learn how late this child (and this device) tends to be, a little
+  // at a time, so the judging gets fairer the longer they play.
+  function learn(errs) {
+    ['tap', 'mic'].forEach(function (src) {
+      var e = [], i;
+      for (i = 0; i < errs.length; i++) { if (errs[i].src === src) { e.push(errs[i].e); } }
+      if (e.length < 2) { return; }
+      e.sort(function (x, y) { return x - y; });
+      var med = e[Math.floor(e.length / 2)];
+      off[src] = src === 'tap' ? clamp(off[src] + med * 0.35, -0.08, 0.16) : clamp(off[src] + med * 0.35, -0.06, 0.25);
     });
   }
 
-  function startRound() {
-    reset();
-    round++;
-    misses = Math.max(0, misses);
-    if (leader === 'child') { freeRound(); return; }
-    cur = pickPattern();
-    copyRound(false);
-  }
-
-  function copyRound(replay) {
-    reset();
-    setDots(cur);
-    for (var i = 0; i < dots.length; i++) { dots[i].lit = 0; }
-    var offs = cur.map(function (b) { return b * SPB; });
-    mousePlays(offs, function () { beginTurn('turn'); });
-  }
-
-  function beginTurn(kind) {
-    state = kind;
-    hits = [];
-    turnStart = nowMs();
-    judgeAt = 0;
-    if (kind === 'turn') {
-      for (var i = 0; i < dots.length; i++) { dots[i].lit = 0; }
-    } else {
-      dots = [];
-    }
-  }
-
-  function freeRound() {
-    reset();
-    dots = [];
-    state = 'demo';       // a beat for the mouse to get ready and look over
-    MIC.deaf = nowMs() + 1e9;
-    later(900, function () { beginTurn('free'); MIC.deaf = nowMs() + 100; });
-  }
-
-  // ------------------------------------------------------------------
-  // Hearing a hit, from the drum on screen or from the microphone
-  // ------------------------------------------------------------------
-  function onHit(src, t) {
-    if (state === 'idle') { return; }
-    if (state !== 'turn' && state !== 'free') { return; }
-    if (t - lastHitT < MIN_GAP) { return; }
-    if (src === 'mic' && t - lastTap < 220) { return; }   // our own drum, heard back
-    if (src === 'tap') { lastTap = t; }
-    lastHitT = t;
-    if (hits.length >= MAX_HITS) { return; }
-    hits.push(t);
-    if (src === 'tap') { strike(false); }   // the mic's hits stay silent: no feedback loop
-    else { strike(true); }
-    if (state === 'turn') {
-      var i = hits.length - 1;
-      if (dots[i]) { dots[i].lit = 2; dots[i].t = t; }
-      if (hits.length === cur.length) { judgeAt = t + 450; }
-      else if (hits.length > cur.length) { judgeAt = t; }
-    } else {
-      var x = 90 + 520 * clamp((t - hits[0]) / 4000, 0, 1);
-      dots.push({ x: x, lit: 2, t: t });
-    }
-  }
-
-  function median(a) {
-    var b = a.slice().sort(function (x, y) { return x - y; });
-    return b[Math.floor(b.length / 2)];
-  }
-
-  function judge() {
-    var n = cur.length, m = hits.length, ok = false, i;
-    if (m === n) {
-      var eg = [], cg = [], ratios = [];
-      for (i = 1; i < n; i++) {
-        eg.push(cur[i] - cur[i - 1]);
-        cg.push(hits[i] - hits[i - 1]);
-        ratios.push(cg[i - 1] / eg[i - 1]);
-      }
-      var s = median(ratios);
-      ok = s > 0.4 * SPB && s < 3 * SPB;
-      for (i = 0; i < eg.length && ok; i++) {
-        if (Math.abs(cg[i] / (eg[i] * s) - 1) > 0.4) { ok = false; }
+  function judgeAnswer(b) {
+    var pat = b.target, N = pat.length, s0 = b.start, i, k;
+    var A = hitsBetween(s0 - 0.5 * STEP, s0 + 9.2 * STEP), Ain = [];
+    for (i = 0; i < A.length; i++) { if (A[i].a < s0 + 7.5 * STEP) { Ain.push(A[i]); } }
+    if (!Ain.length) { return { kind: 'silent', steps: [] }; }
+    var E0 = pat.map(function (s) { return { t: s0 + s * STEP, s: s }; });
+    var m0 = matchSet(E0, Ain), kind;
+    if (m0.n === N && m0.extra <= 1) { kind = 'great'; }
+    else if (m0.n >= Math.ceil(N / 2) || Ain.length === N) { kind = 'good'; }
+    else { kind = 'try'; }
+    if (kind === 'try') {
+      // The right rhythm, started a step or two late, still counts.
+      var shifts = [1, 2, -1];
+      for (k = 0; k < shifts.length; k++) {
+        var Ek = pat.map(function (s) { return { t: s0 + (s + shifts[k]) * STEP, s: s }; });
+        var mk2 = matchSet(Ek, A);
+        if (mk2.n === N && mk2.extra <= 1) { kind = 'good'; break; }
       }
     }
-    if (ok) { cheer(false); } else { tryAgain(); }
+    if (m0.n >= 2) { learn(m0.errs); }
+    return { kind: kind, steps: m0.steps };
   }
 
-  function cheer(soft) {
-    reset();
-    state = 'cheer';
-    cheerT = nowMs();
-    misses = 0;
-    for (var i = 0; i < dots.length; i++) { dots[i].lit = 3; dots[i].t = nowMs(); }
-    stars++;
-    var big = stars >= 5;
-    cheerSound(big);
-    addPop(big);
-    wins++;
-    if (!soft && wins >= 2 && lvl < 4) { lvl++; wins = 0; save(); }
-    if (big) { stars = 0; }
-    later(big ? 2600 : 1700, startRound);
-  }
-
-  function tryAgain() {
-    reset();
-    misses++;
-    if (misses >= 3) {      // never stuck: an easier one, no star
-      misses = 0;
-      lvl = Math.max(0, lvl - 1); wins = 0; save();
-      state = 'again'; againT = nowMs();
-      againSound();
-      later(1400, startRound);
-      return;
+  function judgeChild(b) {
+    var A = hitsBetween(b.start - 0.45 * STEP, b.start + 7.45 * STEP), steps = [];
+    for (var i = 0; i < A.length; i++) {
+      var s = clamp(Math.round((A[i].a - b.start) / STEP), 0, 7);
+      if (steps.indexOf(s) < 0) { steps.push(s); }
     }
-    state = 'again'; againT = nowMs();
-    againSound();
-    later(1300, function () {
-      if (mimicMs) { mimicMs = null; startRound(); } else { copyRound(true); }
+    return { kind: A.length >= 2 ? 'great' : (A.length === 1 ? 'good' : 'silent'), steps: steps };
+  }
+
+  // What the mouse plays back in copy-you: the child's bar, tidied onto
+  // the beat, on whichever drum the child used.
+  function echoAt(src, s) {
+    var A = hitsBetween(src.start + (s - 0.5) * STEP, src.start + Math.min(s + 0.5, 7.45) * STEP);
+    return A.length ? A[A.length - 1].side : null;
+  }
+
+  function nextSleeper() {
+    for (var i = 0; i < CR.length; i++) { if (!CR[i].awake) { return CR[i]; } }
+    return null;
+  }
+  function awakeCount() {
+    var n = 0;
+    for (var i = 0; i < CR.length; i++) { if (CR[i].awake) { n++; } }
+    return n;
+  }
+
+  function verdict(src, t) {
+    var v = src.kind === 'answer' ? judgeAnswer(src) : judgeChild(src);
+    var cr = nextSleeper(), woke = null, stirred = null;
+    if (v.kind === 'great' || (v.kind === 'good' && cr && cr.stirred)) {
+      if (cr) {
+        cr.awake = true; cr.stirred = false; cr.joinT = t + 2 * STEP; woke = cr;
+        sChime(t, true);
+        crSolo(cr, t + 0.5, 0.7);
+      }
+      lastProgress = true; tries = 0; silent = 0;
+    } else if (v.kind === 'good') {
+      if (cr) { cr.stirred = true; stirred = cr; }
+      sChime(t, false);
+      lastProgress = true; tries = 0; silent = 0;
+    } else if (v.kind === 'try') {
+      tries++; silent = 0; lastProgress = false;
+    } else {
+      silent++; lastProgress = false;
+    }
+    vis(t, function () {
+      mood = { kind: v.kind, t: t, cr: woke || stirred };
+      var i;
+      for (i = 0; i < v.steps.length; i++) { starTwinkle(v.steps[i], v.kind === 'great'); }
+      if (woke) { setVis(woke, 'awake'); wakeBurst(woke); }
+      if (stirred) { setVis(stirred, 'stir'); }
     });
   }
 
-  function mimicBack() {
-    // copy-you: the mouse plays back what the child played
-    reset();
-    var offs = [0], i;
-    for (i = 1; i < hits.length; i++) {
-      offs.push(offs[i - 1] + clamp(hits[i] - hits[i - 1], 130, 900));
-    }
-    dots = [];
-    var span = Math.max(1, offs[offs.length - 1]);
-    for (i = 0; i < offs.length; i++) { dots.push({ x: 90 + 520 * (offs[i] / span), lit: 0, t: -1e9 }); }
-    mousePlays(offs, function () { cheer(true); });
-  }
-
   // ------------------------------------------------------------------
-  // Pops (stars rising over the mouse) and the star counter
+  // Layout. The world is 1000 wide and as tall as the screen needs.
   // ------------------------------------------------------------------
-  function starPath(cx, cy, r) {
-    var p = '', i;
-    for (i = 0; i < 10; i++) {
-      var a = -Math.PI / 2 + i * Math.PI / 5, rr = (i % 2) ? r * 0.45 : r;
-      p += (i ? 'L' : 'M') + (cx + Math.cos(a) * rr).toFixed(1) + ' ' + (cy + Math.sin(a) * rr).toFixed(1);
-    }
-    return p + 'Z';
-  }
-  function addPop(big) {
-    var n = big ? 7 : 1;
-    for (var i = 0; i < n; i++) {
-      var el = document.createElementNS(NS, 'path');
-      el.setAttribute('d', starPath(0, 0, big ? 26 : 34));
-      el.setAttribute('fill', '#ffd54a'); el.setAttribute('stroke', '#fff'); el.setAttribute('stroke-width', '4');
-      el.setAttribute('stroke-linejoin', 'round');
-      $('pops').appendChild(el);
-      popList.push({ el: el, t: nowMs(), x: 350 + (n > 1 ? (i - 3) * 80 : 0), dx: 0, y: n > 1 ? 330 : 190, big: big });
-    }
-  }
-
-  var hudStars = [];
-  function buildHud() {
-    var hud = $('hud');
-    for (var i = 0; i < 5; i++) {
-      var p = document.createElementNS(NS, 'path');
-      p.setAttribute('d', starPath(0, 0, 17));
-      p.setAttribute('stroke', '#fff'); p.setAttribute('stroke-width', '3'); p.setAttribute('stroke-linejoin', 'round');
-      hud.appendChild(p); hudStars.push(p);
-    }
-  }
-
-  // ------------------------------------------------------------------
-  // Drawing
-  // ------------------------------------------------------------------
-  var dotEls = [];
-  function syncDotEls() {
-    var dg = $('dots');
-    while (dotEls.length < dots.length) {
-      var c = document.createElementNS(NS, 'circle');
-      c.setAttribute('cy', 650);
-      dg.appendChild(c); dotEls.push(c);
-    }
-    while (dotEls.length > dots.length) { dg.removeChild(dotEls.pop()); }
-  }
+  var svg = $('stage');
+  var L = {}, VX = { k: 1, ox: 0, oy: 0 };
 
   function layout() {
     var vw = Math.max(1, window.innerWidth), vh = Math.max(1, window.innerHeight);
-    var svg = $('stage');
-    svg.setAttribute('viewBox', '0 0 ' + vw + ' ' + vh);
-    svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-    var sc = Math.min(vw / 700, vh / 740);
-    $('scene').setAttribute('transform', 'translate(' + ((vw - 700 * sc) / 2).toFixed(1) + ',' + ((vh - 740 * sc) / 2 + 0).toFixed(1) + ') scale(' + sc.toFixed(4) + ')');
-    var hud = $('hud'); hud.setAttribute('transform', 'translate(34,38)');
-    for (var i = 0; i < hudStars.length; i++) { hudStars[i].setAttribute('transform', 'translate(' + (i * 42) + ',0)'); }
+    var W = 1000, H = clamp(Math.round(W * vh / vw), 420, 2400), tall = H > 1050;
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    VX.k = Math.min(vw / W, vh / H); VX.ox = (vw - W * VX.k) / 2; VX.oy = (vh - H * VX.k) / 2;
+    sizeCanvas(vw, vh);
+    L = { W: W, H: H, tall: tall, cr: {} };
+    if (!tall) {
+      var k = clamp(H / 640, 0.62, 1.3), cs = 0.95 * k;
+      L.ground = H * 0.55;
+      L.sy = Math.max(H * 0.14, 92); L.sx0 = 220; L.sx1 = 780; L.sr = 18 + 6 * k;
+      L.moon = { x: 95, y: Math.max(H * 0.2, 84), r: 28 * k + 6 };
+      L.ms = 1.08 * k; L.mx = 500; L.my = H - 82 * L.ms;
+      L.cr.rabbit = { x: 100, y: H * 0.80, s: cs * 0.9 };
+      L.cr.hedgehog = { x: 192, y: H * 0.975, s: cs };
+      L.cr.frog = { x: 815, y: H * 0.95, s: cs * 0.85 };
+      L.cr.flower = { x: 908, y: H * 0.80, s: cs * 0.85 };
+      L.cr.owl = { x: 878, y: H * 0.43, s: cs * 0.82 };
+    } else {
+      L.ground = H * 0.40;
+      L.sy = H * 0.095; L.sx0 = 92; L.sx1 = 908; L.sr = 32;
+      L.moon = { x: 150, y: H * 0.205, r: 46 };
+      L.ms = clamp(Math.min(860 / 360, H * 0.34 / 265), 1.3, 2.4); L.mx = 500; L.my = H - 82 * L.ms;
+      var top = L.my - 210 * L.ms, span = top - L.ground, cs2 = clamp(span / 300, 0.95, 2.0);
+      L.cr.owl = { x: 790, y: H * 0.29, s: cs2 * 0.9 };
+      L.cr.flower = { x: 175, y: L.ground + span * 0.42, s: cs2 * 0.9 };
+      L.cr.frog = { x: 815, y: L.ground + span * 0.56, s: cs2 * 0.85 };
+      L.cr.rabbit = { x: 145, y: L.my - 72 * L.ms, s: cs2 };
+      L.cr.hedgehog = { x: 868, y: L.my - 70 * L.ms, s: cs2 };
+    }
+    L.sx = [];
+    for (var i = 0; i < 8; i++) { L.sx.push(L.sx0 + (L.sx1 - L.sx0) * i / 7); }
+    drawScene();
+    buildStars();
+    $('dm-mouse').setAttribute('transform', 'translate(' + f1(L.mx) + ',' + f1(L.my) + ') scale(' + L.ms.toFixed(4) + ')');
+    for (i = 0; i < CR.length; i++) {
+      var p = L.cr[CR[i].id];
+      CR[i].x = p.x; CR[i].y = p.y; CR[i].s = p.s;
+      CR[i].g.setAttribute('transform', 'translate(' + f1(p.x) + ',' + f1(p.y) + ') scale(' + p.s.toFixed(4) + ')');
+    }
   }
 
-  var blinkAt = 2000;
-  var VIEWER_LOOK = [0, -1], DOWN_LOOK = [0, 5];
+  function drawScene() {
+    var W = L.W, H = L.H, G = L.ground, s = '', i, rnd = seeded(11);
+    s += '<rect x="-20" y="-20" width="' + (W + 40) + '" height="' + (H + 40) + '" fill="url(#dm-sky)"/>';
+    for (i = 0; i < 70; i++) {
+      var x = rnd() * W, y = rnd() * G * 0.92, r = 0.9 + rnd() * 1.7;
+      s += '<circle cx="' + f1(x) + '" cy="' + f1(y) + '" r="' + f1(r) + '" fill="#fff" opacity="' + (0.25 + rnd() * 0.5).toFixed(2) + '"/>';
+    }
+    // The moon
+    var m = L.moon;
+    s += '<g transform="translate(' + f1(m.x) + ',' + f1(m.y) + ')">'
+      + '<circle id="dm-haloc" r="' + f1(m.r * 2.6) + '" fill="url(#dm-halo)"/>'
+      + '<circle r="' + f1(m.r) + '" fill="#2a2d5e" opacity="0.55"/>'
+      + '<g mask="url(#dm-moonmask)"><circle r="' + f1(m.r) + '" fill="#fff4d2"/>'
+      + '<circle cx="' + f1(-m.r * 0.35) + '" cy="' + f1(-m.r * 0.2) + '" r="' + f1(m.r * 0.18) + '" fill="#ece0b8"/>'
+      + '<circle cx="' + f1(m.r * 0.3) + '" cy="' + f1(m.r * 0.35) + '" r="' + f1(m.r * 0.13) + '" fill="#ece0b8"/>'
+      + '<circle cx="' + f1(m.r * 0.15) + '" cy="' + f1(-m.r * 0.45) + '" r="' + f1(m.r * 0.09) + '" fill="#ece0b8"/></g></g>';
+    $('dm-moonlit').setAttribute('r', f1(m.r));
+    $('dm-moonshade').setAttribute('r', f1(m.r * 1.04));
+    // Far hills, a line of dark bushes, then the clearing
+    s += '<path d="M -20 ' + f1(G - 40) + ' Q 160 ' + f1(G - 120) + ' 360 ' + f1(G - 46) + ' Q 560 ' + f1(G - 130) + ' 760 ' + f1(G - 52) + ' Q 900 ' + f1(G - 100) + ' 1020 ' + f1(G - 60) + ' L 1020 ' + f1(G + 10) + ' L -20 ' + f1(G + 10) + ' Z" fill="#1b2752"/>';
+    for (i = 0; i < 16; i++) {
+      var bx = i * 68 + rnd() * 30, br = 26 + rnd() * 34;
+      s += '<circle cx="' + f1(bx) + '" cy="' + f1(G + 4) + '" r="' + f1(br) + '" fill="#15223f"/>';
+    }
+    s += '<rect x="-20" y="' + f1(G) + '" width="' + (W + 40) + '" height="' + f1(H - G + 20) + '" fill="url(#dm-grass)"/>';
+    s += '<ellipse cx="' + f1(L.mx) + '" cy="' + f1(L.my - 60 * L.ms) + '" rx="' + f1(330 * L.ms) + '" ry="' + f1(150 * L.ms) + '" fill="url(#dm-spot)"/>';
+    // Grass tufts
+    var tufts = '';
+    for (i = 0; i < 40; i++) {
+      var tx = rnd() * W, ty = G + 20 + rnd() * (H - G - 20);
+      tufts += 'M ' + f1(tx) + ' ' + f1(ty) + ' q 4 -13 8 0 q 4 -10 8 0 ';
+    }
+    s += '<path d="' + tufts + '" stroke="#3a6b52" stroke-width="3.5" fill="none" stroke-linecap="round" opacity="0.6"/>';
+    // The owl's tree, at the right-hand edge
+    var o = L.cr.owl, os = o.s;
+    s += '<path d="M ' + (W - 70) + ' -30 L ' + (W - 58) + ' ' + f1(G + 26) + ' L ' + (W + 40) + ' ' + f1(G + 26) + ' L ' + (W + 40) + ' -30 Z" fill="#2a1e1d"/>';
+    s += '<path d="M ' + (W - 40) + ' ' + f1(o.y + 14 * os) + ' Q ' + f1((W + o.x) / 2) + ' ' + f1(o.y + 2 * os) + ' ' + f1(o.x - 80 * os) + ' ' + f1(o.y + 6 * os) + '" stroke="#3a2a24" stroke-width="' + f1(18 * os) + '" fill="none" stroke-linecap="round"/>';
+    s += '<path d="M ' + f1(o.x - 40 * os) + ' ' + f1(o.y + 4 * os) + ' l ' + f1(-30 * os) + ' ' + f1(-26 * os) + '" stroke="#3a2a24" stroke-width="' + f1(7 * os) + '" stroke-linecap="round"/>';
+    s += '<g fill="#173328"><circle cx="' + (W - 30) + '" cy="10" r="110"/><circle cx="' + (W - 120) + '" cy="-30" r="90"/><circle cx="' + (W + 10) + '" cy="' + f1(Math.min(o.y - 150 * os, 120)) + '" r="80"/></g>';
+    // The frog's pond
+    var fr = L.cr.frog, fs = fr.s;
+    s += '<ellipse cx="' + f1(fr.x) + '" cy="' + f1(fr.y + 4 * fs) + '" rx="' + f1(140 * fs) + '" ry="' + f1(32 * fs) + '" fill="#1b4560" stroke="#2c6582" stroke-width="' + f1(4 * fs) + '"/>';
+    s += '<ellipse cx="' + f1(fr.x + 90 * fs) + '" cy="' + f1(fr.y + 8 * fs) + '" rx="' + f1(18 * fs) + '" ry="' + f1(4 * fs) + '" fill="#fff4d2" opacity="0.35"/>';
+    $('scene').innerHTML = s;
+    moonDraw(true);
+  }
+
+  // ------------------------------------------------------------------
+  // The row of eight stars: the bar, drawn across the sky.
+  // ------------------------------------------------------------------
+  function starPath(r) {
+    var p = '', i;
+    for (i = 0; i < 10; i++) {
+      var a = -Math.PI / 2 + i * Math.PI / 5, rr = (i % 2) ? r * 0.5 : r;
+      p += (i ? 'L' : 'M') + (Math.cos(a) * rr).toFixed(1) + ' ' + (Math.sin(a) * rr).toFixed(1);
+    }
+    return p + 'Z';
+  }
+  var ST = [];
+  for (var si = 0; si < 8; si++) { ST.push({ g: 0, gP: -1e9, gr: 0, grP: -1e9, tw: -1e9, twBig: false, fade: -1e9 }); }
+  var starEls = [];
+  function buildStars() {
+    var host = $('stars');
+    while (host.firstChild) { host.removeChild(host.firstChild); }
+    starEls = [];
+    for (var i = 0; i < 8; i++) {
+      var r = L.sr * (i % 2 ? 0.7 : 1);
+      var g = mk('g', { transform: 'translate(' + f1(L.sx[i]) + ',' + f1(L.sy) + ')' }, host);
+      var inner = mk('g', {}, g);
+      mk('path', { d: starPath(r), fill: 'rgba(255,255,255,0.07)', stroke: 'rgba(255,255,255,0.42)', 'stroke-width': 3, 'stroke-linejoin': 'round' }, inner);
+      var fill = mk('path', { d: starPath(r), fill: '#ffd54a', 'stroke-width': 4, 'stroke-linejoin': 'round', opacity: 0 }, inner);
+      starEls.push({ inner: inner, fill: fill });
+    }
+  }
+  function clearStars() { for (var i = 0; i < 8; i++) { ST[i].g = 0; ST[i].gr = 0; ST[i].fade = -1e9; } }
+  function fadeStars() { var P = performance.now(); for (var i = 0; i < 8; i++) { ST[i].fade = P; } }
+  function starGold(s) { ST[s].g = 1; ST[s].gP = performance.now(); ST[s].fade = -1e9; }
+  function starGreen(s) { ST[s].gr = 1; ST[s].grP = performance.now(); ST[s].fade = -1e9; }
+  function starTwinkle(s, big) {
+    ST[s].tw = performance.now(); ST[s].twBig = big;
+    sparkleAt(L.sx[s], L.sy, big ? 9 : 5, big ? '#ffe680' : '#bff7d2', L.sr * 0.9);
+  }
+  function starChase(s) {
+    ST[s].g = 1; ST[s].gr = s % 2; ST[s].gP = performance.now(); ST[s].grP = ST[s].gP; ST[s].fade = -1e9;
+    sparkleAt(L.sx[s], L.sy, 4, s % 2 ? '#bff7d2' : '#ffe680', L.sr);
+  }
+
+  function barVisual(b) {
+    if (b.kind === 'call' || b.kind === 'child' || b.kind === 'lullaby') { clearStars(); }
+    if (b.kind === 'finale' && b.idx === 0) { clearStars(); }
+  }
+
+  // ------------------------------------------------------------------
+  // The creatures. Drawn front-on, feet at y = 0.
+  // ------------------------------------------------------------------
+  function eye(side, x, y, r, o) {
+    var pr = o.pr || r, s = '<g class="eo' + side + '">';
+    if (o.white) { s += '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="#fff"/>'; }
+    if (o.iris) { s += '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="' + o.iris + '"/>'; }
+    s += '<g class="pu' + side + '"><circle cx="' + x + '" cy="' + (y + 0.5) + '" r="' + pr + '" fill="#231f33"/>'
+      + '<circle cx="' + f1(x + pr * 0.35) + '" cy="' + f1(y - pr * 0.38) + '" r="' + f1(pr * 0.36) + '" fill="#fff"/></g></g>';
+    s += '<path class="ec' + side + '" d="M ' + (x - r) + ' ' + y + ' Q ' + x + ' ' + f1(y + r * 0.8) + ' ' + (x + r) + ' ' + y + '"'
+      + ' fill="none" stroke="' + (o.lid || '#231f33') + '" stroke-width="' + f1(Math.max(2.6, r * 0.36)) + '" stroke-linecap="round"/>';
+    return s;
+  }
+  function eyes(x, y, r, o) { return eye('L', -x, y, r, o) + eye('R', x, y, r, o); }
+
+  function spikes(cx, cy, R1, R2, n, a0, a1) {
+    var d = '', i;
+    for (i = 0; i <= n * 2; i++) {
+      var a = a0 + (a1 - a0) * i / (n * 2), r = (i % 2) ? R1 : R2;
+      d += (i ? 'L' : 'M') + f1(cx + Math.cos(a) * r) + ' ' + f1(cy + Math.sin(a) * r);
+    }
+    return d + 'Z';
+  }
+
+  var DEFS = {
+    rabbit: {
+      eyes: [-13, -117, 13, -117], head: [10, -160], hit: [-55, -215, 110, 220],
+      art: function () {
+        return '<g class="bob">'
+          + '<ellipse cx="-22" cy="-7" rx="19" ry="9" fill="#a58b72"/>'
+          + '<g class="foot"><ellipse cx="22" cy="-7" rx="19" ry="9" fill="#a58b72"/></g>'
+          + '<ellipse cx="0" cy="-46" rx="42" ry="45" fill="#b89f86"/>'
+          + '<ellipse cx="0" cy="-38" rx="25" ry="30" fill="#efe3d3"/>'
+          + '<ellipse cx="-15" cy="-15" rx="10" ry="7" fill="#efe3d3"/><ellipse cx="15" cy="-15" rx="10" ry="7" fill="#efe3d3"/>'
+          + '<g class="head">'
+          + '<g class="earL"><ellipse cx="-15" cy="-168" rx="12" ry="40" fill="#b89f86"/><ellipse cx="-15" cy="-166" rx="6" ry="30" fill="#f0b7c3"/></g>'
+          + '<g class="earR"><ellipse cx="15" cy="-168" rx="12" ry="40" fill="#b89f86"/><ellipse cx="15" cy="-166" rx="6" ry="30" fill="#f0b7c3"/></g>'
+          + '<ellipse cx="0" cy="-112" rx="35" ry="31" fill="#b89f86"/>'
+          + '<ellipse cx="-13" cy="-98" rx="13" ry="10" fill="#efe3d3"/><ellipse cx="13" cy="-98" rx="13" ry="10" fill="#efe3d3"/>'
+          + eyes(13, -117, 6.5, { lid: '#4a3b30' })
+          + '<path d="M -5 -107 L 5 -107 L 0 -101 Z" fill="#e88fa2" stroke="#e88fa2" stroke-width="2" stroke-linejoin="round"/>'
+          + '<path d="M 0 -101 L 0 -96 M -6 -93 Q 0 -90 0 -96 Q 0 -90 6 -93" stroke="#7a6555" stroke-width="2.4" fill="none" stroke-linecap="round"/>'
+          + '</g></g>';
+      }
+    },
+    hedgehog: {
+      eyes: [-13, -42, 13, -42], head: [30, -100], hit: [-70, -115, 140, 120],
+      art: function () {
+        return '<g class="bob">'
+          + '<ellipse cx="-22" cy="-4" rx="13" ry="6" fill="#c9a27e"/><ellipse cx="22" cy="-4" rx="13" ry="6" fill="#c9a27e"/>'
+          + '<g class="spikes"><path d="' + spikes(0, -46, 66, 46, 11, Math.PI - 0.35, 2 * Math.PI + 0.35) + '" fill="#6b4a33" stroke="#4e3524" stroke-width="3" stroke-linejoin="round"/></g>'
+          + '<ellipse cx="0" cy="-42" rx="50" ry="42" fill="#8a6647"/>'
+          + '<g class="face">'
+          + '<circle cx="-32" cy="-60" r="9" fill="#d9b48c"/><circle cx="32" cy="-60" r="9" fill="#d9b48c"/>'
+          + '<ellipse cx="0" cy="-34" rx="36" ry="28" fill="#eed4ac"/>'
+          + '<ellipse cx="0" cy="-20" rx="15" ry="10" fill="#eed4ac"/>'
+          + '<ellipse cx="-24" cy="-26" rx="7" ry="5" fill="#f2a9a0" opacity="0.6"/><ellipse cx="24" cy="-26" rx="7" ry="5" fill="#f2a9a0" opacity="0.6"/>'
+          + eyes(13, -42, 5.5, { lid: '#4e3524' })
+          + '<circle cx="0" cy="-22" r="6" fill="#2a2230"/>'
+          + '<path d="M -7 -13 Q 0 -8 7 -13" stroke="#6b4a33" stroke-width="2.4" fill="none" stroke-linecap="round"/>'
+          + '</g></g>';
+      }
+    },
+    frog: {
+      eyes: [-30, -94, 30, -94], head: [40, -120], hit: [-85, -128, 170, 140],
+      art: function () {
+        return '<ellipse cx="0" cy="2" rx="84" ry="17" fill="#3d8a4f"/>'
+          + '<path d="M 0 2 L 46 -10 L 60 4 Z" fill="#1b4560"/>'
+          + '<g class="bob">'
+          + '<ellipse cx="-64" cy="-34" rx="25" ry="32" fill="#3f8232"/><ellipse cx="64" cy="-34" rx="25" ry="32" fill="#3f8232"/>'
+          + '<ellipse cx="-50" cy="-8" rx="22" ry="10" fill="#3f8232"/><ellipse cx="50" cy="-8" rx="22" ry="10" fill="#3f8232"/>'
+          + '<ellipse cx="0" cy="-50" rx="66" ry="50" fill="#5fae4a"/>'
+          + '<ellipse cx="0" cy="-30" rx="42" ry="26" fill="#d7ecab"/>'
+          + '<g class="pouch"><ellipse cx="0" cy="-34" rx="25" ry="15" fill="#f0f8d6"/></g>'
+          + '<circle cx="-30" cy="-92" r="27" fill="#5fae4a"/><circle cx="30" cy="-92" r="27" fill="#5fae4a"/>'
+          + eyes(30, -94, 17, { white: true, pr: 9.5, lid: '#2c5a22' })
+          + '<path d="M -42 -56 Q 0 -34 42 -56" stroke="#2c5a22" stroke-width="5" fill="none" stroke-linecap="round"/>'
+          + '<ellipse cx="-46" cy="-62" rx="9" ry="6" fill="#f2a9a0" opacity="0.5"/><ellipse cx="46" cy="-62" rx="9" ry="6" fill="#f2a9a0" opacity="0.5"/>'
+          + '</g>';
+      }
+    },
+    owl: {
+      eyes: [-19, -100, 19, -100], head: [30, -140], hit: [-60, -150, 120, 160],
+      art: function () {
+        return '<g class="bob">'
+          + '<path d="M -16 -10 L 0 16 L 16 -10 Z" fill="#6e523b"/>'
+          + '<ellipse cx="0" cy="-62" rx="46" ry="58" fill="#8b6a4e"/>'
+          + '<ellipse cx="0" cy="-48" rx="30" ry="40" fill="#dcc6a4"/>'
+          + '<path d="M -14 -64 L -8 -58 L -2 -64 M 2 -64 L 8 -58 L 14 -64 M -16 -46 L -10 -40 L -4 -46 M 4 -46 L 10 -40 L 16 -46 M -6 -28 L 0 -22 L 6 -28" stroke="#b39672" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'
+          + '<ellipse cx="-44" cy="-60" rx="15" ry="38" fill="#76583f"/><ellipse cx="44" cy="-60" rx="15" ry="38" fill="#76583f"/>'
+          + '<path d="M -42 -112 L -36 -146 L -18 -122 Z" fill="#76583f"/><path d="M 42 -112 L 36 -146 L 18 -122 Z" fill="#76583f"/>'
+          + '<circle cx="-19" cy="-100" r="22" fill="#efdcbc"/><circle cx="19" cy="-100" r="22" fill="#efdcbc"/>'
+          + eyes(19, -100, 14, { iris: '#f2b33d', pr: 8, lid: '#5a4330' })
+          + '<path d="M -8 -90 L 8 -90 L 0 -77 Z" fill="#e8a33a"/>'
+          + '<g class="beak"><path d="M -5 -84 L 5 -84 L 0 -77 Z" fill="#b97a26"/></g>'
+          + '<path d="M -18 -4 l 4 7 l 4 -7 l 4 7 M 6 -4 l 4 7 l 4 -7 l 4 7" stroke="#e8a33a" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'
+          + '</g>';
+      }
+    },
+    flower: {
+      eyes: [-12, -152, 12, -152], head: [40, -170], hit: [-55, -210, 110, 215],
+      art: function () {
+        return '<g class="bob">'
+          + '<path d="M 0 0 Q -7 -36 0 -70" stroke="#3f7a3a" stroke-width="8" fill="none" stroke-linecap="round"/>'
+          + '<ellipse cx="-24" cy="-26" rx="24" ry="9" transform="rotate(-28 -24 -26)" fill="#4e9a46"/>'
+          + '<ellipse cx="22" cy="-44" rx="22" ry="8" transform="rotate(24 22 -44)" fill="#4e9a46"/>'
+          + '<g class="top">'
+          + '<path d="M 0 -70 Q 6 -98 0 -122" stroke="#3f7a3a" stroke-width="8" fill="none" stroke-linecap="round"/>'
+          + '<g class="bell">'
+          + '<path d="M -42 -128 Q -50 -172 -27 -198 L -13 -180 L 0 -202 L 13 -180 L 27 -198 Q 50 -172 42 -128 Q 0 -108 -42 -128 Z" fill="#a184e0" stroke="#7d62bd" stroke-width="3" stroke-linejoin="round"/>'
+          + '<ellipse cx="0" cy="-150" rx="27" ry="26" fill="#c6b3f3"/>'
+          + eyes(12, -154, 5, { lid: '#4b3a7a' })
+          + '<ellipse cx="-20" cy="-141" rx="6" ry="4" fill="#f2a9c6" opacity="0.7"/><ellipse cx="20" cy="-141" rx="6" ry="4" fill="#f2a9c6" opacity="0.7"/>'
+          + '<path d="M -6 -138 Q 0 -133 6 -138" stroke="#4b3a7a" stroke-width="2.4" fill="none" stroke-linecap="round"/>'
+          + '</g></g></g>';
+      }
+    }
+  };
+  var ORDER = ['rabbit', 'hedgehog', 'frog', 'owl', 'flower'];
+  var CR = [], CRBY = {};
+
+  function buildCreatures() {
+    var host = $('creatures');
+    ORDER.forEach(function (id, i) {
+      var d = DEFS[id];
+      var g = mk('g', { 'data-cr': id }, host);
+      g.innerHTML = d.art() + '<rect class="hit" x="' + d.hit[0] + '" y="' + d.hit[1] + '" width="' + d.hit[2] + '" height="' + d.hit[3] + '"/>';
+      function q(c) { return g.querySelector('.' + c); }
+      var c = {
+        id: id, d: d, g: g, bob: q('bob'),
+        eo: { L: q('eoL'), R: q('eoR') }, ec: { L: q('ecL'), R: q('ecR') }, pu: { L: q('puL'), R: q('puR') },
+        earL: q('earL'), earR: q('earR'), foot: q('foot'), head: q('head'), spk: q('spikes'), face: q('face'),
+        pouch: q('pouch'), beak: q('beak'), top: q('top'), bell: q('bell'),
+        awake: false, stirred: false, joinT: 1e9,
+        vis: 'asleep', visP: -1e9, w: 0, actP: -1e9, tapP: -1e9, snoreP: -1e9,
+        zNext: 900 + i * 700, ph: i * 1.7, blinkAt: 2000 + Math.random() * 3000,
+        x: 0, y: 0, s: 1
+      };
+      CR.push(c); CRBY[id] = c;
+    });
+  }
+  function setVis(cr, v) { if (cr.vis !== v) { cr.vis = v; cr.visP = performance.now(); } }
+
+  // ------------------------------------------------------------------
+  // The effects layer: fireflies, sparkles and snores. On a canvas, not
+  // in the SVG, because lots of little moving things in one big SVG make
+  // the phone flicker.
+  // ------------------------------------------------------------------
+  var cv = $('fx'), cx = cv.getContext('2d'), DPR = 1, CW = 1, CHh = 1;
+  function sizeCanvas(vw, vh) {
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    CW = vw; CHh = vh;
+    cv.width = Math.round(vw * DPR); cv.height = Math.round(vh * DPR);
+    cv.style.width = vw + 'px'; cv.style.height = vh + 'px';
+  }
+  function sxW(x) { return VX.ox + x * VX.k; }
+  function syW(y) { return VX.oy + y * VX.k; }
+  function glowSprite(rgb) {
+    var c = document.createElement('canvas'); c.width = c.height = 64;
+    var g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(' + rgb + ',1)');
+    gr.addColorStop(0.22, 'rgba(' + rgb + ',0.55)');
+    gr.addColorStop(1, 'rgba(' + rgb + ',0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+    return c;
+  }
+  var GLOW = { gold: glowSprite('255,222,110'), green: glowSprite('130,245,170'), fly: glowSprite('214,255,140'), white: glowSprite('255,250,235'), pink: glowSprite('255,190,225') };
+  function spriteFor(col) {
+    if (col === '#bff7d2') { return GLOW.green; }
+    if (col === '#d6ff8c') { return GLOW.fly; }
+    if (col === '#ffd0ea') { return GLOW.pink; }
+    if (col === '#ffffff') { return GLOW.white; }
+    return GLOW.gold;
+  }
+
+  var sparks = [], zs = [], burst = [], flies = [], flyFl = [];
+  for (var fi = 0; fi < 6; fi++) { flies.push({ a: fi * 1.05, r: 0.8 + (fi % 3) * 0.18, sp: (fi % 2 ? 1 : -1) * (0.5 + fi * 0.07) }); flyFl.push(-1e9); }
+  function flyFlash(i) { flyFl[i % 6] = performance.now(); flyFl[(i + 3) % 6] = performance.now(); }
+
+  function sparkleAt(x, y, n, col, spread) {
+    var P = performance.now();
+    for (var i = 0; i < n && sparks.length < 160; i++) {
+      var a = Math.random() * Math.PI * 2, sp = (0.4 + Math.random()) * spread * 1.6;
+      sparks.push({ x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - spread * 0.4, b: P, life: 700 + Math.random() * 500, col: col, r: 6 + Math.random() * 6 });
+    }
+  }
+  function wakeBurst(cr) {
+    var hx = cr.x + cr.d.head[0] * cr.s * 0.4, hy = cr.y + cr.d.head[1] * cr.s * 0.7;
+    sparkleAt(hx, hy, 18, '#ffe680', 60 * cr.s);
+    sparkleAt(hx, hy, 8, '#ffd0ea', 50 * cr.s);
+  }
+  function finaleBurst() {
+    var P = performance.now(), rnd = Math.random;
+    moonGlowP = P;
+    for (var i = 0; i < 34; i++) {
+      burst.push({ x: L.mx + (rnd() - 0.5) * 200, y: L.my - 150 * L.ms, tx: rnd() * L.W, ty: L.sy + 40 + rnd() * (L.ground - L.sy + 120),
+        b: P + i * 30, ph: rnd() * 6.28, col: i % 4 ? '#d6ff8c' : '#ffe680' });
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Drawing, every frame
+  // ------------------------------------------------------------------
+  var MP = { low: { x: -90, y: -60 }, high: { x: 88, y: -52 } };
+  var M = {
+    body: $('dm-body'), head: $('dm-head'), earL: $('dm-earL'), earR: $('dm-earR'),
+    eyeL: $('dm-eyeL'), eyeR: $('dm-eyeR'), puL: $('dm-puL'), puR: $('dm-puR'), brows: $('dm-brows'),
+    smile: $('dm-mSmile'), grin: $('dm-mGrin'), ooh: $('dm-mOoh'),
+    ripL: $('dm-ripL'), ripR: $('dm-ripR'), glowL: $('dm-glowL'), glowR: $('dm-glowR'),
+    armL: $('dm-armL'), armR: $('dm-armR'), pawL: $('dm-pawL'), pawR: $('dm-pawR'), play: $('dm-play')
+  };
+  var CONTACT = { low: { x: -97, y: -44 }, high: { x: 95, y: -36 } };
+  var REST = { low: { x: -88, y: -62 }, high: { x: 88, y: -54 } };
+  var mBlinkAt = 2500;
+
+  function barAtH(H) {
+    for (var i = bars.length - 1; i >= 0; i--) {
+      if (H >= bars[i].start && H < bars[i].start + BAR) { return bars[i]; }
+    }
+    return null;
+  }
+  function moodNow(H) {
+    if (!mood) { return null; }
+    var age = H - mood.t;
+    return (age >= 0 && age < 2.0) ? mood : null;
+  }
+
+  function liftFor(side, H) {
+    var u = 0, on = false;
+    for (var i = 0; i < strikes.length; i++) {
+      if (strikes[i].side !== side) { continue; }
+      var d = H - strikes[i].t;
+      if (d > -0.17 && d <= 0) { u = Math.max(u, Math.sin(Math.PI * (-d) / 0.17)); on = true; }
+      else if (d > 0 && d <= 0.12) { u = Math.max(u, 0.25 * Math.sin(Math.PI * d / 0.12)); on = true; }
+    }
+    return on ? u : -1;
+  }
+
+  function drawMouse(P, H, kind, bp, md) {
+    var band = kind === 'groove' || kind === 'call' || kind === 'echo' || kind === 'finale';
+    var still = reduced;
+    var dip = (!still && band) ? Math.pow(1 - bp, 4) * (kind === 'finale' ? 10 : 5) : 0;
+    var breathe = still ? 0 : Math.sin(P / 700) * 1.5;
+    var cheer = (md && md.kind === 'great') || kind === 'finale';
+    var lean = 0;
+    if (kind === 'answer') { lean = -3; }
+    if (md && md.kind === 'silent') { lean = 4; }
+    var bodyY = dip + breathe * 0.5 - (cheer && !still ? Math.abs(Math.sin(P / 140)) * 8 : 0);
+    setA(M.body, 'transform', 'translate(0,' + f1(bodyY) + ') rotate(' + f1(still ? 0 : lean) + ' 0 0)');
+
+    // Paws
+    ['low', 'high'].forEach(function (side) {
+      var sgn = side === 'low' ? -1 : 1, tgt = REST[side], u = liftFor(side, H), p = MP[side];
+      if (u >= 0 && (kind === 'call' || kind === 'echo' || kind === 'finale' || kind === 'groove')) {
+        p.x = CONTACT[side].x; p.y = CONTACT[side].y - u * 54;
+      } else {
+        var wob = still ? 0 : Math.sin(P / 210 + (sgn > 0 ? 1.5 : 0));
+        if (cheer) { tgt = { x: sgn * 112, y: -206 + wob * 10 }; }
+        else if (kind === 'answer') { tgt = { x: sgn * 132, y: -142 + (still ? 0 : Math.sin(P / 380) * 4) }; }
+        else if (kind === 'child') { tgt = side === 'high' ? { x: 66, y: -170 } : REST.low; }
+        else if (kind === 'idle' && side === 'high') { tgt = { x: 124, y: -170 + wob * 14 }; }
+        else if (kind === 'wait') {
+          var tapF = still ? 0 : Math.max(0, Math.sin(P / 260 + (sgn > 0 ? 0 : Math.PI)));
+          tgt = { x: REST[side].x, y: REST[side].y - tapF * 8 };
+        }
+        else if (md && md.kind === 'try' && side === 'low') { tgt = { x: -118, y: -118 }; }
+        p.x += (tgt.x - p.x) * 0.25; p.y += (tgt.y - p.y) * 0.25;
+      }
+      var sx = sgn * 44, sy = -92 + bodyY;
+      var arm = side === 'low' ? M.armL : M.armR, paw = side === 'low' ? M.pawL : M.pawR;
+      setA(arm, 'x1', sx); setA(arm, 'y1', f1(sy)); setA(arm, 'x2', f1(p.x)); setA(arm, 'y2', f1(p.y));
+      setA(paw, 'cx', f1(p.x)); setA(paw, 'cy', f1(p.y));
+    });
+
+    // Head: where it looks, and how it tilts
+    var lx = 0, ly = 1.5, tilt = 0, brow = 0, perk = 1;
+    if (kind === 'call' || kind === 'echo' || kind === 'finale') { ly = 5; tilt = still ? 0 : Math.sin(P / 300) * 3; }
+    if (kind === 'answer') { brow = -5; perk = 1.1; tilt = still ? 0 : Math.sin(P / 600) * 2; }
+    if (kind === 'child') { brow = -4; perk = 1.12; tilt = 13; lx = 2; }
+    if (kind === 'groove' && !still) { tilt = (bp < 0.5 ? 1 : -1) * 2; }
+    if (kind === 'wait') { brow = -3; }
+    if (md) {
+      if (md.cr && H - md.t < 1.0) {
+        var dx = md.cr.x - L.mx;
+        lx = dx > 0 ? 4.5 : -4.5; ly = (md.cr.y < L.my - 200 * L.ms) ? -3.5 : 1;
+        tilt = dx > 0 ? 8 : -8;
+      }
+      if (md.kind === 'try') { tilt = 10; brow = -5; }
+      if (md.kind === 'silent') { brow = -6; ly = 1; }
+      if (md.kind === 'great' && !(md.cr && H - md.t < 1.0) && !still) { tilt = Math.sin(P / 160) * 6; }
+    }
+    if (kind === 'lullaby' && !still) { tilt = Math.sin(P / 500) * 6; }
+    var nod = (!still && band) ? Math.pow(1 - bp, 3) * 4 : 0;
+    setA(M.head, 'transform', 'translate(0,' + f1(nod) + ') rotate(' + f1(still ? 0 : tilt) + ' 0 -110)');
+    setA(M.puL, 'transform', 'translate(' + f1(lx) + ',' + f1(ly) + ')');
+    setA(M.puR, 'transform', 'translate(' + f1(lx) + ',' + f1(ly) + ')');
+    setA(M.brows, 'transform', 'translate(0,' + f1(brow) + ')');
+    var tw = clamp(1 - (P - earP) / 180, 0, 1) * (still ? 0 : 12);
+    setA(M.earL, 'transform', 'rotate(' + f1(-tw * 0.6) + ' -30 -150) translate(-42,-176) scale(' + perk + ') translate(42,176)');
+    setA(M.earR, 'transform', 'rotate(' + f1(tw) + ' 30 -150) translate(42,-176) scale(' + perk + ') translate(-42,176)');
+
+    // Eyes and mouth
+    var lid = 1;
+    if (P > mBlinkAt) { lid = 0.1; if (P > mBlinkAt + 120) { mBlinkAt = P + 2400 + Math.random() * 3000; } }
+    if (cheer) { lid = 0.45; }
+    if (kind === 'lullaby') { lid = 0.55; }
+    setA(M.eyeL, 'transform', 'translate(0,' + f1(-148 * (1 - lid)) + ') scale(1,' + lid.toFixed(2) + ')');
+    setA(M.eyeR, 'transform', 'translate(0,' + f1(-148 * (1 - lid)) + ') scale(1,' + lid.toFixed(2) + ')');
+    var mouth = 'smile';
+    if (cheer || (md && md.kind === 'good')) { mouth = 'grin'; }
+    if ((md && md.kind === 'silent') || (kind === 'lullaby' && H - barAtH(H).start < STEP * 2.5)) { mouth = 'ooh'; }
+    setA(M.smile, 'opacity', mouth === 'smile' ? 1 : 0);
+    setA(M.grin, 'opacity', mouth === 'grin' ? 1 : 0);
+    setA(M.ooh, 'opacity', mouth === 'ooh' ? 1 : 0);
+
+    // Drums: ripples, and a glow when it is the child's go
+    ['low', 'high'].forEach(function (side) {
+      var el = side === 'low' ? M.ripL : M.ripR, rx0 = side === 'low' ? 85 : 69, ry0 = side === 'low' ? 22 : 18;
+      var a = clamp((P - ripP[side]) / 360, 0, 1);
+      if (a >= 1) { setA(el, 'opacity', 0); return; }
+      setA(el, 'opacity', (0.9 * (1 - a)).toFixed(2));
+      var k = reduced ? 0.8 : 0.3 + 0.65 * a;
+      setA(el, 'rx', f1(rx0 * k)); setA(el, 'ry', f1(ry0 * k));
+    });
+    var go = (kind === 'answer' || kind === 'child') ? (reduced ? 0.85 : 0.45 + 0.45 * Math.pow(1 - bp, 2)) : 0;
+    setA(M.glowL, 'opacity', go.toFixed(2)); setA(M.glowR, 'opacity', go.toFixed(2));
+    var pl = state === 'idle' ? 1 : (state === 'wait' ? 0.7 : 0);
+    var ps = (pl && !reduced) ? 1 + 0.05 * Math.sin(P / 300) : 1;
+    setA(M.play, 'opacity', pl);
+    setA(M.play, 'transform', 'translate(0,-34) scale(' + ps.toFixed(3) + ') translate(0,34)');
+  }
+
+  function drawCreature(c, P, H, kind, bp, finale) {
+    var tgt = c.vis === 'awake' ? 1 : (c.vis === 'stir' ? 0.35 : 0);
+    c.w += (tgt - c.w) * (tgt > c.w ? 0.09 : 0.04);
+    var sl = 1 - c.w, still = reduced;
+    var breath = still ? 0 : Math.sin(P / 1100 + c.ph) * (0.035 * sl + 0.012);
+    var band = kind === 'groove' || kind === 'call' || kind === 'echo' || kind === 'finale';
+    var hop = 0;
+    if (!still && c.vis === 'awake' && band) { hop += Math.pow(1 - bp, 3) * (finale ? 22 : 8); }
+    if (!still && c.vis === 'awake' && P - c.visP < 800) { hop += Math.sin((P - c.visP) / 800 * Math.PI) * 34; }
+    var sn = clamp(1 - (P - c.snoreP) / 900, 0, 1);
+    var wig = (!still && sn > 0) ? Math.sin(P / 60) * 3 * sn : 0;
+    setA(c.bob, 'transform', 'translate(0,' + f1(-hop + sl * 5) + ') rotate(' + f1(wig) + ' 0 0) scale(' + (1 - breath * 0.4).toFixed(3) + ',' + (1 + breath - sl * 0.04).toFixed(3) + ')');
+
+    // Eyes: the left one opens first, when it stirs
+    var openL = c.vis !== 'asleep', openR = c.vis === 'awake' && c.w > 0.6;
+    var bl = 1;
+    if (openL && P > c.blinkAt) { bl = 0.12; if (P > c.blinkAt + 130) { c.blinkAt = P + 2200 + Math.random() * 3500; } }
+    var e = c.d.eyes;
+    setA(c.eo.L, 'opacity', openL ? 1 : 0); setA(c.ec.L, 'opacity', openL ? 0 : 1);
+    setA(c.eo.R, 'opacity', openR ? 1 : 0); setA(c.ec.R, 'opacity', openR ? 0 : 1);
+    var bt = bl < 1 ? 'translate(0,' + f1(e[1] * (1 - bl)) + ') scale(1,' + bl + ')' : '';
+    setA(c.eo.L, 'transform', bt); setA(c.eo.R, 'transform', bt);
+    // Where it looks: at the mouse while the mouse plays, at the child
+    // while the child plays.
+    var lx = 0, ly = 0;
+    if (c.vis !== 'asleep') {
+      var toMouse = L.mx - c.x;
+      if (kind === 'answer' || kind === 'child') { lx = 0; ly = 2; }
+      else { lx = clamp(toMouse / 120, -1, 1) * 3; ly = (L.my - 120 * L.ms > c.y) ? 2 : -1; }
+    }
+    var lt = 'translate(' + f1(lx) + ',' + f1(ly) + ')';
+    setA(c.pu.L, 'transform', lt); setA(c.pu.R, 'transform', lt);
+
+    var a = clamp(1 - (P - c.actP) / 230, 0, 1);
+    var ta = clamp(1 - (P - c.tapP) / 400, 0, 1);
+    a = Math.max(a, c.vis === 'awake' ? ta : 0);
+    switch (c.id) {
+      case 'rabbit':
+        setA(c.earL, 'transform', 'rotate(' + f1(-78 * sl + (still ? 0 : a * -6)) + ' -13 -136)');
+        setA(c.earR, 'transform', 'rotate(' + f1(78 * sl + (still ? 0 : a * 6)) + ' 13 -136)');
+        setA(c.head, 'transform', 'translate(0,' + f1(sl * 12) + ')');
+        setA(c.foot, 'transform', 'rotate(' + f1(still ? 0 : -24 * a) + ' 6 -4)');
+        break;
+      case 'hedgehog':
+        setA(c.spk, 'transform', 'rotate(' + f1(still ? 0 : Math.sin(P / 35) * 5 * a) + ' 0 -46) translate(0,-46) scale(' + (1 + a * 0.05).toFixed(3) + ') translate(0,46)');
+        setA(c.face, 'transform', 'translate(0,' + f1(sl * 9) + ')');
+        break;
+      case 'frog':
+        setA(c.pouch, 'transform', 'translate(0,-34) scale(' + (1 + a * 0.9).toFixed(3) + ',' + (1 + a * 1.1).toFixed(3) + ') translate(0,34)');
+        break;
+      case 'owl':
+        setA(c.beak, 'transform', 'translate(0,' + f1(a * 6) + ')');
+        break;
+      case 'flower':
+        // It droops towards the middle of the screen, never off the edge.
+        setA(c.top, 'transform', 'rotate(' + f1((c.x > L.W / 2 ? -62 : 62) * sl) + ' 0 -70)');
+        setA(c.bell, 'transform', 'translate(0,-150) scale(' + (1 + a * 0.12).toFixed(3) + ') translate(0,150)');
+        break;
+    }
+
+    // Snores: little floating Zs while it sleeps
+    if (c.vis !== 'awake' && P > c.zNext) {
+      c.zNext = P + (c.vis === 'stir' ? 4200 : 2700) + Math.random() * 600;
+      if (zs.length < 12) {
+        zs.push({ x: c.x + c.d.head[0] * c.s, y: c.y + c.d.head[1] * c.s * (c.id === 'flower' ? 0.55 : 0.8), b: P, s: c.s * (c.vis === 'stir' ? 0.7 : 1) });
+      }
+    }
+  }
+
+  function drawStars(P, H, kind) {
+    for (var i = 0; i < 8; i++) {
+      var st = ST[i], el = starEls[i];
+      if (!el) { continue; }
+      var fade = st.fade > 0 ? clamp(1 - (P - st.fade) / 600, 0, 1) : 1;
+      if (st.fade > 0 && fade <= 0) { st.g = 0; st.gr = 0; st.fade = -1e9; fade = 1; }
+      // Gold the mouse played (fading to an outline to copy), green
+      // the child played, green ringed with gold where they agree.
+      var lit = st.gr || (st.g && P - st.gP < 320);
+      setA(el.fill, 'opacity', ((st.g || st.gr) ? 1 : 0) * fade);
+      setA(el.fill, 'fill', st.gr ? '#6fe39a' : '#ffd54a');
+      setA(el.fill, 'fill-opacity', lit ? 1 : 0.22);
+      setA(el.fill, 'stroke', st.g ? '#ffd54a' : '#ffffff');
+      var pop = Math.max(clamp(1 - (P - st.gP) / 260, 0, 1), clamp(1 - (P - st.grP) / 260, 0, 1));
+      var tw = clamp(1 - (P - st.tw) / 700, 0, 1);
+      var sc = reduced ? 1 : 1 + pop * 0.38 + Math.sin(tw * Math.PI) * (st.twBig ? 0.35 : 0.18);
+      var rot = reduced ? 0 : tw * 72;
+      setA(el.inner, 'transform', (sc !== 1 || rot) ? 'scale(' + sc.toFixed(3) + ') rotate(' + f1(rot) + ')' : '');
+    }
+  }
+
+  function moonDraw(snap) {
+    var target = Math.min(lvl, 4) / 4;
+    if (snap) { moonP = target; } else { moonP += (target - moonP) * 0.03; }
+    var r = L.moon ? L.moon.r : 40;
+    $('dm-moonshade').setAttribute('cx', f1(r * lerp(0.42, 2.3, moonP)));
+    $('dm-moonshade').setAttribute('cy', f1(-r * 0.12 * (1 - moonP)));
+  }
+
+  function drawFx(P, H, kind, b) {
+    cx.setTransform(1, 0, 0, 1, 0, 0);
+    cx.clearRect(0, 0, cv.width, cv.height);
+    cx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    var k = VX.k, i, a;
+
+    // The firefly that flies along the stars, showing where in the bar we are
+    if (b && (kind === 'call' || kind === 'answer' || kind === 'child' || kind === 'echo')) {
+      var sf = clamp((H - b.start) / STEP, -0.4, 7.4);
+      var mine = kind === 'answer' || kind === 'child';
+      var spr = mine ? GLOW.green : GLOW.gold;
+      if (reduced) {
+        var si2 = clamp(Math.round(sf), 0, 7), rr = L.sr * 1.5 * k;
+        cx.globalAlpha = 0.9;
+        cx.drawImage(spr, sxW(L.sx[si2]) - rr, syW(L.sy) - rr, rr * 2, rr * 2);
+      } else {
+        var px = L.sx0 + (L.sx1 - L.sx0) * sf / 7;
+        var py = L.sy + L.sr * 1.9 + Math.sin(P / 140) * 4 - Math.abs(Math.sin(sf * Math.PI)) * L.sr * 0.5;
+        var gr = 30 * k + 10;
+        cx.globalAlpha = 0.95;
+        cx.drawImage(spr, sxW(px) - gr, syW(py) - gr, gr * 2, gr * 2);
+        cx.globalAlpha = 1;
+        cx.fillStyle = mine ? '#eafff1' : '#fff6d0';
+        cx.beginPath(); cx.arc(sxW(px), syW(py), 5 * k + 2, 0, Math.PI * 2); cx.fill();
+      }
+    }
+
+    // The flower's fireflies
+    var fl = CRBY.flower;
+    if (fl && fl.w > 0.3) {
+      var fcx = fl.x + 0, fcy = fl.y - 168 * fl.s, R = 70 * fl.s;
+      for (i = 0; i < flies.length; i++) {
+        var f = flies[i];
+        var ang = f.a + (reduced ? 0 : P / 1000 * f.sp);
+        var fx = fcx + Math.cos(ang) * R * f.r, fy = fcy + Math.sin(ang * 1.3) * R * 0.55 * f.r - (reduced ? 0 : Math.sin(P / 700 + i) * 10 * fl.s);
+        var flash = clamp(1 - (P - flyFl[i]) / 380, 0, 1);
+        var br = (0.45 + 0.3 * Math.sin(P / 330 + i * 1.7) + 0.6 * flash) * clamp((fl.w - 0.3) / 0.7, 0, 1);
+        var gs = (14 + flash * 14) * fl.s * k + 4;
+        cx.globalAlpha = clamp(br, 0, 1);
+        cx.drawImage(GLOW.fly, sxW(fx) - gs, syW(fy) - gs, gs * 2, gs * 2);
+      }
+    }
+
+    // The finale's sky full of fireflies
+    for (i = burst.length - 1; i >= 0; i--) {
+      var q = burst[i], age = P - q.b;
+      if (age < 0) { continue; }
+      var life = q.end ? clamp(1 - (P - q.end) / 1500, 0, 1) : 1;
+      if (q.end && life <= 0) { burst.splice(i, 1); continue; }
+      var u = reduced ? 1 : clamp(age / 1400, 0, 1), e2 = 1 - Math.pow(1 - u, 3);
+      var bx = lerp(q.x, q.tx, e2) + (reduced ? 0 : Math.sin(P / 900 + q.ph) * 18);
+      var by = lerp(q.y, q.ty, e2) + (reduced ? 0 : Math.cos(P / 1100 + q.ph) * 12);
+      var g2 = (12 + 5 * Math.sin(P / 260 + q.ph)) * k + 4;
+      cx.globalAlpha = clamp((0.55 + 0.45 * Math.sin(P / 300 + q.ph)) * life, 0, 1);
+      cx.drawImage(q.col === '#ffe680' ? GLOW.gold : GLOW.fly, sxW(bx) - g2, syW(by) - g2, g2 * 2, g2 * 2);
+    }
+
+    // Sparkles
+    for (i = sparks.length - 1; i >= 0; i--) {
+      var s = sparks[i], t2 = (P - s.b) / s.life;
+      if (t2 >= 1) { sparks.splice(i, 1); continue; }
+      var ease = 1 - Math.pow(1 - t2, 2);
+      var x = s.x + (reduced ? 0 : s.vx * ease), y = s.y + (reduced ? 0 : s.vy * ease + 40 * t2 * t2);
+      var rr2 = s.r * k * (1 - t2 * 0.5) + 2;
+      cx.globalAlpha = 1 - t2;
+      cx.drawImage(spriteFor(s.col), sxW(x) - rr2 * 1.6, syW(y) - rr2 * 1.6, rr2 * 3.2, rr2 * 3.2);
+    }
+
+    // Zs
+    cx.lineCap = 'round'; cx.lineJoin = 'round';
+    for (i = zs.length - 1; i >= 0; i--) {
+      var z = zs[i], t3 = (P - z.b) / 2600;
+      if (t3 >= 1) { zs.splice(i, 1); continue; }
+      var zx = sxW(z.x + (reduced ? 0 : t3 * 34 * z.s)), zy = syW(z.y - (reduced ? 0 : t3 * 70 * z.s));
+      var zz = (7 + t3 * 7) * z.s * k + 2;
+      cx.globalAlpha = Math.sin(t3 * Math.PI) * 0.85;
+      cx.strokeStyle = '#dfe6ff'; cx.lineWidth = Math.max(1.5, zz * 0.32);
+      cx.beginPath(); cx.moveTo(zx - zz, zy - zz); cx.lineTo(zx + zz, zy - zz); cx.lineTo(zx - zz, zy + zz); cx.lineTo(zx + zz, zy + zz); cx.stroke();
+    }
+    cx.globalAlpha = 1;
+  }
+
+  var lastMic = { ring: -1, slash: -1 };
+  function drawHud(P) {
+    var on = MIC.state === 'on';
+    var r = on ? Math.min(0.85, 0.25 + Math.min(0.5, MIC.level * 6) + (P - MIC.flash < 160 ? 0.3 : 0)) : 0;
+    r = Math.round(r * 20) / 20;
+    if (r !== lastMic.ring) { lastMic.ring = r; $('micring').setAttribute('opacity', r); }
+    var sl = MIC.state === 'blocked' ? 1 : 0;
+    if (sl !== lastMic.slash) { lastMic.slash = sl; $('micslash').setAttribute('opacity', sl); }
+    // The moon's glow, when a night ends or the finale starts
+    var mg = clamp(1 - (P - moonGlowP) / 2200, 0, 1);
+    var halo = $('dm-haloc');
+    if (halo) { setA(halo, 'transform', 'scale(' + (1 + (reduced ? 0 : mg * 0.5)).toFixed(3) + ')'); setA(halo, 'opacity', (0.7 + mg * 0.3).toFixed(2)); }
+  }
 
   function frame() {
-    var t = nowMs(), i, q;
     requestAnimationFrame(frame);
-
-    // scheduled events
-    for (i = 0; i < queue.length;) {
-      q = queue[i];
-      if (q.g !== gen) { queue.splice(i, 1); continue; }
-      if (t >= q.t) { queue.splice(i, 1); q.fn(); } else { i++; }
+    var P = performance.now(), H = AC ? heardNow() : P / 1000;
+    drainVis(H);
+    listen(P, H);
+    var b = (state === 'play' || state === 'wait') ? barAtH(H) : null;
+    var kind = state === 'idle' ? 'idle' : (b ? b.kind : 'wait');
+    var bp = b ? (((H - b.start) / (2 * STEP)) % 1) : 0;
+    var md = moodNow(H);
+    while (strikes.length && strikes[0].t < H - 1) { strikes.shift(); }
+    drawMouse(P, H, kind, bp, md);
+    for (var i = 0; i < CR.length; i++) { drawCreature(CR[i], P, H, kind, bp, kind === 'finale'); }
+    drawStars(P, H, kind);
+    if (Math.abs(moonP - Math.min(lvl, 4) / 4) > 0.002) { moonDraw(false); }
+    if (kind === 'lullaby' || (kind !== 'finale' && burst.length)) {
+      for (i = 0; i < burst.length; i++) { if (!burst[i].end) { burst[i].end = P; } }
     }
-
-    listen(t);
-
-    // turn timing
-    if (state === 'turn') {
-      if (judgeAt && t >= judgeAt) { judgeAt = 0; judge(); }
-      else if (!judgeAt) {
-        var longest = 1;
-        for (i = 1; i < cur.length; i++) { longest = Math.max(longest, cur[i] - cur[i - 1]); }
-        var wait = Math.max(1700, longest * SPB * 2.2);
-        if (hits.length > 0 && t - lastHitT > wait) { judge(); }
-        else if (hits.length === 0 && t - turnStart > 9000) { mimicMs = null; tryAgainNoCount(); }
-      }
-    } else if (state === 'free') {
-      if ((hits.length >= 6) || (hits.length > 0 && t - lastHitT > 1300)) { state = 'think'; thinkT = t; later(700, mimicBack); }
-      else if (hits.length === 0 && t - turnStart > 10000) { startRound(); }
-    }
-
-    draw(t);
-  }
-  var thinkT = 0;
-
-  function tryAgainNoCount() {
-    // nothing heard for a long while: just play it again, no penalty
-    reset();
-    state = 'again'; againT = nowMs();
-    againSound();
-    later(1000, function () { copyRound(true); });
-  }
-
-  function draw(t) {
-    var listening = (state === 'turn' || state === 'free');
-    ready += ((listening ? 1 : 0) - ready) * 0.12;
-
-    // paws
-    var ph = [0, 0], k;
-    for (k = 0; k < 2; k++) { ph[k] = clamp((t - pawT[k]) / 230, 0, 1); }
-    var cheerBob = (state === 'cheer' && !reduced) ? Math.abs(Math.sin((t - cheerT) / 130)) : 0;
-    var nod = clamp(1 - (t - nodT) / 200, 0, 1) * (reduced ? 0 : 7);
-    var bodyY = -cheerBob * 18;
-    $('body').setAttribute('transform', 'translate(0,' + (bodyY / 1.5).toFixed(1) + ')');
-
-    var s, sh, rest, down, h, tip, name;
-    for (k = 0; k < 2; k++) {
-      s = k ? 1 : -1; name = k ? 'R' : 'L';
-      var d = ph[k] < 0.18 ? 1 - ph[k] / 0.18 * 0.0 : 1 - (ph[k] - 0.18) / 0.82;   // drops, then lifts
-      if (pawT[k] < -1e8) { d = 0; }
-      var wave = (state === 'cheer' && !reduced) ? Math.sin((t - cheerT) / 110 + k * 3) * 22 : 0;
-      var idleWave = (state === 'idle' && k === 1 && !reduced) ? Math.sin(t / 260) * 18 : 0;
-      var restX = 350 + s * 84, restY = 338;
-      var readyX = 350 + s * 150, readyY = 292;
-      var rx = lerp(restX, readyX, ready), ry = lerp(restY, readyY, ready) + wave + idleWave;
-      var dx = 350 + s * 62, dy = 394;
-      var hx = lerp(rx, dx, d), hy = lerp(ry, dy, d);
-      sh = [350 + s * 46, 302 + bodyY];
-      $('a' + name).setAttribute('x1', sh[0]); $('a' + name).setAttribute('y1', sh[1]);
-      $('a' + name).setAttribute('x2', hx.toFixed(1)); $('a' + name).setAttribute('y2', hy.toFixed(1));
-      $('h' + name).setAttribute('cx', hx.toFixed(1)); $('h' + name).setAttribute('cy', hy.toFixed(1));
-      var sx = hx.toFixed(1), sy = hy.toFixed(1);
-      $('s' + name).setAttribute('x1', sx); $('s' + name).setAttribute('y1', sy);
-      $('s' + name).setAttribute('x2', (hx - s * 12).toFixed(1)); $('s' + name).setAttribute('y2', (hy + 50).toFixed(1));
-      $('s' + name).setAttribute('opacity', (1 - ready).toFixed(2));
-    }
-
-    // head: tilts to ask "again?", leans toward the child on their go
-    var tilt = 0;
-    if (state === 'again') { tilt = reduced ? 0 : 11 * Math.sin(Math.min(1, (t - againT) / 500) * Math.PI) * 1.0 + 6; }
-    else if (state === 'think') { tilt = reduced ? 0 : Math.sin(t / 120) * 6; }
-    else if (listening && !reduced) { tilt = Math.sin(t / 900) * 3; }
-    else if (state === 'cheer' && !reduced) { tilt = Math.sin((t - cheerT) / 160) * 5; }
-    $('head').setAttribute('transform', 'translate(0,' + (nod / 1.5).toFixed(1) + ') rotate(' + tilt.toFixed(1) + ' 0 -100)');
-
-    // eyes
-    var look = (listening || state === 'cheer' || state === 'again' || state === 'think') ? VIEWER_LOOK
-             : (state === 'idle' ? [Math.sin(t / 900) * 3, 0] : DOWN_LOOK);
-    var blink = 1;
-    if (t > blinkAt) { blink = 0.1; if (t > blinkAt + 120) { blinkAt = t + 2500 + Math.random() * 2500; blink = 1; } }
-    var happy = state === 'cheer';
-    ['L', 'R'].forEach(function (n2, i2) {
-      var cx = (i2 ? 15 : -15), p = $('pup' + n2), shn = $('sh' + n2);
-      p.setAttribute('cx', cx + look[0]); p.setAttribute('cy', -119 + look[1]);
-      shn.setAttribute('cx', cx + look[0] + 2); shn.setAttribute('cy', -123 + look[1]);
-      $('eye' + n2).setAttribute('transform', 'translate(0,' + (-120 * (1 - (happy ? 0.35 : blink))).toFixed(1) + ') scale(1,' + (happy ? 0.35 : blink).toFixed(2) + ')');
-    });
-    var open = (state === 'cheer') || (state === 'again' && t - againT < 300);
-    $('grin').setAttribute('opacity', open ? 1 : 0);
-    $('smile').setAttribute('opacity', open ? 0 : 1);
-
-    // drum ripple and the "your go" ring
-    var rp = clamp((t - rippleT) / 320, 0, 1);
-    var rE = $('ripple');
-    rE.setAttribute('opacity', (rp < 1 ? 0.8 * (1 - rp) : 0).toFixed(2));
-    rE.setAttribute('rx', (reduced ? 130 : 60 + 150 * rp).toFixed(1));
-    rE.setAttribute('ry', (reduced ? 34 : 16 + 40 * rp).toFixed(1));
-    var gl = listening ? (reduced ? 0.9 : 0.55 + 0.4 * Math.sin(t / 260)) : 0;
-    $('glow').setAttribute('opacity', (gl * ready).toFixed(2));
-    $('play').setAttribute('opacity', state === 'idle' ? (reduced ? 1 : 0.8 + 0.2 * Math.sin(t / 300)) : 0);
-    $('play').setAttribute('transform', state === 'idle' && !reduced ? 'translate(350 450) scale(' + (1 + 0.05 * Math.sin(t / 300)).toFixed(3) + ') translate(-350 -450)' : '');
-
-    // dots
-    syncDotEls();
-    for (var di = 0; di < dots.length; di++) {
-      var dd = dots[di], el = dotEls[di], age = t - dd.t, r = 22, fill = 'none', stroke = '#9d9ac8';
-      if (dd.lit === 1) { fill = '#ffd54a'; stroke = '#fff'; r = 22 + (reduced ? 0 : 10 * clamp(1 - age / 250, 0, 1)); }
-      else if (dd.lit === 2) { fill = '#6fe39a'; stroke = '#fff'; r = 22 + (reduced ? 0 : 10 * clamp(1 - age / 250, 0, 1)); }
-      else if (dd.lit === 3) { fill = '#ffd54a'; stroke = '#fff'; r = 26; }
-      el.setAttribute('cx', dd.x.toFixed(1)); el.setAttribute('r', r.toFixed(1));
-      el.setAttribute('fill', fill); el.setAttribute('stroke', stroke); el.setAttribute('stroke-width', 5);
-    }
-
-    // pops
-    for (var pi = popList.length - 1; pi >= 0; pi--) {
-      var pp = popList[pi], pa = (t - pp.t) / (pp.big ? 1800 : 1400);
-      if (pa >= 1) { $('pops').removeChild(pp.el); popList.splice(pi, 1); continue; }
-      var py = pp.y - (reduced ? 0 : (pp.big ? 120 : 50) * pa);
-      pp.el.setAttribute('transform', 'translate(' + pp.x + ',' + py.toFixed(1) + ') scale(' + (reduced ? 1 : (0.4 + Math.min(1, pa * 4) * 0.8)).toFixed(2) + ')');
-      pp.el.setAttribute('opacity', (pa < 0.7 ? 1 : (1 - pa) / 0.3).toFixed(2));
-    }
-
-    // hud stars
-    for (var hi = 0; hi < hudStars.length; hi++) {
-      hudStars[hi].setAttribute('fill', hi < stars ? '#ffd54a' : 'rgba(255,255,255,0.18)');
-    }
-
-    // mic button
-    var ring = $('micring');
-    var on = MIC.state === 'on';
-    ring.setAttribute('opacity', on ? (0.25 + Math.min(0.6, MIC.level * 6) + (t - MIC.flash < 160 ? 0.15 : 0)).toFixed(2) : 0);
-    $('micslash').setAttribute('opacity', MIC.state === 'blocked' ? 1 : 0);
+    drawFx(P, H, kind, b);
+    drawHud(P);
   }
 
   // ------------------------------------------------------------------
   // Input
   // ------------------------------------------------------------------
-  var hb = $('hitbox');
-  hb.addEventListener('pointerup', function (e) {
-    if (state === 'idle') {
-      initAudio();
-      startMic();
-      strike(false);
-      state = 'demo';
-      setTimeout(startRound, 450);
-    }
-  });
-  hb.addEventListener('pointerdown', function (e) {
-    e.preventDefault();
-    if (state === 'turn' || state === 'free') { onHit('tap', nowMs()); }
-  });
+  function eventTime(e) {
+    var now = performance.now(), ts = e.timeStamp;
+    return (ts > 0 && ts <= now + 5 && now - ts < 1000) ? ts : now;
+  }
+
+  function tapCreature(c, e) {
+    if (!AC) { return; }
+    var P = performance.now();
+    if (P - c.tapP < (c.vis === 'awake' ? 300 : 1100)) { return; }
+    c.tapP = P; lastTapP = P;
+    var t = AC.currentTime + 0.01;
+    if (c.vis === 'awake') { crSolo(c, t, 0.8); c.actP = P; if (c.id === 'flower') { flyFlash(0); flyFlash(1); flyFlash(2); } }
+    else { sSnore(t); c.snoreP = P; }
+  }
+
+  function drumTap(e) {
+    if (!AC) { return; }
+    var P = eventTime(e);
+    var side = e.clientX < sxW(L.mx) ? 'low' : 'high';
+    sBongo(side, AC.currentTime + 0.004, 0.9);
+    lastTapP = performance.now();
+    ripP[side] = performance.now();
+    if (state === 'wait') { seqStart(); return; }
+    childHit('tap', side, heardAt(P));
+  }
+
+  document.addEventListener('pointerdown', function (e) {
+    var tg = e.target;
+    if (tg && tg.closest && tg.closest('button, #who')) { return; }
+    if (state === 'idle') { return; }   // the first touch starts things on pointerup
+    initAudio();
+    var crEl = tg && tg.closest ? tg.closest('[data-cr]') : null;
+    if (crEl) { tapCreature(CRBY[crEl.getAttribute('data-cr')], e); return; }
+    drumTap(e);
+  }, true);
+
+  document.addEventListener('pointerup', function (e) {
+    var tg = e.target;
+    if (tg && tg.closest && tg.closest('button, #who')) { return; }
+    if (state !== 'idle') { return; }
+    initAudio();
+    if (!AC) { return; }
+    startMic();
+    sBongo('low', AC.currentTime + 0.01, 0.9);
+    ripP.low = performance.now();
+    seqStart();
+  }, true);
+
   // On a touchscreen only pointerup counts as a gesture that may start
-  // audio, so any first touch anywhere makes sure the sound is awake.
+  // audio, so any later touch anywhere makes sure the sound is awake.
   ['pointerup', 'touchend', 'click'].forEach(function (ev) {
     document.addEventListener(ev, function () { if (AC) { initAudio(); } }, true);
   });
+  document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
   $('mic').addEventListener('click', function (e) {
     e.stopPropagation();
     initAudio();
@@ -794,19 +1693,28 @@
   function setLeader(who) {
     if (who === leader) { return; }
     leader = who; save(); paintWho();
-    if (state !== 'idle') {     // swap straight into the new way round
-      reset(); state = 'demo'; hits = []; dots = [];
-      MIC.deaf = nowMs() + 1e9;
-      later(500, startRound);
+    if (seq.on) {
+      if (lastListen) { lastListen.dead = true; }
+      pendingJudge = null;
+      var keep = seq.todo.indexOf('finale') >= 0 || seq.todo.indexOf('lullaby') >= 0;
+      if (!keep) { seq.todo = ['groove']; }
+      lastProgress = true; tries = 0;
     }
   }
   $('whoMouse').addEventListener('click', function (e) { e.stopPropagation(); setLeader('mouse'); });
   $('whoChild').addEventListener('click', function (e) { e.stopPropagation(); setLeader('child'); });
   paintWho();
 
-  window.addEventListener('resize', layout);
-  window.addEventListener('orientationchange', layout);
-  buildHud();
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden && seq.on && AC) { seqStop(AC.currentTime); }
+    if (!document.hidden && AC && AC.state === 'suspended') { AC.resume(); }
+  });
+
+  var resizeTimer = 0;
+  window.addEventListener('resize', function () { clearTimeout(resizeTimer); resizeTimer = setTimeout(layout, 120); });
+  window.addEventListener('orientationchange', function () { clearTimeout(resizeTimer); resizeTimer = setTimeout(layout, 220); });
+
+  buildCreatures();
   layout();
   requestAnimationFrame(frame);
 })();
