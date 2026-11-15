@@ -1,0 +1,777 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#141d3a">
+<title>Drum Mouse</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #141d3a;
+    overflow: hidden;
+    touch-action: manipulation;
+    overscroll-behavior: none;
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #stage { display: block; width: 100vw; height: 100vh; width: 100dvw; height: 100dvh; }
+  .hit { fill: transparent; cursor: pointer; }
+  #mic {
+    position: fixed; top: 6px; right: 6px; z-index: 30;
+    width: 62px; height: 62px; padding: 0; line-height: 0; border: 0;
+    border-radius: 18px; background: rgba(255,255,255,0.72); cursor: pointer;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.25);
+    -webkit-tap-highlight-color: transparent;
+  }
+</style>
+</head>
+<body>
+<script>
+// Full screen on the first touch, and a way back if it is off.
+// (Same as Animal Band: only pointerup / touchend / click count as a
+// gesture on a touchscreen, so those are what it listens for.)
+(function () {
+  var el = document.documentElement;
+  var go = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (!go) { return; }
+  var EVENTS = ['pointerup', 'touchend', 'click', 'mousedown'];
+  var asking = false, done = false, btn = null, i;
+  function isFull() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+  function request() {
+    if (asking || isFull()) { return; }
+    asking = true;
+    try {
+      var p = go.call(el);
+      if (p && p.then) { p.then(function () { asking = false; }, function () { asking = false; }); }
+      else { setTimeout(function () { asking = false; }, 500); }
+    } catch (e) { asking = false; }
+  }
+  function stopAuto() {
+    done = true;
+    for (var k = 0; k < EVENTS.length; k++) { document.removeEventListener(EVENTS[k], autoTry, true); }
+  }
+  function autoTry() {
+    if (done) { return; }
+    if (isFull()) { stopAuto(); sync(); return; }
+    request();
+  }
+  function sync() {
+    var want = !isFull();
+    if (want && !btn && document.body) {
+      btn = document.createElement('button');
+      btn.setAttribute('aria-label', 'Full screen');
+      btn.style.cssText = 'position:fixed;top:5px;left:50%;transform:translateX(-50%);'
+        + 'z-index:30;width:46px;height:46px;padding:0;line-height:0;border:0;'
+        + 'border-radius:14px;background:rgba(255,255,255,0.68);cursor:pointer;'
+        + 'box-shadow:0 1px 5px rgba(0,0,0,0.22);-webkit-tap-highlight-color:transparent;';
+      btn.innerHTML = '<svg width="46" height="46" viewBox="0 0 46 46" aria-hidden="true">'
+        + '<g fill="none" stroke="#40563a" stroke-width="3.4" stroke-linecap="round"'
+        + ' stroke-linejoin="round">'
+        + '<path d="M19 14 H14 V19 M27 14 H32 V19 M19 32 H14 V27 M27 32 H32 V27"/>'
+        + '</g></svg>';
+      btn.addEventListener('click', function (e) { e.stopPropagation(); request(); });
+      document.body.appendChild(btn);
+    }
+    if (btn) { btn.style.display = want ? 'block' : 'none'; }
+  }
+  document.addEventListener('fullscreenchange', function () { if (isFull()) { stopAuto(); } sync(); });
+  document.addEventListener('webkitfullscreenchange', function () { if (isFull()) { stopAuto(); } sync(); });
+  for (i = 0; i < EVENTS.length; i++) { document.addEventListener(EVENTS[i], autoTry, true); }
+  sync();
+})();
+</script>
+
+<svg id="stage" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 760" preserveAspectRatio="xMidYMid slice" aria-label="Drum Mouse">
+  <defs>
+    <linearGradient id="dm-sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#141d3a"/><stop offset="1" stop-color="#3a2f66"/>
+    </linearGradient>
+    <linearGradient id="dm-wood" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#cf9459"/><stop offset="1" stop-color="#8a5a2c"/>
+    </linearGradient>
+    <radialGradient id="dm-spot" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff3c2" stop-opacity="0.38"/><stop offset="1" stop-color="#fff3c2" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="dm-shell" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#a8323f"/><stop offset="0.5" stop-color="#e0586a"/><stop offset="1" stop-color="#a8323f"/>
+    </linearGradient>
+    <radialGradient id="dm-skin" cx="0.5" cy="0.45" r="0.6">
+      <stop offset="0" stop-color="#fff8e4"/><stop offset="1" stop-color="#efdcae"/>
+    </radialGradient>
+  </defs>
+
+  <rect id="bg" x="-3000" y="-3000" width="7000" height="7000" fill="url(#dm-sky)"/>
+  <g id="scene">
+    <rect x="-3000" y="560" width="7000" height="3000" fill="url(#dm-wood)"/>
+    <rect x="-3000" y="560" width="7000" height="8" fill="#6b431f"/>
+    <circle cx="350" cy="330" r="360" fill="url(#dm-spot)"/>
+
+    <!-- the mouse, behind the drum -->
+    <g id="mouse" transform="translate(350,400) scale(1.5)">
+      <g id="body">
+        <path d="M 40 -40 Q 96 -34 88 -96" stroke="#e3b7c2" stroke-width="9" fill="none" stroke-linecap="round"/>
+        <ellipse cx="0" cy="-58" rx="46" ry="48" fill="#bab7c6"/>
+        <ellipse cx="0" cy="-48" rx="26" ry="30" fill="#ded9e6"/>
+        <g id="head">
+          <circle cx="-33" cy="-138" r="28" fill="#bab7c6"/>
+          <circle cx="33" cy="-138" r="28" fill="#bab7c6"/>
+          <circle cx="-33" cy="-138" r="18" fill="#f0b7c3"/>
+          <circle cx="33" cy="-138" r="18" fill="#f0b7c3"/>
+          <ellipse cx="0" cy="-112" rx="35" ry="31" fill="#bab7c6"/>
+          <path d="M -66 -96 L -26 -92" stroke="#efeaf2" stroke-width="3" stroke-linecap="round"/>
+          <path d="M 66 -96 L 26 -92" stroke="#efeaf2" stroke-width="3" stroke-linecap="round"/>
+          <path d="M -64 -106 L -26 -100" stroke="#efeaf2" stroke-width="3" stroke-linecap="round"/>
+          <path d="M 64 -106 L 26 -100" stroke="#efeaf2" stroke-width="3" stroke-linecap="round"/>
+          <ellipse cx="0" cy="-94" rx="9" ry="7" fill="#e88fa2"/>
+          <g id="eyeL"><ellipse cx="-15" cy="-120" rx="11" ry="11" fill="#fff"/><circle id="pupL" cx="-15" cy="-119" r="6" fill="#22203a"/><circle id="shL" cx="-13" cy="-123" r="2" fill="#fff"/></g>
+          <g id="eyeR"><ellipse cx="15" cy="-120" rx="11" ry="11" fill="#fff"/><circle id="pupR" cx="15" cy="-119" r="6" fill="#22203a"/><circle id="shR" cx="17" cy="-123" r="2" fill="#fff"/></g>
+          <path id="smile" d="M -12 -84 Q 0 -76 12 -84 Q 0 -80 -12 -84 Z" fill="#6d6a7a" stroke="#6d6a7a" stroke-width="2" stroke-linejoin="round"/>
+          <path id="grin" d="M -13 -84 Q 0 -66 13 -84 Z" fill="#6d3a46" stroke="#6d6a7a" stroke-width="2" stroke-linejoin="round" opacity="0"/>
+        </g>
+      </g>
+    </g>
+
+    <!-- the drum -->
+    <g id="drum">
+      <ellipse cx="350" cy="566" rx="214" ry="22" fill="#000" opacity="0.22"/>
+      <path d="M 140 450 L 140 520 Q 140 560 350 560 Q 560 560 560 520 L 560 450 Z" fill="url(#dm-shell)"/>
+      <path d="M 140 470 L 175 520 L 210 470 L 245 523 L 280 472 L 315 526 L 350 473 L 385 526 L 420 472 L 455 523 L 490 470 L 525 520 L 560 470"
+            fill="none" stroke="#fff3d6" stroke-width="7" stroke-linejoin="round" stroke-linecap="round" opacity="0.85"/>
+      <ellipse cx="350" cy="450" rx="210" ry="60" fill="#e6b441"/>
+      <ellipse cx="350" cy="450" rx="198" ry="52" fill="url(#dm-skin)"/>
+      <ellipse id="ripple" cx="350" cy="450" rx="100" ry="26" fill="none" stroke="#e0586a" stroke-width="7" opacity="0"/>
+      <ellipse id="glow" cx="350" cy="450" rx="218" ry="66" fill="none" stroke="#7bf0a4" stroke-width="11" opacity="0"/>
+    </g>
+
+    <!-- paws and sticks, in front of the drum -->
+    <g id="arms">
+      <g id="armL"><line id="aL" stroke="#9592a4" stroke-width="24" stroke-linecap="round"/><line id="sL" stroke="#e8c78a" stroke-width="8" stroke-linecap="round"/><circle id="hL" r="19" fill="#bab7c6" stroke="#9592a4" stroke-width="3"/></g>
+      <g id="armR"><line id="aR" stroke="#9592a4" stroke-width="24" stroke-linecap="round"/><line id="sR" stroke="#e8c78a" stroke-width="8" stroke-linecap="round"/><circle id="hR" r="19" fill="#bab7c6" stroke="#9592a4" stroke-width="3"/></g>
+    </g>
+
+    <!-- the rhythm, as dots spaced out in time -->
+    <g id="dots"></g>
+
+    <!-- start cue: only until the first tap -->
+    <g id="play">
+      <circle cx="350" cy="450" r="62" fill="#3fbf6c" stroke="#fff" stroke-width="7"/>
+      <path d="M 334 422 L 334 478 L 382 450 Z" fill="#fff" stroke="#fff" stroke-width="6" stroke-linejoin="round"/>
+    </g>
+
+    <g id="pops"></g>
+    <rect id="hitbox" class="hit" x="120" y="380" width="460" height="200" rx="60"/>
+  </g>
+  <g id="hud"></g>
+</svg>
+
+<button id="mic" aria-label="Microphone">
+  <svg width="62" height="62" viewBox="0 0 62 62" aria-hidden="true">
+    <circle id="micring" cx="31" cy="31" r="19" fill="#7bf0a4" opacity="0"/>
+    <g fill="none" stroke="#40563a" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="25" y="13" width="12" height="22" rx="6" fill="#fff"/>
+      <path d="M 19 30 Q 19 43 31 43 Q 43 43 43 30"/>
+      <path d="M 31 43 L 31 50 M 24 50 L 38 50"/>
+    </g>
+    <path id="micslash" d="M 14 49 L 48 13" stroke="#d1495b" stroke-width="5" stroke-linecap="round" opacity="0"/>
+  </svg>
+</button>
+
+<script>
+(function () {
+  'use strict';
+  var NS = 'http://www.w3.org/2000/svg';
+  function $(id) { return document.getElementById(id); }
+  function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function nowMs() { return performance.now(); }
+
+  var reduceQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+  var reduced = reduceQuery.matches;
+  if (reduceQuery.addEventListener) {
+    reduceQuery.addEventListener('change', function (e) { reduced = e.matches; });
+  }
+
+  // ------------------------------------------------------------------
+  // Saved level
+  // ------------------------------------------------------------------
+  var KEY = 'drum-mouse-v1';
+  var lvl = 0, wins = 0, stars = 0;
+  try {
+    var saved = JSON.parse(localStorage.getItem(KEY) || '{}');
+    if (typeof saved.lvl === 'number') { lvl = clamp(saved.lvl | 0, 0, 4); }
+  } catch (e) {}
+  function save() { try { localStorage.setItem(KEY, JSON.stringify({ lvl: lvl })); } catch (e) {} }
+
+  // ------------------------------------------------------------------
+  // Sound. Everything is synthesised, so it can never be silent.
+  // One drum voice at a time: a new hit cuts the last one short.
+  // ------------------------------------------------------------------
+  var AC = null, master = null, noiseBuf = null, lastDrum = null;
+
+  function initAudio() {
+    if (AC) { if (AC.state === 'suspended') { AC.resume(); } return; }
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) { return; }
+    AC = new Ctx();
+    var comp = AC.createDynamicsCompressor();
+    comp.threshold.setValueAtTime(-16, AC.currentTime);
+    comp.ratio.setValueAtTime(6, AC.currentTime);
+    master = AC.createGain();
+    master.gain.setValueAtTime(0.7, AC.currentTime);
+    master.connect(comp); comp.connect(AC.destination);
+    var n = Math.floor(AC.sampleRate * 0.2);
+    noiseBuf = AC.createBuffer(1, n, AC.sampleRate);
+    var d = noiseBuf.getChannelData(0);
+    for (var i = 0; i < n; i++) { d[i] = Math.random() * 2 - 1; }
+    if (AC.state === 'suspended') { AC.resume(); }
+  }
+
+  function drumSound(side) {
+    if (!AC) { return; }
+    var t = AC.currentTime + 0.004;
+    if (lastDrum) {
+      lastDrum.gain.cancelScheduledValues(t);
+      lastDrum.gain.setTargetAtTime(0, t, 0.015);
+    }
+    var o = AC.createOscillator(), g = AC.createGain();
+    var f0 = side > 0 ? 200 : 172;
+    o.type = 'sine';
+    o.frequency.setValueAtTime(f0 * 1.9, t);
+    o.frequency.exponentialRampToValueAtTime(f0 * 0.55, t + 0.17);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.95, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.34);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + 0.36);
+    var s = AC.createBufferSource(), bp = AC.createBiquadFilter(), ng = AC.createGain();
+    s.buffer = noiseBuf;
+    bp.type = 'bandpass'; bp.frequency.setValueAtTime(1900, t);
+    ng.gain.setValueAtTime(0.32, t);
+    ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+    s.connect(bp); bp.connect(ng); ng.connect(g);
+    s.start(t); s.stop(t + 0.06);
+    lastDrum = g;
+  }
+
+  function note(f, t0, dur, type, vol) {
+    if (!AC) { return; }
+    var t = AC.currentTime + t0;
+    var o = AC.createOscillator(), g = AC.createGain();
+    o.type = type || 'triangle';
+    o.frequency.setValueAtTime(f, t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol || 0.3, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.02);
+  }
+  function cheerSound(big) {
+    var f = [523, 659, 784, 1047, 1319];
+    var n = big ? 5 : 3;
+    for (var i = 0; i < n; i++) { note(f[i], i * 0.11, 0.3, 'triangle', 0.28); }
+  }
+  function againSound() {   // a little questioning squeak
+    note(620, 0, 0.12, 'triangle', 0.22);
+    note(840, 0.11, 0.2, 'triangle', 0.22);
+  }
+
+  // ------------------------------------------------------------------
+  // The ears. Same settings as Recorder Garden: all the speech cleaning
+  // is switched off, because it is aimed squarely at deleting a tap.
+  // Hits are sudden jumps in loudness above the room's own level.
+  // ------------------------------------------------------------------
+  var MIC = { state: 'off', stream: null, src: null, analyser: null, buf: null,
+              level: 0, prev: 0, floor: 0.004, lastOn: -1e9, deaf: 0, flash: -1e9 };
+
+  function micPossible() { return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia); }
+
+  function startMic() {
+    if (!AC || MIC.state === 'on' || MIC.state === 'asking') { return; }
+    if (!micPossible()) { MIC.state = 'blocked'; return; }
+    MIC.state = 'asking';
+    navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 }
+    }).then(function (stream) {
+      MIC.stream = stream;
+      MIC.src = AC.createMediaStreamSource(stream);
+      var hp = AC.createBiquadFilter();
+      hp.type = 'highpass'; hp.frequency.setValueAtTime(150, AC.currentTime);
+      var an = AC.createAnalyser();
+      an.fftSize = 1024; an.smoothingTimeConstant = 0;
+      MIC.src.connect(hp); hp.connect(an);
+      MIC.analyser = an;
+      MIC.buf = new Float32Array(an.fftSize);
+      MIC.state = 'on';
+    })['catch'](function () { MIC.state = 'blocked'; });
+  }
+
+  function listen(t) {
+    if (MIC.state !== 'on' || !MIC.analyser) { MIC.level = 0; return; }
+    var buf = MIC.buf, n = buf.length, i, s = 0, mean = 0, from = n - 480;
+    MIC.analyser.getFloatTimeDomainData(buf);
+    for (i = from; i < n; i++) { mean += buf[i]; }
+    mean /= 480;
+    for (i = from; i < n; i++) { s += (buf[i] - mean) * (buf[i] - mean); }
+    var e = Math.sqrt(s / 480);
+    MIC.level = e;
+    var thr = Math.max(0.015, MIC.floor * 3.5);
+    var listening = (state === 'turn' || state === 'free') && t >= MIC.deaf;
+    if (listening && e > thr && e > MIC.prev * 1.25 && t - MIC.lastOn > 110) {
+      MIC.lastOn = t; MIC.flash = t;
+      onHit('mic', t);
+    } else if (e < thr) {
+      MIC.floor += (e - MIC.floor) * 0.02;
+    }
+    MIC.prev = e;
+  }
+
+  // ------------------------------------------------------------------
+  // Patterns, in beats. They get harder by length, then by mixing long
+  // and short, then by rests. Never by speed.
+  // ------------------------------------------------------------------
+  var POOLS = [
+    [[0, 1], [0, 2], [0, 1, 2]],
+    [[0, 1, 2], [0, 1, 2, 3], [0, 2, 3]],
+    [[0, 0.5, 1, 2], [0, 1, 1.5, 2], [0, 1, 1.5, 2.5], [0, 0.5, 1, 1.5]],
+    [[0, 1, 3], [0, 1, 2, 4], [0, 0.5, 1, 3], [0, 2, 3, 4]],
+    [[0, 0.5, 1, 2, 3], [0, 1, 1.5, 2, 3], [0, 0.5, 1, 1.5, 2.5, 3], [0, 1, 1.5, 2, 2.5, 4], [0, 0.5, 1, 3, 3.5, 4]]
+  ];
+  var SPB = 520;           // ms per beat
+  var MIN_GAP = 90;        // hits closer than this are one hit
+  var MAX_HITS = 12;
+
+  var lastPick = null;
+  function pickPattern() {
+    var pool = POOLS[lvl], p, tries = 0;
+    do { p = pool[Math.floor(Math.random() * pool.length)]; tries++; } while (p === lastPick && tries < 8);
+    lastPick = p;
+    return p;
+  }
+
+  // ------------------------------------------------------------------
+  // State
+  // ------------------------------------------------------------------
+  var state = 'idle';   // idle | demo | turn | free | cheer | again
+  var gen = 0, queue = [];
+  var cur = null;       // the pattern being copied (beats)
+  var round = 0, misses = 0;
+  var hits = [], lastHitT = -1e9, lastTap = -1e9, turnStart = 0, judgeAt = 0;
+  var side = 1, pawT = [-1e9, -1e9], nodT = -1e9, rippleT = -1e9, cheerT = -1e9, againT = -1e9;
+  var ready = 0, dots = [], popList = [], mimicMs = null;
+
+  function later(ms, fn) { queue.push({ t: nowMs() + ms, g: gen, fn: fn }); }
+  function reset() { gen++; queue.length = 0; }
+
+  function setDots(beats) {
+    dots = [];
+    var span = Math.max(1, beats[beats.length - 1]);
+    for (var i = 0; i < beats.length; i++) {
+      dots.push({ x: 90 + 520 * (beats[i] / span), lit: 0, t: -1e9 });
+    }
+  }
+
+  function strike(silent) {
+    var t = nowMs();
+    side = -side;
+    pawT[side > 0 ? 1 : 0] = t;
+    rippleT = t; nodT = t;
+    if (!silent) { drumSound(side); }
+  }
+
+  // The mouse plays a list of offsets (ms). Calls done() when it finishes.
+  function mousePlays(offsets, done) {
+    state = 'demo';
+    MIC.deaf = nowMs() + 1e9;
+    var lead = 900, i;
+    for (i = 0; i < offsets.length; i++) {
+      (function (i) {
+        later(lead + offsets[i], function () {
+          strike(false);
+          if (dots[i]) { dots[i].lit = 1; dots[i].t = nowMs(); }
+        });
+      })(i);
+    }
+    later(lead + offsets[offsets.length - 1] + 500, function () {
+      MIC.deaf = nowMs() + 300;
+      done();
+    });
+  }
+
+  function startRound() {
+    reset();
+    round++;
+    misses = Math.max(0, misses);
+    var free = (round % 3 === 0);
+    if (free) { freeRound(); return; }
+    cur = pickPattern();
+    copyRound(false);
+  }
+
+  function copyRound(replay) {
+    reset();
+    setDots(cur);
+    for (var i = 0; i < dots.length; i++) { dots[i].lit = 0; }
+    var offs = cur.map(function (b) { return b * SPB; });
+    mousePlays(offs, function () { beginTurn('turn'); });
+  }
+
+  function beginTurn(kind) {
+    state = kind;
+    hits = [];
+    turnStart = nowMs();
+    judgeAt = 0;
+    if (kind === 'turn') {
+      for (var i = 0; i < dots.length; i++) { dots[i].lit = 0; }
+    } else {
+      dots = [];
+    }
+  }
+
+  function freeRound() {
+    reset();
+    dots = [];
+    state = 'demo';       // a beat for the mouse to get ready and look over
+    MIC.deaf = nowMs() + 1e9;
+    later(900, function () { beginTurn('free'); MIC.deaf = nowMs() + 100; });
+  }
+
+  // ------------------------------------------------------------------
+  // Hearing a hit, from the drum on screen or from the microphone
+  // ------------------------------------------------------------------
+  function onHit(src, t) {
+    if (state === 'idle') { return; }
+    if (state !== 'turn' && state !== 'free') { return; }
+    if (t - lastHitT < MIN_GAP) { return; }
+    if (src === 'mic' && t - lastTap < 220) { return; }   // our own drum, heard back
+    if (src === 'tap') { lastTap = t; }
+    lastHitT = t;
+    if (hits.length >= MAX_HITS) { return; }
+    hits.push(t);
+    if (src === 'tap') { strike(false); }   // the mic's hits stay silent: no feedback loop
+    else { strike(true); }
+    if (state === 'turn') {
+      var i = hits.length - 1;
+      if (dots[i]) { dots[i].lit = 2; dots[i].t = t; }
+      if (hits.length === cur.length) { judgeAt = t + 450; }
+      else if (hits.length > cur.length) { judgeAt = t; }
+    } else {
+      var x = 90 + 520 * clamp((t - hits[0]) / 4000, 0, 1);
+      dots.push({ x: x, lit: 2, t: t });
+    }
+  }
+
+  function median(a) {
+    var b = a.slice().sort(function (x, y) { return x - y; });
+    return b[Math.floor(b.length / 2)];
+  }
+
+  function judge() {
+    var n = cur.length, m = hits.length, ok = false, i;
+    if (m === n) {
+      var eg = [], cg = [], ratios = [];
+      for (i = 1; i < n; i++) {
+        eg.push(cur[i] - cur[i - 1]);
+        cg.push(hits[i] - hits[i - 1]);
+        ratios.push(cg[i - 1] / eg[i - 1]);
+      }
+      var s = median(ratios);
+      ok = s > 0.4 * SPB && s < 3 * SPB;
+      for (i = 0; i < eg.length && ok; i++) {
+        if (Math.abs(cg[i] / (eg[i] * s) - 1) > 0.4) { ok = false; }
+      }
+    }
+    if (ok) { cheer(false); } else { tryAgain(); }
+  }
+
+  function cheer(soft) {
+    reset();
+    state = 'cheer';
+    cheerT = nowMs();
+    misses = 0;
+    for (var i = 0; i < dots.length; i++) { dots[i].lit = 3; dots[i].t = nowMs(); }
+    stars++;
+    var big = stars >= 5;
+    cheerSound(big);
+    addPop(big);
+    wins++;
+    if (!soft && wins >= 2 && lvl < 4) { lvl++; wins = 0; save(); }
+    if (big) { stars = 0; }
+    later(big ? 2600 : 1700, startRound);
+  }
+
+  function tryAgain() {
+    reset();
+    misses++;
+    if (misses >= 3) {      // never stuck: an easier one, no star
+      misses = 0;
+      lvl = Math.max(0, lvl - 1); wins = 0; save();
+      state = 'again'; againT = nowMs();
+      againSound();
+      later(1400, startRound);
+      return;
+    }
+    state = 'again'; againT = nowMs();
+    againSound();
+    later(1300, function () {
+      if (mimicMs) { mimicMs = null; startRound(); } else { copyRound(true); }
+    });
+  }
+
+  function mimicBack() {
+    // copy-you: the mouse plays back what the child played
+    reset();
+    var offs = [0], i;
+    for (i = 1; i < hits.length; i++) {
+      offs.push(offs[i - 1] + clamp(hits[i] - hits[i - 1], 130, 900));
+    }
+    dots = [];
+    var span = Math.max(1, offs[offs.length - 1]);
+    for (i = 0; i < offs.length; i++) { dots.push({ x: 90 + 520 * (offs[i] / span), lit: 0, t: -1e9 }); }
+    mousePlays(offs, function () { cheer(true); });
+  }
+
+  // ------------------------------------------------------------------
+  // Pops (stars rising over the mouse) and the star counter
+  // ------------------------------------------------------------------
+  function starPath(cx, cy, r) {
+    var p = '', i;
+    for (i = 0; i < 10; i++) {
+      var a = -Math.PI / 2 + i * Math.PI / 5, rr = (i % 2) ? r * 0.45 : r;
+      p += (i ? 'L' : 'M') + (cx + Math.cos(a) * rr).toFixed(1) + ' ' + (cy + Math.sin(a) * rr).toFixed(1);
+    }
+    return p + 'Z';
+  }
+  function addPop(big) {
+    var n = big ? 7 : 1;
+    for (var i = 0; i < n; i++) {
+      var el = document.createElementNS(NS, 'path');
+      el.setAttribute('d', starPath(0, 0, big ? 26 : 34));
+      el.setAttribute('fill', '#ffd54a'); el.setAttribute('stroke', '#fff'); el.setAttribute('stroke-width', '4');
+      el.setAttribute('stroke-linejoin', 'round');
+      $('pops').appendChild(el);
+      popList.push({ el: el, t: nowMs(), x: 350 + (n > 1 ? (i - 3) * 80 : 0), dx: 0, y: n > 1 ? 330 : 190, big: big });
+    }
+  }
+
+  var hudStars = [];
+  function buildHud() {
+    var hud = $('hud');
+    for (var i = 0; i < 5; i++) {
+      var p = document.createElementNS(NS, 'path');
+      p.setAttribute('d', starPath(0, 0, 17));
+      p.setAttribute('stroke', '#fff'); p.setAttribute('stroke-width', '3'); p.setAttribute('stroke-linejoin', 'round');
+      hud.appendChild(p); hudStars.push(p);
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Drawing
+  // ------------------------------------------------------------------
+  var dotEls = [];
+  function syncDotEls() {
+    var dg = $('dots');
+    while (dotEls.length < dots.length) {
+      var c = document.createElementNS(NS, 'circle');
+      c.setAttribute('cy', 650);
+      dg.appendChild(c); dotEls.push(c);
+    }
+    while (dotEls.length > dots.length) { dg.removeChild(dotEls.pop()); }
+  }
+
+  function layout() {
+    var vw = Math.max(1, window.innerWidth), vh = Math.max(1, window.innerHeight);
+    var svg = $('stage');
+    svg.setAttribute('viewBox', '0 0 ' + vw + ' ' + vh);
+    svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    var sc = Math.min(vw / 700, vh / 740);
+    $('scene').setAttribute('transform', 'translate(' + ((vw - 700 * sc) / 2).toFixed(1) + ',' + ((vh - 740 * sc) / 2 + 0).toFixed(1) + ') scale(' + sc.toFixed(4) + ')');
+    var hud = $('hud'); hud.setAttribute('transform', 'translate(34,38)');
+    for (var i = 0; i < hudStars.length; i++) { hudStars[i].setAttribute('transform', 'translate(' + (i * 42) + ',0)'); }
+  }
+
+  var blinkAt = 2000;
+  var VIEWER_LOOK = [0, -1], DOWN_LOOK = [0, 5];
+
+  function frame() {
+    var t = nowMs(), i, q;
+    requestAnimationFrame(frame);
+
+    // scheduled events
+    for (i = 0; i < queue.length;) {
+      q = queue[i];
+      if (q.g !== gen) { queue.splice(i, 1); continue; }
+      if (t >= q.t) { queue.splice(i, 1); q.fn(); } else { i++; }
+    }
+
+    listen(t);
+
+    // turn timing
+    if (state === 'turn') {
+      if (judgeAt && t >= judgeAt) { judgeAt = 0; judge(); }
+      else if (!judgeAt) {
+        var longest = 1;
+        for (i = 1; i < cur.length; i++) { longest = Math.max(longest, cur[i] - cur[i - 1]); }
+        var wait = Math.max(1700, longest * SPB * 2.2);
+        if (hits.length > 0 && t - lastHitT > wait) { judge(); }
+        else if (hits.length === 0 && t - turnStart > 9000) { mimicMs = null; tryAgainNoCount(); }
+      }
+    } else if (state === 'free') {
+      if ((hits.length >= 6) || (hits.length > 0 && t - lastHitT > 1300)) { state = 'think'; thinkT = t; later(700, mimicBack); }
+      else if (hits.length === 0 && t - turnStart > 10000) { startRound(); }
+    }
+
+    draw(t);
+  }
+  var thinkT = 0;
+
+  function tryAgainNoCount() {
+    // nothing heard for a long while: just play it again, no penalty
+    reset();
+    state = 'again'; againT = nowMs();
+    againSound();
+    later(1000, function () { copyRound(true); });
+  }
+
+  function draw(t) {
+    var listening = (state === 'turn' || state === 'free');
+    ready += ((listening ? 1 : 0) - ready) * 0.12;
+
+    // paws
+    var ph = [0, 0], k;
+    for (k = 0; k < 2; k++) { ph[k] = clamp((t - pawT[k]) / 230, 0, 1); }
+    var cheerBob = (state === 'cheer' && !reduced) ? Math.abs(Math.sin((t - cheerT) / 130)) : 0;
+    var nod = clamp(1 - (t - nodT) / 200, 0, 1) * (reduced ? 0 : 7);
+    var bodyY = -cheerBob * 18;
+    $('body').setAttribute('transform', 'translate(0,' + (bodyY / 1.5).toFixed(1) + ')');
+
+    var s, sh, rest, down, h, tip, name;
+    for (k = 0; k < 2; k++) {
+      s = k ? 1 : -1; name = k ? 'R' : 'L';
+      var d = ph[k] < 0.18 ? 1 - ph[k] / 0.18 * 0.0 : 1 - (ph[k] - 0.18) / 0.82;   // drops, then lifts
+      if (pawT[k] < -1e8) { d = 0; }
+      var wave = (state === 'cheer' && !reduced) ? Math.sin((t - cheerT) / 110 + k * 3) * 22 : 0;
+      var idleWave = (state === 'idle' && k === 1 && !reduced) ? Math.sin(t / 260) * 18 : 0;
+      var restX = 350 + s * 84, restY = 338;
+      var readyX = 350 + s * 150, readyY = 292;
+      var rx = lerp(restX, readyX, ready), ry = lerp(restY, readyY, ready) + wave + idleWave;
+      var dx = 350 + s * 62, dy = 394;
+      var hx = lerp(rx, dx, d), hy = lerp(ry, dy, d);
+      sh = [350 + s * 46, 302 + bodyY];
+      $('a' + name).setAttribute('x1', sh[0]); $('a' + name).setAttribute('y1', sh[1]);
+      $('a' + name).setAttribute('x2', hx.toFixed(1)); $('a' + name).setAttribute('y2', hy.toFixed(1));
+      $('h' + name).setAttribute('cx', hx.toFixed(1)); $('h' + name).setAttribute('cy', hy.toFixed(1));
+      var sx = hx.toFixed(1), sy = hy.toFixed(1);
+      $('s' + name).setAttribute('x1', sx); $('s' + name).setAttribute('y1', sy);
+      $('s' + name).setAttribute('x2', (hx - s * 12).toFixed(1)); $('s' + name).setAttribute('y2', (hy + 50).toFixed(1));
+      $('s' + name).setAttribute('opacity', (1 - ready).toFixed(2));
+    }
+
+    // head: tilts to ask "again?", leans toward the child on their go
+    var tilt = 0;
+    if (state === 'again') { tilt = reduced ? 0 : 11 * Math.sin(Math.min(1, (t - againT) / 500) * Math.PI) * 1.0 + 6; }
+    else if (state === 'think') { tilt = reduced ? 0 : Math.sin(t / 120) * 6; }
+    else if (listening && !reduced) { tilt = Math.sin(t / 900) * 3; }
+    else if (state === 'cheer' && !reduced) { tilt = Math.sin((t - cheerT) / 160) * 5; }
+    $('head').setAttribute('transform', 'translate(0,' + (nod / 1.5).toFixed(1) + ') rotate(' + tilt.toFixed(1) + ' 0 -100)');
+
+    // eyes
+    var look = (listening || state === 'cheer' || state === 'again' || state === 'think') ? VIEWER_LOOK
+             : (state === 'idle' ? [Math.sin(t / 900) * 3, 0] : DOWN_LOOK);
+    var blink = 1;
+    if (t > blinkAt) { blink = 0.1; if (t > blinkAt + 120) { blinkAt = t + 2500 + Math.random() * 2500; blink = 1; } }
+    var happy = state === 'cheer';
+    ['L', 'R'].forEach(function (n2, i2) {
+      var cx = (i2 ? 15 : -15), p = $('pup' + n2), shn = $('sh' + n2);
+      p.setAttribute('cx', cx + look[0]); p.setAttribute('cy', -119 + look[1]);
+      shn.setAttribute('cx', cx + look[0] + 2); shn.setAttribute('cy', -123 + look[1]);
+      $('eye' + n2).setAttribute('transform', 'translate(0,' + (-120 * (1 - (happy ? 0.35 : blink))).toFixed(1) + ') scale(1,' + (happy ? 0.35 : blink).toFixed(2) + ')');
+    });
+    var open = (state === 'cheer') || (state === 'again' && t - againT < 300);
+    $('grin').setAttribute('opacity', open ? 1 : 0);
+    $('smile').setAttribute('opacity', open ? 0 : 1);
+
+    // drum ripple and the "your go" ring
+    var rp = clamp((t - rippleT) / 320, 0, 1);
+    var rE = $('ripple');
+    rE.setAttribute('opacity', (rp < 1 ? 0.8 * (1 - rp) : 0).toFixed(2));
+    rE.setAttribute('rx', (reduced ? 130 : 60 + 150 * rp).toFixed(1));
+    rE.setAttribute('ry', (reduced ? 34 : 16 + 40 * rp).toFixed(1));
+    var gl = listening ? (reduced ? 0.9 : 0.55 + 0.4 * Math.sin(t / 260)) : 0;
+    $('glow').setAttribute('opacity', (gl * ready).toFixed(2));
+    $('play').setAttribute('opacity', state === 'idle' ? (reduced ? 1 : 0.8 + 0.2 * Math.sin(t / 300)) : 0);
+    $('play').setAttribute('transform', state === 'idle' && !reduced ? 'translate(350 450) scale(' + (1 + 0.05 * Math.sin(t / 300)).toFixed(3) + ') translate(-350 -450)' : '');
+
+    // dots
+    syncDotEls();
+    for (var di = 0; di < dots.length; di++) {
+      var dd = dots[di], el = dotEls[di], age = t - dd.t, r = 22, fill = 'none', stroke = '#9d9ac8';
+      if (dd.lit === 1) { fill = '#ffd54a'; stroke = '#fff'; r = 22 + (reduced ? 0 : 10 * clamp(1 - age / 250, 0, 1)); }
+      else if (dd.lit === 2) { fill = '#6fe39a'; stroke = '#fff'; r = 22 + (reduced ? 0 : 10 * clamp(1 - age / 250, 0, 1)); }
+      else if (dd.lit === 3) { fill = '#ffd54a'; stroke = '#fff'; r = 26; }
+      el.setAttribute('cx', dd.x.toFixed(1)); el.setAttribute('r', r.toFixed(1));
+      el.setAttribute('fill', fill); el.setAttribute('stroke', stroke); el.setAttribute('stroke-width', 5);
+    }
+
+    // pops
+    for (var pi = popList.length - 1; pi >= 0; pi--) {
+      var pp = popList[pi], pa = (t - pp.t) / (pp.big ? 1800 : 1400);
+      if (pa >= 1) { $('pops').removeChild(pp.el); popList.splice(pi, 1); continue; }
+      var py = pp.y - (reduced ? 0 : (pp.big ? 120 : 50) * pa);
+      pp.el.setAttribute('transform', 'translate(' + pp.x + ',' + py.toFixed(1) + ') scale(' + (reduced ? 1 : (0.4 + Math.min(1, pa * 4) * 0.8)).toFixed(2) + ')');
+      pp.el.setAttribute('opacity', (pa < 0.7 ? 1 : (1 - pa) / 0.3).toFixed(2));
+    }
+
+    // hud stars
+    for (var hi = 0; hi < hudStars.length; hi++) {
+      hudStars[hi].setAttribute('fill', hi < stars ? '#ffd54a' : 'rgba(255,255,255,0.18)');
+    }
+
+    // mic button
+    var ring = $('micring');
+    var on = MIC.state === 'on';
+    ring.setAttribute('opacity', on ? (0.25 + Math.min(0.6, MIC.level * 6) + (t - MIC.flash < 160 ? 0.15 : 0)).toFixed(2) : 0);
+    $('micslash').setAttribute('opacity', MIC.state === 'blocked' ? 1 : 0);
+  }
+
+  // ------------------------------------------------------------------
+  // Input
+  // ------------------------------------------------------------------
+  var hb = $('hitbox');
+  hb.addEventListener('pointerup', function (e) {
+    if (state === 'idle') {
+      initAudio();
+      startMic();
+      strike(false);
+      state = 'demo';
+      setTimeout(startRound, 450);
+    }
+  });
+  hb.addEventListener('pointerdown', function (e) {
+    e.preventDefault();
+    if (state === 'turn' || state === 'free') { onHit('tap', nowMs()); }
+  });
+  // On a touchscreen only pointerup counts as a gesture that may start
+  // audio, so any first touch anywhere makes sure the sound is awake.
+  ['pointerup', 'touchend', 'click'].forEach(function (ev) {
+    document.addEventListener(ev, function () { if (AC) { initAudio(); } }, true);
+  });
+  $('mic').addEventListener('click', function (e) {
+    e.stopPropagation();
+    initAudio();
+    if (MIC.state === 'blocked' || MIC.state === 'off') { MIC.state = 'off'; startMic(); }
+  });
+
+  window.addEventListener('resize', layout);
+  window.addEventListener('orientationchange', layout);
+  buildHud();
+  layout();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
