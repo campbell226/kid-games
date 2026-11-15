@@ -169,6 +169,26 @@
   <g id="hud"></g>
 </svg>
 
+<div id="who" style="position:fixed;top:6px;right:76px;z-index:30;display:flex;gap:4px;padding:3px;border-radius:20px;background:rgba(255,255,255,0.72);box-shadow:0 1px 5px rgba(0,0,0,0.25);">
+  <button id="whoMouse" aria-label="Mouse plays, you copy" style="width:56px;height:56px;padding:0;line-height:0;border:0;border-radius:17px;cursor:pointer;-webkit-tap-highlight-color:transparent;">
+    <svg width="56" height="56" viewBox="0 0 56 56" aria-hidden="true">
+      <circle cx="16" cy="16" r="9" fill="#bab7c6"/><circle cx="40" cy="16" r="9" fill="#bab7c6"/>
+      <circle cx="16" cy="16" r="5" fill="#f0b7c3"/><circle cx="40" cy="16" r="5" fill="#f0b7c3"/>
+      <ellipse cx="28" cy="31" rx="16" ry="15" fill="#bab7c6"/>
+      <circle cx="22" cy="28" r="2.6" fill="#22203a"/><circle cx="34" cy="28" r="2.6" fill="#22203a"/>
+      <ellipse cx="28" cy="36" rx="3.4" ry="2.6" fill="#e88fa2"/>
+    </svg>
+  </button>
+  <button id="whoChild" aria-label="You play, mouse copies" style="width:56px;height:56px;padding:0;line-height:0;border:0;border-radius:17px;cursor:pointer;-webkit-tap-highlight-color:transparent;">
+    <svg width="56" height="56" viewBox="0 0 56 56" aria-hidden="true">
+      <g fill="#f4c9a0" stroke="#b9845a" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round">
+        <rect x="13" y="25" width="30" height="24" rx="11"/>
+        <rect x="13" y="11" width="6" height="22" rx="3"/><rect x="21" y="7" width="6" height="26" rx="3"/>
+        <rect x="29" y="7" width="6" height="26" rx="3"/><rect x="37" y="11" width="6" height="22" rx="3"/>
+      </g>
+    </svg>
+  </button>
+</div>
 <button id="mic" aria-label="Microphone">
   <svg width="62" height="62" viewBox="0 0 62 62" aria-hidden="true">
     <circle id="micring" cx="31" cy="31" r="19" fill="#7bf0a4" opacity="0"/>
@@ -201,11 +221,13 @@
   // ------------------------------------------------------------------
   var KEY = 'drum-mouse-v1';
   var lvl = 0, wins = 0, stars = 0;
+  var leader = 'mouse';   // 'mouse': the child copies the mouse. 'child': the mouse copies the child.
   try {
     var saved = JSON.parse(localStorage.getItem(KEY) || '{}');
     if (typeof saved.lvl === 'number') { lvl = clamp(saved.lvl | 0, 0, 4); }
+    if (saved.leader === 'child') { leader = 'child'; }
   } catch (e) {}
-  function save() { try { localStorage.setItem(KEY, JSON.stringify({ lvl: lvl })); } catch (e) {} }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify({ lvl: lvl, leader: leader })); } catch (e) {} }
 
   // ------------------------------------------------------------------
   // Sound. Everything is synthesised, so it can never be silent.
@@ -406,8 +428,7 @@
     reset();
     round++;
     misses = Math.max(0, misses);
-    var free = (round % 3 === 0);
-    if (free) { freeRound(); return; }
+    if (leader === 'child') { freeRound(); return; }
     cur = pickPattern();
     copyRound(false);
   }
@@ -765,6 +786,23 @@
     initAudio();
     if (MIC.state === 'blocked' || MIC.state === 'off') { MIC.state = 'off'; startMic(); }
   });
+
+  function paintWho() {
+    $('whoMouse').style.background = leader === 'mouse' ? '#7bf0a4' : 'transparent';
+    $('whoChild').style.background = leader === 'child' ? '#7bf0a4' : 'transparent';
+  }
+  function setLeader(who) {
+    if (who === leader) { return; }
+    leader = who; save(); paintWho();
+    if (state !== 'idle') {     // swap straight into the new way round
+      reset(); state = 'demo'; hits = []; dots = [];
+      MIC.deaf = nowMs() + 1e9;
+      later(500, startRound);
+    }
+  }
+  $('whoMouse').addEventListener('click', function (e) { e.stopPropagation(); setLeader('mouse'); });
+  $('whoChild').addEventListener('click', function (e) { e.stopPropagation(); setLeader('child'); });
+  paintWho();
 
   window.addEventListener('resize', layout);
   window.addEventListener('orientationchange', layout);
