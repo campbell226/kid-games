@@ -284,8 +284,8 @@
       </div>
 
       <div class="numrow" id="numRow">
-        <label for="num" id="numLabel">Type a number</label>
-        <input id="num" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Type a number!">
+        <label for="num" id="numLabel" class="sr">Type a number</label>
+        <input id="num" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" autocapitalize="off" spellcheck="false">
       </div>
 
       <div class="pad" id="pad" role="group" aria-label="Numeral keys" hidden>
@@ -759,7 +759,7 @@ function fromRoman(tokens) {
   function setMode(m) {
     if (celebrating || m === S.mode) { return; }
     var pr, v;
-    if (S.quest) { S.mode = m; endQuest(); say(m === 'n2r' ? 'Type a number and watch it turn Roman!' : 'Tap the letters to find the number!'); return; }
+    if (S.quest) { S.mode = m; endQuest(); return; }
     if (m === 'r2n') {
       v = S.numStr === '' ? 0 : Number(S.numStr);
       S.tokens = v > 0 ? toRoman(v) : [];
@@ -769,7 +769,6 @@ function fromRoman(tokens) {
       $('num').value = S.numStr;
     }
     S.mode = m; S.bar = false; S.note = '';
-    say(m === 'n2r' ? 'Type a number and watch it turn Roman!' : 'Tap the letters to find the number!');
     render();
   }
 
@@ -795,7 +794,7 @@ function fromRoman(tokens) {
   $('dirA').addEventListener('click', function () { setMode('n2r'); });
   $('dirB').addEventListener('click', function () { setMode('r2n'); });
   $('mute').addEventListener('click', function () { P.mute = !P.mute; save(); drawMute(); if (!P.mute) { sndTap(); } });
-  $('questBtn').addEventListener('click', function () { if (!celebrating) { sndTap(); newQuest(); say(S.mode === 'n2r' ? 'Tap the letters to build it!' : 'Type the number you think it is!'); } });
+  $('questBtn').addEventListener('click', function () { if (!celebrating) { sndTap(); newQuest(); } });
   $('qbar').addEventListener('click', function (e) {
     var b = e.target.closest ? e.target.closest('button') : null; if (!b || celebrating) { return; }
     if (b.dataset.lv) { P.level = Number(b.dataset.lv); P.done = 0; save(); newQuest(); }
@@ -808,7 +807,6 @@ function fromRoman(tokens) {
   $('barClose').addEventListener('click', function () { var d = $('barDlg'); if (d.close) { d.close(); } else { d.removeAttribute('open'); } });
 
   drawMute();
-  say('Type a number and watch it turn Roman!');
   render();
 
   // test hook for scripted checks (harmless)
