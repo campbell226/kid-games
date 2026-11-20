@@ -182,6 +182,11 @@ content was never at fault. The shell is for running things: git, node, wc.
 - To actually look at a tile, write a throwaway page holding the SVGs at about
   640px wide and put it **inside this folder** — the browser pane will not
   screenshot a file outside the project. Delete it before committing.
+- A new tile carries `data-added` (the date its folder first appeared in
+  git, `git log --diff-filter=A --format=%as -- games/<name>`),
+  `data-age` (a range like `4-7`) and `data-tags` (extra words for the
+  search box). Without them it still shows but sorts to the end. "Last
+  updated" sorting needs nothing; it asks GitHub.
 - Nothing to do for the "last updated" footer. It asks GitHub which commit
   last touched `games/` and takes the game's name from the tile's own link,
   so adding a tile is the whole of the work. It was a hand-kept list of

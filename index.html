@@ -63,6 +63,41 @@
     font-size: clamp(1.1rem, 4vw, 1.35rem);
     font-weight: 700;
   }
+  .game[hidden] { display: none; }
+
+  /* Parent controls: search, sort, reverse. Deliberately quieter than
+     the tiles, which are what the children are there for. */
+  .tools {
+    display: flex; flex-wrap: wrap; gap: 0.6rem;
+    width: 100%; max-width: 60rem;
+    margin: calc(-1 * clamp(0.5rem, 2vw, 1.5rem)) 0 clamp(1rem, 3vw, 1.6rem);
+  }
+  .tools input, .tools select, .tools button {
+    min-height: 2.75rem;
+    font: inherit; font-size: 1rem;
+    color: #eef2ff;
+    background: #1a2348;
+    border: 2px solid #35407a;
+    border-radius: 0.9rem;
+    padding: 0 0.9rem;
+  }
+  .tools input { flex: 1 1 12rem; min-width: 0; }
+  .tools input::placeholder { color: #8b96c8; }
+  .tools select { flex: 0 1 auto; cursor: pointer; }
+  .tools button { flex: 0 0 auto; cursor: pointer; white-space: nowrap; }
+  .tools input:focus-visible, .tools select:focus-visible, .tools button:focus-visible {
+    outline: none; border-color: #7d8ada;
+  }
+  .tools option { background: #1a2348; color: #eef2ff; }
+  @media (max-width: 40rem) {
+    .tools input { flex-basis: 100%; }
+    .tools select { flex: 1 1 auto; }
+  }
+  #none {
+    margin: 1rem 0 0;
+    color: #8b96c8;
+    text-align: center;
+  }
   @media (prefers-reduced-motion: reduce) {
     .game { transition: none; }
     .game:hover, .game:focus-visible, .game:active { transform: none; }
@@ -72,8 +107,21 @@
 <body>
   <h1>Kid Games</h1>
 
+  <div class="tools">
+    <input id="find" type="search" placeholder="Search" aria-label="Search games" autocomplete="off" spellcheck="false">
+    <select id="sort" aria-label="Sort by">
+      <option value="added">Date added</option>
+      <option value="updated">Last updated</option>
+      <option value="name">Name</option>
+      <option value="age">Age</option>
+      <option value="plays">Most played here</option>
+      <option value="shuffle">Shuffle</option>
+    </select>
+    <button id="flip" type="button" aria-label="Reverse order"></button>
+  </div>
+
   <div class="shelf">
-    <a class="game" href="games/animal-band/animal-band.html">
+    <a class="game" href="games/animal-band/animal-band.html" data-added="2026-08-26" data-age="2-5" data-tags="music animals band instruments">
       <svg viewBox="0 0 320 200" role="img" aria-label="Animal Band">
         <defs>
           <linearGradient id="t-sky" x1="0" y1="0" x2="0" y2="1">
@@ -135,7 +183,7 @@
       <span>Animal Band</span>
     </a>
 
-    <a class="game" href="games/hamish-times-tables/hamish-times-tables.html">
+    <a class="game" href="games/hamish-times-tables/hamish-times-tables.html" data-added="2026-08-26" data-age="6-9" data-tags="maths numbers times tables multiplication cow coo hamish">
       <svg viewBox="0 0 320 200" role="img" aria-label="Hamish's Times Tables">
         <defs>
           <linearGradient id="h-sky" x1="0" y1="0" x2="0" y2="1">
@@ -176,7 +224,7 @@
       <span>Hamish's Times Tables</span>
     </a>
 
-    <a class="game" href="games/post-a-letter/post-a-letter.html">
+    <a class="game" href="games/post-a-letter/post-a-letter.html" data-added="2026-08-29" data-age="3-5" data-tags="letters alphabet phonics sounds reading post">
       <svg viewBox="0 0 320 200" role="img" aria-label="Post a Letter">
         <defs>
           <linearGradient id="p-sky" x1="0" y1="0" x2="0" y2="1">
@@ -247,7 +295,7 @@
       <span>Post a Letter</span>
     </a>
 
-    <a class="game" href="games/post-a-number/post-a-number.html">
+    <a class="game" href="games/post-a-number/post-a-number.html" data-added="2026-10-13" data-age="3-5" data-tags="numbers counting maths post">
       <svg viewBox="0 0 320 200" role="img" aria-label="Post a Number">
         <defs>
           <linearGradient id="pn-sky" x1="0" y1="0" x2="0" y2="1">
@@ -319,7 +367,7 @@
       <span>Post a Number</span>
     </a>
 
-    <a class="game" href="games/numberbots/numberbots.html">
+    <a class="game" href="games/numberbots/numberbots.html" data-added="2026-10-13" data-age="4-7" data-tags="maths numbers robots counting">
       <svg viewBox="0 0 320 200" role="img" aria-label="Numberbots">
         <defs>
           <linearGradient id="nb-wall" x1="0" y1="0" x2="0" y2="1">
@@ -438,7 +486,7 @@
       <span>Numberbots</span>
     </a>
 
-    <a class="game" href="games/recorder-garden/recorder-garden.html">
+    <a class="game" href="games/recorder-garden/recorder-garden.html" data-added="2026-08-29" data-age="4-8" data-tags="music recorder mic microphone garden">
       <svg viewBox="0 0 320 200" role="img" aria-label="Recorder Garden">
         <defs>
           <linearGradient id="r-sky" x1="0" y1="0" x2="0" y2="1">
@@ -515,7 +563,7 @@
       <span>Recorder Garden</span>
     </a>
 
-    <a class="game" href="games/recorder-garden-2/recorder-garden-2.html">
+    <a class="game" href="games/recorder-garden-2/recorder-garden-2.html" data-added="2026-11-09" data-age="5-9" data-tags="music recorder mic microphone garden">
       <svg viewBox="0 0 320 200" role="img" aria-label="Recorder Garden 2">
         <defs>
           <linearGradient id="r2-sky" x1="0" y1="0" x2="0" y2="1">
@@ -567,7 +615,7 @@
       </svg>
       <span>Recorder Garden 2</span>
     </a>
-    <a class="game" href="games/picture-pop/picture-pop.html">
+    <a class="game" href="games/picture-pop/picture-pop.html" data-added="2026-09-05" data-age="2-5" data-tags="pictures words">
       <svg viewBox="0 0 320 200" role="img" aria-label="Picture Pop">
         <defs>
           <linearGradient id="p-night" x1="0" y1="0" x2="0" y2="1">
@@ -639,7 +687,7 @@
       <span>Picture Pop</span>
     </a>
 
-    <a class="game" href="games/hoot-and-shellby/hoot-and-shellby.html">
+    <a class="game" href="games/hoot-and-shellby/hoot-and-shellby.html" data-added="2026-09-05" data-age="3-6" data-tags="hoot shellby owl tortoise">
       <svg viewBox="0 0 320 200" role="img" aria-label="Hoot and Shellby">
         <defs>
           <linearGradient id="hs-sky" x1="0" y1="0" x2="0" y2="1">
@@ -757,7 +805,7 @@
       <span>Hoot &amp; Shellby</span>
     </a>
 
-    <a class="game" href="games/pizza-and-ice-cream/pizza-and-ice-cream.html">
+    <a class="game" href="games/pizza-and-ice-cream/pizza-and-ice-cream.html" data-added="2026-09-05" data-age="3-6" data-tags="hoot shellby food cooking pizza ice cream">
       <svg viewBox="0 0 320 200" role="img" aria-label="Pizza and Ice Cream">
         <defs>
           <linearGradient id="pi-warm" x1="0" y1="0" x2="0" y2="1">
@@ -912,7 +960,7 @@
       <span>Pizza &amp; Ice Cream</span>
     </a>
 
-    <a class="game" href="games/dentist-hoot/dentist-hoot.html">
+    <a class="game" href="games/dentist-hoot/dentist-hoot.html" data-added="2026-09-05" data-age="3-6" data-tags="hoot owl teeth dentist counting maths painting">
       <svg viewBox="0 0 320 200" role="img" aria-label="Dentist Hoot">
         <defs>
           <linearGradient id="dt-wall" x1="0" y1="0" x2="0" y2="1">
@@ -1025,7 +1073,7 @@
       <span>Dentist Hoot</span>
     </a>
 
-    <a class="game" href="games/doctor-hoot/doctor-hoot.html">
+    <a class="game" href="games/doctor-hoot/doctor-hoot.html" data-added="2026-09-05" data-age="3-6" data-tags="hoot owl doctor body">
       <svg viewBox="0 0 320 200" role="img" aria-label="Doctor Hoot">
         <defs>
           <linearGradient id="dr-wall" x1="0" y1="0" x2="0" y2="1">
@@ -1157,7 +1205,7 @@
       </svg>
       <span>Doctor Hoot</span>
     </a>
-    <a class="game" href="games/vibe-with-me/vibe-with-me.html">
+    <a class="game" href="games/vibe-with-me/vibe-with-me.html" data-added="2026-09-05" data-age="2-5" data-tags="music dance">
       <svg viewBox="0 0 320 200" role="img" aria-label="Vibe With Me">
         <defs>
           <linearGradient id="vb-room" x1="0" y1="0" x2="0" y2="1">
@@ -1261,7 +1309,7 @@
       <span>Vibe With Me</span>
     </a>
 
-    <a class="game" href="games/dictionary/dictionary.html">
+    <a class="game" href="games/dictionary/dictionary.html" data-added="2026-09-06" data-age="5-10" data-tags="words reading meanings mic microphone">
       <svg viewBox="0 0 320 200" role="img" aria-label="Dictionary">
         <defs>
           <linearGradient id="dic-t-wall" x1="0" y1="0" x2="0" y2="1">
@@ -1388,7 +1436,7 @@
       <span>Dictionary</span>
     </a>
 
-    <a class="game" href="games/equine-dentist-academy/equine-dentist-academy.html">
+    <a class="game" href="games/equine-dentist-academy/equine-dentist-academy.html" data-added="2026-09-12" data-age="7-12" data-tags="horses teeth dentist animals">
       <svg viewBox="0 0 320 200" role="img" aria-label="Equine Dentist Academy">
         <defs>
           <linearGradient id="eda-wall" x1="0" y1="0" x2="0" y2="1">
@@ -1459,7 +1507,7 @@
       <span>Equine Dentist Academy</span>
     </a>
 
-    <a class="game" href="games/murmuration/murmuration.html">
+    <a class="game" href="games/murmuration/murmuration.html" data-added="2026-09-30" data-age="2-6" data-tags="birds starlings nature calm">
       <svg viewBox="0 0 320 200" role="img" aria-label="Murmuration">
         <defs>
           <linearGradient id="mu-sky" x1="0" y1="0" x2="0" y2="1">
@@ -1522,7 +1570,7 @@
       <span>Murmuration</span>
     </a>
 
-    <a class="game" href="games/koi-pond/koi-pond.html">
+    <a class="game" href="games/koi-pond/koi-pond.html" data-added="2026-10-01" data-age="2-6" data-tags="fish pond nature calm">
       <svg viewBox="0 0 320 200" role="img" aria-label="Koi Pond">
         <defs>
           <radialGradient id="kp-water" cx="0.5" cy="0.55" r="0.6">
@@ -1661,7 +1709,7 @@
       <span>Koi Pond</span>
     </a>
 
-    <a class="game" href="games/stargazing/stargazing.html">
+    <a class="game" href="games/stargazing/stargazing.html" data-added="2026-10-07" data-age="4-8" data-tags="stars space night sky planets">
       <svg viewBox="0 0 320 200" role="img" aria-label="Stargazing">
         <defs>
           <linearGradient id="sg-sky" x1="0" y1="0" x2="0" y2="1">
@@ -1762,7 +1810,7 @@
       <span>Stargazing</span>
     </a>
 
-    <a class="game" href="games/hoots-postcards/hoots-postcards.html">
+    <a class="game" href="games/hoots-postcards/hoots-postcards.html" data-added="2026-10-20" data-age="4-8" data-tags="hoot owl world map countries languages hello geography">
       <svg viewBox="0 0 320 200" role="img" aria-label="Hoot's Postcards">
         <defs>
           <radialGradient id="hp-space" cx="0.4" cy="0.55" r="0.8">
@@ -1845,7 +1893,7 @@
       <span>Hoot's Postcards</span>
     </a>
 
-    <a class="game" href="games/prisoners-dilemma/prisoners-dilemma.html">
+    <a class="game" href="games/prisoners-dilemma/prisoners-dilemma.html" data-added="2026-10-27" data-age="7-12" data-tags="thinking strategy">
       <svg viewBox="0 0 320 200" role="img" aria-label="Prisoner's Dilemma">
         <defs>
           <pattern id="pd-t-stone" width="60" height="34" patternUnits="userSpaceOnUse">
@@ -1887,7 +1935,7 @@
       <span>Prisoner's Dilemma</span>
     </a>
 
-    <a class="game" href="games/chess-quest/chess-quest.html">
+    <a class="game" href="games/chess-quest/chess-quest.html" data-added="2026-11-01" data-age="5-10" data-tags="chess board strategy thinking">
       <svg viewBox="0 0 320 200" role="img" aria-label="Chess Quest">
         <defs>
           <linearGradient id="cq-t-sky" x1="0" y1="0" x2="0" y2="1">
@@ -1923,7 +1971,7 @@
       <span>Chess Quest</span>
     </a>
 
-    <a class="game" href="games/odd-or-even/odd-or-even.html">
+    <a class="game" href="games/odd-or-even/odd-or-even.html" data-added="2026-11-02" data-age="4-7" data-tags="maths numbers odd even">
       <svg viewBox="0 0 320 200" role="img" aria-label="Odd or Even">
         <defs>
           <linearGradient id="oe-t-sky" x1="0" y1="0" x2="0" y2="1">
@@ -1996,7 +2044,7 @@
       <span>Odd or Even</span>
     </a>
 
-    <a class="game" href="games/inside-me/inside-me.html">
+    <a class="game" href="games/inside-me/inside-me.html" data-added="2026-11-02" data-age="4-8" data-tags="body anatomy science">
       <svg viewBox="0 0 320 200" role="img" aria-label="Inside Me">
         <defs>
           <linearGradient id="im-bg" x1="0" y1="0" x2="0" y2="1">
@@ -2041,7 +2089,7 @@
       </svg>
       <span>Inside Me</span>
     </a>
-    <a class="game" href="games/drum-mouse/drum-mouse.html">
+    <a class="game" href="games/drum-mouse/drum-mouse.html" data-added="2026-11-15" data-age="3-6" data-tags="music rhythm drums mouse forest mic microphone">
       <svg viewBox="0 0 320 200" role="img" aria-label="Drum Mouse">
         <defs>
           <linearGradient id="dmt-sky" x1="0" y1="0" x2="0" y2="1">
@@ -2115,7 +2163,7 @@
       </svg>
       <span>Drum Mouse</span>
     </a>
-    <a class="game" href="games/wordtap/wordtap.html">
+    <a class="game" href="games/wordtap/wordtap.html" data-added="2026-11-09" data-age="4-7" data-tags="words reading rhyme letters">
       <svg viewBox="0 0 320 200" role="img" aria-label="WordTap">
         <rect width="320" height="200" fill="#FFF9E6"/>
         <circle cx="160" cy="46" r="30" fill="#FF8A65"/>
@@ -2128,7 +2176,7 @@
       </svg>
       <span>WordTap</span>
     </a>
-    <a class="game" href="games/roman-numeral-workshop/roman-numeral-workshop.html">
+    <a class="game" href="games/roman-numeral-workshop/roman-numeral-workshop.html" data-added="2026-11-17" data-age="6-10" data-tags="maths numbers roman numerals">
       <svg viewBox="0 0 320 200" role="img" aria-label="Roman Numeral Workshop">
         <defs>
           <linearGradient id="rnt-bg" x1="0" y1="0" x2="1" y2="1">
@@ -2167,8 +2215,206 @@
     </a>
 
   </div>
+  <p id="none" hidden>No games match</p>
 
   <footer id="latest"></footer>
+
+<script>
+// Search, sort and reverse.
+//
+// Everything a sort needs is on the tile itself: data-added is the date
+// the game first appeared in git (looked up once; it never changes),
+// data-age is a range like "3-6", data-tags are extra words for search.
+// A new tile without them still shows, it just sorts to the end.
+//
+// "Last updated" is asked of GitHub, one game at a time, only when that
+// sort is chosen, and kept for six hours: 26 calls against a limit of
+// 60 an hour per address, shared with the footer below. Offline, or
+// refused, it uses whatever it last heard and falls back to data-added.
+(function () {
+  var REPO = 'campbell226/kid-games';
+  var PREFS = 'kid-games-sort';
+  var PLAYS = 'kid-games-plays';
+  var UPDATED = 'kid-games-updated';
+  var KEEP = 6 * 60 * 60 * 1000;
+
+  var shelf = document.querySelector('.shelf');
+  var find = document.getElementById('find');
+  var sort = document.getElementById('sort');
+  var flip = document.getElementById('flip');
+  var none = document.getElementById('none');
+  if (!shelf || !find || !sort || !flip) { return; }
+
+  function load(key) {
+    try { return JSON.parse(window.localStorage.getItem(key)) || null; }
+    catch (e) { return null; }
+  }
+  function save(key, v) {
+    try { window.localStorage.setItem(key, JSON.stringify(v)); }
+    catch (e) { /* private browsing: it just won't remember */ }
+  }
+
+  var tiles = Array.prototype.slice.call(shelf.querySelectorAll('a.game'));
+  var games = tiles.map(function (el, i) {
+    var m = /games\/([^/]+)\//.exec(el.getAttribute('href') || '');
+    var span = el.querySelector('span');
+    var name = span ? span.textContent.trim() : '';
+    var age = /^(\d+)\s*-\s*(\d+)$/.exec(el.getAttribute('data-age') || '');
+    return {
+      el: el,
+      slug: m ? m[1] : '',
+      name: name,
+      added: el.getAttribute('data-added') || '',
+      lo: age ? +age[1] : null,
+      mid: age ? (+age[1] + +age[2]) / 2 : null,
+      words: plain(name + ' ' + (el.getAttribute('data-tags') || '')),
+      shelf: i,
+      rand: Math.random()
+    };
+  });
+
+  // Lower case, no apostrophes or accents, & as "and", so "hoots" finds
+  // Hoot's Postcards and "pizza and" finds Pizza & Ice Cream.
+  function plain(s) {
+    s = String(s).toLowerCase().replace(/&/g, ' and ');
+    if (s.normalize) { s = s.normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+    return s.replace(/['’]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  }
+
+  var prefs = load(PREFS) || {};
+  var by = prefs.by;
+  if (!sort.querySelector('option[value="' + by + '"]')) { by = 'added'; }
+  var rev = !!prefs.rev;
+  sort.value = by;
+
+  var plays = load(PLAYS) || {};
+  var updated = (load(UPDATED) || {}).map || {};
+
+  // Each sort's natural direction, and what the button says it is now.
+  var LABEL = {
+    added:   ['Newest first', 'Oldest first'],
+    updated: ['Newest first', 'Oldest first'],
+    name:    ['A → Z', 'Z → A'],
+    age:     ['Youngest first', 'Oldest first'],
+    plays:   ['Most first', 'Least first']
+  };
+
+  function byName(a, b) { return a.name.localeCompare(b.name, 'en-GB'); }
+  // Missing values always go last, whichever way round the sort is.
+  function cmp(a, b, va, vb, desc) {
+    var ma = va === null || va === '', mb = vb === null || vb === '';
+    if (ma || mb) { return ma === mb ? byName(a, b) : (ma ? 1 : -1); }
+    if (va === vb) { return byName(a, b); }
+    var r = va < vb ? -1 : 1;
+    return (desc !== rev) ? -r : r;
+  }
+
+  function arrange() {
+    var list = games.slice();
+    if (by === 'shuffle') {
+      list.sort(function (a, b) { return a.rand - b.rand; });
+    } else if (by === 'name') {
+      list.sort(function (a, b) { return rev ? byName(b, a) : byName(a, b); });
+    } else if (by === 'age') {
+      list.sort(function (a, b) {
+        if (a.mid !== null && a.mid === b.mid) { return cmp(a, b, a.lo, b.lo, false); }
+        return cmp(a, b, a.mid, b.mid, false);
+      });
+    } else if (by === 'plays') {
+      list.sort(function (a, b) { return cmp(a, b, plays[a.slug] || 0, plays[b.slug] || 0, true); });
+    } else if (by === 'updated') {
+      list.sort(function (a, b) {
+        return cmp(a, b, updated[a.slug] || a.added, updated[b.slug] || b.added, true);
+      });
+    } else {
+      list.sort(function (a, b) { return cmp(a, b, a.added, b.added, true); });
+    }
+    for (var i = 0; i < list.length; i++) { shelf.appendChild(list[i].el); }
+    flip.textContent = by === 'shuffle' ? '↻ Shuffle again'
+      : '⇅ ' + LABEL[by][rev ? 1 : 0];
+  }
+
+  function filter() {
+    var q = plain(find.value), shown = 0;
+    var parts = q ? q.split(' ') : [];
+    games.forEach(function (g) {
+      var hay = ' ' + g.words;
+      var ok = parts.every(function (p) { return hay.indexOf(' ' + p) !== -1; });
+      g.el.hidden = !ok;
+      if (ok) { shown++; }
+    });
+    none.hidden = shown > 0;
+  }
+
+  function remember() { save(PREFS, { by: by, rev: rev }); }
+
+  var asked = false;
+  function askGitHub() {
+    var have = load(UPDATED);
+    if (asked || (have && Date.now() - (have.got || 0) < KEEP)) { return; }
+    asked = true;
+    var map = {}, left = games.length, refused = false;
+    games.forEach(function (g) {
+      if (!g.slug) { finish(); return; }
+      fetch('https://api.github.com/repos/' + REPO + '/commits?per_page=1&path=games/' + g.slug)
+        .then(function (r) { if (!r.ok) { throw new Error(r.status); } return r.json(); })
+        .then(function (list) {
+          var c = list && list[0] && list[0].commit;
+          var when = c && ((c.committer && c.committer.date) || (c.author && c.author.date));
+          if (when) { map[g.slug] = when.slice(0, 19); }
+        })
+        .catch(function () { refused = true; })
+        .then(finish);
+    });
+    function finish() {
+      if (--left > 0) { return; }
+      for (var k in map) { updated[k] = map[k]; }
+      // A partial answer is kept but not trusted for long: try again
+      // next visit rather than waiting six hours.
+      save(UPDATED, { got: refused ? 0 : Date.now(), map: updated });
+      if (by === 'updated') { arrange(); }
+    }
+  }
+
+  sort.addEventListener('change', function () {
+    by = sort.value;
+    rev = false;
+    if (by === 'shuffle') { games.forEach(function (g) { g.rand = Math.random(); }); }
+    if (by === 'updated') { askGitHub(); }
+    remember();
+    arrange();
+  });
+
+  flip.addEventListener('click', function () {
+    if (by === 'shuffle') {
+      games.forEach(function (g) { g.rand = Math.random(); });
+    } else {
+      rev = !rev;
+      remember();
+    }
+    arrange();
+  });
+
+  find.addEventListener('input', filter);
+
+  // Count a play when a tile is opened, on this device only.
+  shelf.addEventListener('click', function (e) {
+    var a = e.target.closest ? e.target.closest('a.game') : null;
+    var g = a && games.filter(function (x) { return x.el === a; })[0];
+    if (!g || !g.slug) { return; }
+    plays[g.slug] = (plays[g.slug] || 0) + 1;
+    save(PLAYS, plays);
+  });
+
+  // Coming back with the browser's back button can restore a typed
+  // search from before; filter by whatever is actually in the box.
+  window.addEventListener('pageshow', filter);
+
+  if (by === 'updated') { askGitHub(); }
+  arrange();
+  filter();
+})();
+</script>
 
 <script>
 // Which game was touched last, and when.
