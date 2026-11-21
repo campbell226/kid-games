@@ -720,7 +720,7 @@ function pieceSvg(set, c, t, cls) {
 //  the names of the pieces are spoken by the device when it can. A game
 //  that cannot speak plays the piece's own little tune instead.
 // =====================================================================
-var CFG = { name: '', style: 'auto', sound: true, speech: true, stages: {} };
+var CFG = { name: '', style: 'auto', sound: true, speech: true, haptic: true, stages: {} };
 var AC = null, voices = 0, lastAt = {};
 
 function loadCfg() {
@@ -745,6 +745,13 @@ function gate(key, ms) {
   var now = Date.now();
   if (lastAt[key] && now - lastAt[key] < ms) { return false; }
   lastAt[key] = now; return true;
+}
+// a little tap in the hand for good moves. Only where the browser has it
+// (Chrome and our Android app); silent everywhere else. Never for a wrong
+// move, and never faster than once every 150 ms.
+function buzz(p) {
+  if (CFG.haptic === false || !navigator.vibrate || !gate('buzz', 150)) { return; }
+  try { navigator.vibrate(p); } catch (e) { /* ignore */ }
 }
 function tone(f, d, type, v, delay, slide) {
   var a = actx(), t, o, g;
@@ -789,11 +796,12 @@ function motif(t) {
 }
 var SFX = {
   tap: function () { if (gate('tap', 70)) { tone(620, 0.07, 'triangle', 0.1); } },
-  ok: function () { if (gate('ok', 200)) { tone(523, 0.14, 'triangle', 0.15); tone(659, 0.14, 'triangle', 0.15, 0.1); tone(784, 0.3, 'triangle', 0.15, 0.2); } },
+  ok: function () { if (gate('ok', 200)) { buzz([20, 50, 20]); tone(523, 0.14, 'triangle', 0.15); tone(659, 0.14, 'triangle', 0.15, 0.1); tone(784, 0.3, 'triangle', 0.15, 0.2); } },
   no: function () { if (gate('no', 250)) { tone(250, 0.22, 'sine', 0.12, 0, 190); } },
-  star: function () { if (gate('star', 150)) { tone(1047, 0.12, 'sine', 0.1); tone(1568, 0.3, 'sine', 0.09, 0.08); } },
+  star: function () { if (gate('star', 150)) { buzz(15); tone(1047, 0.12, 'sine', 0.1); tone(1568, 0.3, 'sine', 0.09, 0.08); } },
   win: function () {
     var n = [523, 659, 784, 1047, 1319], i;
+    buzz([15, 60, 15, 60, 15, 60, 30]);
     for (i = 0; i < n.length; i++) { tone(n[i], 0.22, 'triangle', 0.14, i * 0.11); }
     tone(1568, 0.7, 'sine', 0.1, 0.6);
   },
@@ -803,8 +811,8 @@ var SFX = {
     tone({ k: 180, q: 330, r: 130, b: 260, n: 300, p: 400 }[t] || 260, 0.1, 'sine', 0.1);
   },
   hop: function () { if (gate('hop', 90)) { tone(300, 0.16, 'sine', 0.1, 0, 520); } },
-  take: function () { if (gate('take', 120)) { noise(0.18, 0.25, 0, 1400); tone(700, 0.2, 'square', 0.08, 0, 160); tone(1100, 0.15, 'triangle', 0.1, 0.12); } },
-  place: function () { if (gate('place', 70)) { noise(0.04, 0.12, 0, 600); tone(200, 0.09, 'sine', 0.12); } },
+  take: function () { if (gate('take', 120)) { buzz([30, 40, 30]); noise(0.18, 0.25, 0, 1400); tone(700, 0.2, 'square', 0.08, 0, 160); tone(1100, 0.15, 'triangle', 0.1, 0.12); } },
+  place: function () { if (gate('place', 70)) { buzz(20); noise(0.04, 0.12, 0, 600); tone(200, 0.09, 'sine', 0.12); } },
   whoosh: function () { if (gate('wh', 200)) { noise(0.35, 0.1, 0, 2400); } }
 };
 
@@ -1190,6 +1198,8 @@ function openParent() {
   bs.onclick = function () { CFG.sound = CFG.sound === false; saveCfg(); openParent(); };
   var bv = h('button', 'pb2' + (CFG.speech !== false ? ' on' : ''), r1, 'Spoken names');
   bv.onclick = function () { CFG.speech = CFG.speech === false; saveCfg(); openParent(); };
+  var bh = h('button', 'pb2' + (CFG.haptic !== false ? ' on' : ''), r1, 'Buzz');
+  bh.onclick = function () { CFG.haptic = CFG.haptic === false; saveCfg(); openParent(); if (CFG.haptic && navigator.vibrate) { navigator.vibrate(40); } };
   var r2 = h('div', 'row', box);
   var ba = h('button', 'pb2' + (CFG.all ? ' on' : ''), r2, 'Open every stage');
   ba.onclick = function () { CFG.all = !CFG.all; saveCfg(); openParent(); };

@@ -5,6 +5,8 @@
     <!-- Recorder Garden listens. Android asks the first time it does. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- Haptic taps from navigator.vibrate. A normal permission: no prompt. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <!-- Android only lets an app see the phone's speech engines if it says
          it is looking for them. -->
