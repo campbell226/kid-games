@@ -1625,83 +1625,62 @@ function startSquare(t, kind, blockers) {
   } while (n < need && tries < 300);
   return sq;
 }
+// The piece is placed once per stage and stays where it last landed (a pawn,
+// which can only go forward, gets a fresh one at home each round). The dots
+// stay on while it is being learned; once they have been used well, they
+// go, and the last rounds are the same job without them.
+var moveCarry = null;
 ROUNDS.moves = function (c, st) {
-  var t = st.piece === '*' ? pick(['r', 'b', 'q', 'n', 'k']) : st.piece, kind = st.plan[c.i], sq, id, steps = 2, stepMiss = 0, busy = false, target = -1, dm, cand, d;
+  var t = st.piece === '*' ? pick(['r', 'b', 'q', 'n', 'k']) : st.piece, kind = st.plan[c.i], test = kind === 'test', first = test && st.plan[c.i - 1] !== 'test';
+  var sq, id, steps = 2, stepMiss = 0, busy = false, target = -1, dm, cand, d, dots = !test, i;
   boardRound(c, false);
-  sq = startSquare(t, kind, null);
-  id = Bd.add(t, 'w', sq, { pop: true });
+  if (t !== 'p' && st.piece !== '*' && moveCarry && moveCarry.run === run) { sq = moveCarry.sq; id = Bd.add(t, 'w', sq, {}); }
+  else { sq = startSquare(t, kind === 'test' ? 'star2' : kind, null); id = Bd.add(t, 'w', sq, { pop: true }); }
   if (st.piece === '*') { later(function () { sayPiece(t); }, 600); c.say = function () { sayPiece(t); }; }
   else if (c.i === 0) { later(function () { motif(t); }, 500); }
   function legalNow() { return movesFor(t, 'w', Bd.get(id).sq, null); }
-  c.hint = function () { Bd.clearMarks('dot'); showDots(legalNow()); };
+  function showAll() { Bd.clearMarks('dot'); Bd.clearMarks('ring'); showDots(legalNow()); }
+  c.hint = function () { dots = true; showAll(); };
   function afterMove() {
-    busy = false;
+    busy = false; moveCarry = { run: run, sq: Bd.get(id).sq };
     if (kind === 'free') {
       steps--; stepMiss = 0;
-      if (steps === 0) { c.win(); }
+      if (steps === 0) { c.win(); return; }
     } else if (Bd.get(id).sq === target) {
-      Bd.takeStar(target); c.win(1500);
+      Bd.takeStar(target); c.win(1500); return;
     } else { stepMiss = 0; }
+    if (dots) { showAll(); }
   }
   function tap(i) {
     var p = Bd.get(id), m, k, found = null;
     if (busy || c.over) { return; }
-    if (i === p.sq) {
-      Bd.clearMarks(); showDots(legalNow()); Bd.hop(id);
-      setTimeout(function () { Bd.clearMarks('dot'); }, 1800);
-      return;
-    }
+    if (i === p.sq) { showAll(); Bd.hop(id); return; }
     m = legalNow();
     for (k = 0; k < m.length; k++) { if (m[k].to === i) { found = m[k]; } }
     if (found) { busy = true; Bd.clearMarks(); Bd.move(id, i, afterMove); }
     else {
       Bd.shake(id); Bd.flash(i, 'red'); c.fail(); stepMiss++;
-      if (stepMiss >= 2) { c.hint(); }
+      // a wrong move in a no-dots round: the dots come back to help
+      if (!dots) { c.hint(); }
     }
   }
-  if (kind === 'demo') {
-    Bd.lock = true; busy = true;
-    (function demo() {
-      var m0 = legalNow(), first, second, i;
-      later(function () {
-        for (i = 0; i < m0.length; i++) { (function (m, n) { later(function () { Bd.mark(m.to, 'dot'); SFX.tap(); }, n * 45); })(m0[i], i); }
-        later(function () {
-          first = t === 'p' ? m0[m0.length - 1] : m0[rnd(m0.length)];
-          Bd.clearMarks();
-          Bd.move(id, first.to, function () {
-            later(function () {
-              var m1 = legalNow(), k2;
-              showDots(m1);
-              later(function () {
-                second = m1[t === 'p' ? 0 : rnd(m1.length)];
-                if (t !== 'p' && m1.length > 1) { k2 = 0; while (second.to === sq && k2++ < 6) { second = m1[rnd(m1.length)]; } }
-                Bd.clearMarks();
-                Bd.move(id, second.to, function () { later(function () { c.win(600); }, 500); });
-              }, 900 + m1.length * 20);
-            }, 400);
-          });
-        }, m0.length * 45 + 800);
-      }, 700);
-    })();
-    c.solve = function () { /* the demo plays itself */ };
-    return;
-  }
-  if (kind === 'star1' || kind === 'star2') {
+  if (kind === 'star1' || kind === 'star2' || test) {
     d = kind === 'star1' ? 1 : 2;
     dm = distMap(t, 'w', sq, null, 3);
     cand = [];
-    for (var i = 0; i < 64; i++) {
+    for (i = 0; i < 64; i++) {
       if (t === 'p') { if (i > sq && (i - sq) % 8 === 0 && (i - sq) / 8 >= d && (i - sq) / 8 <= d + (d === 2 ? 1 : 0) && i < 56) { cand.push(i); } }
       else if (dm[i] === d) { cand.push(i); }
     }
     target = pick(cand);
     Bd.starAt(target);
   }
+  if (dots) { later(showAll, 350); }
+  else if (first) { later(function () { SFX.star(); owl('talk', 900); }, 300); }
   Bd.setTap(tap);
   c.solve = function () {
     var p = Bd.get(id), m = legalNow(), best = m[0], k, dd;
     if (target >= 0) {
-      // aim for the star: any move that gets closer (by the move table)
       dd = distMap(t, 'w', p.sq, null, 3);
       if (dd[target] === 1) { best = { to: target }; }
       else {
@@ -2212,7 +2191,7 @@ function S(world, id, type, n, icon, more) {
   STAGES.push(st);
 }
 function moveStage(t) {
-  var plan = ['demo', 'free', 'free', 'free', 'star1', 'star2', 'star2'];
+  var plan = ['free', 'free', 'star1', 'star2', 'test', 'test', 'test'];
   S(1, 'move-' + t, 'moves', 7, { t: t }, { piece: t, plan: plan });
 }
 
@@ -2225,8 +2204,8 @@ S(0, 'match', 'match', 4, { g: 'pair' }, { pairs: 3 });
 S(0, 'odd', 'odd', 6, { g: 'odd' }, { hard: true });
 // 1: how they move
 ['r', 'b', 'q', 'k', 'n'].forEach(moveStage);
-S(1, 'move-p', 'moves', 7, { t: 'p' }, { piece: 'p', plan: ['demo', 'free', 'free', 'free', 'star1', 'star2', 'star2'] });
-S(1, 'move-mix', 'moves', 6, { g: 'who' }, { piece: '*', plan: ['star1', 'star2', 'star2', 'star2', 'star2', 'star2'] });
+S(1, 'move-p', 'moves', 7, { t: 'p' }, { piece: 'p', plan: ['free', 'free', 'star1', 'star2', 'test', 'test', 'test'] });
+S(1, 'move-mix', 'moves', 6, { g: 'who' }, { piece: '*', plan: ['star1', 'star2', 'star2', 'test', 'test', 'test'] });
 // 2: taking
 S(2, 'take', 'take', 6, { g: 'take' }, { plan: [{ t: 'r', k: 1, d: 0 }, { t: 'b', k: 1, d: 1 }, { t: 'q', k: 2, d: 1 }, { t: 'n', k: 2, d: 2 }, { t: 'k', k: 1, d: 2 }, { t: '*', k: 2, d: 2 }] });
 S(2, 'blocked', 'blocked', 6, { g: 'block' }, { plan: ['r', 'b', 'q', 'n', 'r', 'q'] });
