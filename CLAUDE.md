@@ -89,6 +89,29 @@ needs another country picked out by name, `tools/hoots-postcards-map.js`
 re-bakes it from that file. Like the ffmpeg pass, it is a one-off, not a
 build step.
 
+## Adult mode
+
+A game that needs parent controls (skipping levels, settings, resetting
+progress) reaches them the same way everywhere. Copy the `AdultGate` block
+from `games/post-a-letter/post-a-letter.html` (it sits just before
+`<div id="parent"`) and call `AdultGate.attach(openParent)`.
+
+- A gear in the top-right corner flashes three times at launch, then is
+  invisible. With reduced motion it shows steadily for about 3 seconds, then
+  fades.
+- Holding it for 1.5 s asks one random question (2 to the power 3, the first
+  digit of pi, and so on) answered on a number pad. Right opens the controls;
+  wrong closes quietly. It is a speed bump for a child button-bashing, not
+  security. Add questions to the `QS` list in each copy.
+- Where a game has levels, the panel's first section is "open every
+  level" and "start again" (the second needs a confirming tap). Game-specific
+  settings go below it. Words are fine in the panel.
+- Don't draw a visible cog or corner dot of your own.
+
+Applied so far to Chess Quest, Dictionary, Numberbots, Post a Letter and
+Post a Number. The others have no parent controls yet; add the gate when one
+needs them.
+
 ## Hosting
 
 Live on GitHub Pages from `campbell226/kid-games`, served straight off

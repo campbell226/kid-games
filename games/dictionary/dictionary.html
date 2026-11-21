@@ -250,10 +250,111 @@
   <span id="ageNum">5</span>
 </div>
 
+<script>
+// Adult gate. The same block sits in every game that has parent controls.
+// A gear in the top-right flashes three times at launch so a grown-up knows
+// it is there, then is invisible. Hold it for 1.5 s and it asks one
+// random question with a number pad. Right opens the controls; wrong
+// closes quietly. It is a speed bump for a button-bashing child, not security.
+// Use: var gearBtn = AdultGate.attach(openParent);
+var AdultGate = (function () {
+  'use strict';
+  var QS = [
+    ['What is 2 to the power 3?', 8],
+    ['What is the first digit of pi?', 3],
+    ['What are the first two digits of pi after the point?', 14],
+    ['How many days are there in a leap year?', 366],
+    ['What is 7 × 8?', 56],
+    ['What is the square root of 144?', 12],
+    ['How many players are on the pitch for one football team?', 11],
+    ['At what temperature in °C does water boil?', 100],
+    ['How many minutes are there in a day?', 1440],
+    ['What is the atomic number of carbon?', 6],
+    ['What is 15% of 200?', 30],
+    ['How many degrees do the angles of a triangle add up to?', 180]
+  ];
+  var RM = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function css(n, s) { n.style.cssText = s; return n; }
+
+  function attach(open) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.setAttribute('aria-label', 'Parent controls');
+    btn.innerHTML = '<svg viewBox="0 0 40 40" width="100%" height="100%"><circle cx="20" cy="20" r="6" fill="none" stroke="#fff" stroke-width="3.4"/><path d="M20 4V9M20 31V36M4 20H9M31 20H36M9 9L12.5 12.5M27.5 27.5L31 31M31 9L27.5 12.5M12.5 27.5L9 31" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/></svg>';
+    css(btn, 'position:fixed;top:max(8px,env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right));' +
+      'width:56px;height:56px;padding:12px;border:0;border-radius:50%;background:rgba(0,0,0,0.35);' +
+      'opacity:0;z-index:40;cursor:pointer;touch-action:none;-webkit-tap-highlight-color:transparent;');
+    document.body.appendChild(btn);
+
+    // Three flashes, then gone. Reduced motion: held steady, then a fade.
+    if (btn.animate) {
+      btn.animate(RM
+        ? [{ opacity: 0.8 }, { opacity: 0.8, offset: 0.8 }, { opacity: 0 }]
+        : [{ opacity: 0 }, { opacity: 0.8, offset: 0.08 }, { opacity: 0, offset: 0.16 },
+           { opacity: 0.8, offset: 0.32 }, { opacity: 0, offset: 0.4 },
+           { opacity: 0.8, offset: 0.56 }, { opacity: 0 }],
+        { duration: RM ? 3000 : 2400, delay: 700, fill: 'none' });
+    }
+
+    var t = 0;
+    function stop() { clearTimeout(t); }
+    btn.addEventListener('pointerdown', function () { stop(); t = setTimeout(ask, 1500); });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (e) { btn.addEventListener(e, stop); });
+    btn.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
+    function ask() {
+      var q = QS[Math.floor(Math.random() * QS.length)], typed = '';
+      var wrap = css(document.createElement('div'),
+        'position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;' +
+        'background:rgba(12,24,40,0.6);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;');
+      var box = css(document.createElement('div'),
+        'background:#fdfaf3;color:#22303f;border-radius:18px;padding:18px;width:min(320px,92vw);' +
+        'box-shadow:0 18px 50px rgba(0,0,0,0.35);text-align:center;');
+      var qt = css(document.createElement('div'), 'font-size:16px;margin-bottom:10px;min-height:46px;');
+      qt.textContent = q[0];
+      var shown = css(document.createElement('div'),
+        'font-size:30px;font-weight:700;height:46px;line-height:46px;border-radius:10px;background:#fff;border:2px solid #cfd8e0;margin-bottom:10px;');
+      var pad = css(document.createElement('div'), 'display:grid;grid-template-columns:repeat(3,1fr);gap:8px;');
+      box.appendChild(qt); box.appendChild(shown); box.appendChild(pad);
+      wrap.appendChild(box);
+      function close() { if (wrap.parentNode) { wrap.parentNode.removeChild(wrap); } document.removeEventListener('keydown', key); }
+      function submit() { var ok = typed !== '' && +typed === q[1]; close(); if (ok) { open(); } }
+      function press(k) {
+        if (k === 'ok') { submit(); return; }
+        if (k === 'del') { typed = typed.slice(0, -1); }
+        else if (typed.length < 5) { typed += k; }
+        shown.textContent = typed;
+      }
+      function key(e) {
+        if (e.key === 'Escape') { close(); }
+        else if (e.key === 'Enter') { submit(); }
+        else if (e.key === 'Backspace') { press('del'); }
+        else if (/^[0-9]$/.test(e.key)) { press(e.key); }
+      }
+      ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'ok'].forEach(function (k) {
+        var b = css(document.createElement('button'),
+          'min-height:52px;border:2px solid #cfd8e0;border-radius:11px;background:' + (k === 'ok' ? '#c8102e' : '#fff') +
+          ';color:' + (k === 'ok' ? '#fff' : '#22303f') + ';font:inherit;font-size:22px;font-weight:600;cursor:pointer;');
+        b.type = 'button';
+        b.textContent = k === 'del' ? '⌫' : (k === 'ok' ? '✓' : k);
+        b.addEventListener('click', function () { press(k); });
+        pad.appendChild(b);
+      });
+      wrap.addEventListener('click', function (e) { if (e.target === wrap) { close(); } });
+      document.addEventListener('keydown', key);
+      document.body.appendChild(wrap);
+    }
+    return btn;
+  }
+  return { attach: attach };
+})();
+</script>
+
 <div id="parent" role="dialog" aria-modal="true" aria-label="Parent controls">
   <div id="panel">
     <h2>Parent controls</h2>
-    <p class="sub">She will not find this by accident &mdash; it needs a long press on the corner.</p>
+    <p class="sub">She will not find this by accident &mdash; it needs a long press on the gear in the top-right corner, and a grown-up question answered.</p>
 
     <p id="status"></p>
 
@@ -764,11 +865,6 @@
   function drawCorner() {
     var g = document.getElementById('corner');
     clear(g);
-    var r = Math.max(20, L.W * 0.026);
-    g.appendChild(el('circle', {
-      id: 'cornerdot', cx: L.W - r * 0.9, cy: r * 0.9, r: r,
-      fill: '#ffffff', opacity: 0.14
-    }));
   }
 
   // ------------------------------------------------------------------
@@ -2255,11 +2351,6 @@
     var t = ev.target;
     if (!t || !t.closest) { return; }
 
-    if (t.id === 'cornerdot') {
-      clearTimeout(pressTimer);
-      pressTimer = setTimeout(openParent, 850);
-      return;
-    }
 
     var card = t.getAttribute && t.getAttribute('data-card');
     if (card !== null && card !== undefined && card !== '') {
@@ -2411,6 +2502,7 @@
 
   function openParent() { syncPanel(); parentEl.classList.add('open'); }
   function closeParent() { parentEl.classList.remove('open'); }
+  AdultGate.attach(openParent);
 
   // The reading age, live on the screen. Dragging it does not disturb
   // whatever is currently in the book - it is the next word that comes
