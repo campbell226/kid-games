@@ -220,7 +220,7 @@ var AdultGate = (function () {
     var btn = document.createElement('button');
     btn.type = 'button';
     btn.setAttribute('aria-label', 'Parent controls');
-    btn.innerHTML = '<svg viewBox="0 0 40 40" width="100%" height="100%"><circle cx="20" cy="20" r="6" fill="none" stroke="#fff" stroke-width="3.4"/><path d="M20 4V9M20 31V36M4 20H9M31 20H36M9 9L12.5 12.5M27.5 27.5L31 31M31 9L27.5 12.5M12.5 27.5L9 31" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/></svg>';
+    btn.innerHTML = '<svg viewBox="0 0 40 40" width="100%" height="100%"><path fill="#fff" fill-rule="evenodd" d="M17.5 7.2L18.1 2.6L21.9 2.6L22.5 7.2L27.2 9.2L30.9 6.3L33.7 9.1L30.8 12.8L32.8 17.5L37.4 18.1L37.4 21.9L32.8 22.5L30.8 27.2L33.7 30.9L30.9 33.7L27.2 30.8L22.5 32.8L21.9 37.4L18.1 37.4L17.5 32.8L12.8 30.8L9.1 33.7L6.3 30.9L9.2 27.2L7.2 22.5L2.6 21.9L2.6 18.1L7.2 17.5L9.2 12.8L6.3 9.1L9.1 6.3L12.8 9.2ZM20 13.6a6.4 6.4 0 1 0 0.01 0Z"/></svg>';
     css(btn, 'position:fixed;top:max(8px,env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right));' +
       'width:56px;height:56px;padding:12px;border:0;border-radius:50%;background:rgba(0,0,0,0.35);' +
       'opacity:0;z-index:40;cursor:pointer;touch-action:none;-webkit-tap-highlight-color:transparent;');
