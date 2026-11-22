@@ -184,6 +184,26 @@
   #parent .pb2.on { background: #3a9d4d; }
   #parent .pb2.danger { background: #a63a3a; }
   #parent small { opacity: 0.6; line-height: 1.4; }
+  #parent .plr { background: #1a2350; border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+  #parent .plr .row { flex-wrap: wrap; }
+  #parent .plr .dot { width: 34px; height: 34px; border-radius: 50%; flex: none; }
+  /* who is playing */
+  #who { background: linear-gradient(#2b3d78, #1e2a4a 70%); z-index: 8; overflow-y: auto; display: flex; align-items: center; justify-content: center; padding: 70px 16px 30px; }
+  #who .wbox { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 22px; max-width: 760px; }
+  #who .ptile { width: clamp(120px, 26vw, 170px); display: flex; flex-direction: column; align-items: center; gap: 8px; font-size: clamp(18px, 4vmin, 26px); font-weight: 800; color: #fff; }
+  #who .pface { width: 100%; aspect-ratio: 1; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: clamp(54px, 13vmin, 84px); font-weight: 900; color: #fff; box-shadow: 0 7px 0 rgba(0,0,0,0.25); text-shadow: 0 3px 0 rgba(0,0,0,0.2); transition: transform .15s; }
+  #who .ptile:active .pface { transform: scale(0.93); }
+  #who .ptile.add .pface { background: rgba(255,255,255,0.12); border: 5px dashed rgba(255,255,255,0.55); box-shadow: none; }
+  #who .ptile .pn { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #who .form { display: flex; flex-direction: column; align-items: center; gap: 22px; }
+  #who input[type=text] { font: inherit; font-size: clamp(28px, 7vmin, 44px); font-weight: 800; text-align: center; padding: 10px 14px; border-radius: 18px; border: 0; width: min(80vw, 360px); }
+  #who .sw { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+  #who .sw button { width: clamp(52px, 12vmin, 70px); height: clamp(52px, 12vmin, 70px); border-radius: 50%; box-shadow: 0 5px 0 rgba(0,0,0,0.25); }
+  #who .sw button.on { outline: 6px solid #fff; outline-offset: 2px; }
+  #who .go { width: clamp(80px, 18vmin, 110px); height: clamp(80px, 18vmin, 110px); border-radius: 50%; background: #3a9d4d; box-shadow: 0 7px 0 rgba(0,0,0,0.25); display: flex; align-items: center; justify-content: center; }
+  #who .go svg, #who .back svg { width: 60%; height: 60%; }
+  #who .back { position: absolute; left: 14px; top: 14px; width: 56px; height: 56px; border-radius: 50%; background: rgba(255,255,255,0.18); display: flex; align-items: center; justify-content: center; }
+  #whoBtn { position: fixed; left: 12px; top: 12px; z-index: 5; width: 54px; height: 54px; border-radius: 50%; border: 4px solid #fff; font-size: 26px; font-weight: 900; color: #fff; box-shadow: 0 4px 0 rgba(0,0,0,0.3); text-shadow: 0 2px 0 rgba(0,0,0,0.2); display: none; align-items: center; justify-content: center; }
   #fx { pointer-events: none; z-index: 20; width: 100%; height: 100%; }
 
   @media (prefers-reduced-motion: reduce) {
@@ -284,6 +304,8 @@
 
 <div id="app">
   <div id="map" class="screen"></div>
+  <div id="who" class="screen hidden"></div>
+  <button id="whoBtn" aria-label="Who is playing"></button>
 
   <div id="play" class="screen hidden">
     <div id="top">
@@ -720,18 +742,51 @@ function pieceSvg(set, c, t, cls) {
 //  the names of the pieces are spoken by the device when it can. A game
 //  that cannot speak plays the piece's own little tune instead.
 // =====================================================================
-var CFG = { name: '', style: 'auto', sound: true, speech: true, haptic: true, stages: {} };
+// Players. CFG.players holds everyone; CFG.cur is who is playing. CFG.name,
+// CFG.all and CFG.stages are the *current player's* working copy, so the
+// rest of the game reads them as it always did. saveCfg() writes them back.
+var CFG = { name: '', style: 'auto', sound: true, speech: true, haptic: true, stages: {}, all: false, players: [], cur: '' };
 var AC = null, voices = 0, lastAt = {};
+var PCOL = ['#ff6b6b', '#ff9b3d', '#f2b134', '#3a9d4d', '#4aa3ff', '#b07cff'];
+var MAX_PLAYERS = 8;
 
 function loadCfg() {
-  var s, k;
+  var s = null, k, hadPlayers = false;
   try {
     s = JSON.parse(localStorage.getItem('chessQuest1'));
-    if (s && typeof s === 'object') { for (k in s) { if (k in CFG) { CFG[k] = s[k]; } } }
+    if (s && typeof s === 'object') {
+      hadPlayers = Array.isArray(s.players);
+      for (k in s) { if (k in CFG) { CFG[k] = s[k]; } }
+    }
   } catch (e) { /* no storage: start fresh each time */ }
   if (!CFG.stages || typeof CFG.stages !== 'object') { CFG.stages = {}; }
+  if (!Array.isArray(CFG.players)) { CFG.players = []; }
+  // Before players existed there was one name and one set of stars. Keep them as the first player.
+  if (!hadPlayers && (CFG.name || Object.keys(CFG.stages).length)) {
+    CFG.players = [{ id: newPid(), name: CFG.name || 'Player 1', col: PCOL[0], all: !!CFG.all, stages: CFG.stages }];
+    CFG.cur = CFG.players[0].id;
+  }
+  CFG.players = CFG.players.filter(function (p) { return p && typeof p === 'object' && p.id; });
+  CFG.players.forEach(function (p) { if (!p.stages || typeof p.stages !== 'object') { p.stages = {}; } if (typeof p.name !== 'string') { p.name = ''; } });
+  if (!findPlayer(CFG.cur)) { CFG.cur = ''; CFG.name = ''; CFG.all = false; CFG.stages = {}; }
+  else { pullPlayer(findPlayer(CFG.cur)); }
 }
-function saveCfg() { try { localStorage.setItem('chessQuest1', JSON.stringify(CFG)); } catch (e) { /* ignore */ } }
+function newPid() { return 'p' + Date.now().toString(36) + Math.floor(Math.random() * 1e5).toString(36); }
+function findPlayer(id) { var i; for (i = 0; i < CFG.players.length; i++) { if (CFG.players[i].id === id) { return CFG.players[i]; } } return null; }
+function pullPlayer(p) { CFG.name = p.name; CFG.all = !!p.all; CFG.stages = p.stages; }
+function pushPlayer() { var p = findPlayer(CFG.cur); if (p) { p.name = CFG.name; p.all = !!CFG.all; p.stages = CFG.stages; } }
+function saveCfg() { pushPlayer(); try { localStorage.setItem('chessQuest1', JSON.stringify(CFG)); } catch (e) { /* ignore */ } }
+function activate(id) { var p = findPlayer(id); if (!p) { return; } pushPlayer(); CFG.cur = id; pullPlayer(p); saveCfg(); }
+function addPlayer(name, col) {
+  var p = { id: newPid(), name: name, col: col, all: false, stages: {} };
+  CFG.players.push(p); activate(p.id); return p;
+}
+function removePlayer(id) {
+  CFG.players = CFG.players.filter(function (p) { return p.id !== id; });
+  if (CFG.cur === id) { CFG.cur = ''; CFG.name = ''; CFG.all = false; CFG.stages = {}; }
+  saveCfg();
+}
+function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 
 function actx() {
   if (AC === null) {
@@ -930,7 +985,7 @@ function owlClone() {
 
 // ---------- screens ----------
 function show(name) {
-  ['map', 'play', 'done', 'parent'].forEach(function (n) { $(n).classList.toggle('hidden', n !== name && !(name === 'done' && n === 'play')); });
+  ['map', 'play', 'done', 'parent', 'who'].forEach(function (n) { $(n).classList.toggle('hidden', n !== name && !(name === 'done' && n === 'play')); });
   if (name === 'done') { $('parent').classList.add('hidden'); }
 }
 function mode(boardOn) { $('play').classList.toggle('nobd', !boardOn); refit(); }
@@ -1147,8 +1202,61 @@ function stageIcon(ic) {
 }
 function lockSvg() { return '<svg class="lockic" viewBox="0 0 40 40"><rect x="8" y="17" width="24" height="18" rx="4" fill="#cfd6ea"/><path d="M13 17 V12 A7 7 0 0 1 27 12 V17" fill="none" stroke="#cfd6ea" stroke-width="4"/></svg>'; }
 
+// ---------- who is playing ----------
+function initialOf(n) { return n ? Array.from(n.trim())[0].toUpperCase() : '?'; }
+function enterGame() {
+  if (!findPlayer(CFG.cur)) { goWho(CFG.players.length === 0); } else { show('map'); buildMap(); }
+}
+function goWho(adding) { buildWho(adding); show('who'); }
+function buildWho(adding) {
+  var w = $('who'), box, col = PCOL[CFG.players.length % PCOL.length];
+  w.innerHTML = '';
+  if (adding) {
+    var f = h('div', 'form', w), inp, sw, go, ok;
+    inp = h('input', '', f); inp.type = 'text'; inp.maxLength = 14; inp.id = 'wName';
+    inp.setAttribute('autocomplete', 'off'); inp.setAttribute('autocapitalize', 'words'); inp.setAttribute('aria-label', 'Name');
+    sw = h('div', 'sw', f);
+    PCOL.forEach(function (c) {
+      var b = h('button', c === col ? 'on' : '', sw); b.style.background = c; b.setAttribute('aria-label', 'Colour');
+      b.onclick = function () { SFX.tap(); col = c; Array.prototype.forEach.call(sw.children, function (x) { x.className = x === b ? 'on' : ''; }); };
+    });
+    go = h('button', 'go', f, '<svg viewBox="0 0 100 100"><path d="M20 53 L42 75 L82 28" fill="none" stroke="#fff" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/></svg>');
+    go.setAttribute('aria-label', 'Done');
+    ok = function () {
+      var nm = inp.value.trim();
+      if (!nm) { SFX.no(); inp.classList.add('shk'); setTimeout(function () { inp.classList.remove('shk'); }, 450); inp.focus(); return; }
+      SFX.tap(); addPlayer(nm, col); show('map'); buildMap();
+    };
+    go.onclick = ok;
+    inp.onkeydown = function (ev) { if (ev.key === 'Enter') { ok(); } };
+    if (CFG.players.length) {
+      var bk = h('button', 'back', w, '<svg viewBox="0 0 100 100"><path d="M62 18 L28 50 L62 82" fill="none" stroke="#fff" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/></svg>');
+      bk.setAttribute('aria-label', 'Back');
+      bk.onclick = function () { SFX.tap(); goWho(false); };
+    }
+    setTimeout(function () { try { inp.focus(); } catch (e) { /* ignore */ } }, 60);
+    return;
+  }
+  box = h('div', 'wbox', w);
+  CFG.players.forEach(function (p) {
+    var t = h('button', 'ptile', box, '<div class="pface" style="background:' + esc(p.col || PCOL[0]) + '">' + esc(initialOf(p.name)) + '</div><div class="pn">' + esc(p.name) + '</div>');
+    t.onclick = function () { SFX.tap(); activate(p.id); show('map'); buildMap(); };
+  });
+  if (CFG.players.length < MAX_PLAYERS) {
+    var a = h('button', 'ptile add', box, '<div class="pface"><svg viewBox="0 0 100 100" style="width:50%;height:50%"><path d="M50 18 V82 M18 50 H82" stroke="#fff" stroke-width="14" stroke-linecap="round"/></svg></div>');
+    a.setAttribute('aria-label', 'New player');
+    a.onclick = function () { SFX.tap(); goWho(true); };
+  }
+}
+function paintWhoBtn() {
+  var b = $('whoBtn'), p = findPlayer(CFG.cur);
+  if (!p) { return; }
+  b.style.background = p.col || PCOL[0]; b.textContent = initialOf(p.name);
+}
+
 function buildMap() {
   var m = $('map'), cur = firstUndone(), lastW = -1, wrap = null, nodes = null, nowNode = null;
+  paintWhoBtn();
   m.innerHTML = '';
   STAGES.forEach(function (st, i) {
     var w = WORLDS[st.world], locked = !CFG.all && i > cur, rec = CFG.stages[st.id], n, k, em;
@@ -1186,7 +1294,35 @@ function openParent() {
   p.innerHTML = '';
   box = h('div', 'box', p);
   h('h3', '', box, 'Parent controls');
-  h('label', '', box, 'Her name <input type="text" id="pName" maxlength="14" value="' + (CFG.name || '').replace(/"/g, '') + '">');
+  h('h3', '', box, 'Players');
+  if (!CFG.players.length) { h('small', '', box, 'No players yet. A child can add themselves from the picture screen, or add one here.'); }
+  CFG.players.forEach(function (pl) {
+    var card = h('div', 'plr', box), r, ni, bo, bx, bd, done = 0;
+    r = h('div', 'row', card);
+    h('div', 'dot', r).style.background = pl.col || PCOL[0];
+    ni = h('input', '', r); ni.type = 'text'; ni.maxLength = 14; ni.value = pl.name; ni.setAttribute('aria-label', 'Name');
+    ni.oninput = function () { pl.name = ni.value.trim() || pl.name; if (pl.id === CFG.cur) { pullPlayer(pl); } saveCfg(); };
+    ni.onchange = function () { if (!ni.value.trim()) { ni.value = pl.name; } };
+    for (var k in pl.stages) { if (pl.stages[k] && pl.stages[k].done) { done++; } }
+    h('small', '', r, done + ' of ' + STAGES.length + ' stages done');
+    r = h('div', 'row', card);
+    bo = h('button', 'pb2' + (pl.all ? ' on' : ''), r, 'Open every stage');
+    bo.onclick = function () { pl.all = !pl.all; if (pl.id === CFG.cur) { pullPlayer(pl); } saveCfg(); openParent(); };
+    bx = h('button', 'pb2 danger', r, 'Start again');
+    bx.onclick = function () {
+      if (bx.getAttribute('data-sure')) { pl.stages = {}; pl.all = false; if (pl.id === CFG.cur) { pullPlayer(pl); } saveCfg(); openParent(); return; }
+      bx.setAttribute('data-sure', '1'); bx.textContent = 'Tap again to wipe their progress';
+    };
+    bd = h('button', 'pb2 danger', r, 'Delete');
+    bd.onclick = function () {
+      if (bd.getAttribute('data-sure')) { removePlayer(pl.id); openParent(); return; }
+      bd.setAttribute('data-sure', '1'); bd.textContent = 'Tap again to delete ' + pl.name;
+    };
+  });
+  if (CFG.players.length < MAX_PLAYERS) {
+    var ap = h('button', 'pb2', box, 'Add a player');
+    ap.onclick = function () { goWho(true); };
+  }
   h('h3', '', box, 'Piece style');
   styles = h('div', 'row', box);
   styles.style.flexWrap = 'wrap';
@@ -1201,28 +1337,17 @@ function openParent() {
   bv.onclick = function () { CFG.speech = CFG.speech === false; saveCfg(); openParent(); };
   var bh = h('button', 'pb2' + (CFG.haptic !== false ? ' on' : ''), r1, 'Buzz');
   bh.onclick = function () { CFG.haptic = CFG.haptic === false; saveCfg(); openParent(); if (CFG.haptic && navigator.vibrate) { navigator.vibrate(40); } };
-  var r2 = h('div', 'row', box);
-  var ba = h('button', 'pb2' + (CFG.all ? ' on' : ''), r2, 'Open every stage');
-  ba.onclick = function () { CFG.all = !CFG.all; saveCfg(); openParent(); };
-  var br = h('button', 'pb2 danger', r2, 'Start again');
-  br.onclick = function () {
-    if (br.getAttribute('data-sure')) { CFG.stages = {}; CFG.all = false; saveCfg(); openParent(); return; }
-    br.setAttribute('data-sure', '1'); br.textContent = 'Tap again to wipe all progress';
-  };
   h('small', '', box, 'Classic pieces by Colin M.L. Burnett (Cburnett), Wikimedia Commons, CC BY-SA 3.0. Everything else, including every sound, is drawn or made in this page. Hold the gear (top right, invisible after the first seconds) on the map to get back here.');
   var cl = h('button', 'pb2', box, 'Done');
-  cl.onclick = function () {
-    var inp = $('pName');
-    if (inp) { CFG.name = inp.value.trim(); saveCfg(); }
-    show('map'); buildMap();
-  };
+  cl.onclick = function () { enterGame(); };
   show('parent');
 }
 function initGear() {
   window.gearBtn = AdultGate.attach(openParent);
 }
 var _show = show;
-show = function (name) { _show(name); if (window.gearBtn) { window.gearBtn.style.display = name === 'map' ? 'flex' : 'none'; } };
+show = function (name) { _show(name); if (window.gearBtn) { window.gearBtn.style.display = (name === 'map' || name === 'who') ? 'flex' : 'none'; }
+  $('whoBtn').style.display = name === 'map' ? 'flex' : 'none'; };
 
 function initUI() {
   loadCfg();
@@ -1233,7 +1358,11 @@ function initUI() {
   $('sayBtn').onclick = function () { if (run && run.ctx && run.ctx.say) { owl('talk', 900); run.ctx.say(); } };
   document.addEventListener('pointerdown', function () { if (run && !$('play').classList.contains('hidden')) { armIdle(); } }, true);
   Bd.init();
-  show('map'); buildMap();
+  $('whoBtn').onclick = function () { SFX.tap(); goWho(false); };
+  // Two or more players: ask who. One: straight to the map. None: the add screen.
+  if (CFG.players.length > 1) { CFG.cur = ''; CFG.name = ''; CFG.all = false; CFG.stages = {}; }
+  else if (CFG.players.length === 1) { activate(CFG.players[0].id); }
+  enterGame();
 }
 
 // =====================================================================

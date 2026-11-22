@@ -108,6 +108,13 @@ from `games/post-a-letter/post-a-letter.html` (it sits just before
   settings go below it. Words are fine in the panel.
 - Don't draw a visible cog or corner dot of your own.
 
+Players: Chess Quest keeps named players, each with their own stars and
+their own "open every stage" and "start again", all in the parent panel's
+Players section. A child may add themselves from the picker (the + tile)
+without the gate; rename and delete are parent-only. Copy the player block
+from `games/chess-quest/chess-quest.html` (`CFG.players`, `buildWho`) into
+any other game that gains saved levels.
+
 Applied so far to Chess Quest, Dictionary, Numberbots, Post a Letter and
 Post a Number. The others have no parent controls yet; add the gate when one
 needs them.
