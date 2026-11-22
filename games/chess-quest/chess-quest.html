@@ -1337,7 +1337,7 @@ function openParent() {
   bv.onclick = function () { CFG.speech = CFG.speech === false; saveCfg(); openParent(); };
   var bh = h('button', 'pb2' + (CFG.haptic !== false ? ' on' : ''), r1, 'Buzz');
   bh.onclick = function () { CFG.haptic = CFG.haptic === false; saveCfg(); openParent(); if (CFG.haptic && navigator.vibrate) { navigator.vibrate(40); } };
-  h('small', '', box, 'Classic pieces by Colin M.L. Burnett (Cburnett), Wikimedia Commons, CC BY-SA 3.0. Everything else, including every sound, is drawn or made in this page. Hold the gear (top right; always showing on the who's-playing screen, invisible after the first seconds on the map) to get back here.');
+  h('small', '', box, 'Classic pieces by Colin M.L. Burnett (Cburnett), Wikimedia Commons, CC BY-SA 3.0. Everything else, including every sound, is drawn or made in this page. Hold the gear (top right; always showing on the player-picker screen, invisible after the first seconds on the map) to get back here.');
   var cl = h('button', 'pb2', box, 'Done');
   cl.onclick = function () { enterGame(); };
   show('parent');
