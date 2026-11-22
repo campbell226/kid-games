@@ -1511,6 +1511,12 @@ function playRound(r, k) {
     if (RUN.friend && RUN.friend.cls.sleep) { RUN.friend.state('sleep', false); }
     PZ[r.t](cx, r);
     if (cx.draw) { cx.draw(); }
+    // a first-time word from the friend, before the round takes taps
+    if (cx.preface) {
+      var me = cx;
+      me.busy = true;
+      sleep(350).then(function () { return talk(me.preface); }).then(function () { me.busy = false; armIdle(); });
+    }
     armIdle();
     if (ep !== epoch) { return; }
   });
@@ -1743,7 +1749,11 @@ async function showInvite(cx0, cy0, sc, decoded) {
   g.innerHTML = inviteArt(decoded);
   for (i = 0; i < 3; i++) {
     var rg = S('g', {}, g);
-    numeral(rg, roman(INVITE[i].v), decoded ? -20 : 40, -40 + i * 150, 96, { fill: '#3a2410' });
+    numeral(rg, roman(INVITE[i].v), decoded ? -28 : 40, -40 + i * 150, decoded ? 88 : 96, { colours: !!decoded, fill: '#3a2410' });
+    if (decoded) {
+      T(rg, '=', { x: 104, y: -40 + i * 150 + 26, 'class': 'sans', 'font-size': 64, 'text-anchor': 'middle', fill: '#8a6414' });
+      digitsText(rg, INVITE[i].v, 140 + String(INVITE[i].v).length * 78 * 0.3, -40 + i * 150, 78);
+    }
     rows.push(rg);
   }
   node = N(g, cx0, cy0, 0.05); node.o = 0; node.set();
@@ -1781,7 +1791,8 @@ async function runPrologue() {
   await talk([
     ['granny', 'Long, long ago, in the great city of Rome, enemies crept up the hill in the dark.'],
     ['granny', 'The guard dogs were fast asleep. But the geese heard them coming…'],
-    ['granny', '…and they honked and HONKED! Everybody woke up, and Rome was saved.']
+    ['granny', '…and they honked and HONKED! Everybody woke up, and Rome was saved.'],
+    ['granny', 'Those geese lived at the temple of the goddess Juno. That’s who you’re named after!']
   ]);
   RUN.juno.play('cheer', 1200); SFX.honk(3);
   await talk([['juno', 'Hooray for the geese! Honk honk!']]);
@@ -2030,7 +2041,7 @@ PZ.pens = function (cx, r) {
   cx.hint = function () { var j = st.opts.indexOf(st.v), p = geo.pens[j]; hintAt(p.x + p.w / 2, p.y + p.h / 2, Math.min(p.w, p.h) * 0.6); };
   if (cx.first && !RUN.sawPens) {
     RUN.sawPens = true;
-    setTimeout(function () { cx.lock(function () { return talk([['rufus', 'Oh dear, the sheep are in three pens. Which pen has {' + roman(st.v) + '} sheep?']]); }); }, 400);
+    cx.preface = [['rufus', 'Oh dear, the sheep are in three pens. Which pen has {' + roman(st.v) + '} sheep?']];
   }
 };
 
@@ -2224,7 +2235,7 @@ PZ.coins = function (cx, r) {
     o.board = { x: Tp.x + Tp.w / 2 + 100, y: Tp.y + Tp.h / 2, w: Math.min(Tp.w * 0.55, 420), h: Math.min(Tp.h, 180) };
     o.item = { x: o.board.x - o.board.w / 2 - 110, y: o.board.y + 6 };
     if (ly.land) { o.counter = { x: P.x, y: P.y + 10, w: P.w, h: 200 }; o.purse = { x: P.x + 30, y: P.y + 290, w: P.w - 60, h: P.h - 300 }; }
-    else { o.counter = { x: P.x, y: P.y + 30, w: P.w, h: 210 }; o.purse = { x: P.x + 10, y: P.y + 330, w: P.w - 20, h: Math.max(280, P.h - 340) }; }
+    else { o.counter = { x: P.x, y: P.y + 30, w: P.w, h: 210 }; o.purse = { x: P.x + 10, y: P.y + 330, w: P.w - 20, h: clamp(P.h - 340, 280, 440) }; }
     return o;
   }
   function cpos(k, n) { var gap = Math.min(geo.cr * 2 + 16, (geo.counter.w - 60) / Math.max(1, n)); return { x: geo.counter.x + geo.counter.w / 2 + (k - (n - 1) / 2) * gap, y: geo.counter.y + geo.counter.h / 2 + 4 }; }
@@ -2325,11 +2336,7 @@ PZ.coins = function (cx, r) {
     hintAt(nodes[target].x, nodes[target].y, geo.cr + 26);
   };
   if (r.teach && cx.first) {
-    setTimeout(function () {
-      cx.lock(function () {
-        return talk([['juno', 'Oh no! It’s {IV}, and I’ve only got one {=I} coin.'], ['porcia', 'Never mind! Give me a {=V}, and I’ll give you an {=I} back. Five, take away one!']]);
-      });
-    }, 500);
+    cx.preface = [['juno', 'Oh no! It’s {IV}, and I’ve only got one {=I} coin.'], ['porcia', 'Never mind! Give me a {=V}, and I’ll give you an {=I} back. Five, take away one!']];
   }
 };
 
@@ -2340,8 +2347,9 @@ PZ.coins = function (cx, r) {
 CH.push({
   id: 'c3', key: 'III', friend: 'lutra',
   voice: function () { SFX.chirp(); },
-  bg: function (g, ly) {
-    var hz = ly.hz;
+  bg: function (g, ly0) {
+    // standing up, the sea comes higher, so the boat floats in it
+    var ly = ly0.land ? ly0 : Object.assign({}, ly0, { hz: ly0.hz - 260 }), hz = ly.hz;
     sky(g, 'r-skyDay', hz);
     // the white cliffs, and the Romans' lighthouse on top (it still stands)
     G(g, '<path d="M' + (-W) + ' ' + f1(hz) + ' L' + (-W) + ' ' + f1(hz - 200) + ' L' + f1(W * 0.18) + ' ' + f1(hz - 210) + ' Q' + f1(W * 0.3) + ' ' + f1(hz - 190) + ' ' + f1(W * 0.34) + ' ' + f1(hz) + ' Z" fill="#f4f1e6" stroke="#d4cdb8" stroke-width="4"/>' +
@@ -2427,9 +2435,9 @@ PZ.boat = function (cx, r) {
     geo = layout();
     var D = geo.dock, half = geo.half;
     // the jetty under the dock crates, on its posts
-    var jx0 = D.x - 30, jx1 = cx.ly.land ? W + 50 : D.x + D.w + 30;
-    G(Lui, '<rect x="' + f1(jx0 + 20) + '" y="' + f1(D.base + 20) + '" width="18" height="260" fill="#6b4420"/><rect x="' + f1(jx1 - 60) + '" y="' + f1(D.base + 20) + '" width="18" height="260" fill="#6b4420"/>' +
-      '<rect x="' + f1(jx0) + '" y="' + f1(D.base - 2) + '" width="' + f1(jx1 - jx0) + '" height="40" rx="6" fill="#a8743a" stroke="#6b4420" stroke-width="5"/>');
+    var jx0 = D.x - 30, jx1 = W + 60, posts = '', px;
+    for (px = jx0 + 20; px < jx1; px += 170) { posts += '<rect x="' + f1(px) + '" y="' + f1(D.base + 20) + '" width="18" height="260" fill="#6b4420"/>'; }
+    G(Lui, posts + '<rect x="' + f1(jx0) + '" y="' + f1(D.base - 2) + '" width="' + f1(jx1 - jx0) + '" height="40" rx="6" fill="#a8743a" stroke="#6b4420" stroke-width="5"/>');
     boat = N(S('g', {}, Lui), geo.bx, geo.by);
     var bg = boat.el;
     G(bg, '<path d="M0 0 V-300" stroke="#6b4420" stroke-width="10"/><path d="M8 -292 Q120 -200 8 -70 Z" fill="#fff3d6" stroke="#c9b48a" stroke-width="4"/><path d="M8 -250 Q60 -200 8 -130" stroke="#c73a2a" stroke-width="10" fill="none"/>' +
@@ -2724,9 +2732,9 @@ function mileRound(seq, gap, isL) {
   [v + d, v - d, v + 1, v - 1, v + 2, v + 3, v - 2].forEach(function (q) { if (q > 0 && q !== v && c.indexOf(q) < 0 && seq.indexOf(q) < 0) { c.push(q); } });
   return { t: 'miles', seq: seq, gap: gap, opts: shuffle([v].concat(c.slice(0, 2))), isL: !!isL };
 }
-function milestoneArt(w, h) {
+function milestoneArt(w, h, marble) {
   return '<ellipse cx="0" cy="4" rx="' + f1(w * 0.62) + '" ry="12" fill="rgba(60,40,10,.25)"/>' +
-    '<path d="M' + f1(-w / 2) + ' 0 V' + f1(-h + w / 2) + ' A' + f1(w / 2) + ' ' + f1(w / 2) + ' 0 0 1 ' + f1(w / 2) + ' ' + f1(-h + w / 2) + ' V0 Z" fill="#ddd2b8" stroke="#9c8a66" stroke-width="5"/>' +
+    '<path d="M' + f1(-w / 2) + ' 0 V' + f1(-h + w / 2) + ' A' + f1(w / 2) + ' ' + f1(w / 2) + ' 0 0 1 ' + f1(w / 2) + ' ' + f1(-h + w / 2) + ' V0 Z" fill="' + (marble ? '#f7f2e6' : '#ddd2b8') + '" stroke="' + (marble ? '#c2b48f' : '#9c8a66') + '" stroke-width="5"/>' +
     '<path d="M' + f1(-w / 2 + 10) + ' ' + f1(-h * 0.2) + ' H' + f1(w / 2 - 10) + '" stroke="#b9a983" stroke-width="3"/>';
 }
 PZ.miles = function (cx, r) {
@@ -2743,7 +2751,7 @@ PZ.miles = function (cx, r) {
   }
   function stone(parent, val, x, y, rot) {
     var g = S('g', {}, parent), rs = roman(val);
-    g.innerHTML = milestoneArt(geo.w, geo.h);
+    g.innerHTML = milestoneArt(geo.w, geo.h, r.steps);
     numeral(g, rs, 0, -geo.h * 0.55, geo.fs(rs), { fill: '#4a3a22', carved: 'rgba(255,255,255,.6)' });
     G(g, '<rect class="hit" x="' + f1(-geo.w / 2 - 14) + '" y="' + f1(-geo.h - 14) + '" width="' + f1(geo.w + 28) + '" height="' + f1(geo.h + 28) + '"/>');
     var nd = N(g, x, y); nd.r = rot || 0; nd.set();
@@ -2808,9 +2816,13 @@ PZ.miles = function (cx, r) {
     await sleep(700);
   }
   cx.hint = function () { var j = r.opts.indexOf(v), nd = chN[j]; if (nd) { hintAt(nd.x, nd.y - geo.h / 2, geo.h * 0.65); } };
+  if (r.steps && cx.first && !RUN.sawSteps) {
+    RUN.sawSteps = true;
+    cx.preface = [['lupa', 'Now up the Hundred Steps to the temple! There’s a marker every ten steps.'], ['lupa', '{=C} means a hundred: ten tens. What’s missing?']];
+  }
   if (r.isL && cx.first && !RUN.sawL) {
     RUN.sawL = true;
-    setTimeout(function () { cx.lock(function () { return talk([['mola', 'See this big stone at the end? {=L} means fifty: five tens.'], ['mola', 'So what comes just before it? Remember {IV} and {IX}…']]); }); }, 500);
+    cx.preface = [['mola', 'See this big stone at the end? {=L} means fifty: five tens.'], ['mola', 'So what comes just before it? Remember {IV} and {IX}…']];
   }
 };
 
@@ -2869,7 +2881,7 @@ PZ.parade = function (cx, r) {
   function layout() {
     var ly = cx.ly, P = ly.play, o = {};
     o.sp = P.w / n;
-    o.ms = clamp(o.sp / 250, 0.32, 0.62);           // mouse size
+    o.ms = clamp(o.sp / 250, 0.32, ly.land ? 0.62 : 0.8);           // mouse size
     o.sw = Math.min(o.sp * 0.92, 210); o.sh = Math.min(o.sw * 0.55, 92);   // shield
     o.stepBase = ly.land ? P.y + P.h - 40 : P.y + P.h - 30;
     o.stepH = function (k) { return 40 + k * (ly.land ? 32 : 40); };
@@ -3078,6 +3090,461 @@ PZ.mosaic = function (cx, r) {
 };
 
 // =====================================================================
+//  VIII. The Alps. Capra the goat keeps the toll on an abacus, the way
+//  Romans really calculated: a wire for each place, a bead worth five
+//  above the bar. Set the number on the sign, and our digits appear
+//  under the wires. The Romans counted in columns; they just didn't
+//  write that way.
+// =====================================================================
+CH.push({
+  id: 'c8', key: 'VIII', friend: 'capra',
+  voice: function () { SFX.bleat(); },
+  bg: function (g, ly) {
+    var hz = ly.hz, s = '';
+    sky(g, 'r-skyDay', hz);
+    s += '<path d="M' + (-W) + ' ' + f1(hz) + ' L' + f1(W * 0.05) + ' ' + f1(hz - 420) + ' L' + f1(W * 0.3) + ' ' + f1(hz - 180) + ' L' + f1(W * 0.52) + ' ' + f1(hz - 470) + ' L' + f1(W * 0.78) + ' ' + f1(hz - 150) + ' L' + f1(W * 0.95) + ' ' + f1(hz - 380) + ' L' + (2 * W) + ' ' + f1(hz) + ' Z" fill="#9aa3b5"/>';
+    s += '<path d="M' + f1(W * 0.05) + ' ' + f1(hz - 420) + ' L' + f1(W * 0.12) + ' ' + f1(hz - 330) + ' L' + f1(W * 0.08) + ' ' + f1(hz - 340) + ' L' + f1(W * 0.03) + ' ' + f1(hz - 320) + ' L' + f1(-W * 0.02) + ' ' + f1(hz - 345) + ' Z" fill="#fff"/>';
+    s += '<path d="M' + f1(W * 0.52) + ' ' + f1(hz - 470) + ' L' + f1(W * 0.6) + ' ' + f1(hz - 370) + ' L' + f1(W * 0.55) + ' ' + f1(hz - 380) + ' L' + f1(W * 0.5) + ' ' + f1(hz - 360) + ' L' + f1(W * 0.45) + ' ' + f1(hz - 385) + ' Z" fill="#fff"/>';
+    s += '<path d="M' + f1(W * 0.95) + ' ' + f1(hz - 380) + ' L' + f1(W * 1.02) + ' ' + f1(hz - 300) + ' L' + f1(W * 0.97) + ' ' + f1(hz - 305) + ' L' + f1(W * 0.92) + ' ' + f1(hz - 290) + ' L' + f1(W * 0.88) + ' ' + f1(hz - 310) + ' Z" fill="#fff"/>';
+    s += '<path d="M' + (-W) + ' ' + f1(hz) + ' L' + f1(W * 0.2) + ' ' + f1(hz - 120) + ' L' + f1(W * 0.42) + ' ' + f1(hz - 40) + ' L' + f1(W * 0.66) + ' ' + f1(hz - 140) + ' L' + (2 * W) + ' ' + f1(hz - 20) + ' L' + (2 * W) + ' ' + f1(hz) + ' Z" fill="#7d8899"/>';
+    G(g, s);
+    ground(g, hz, '#eef3f4');
+    // the toll hut and its barrier, by Capra
+    var hx = ly.fx + (ly.land ? 40 : 60), hy = ly.gy;
+    G(g, '<rect x="' + f1(hx - 40) + '" y="' + f1(hy - 330) + '" width="210" height="190" fill="#a0703a" stroke="#6b4420" stroke-width="5"/><path d="M' + f1(hx - 60) + ' ' + f1(hy - 330) + ' L' + f1(hx + 65) + ' ' + f1(hy - 410) + ' L' + f1(hx + 190) + ' ' + f1(hy - 330) + ' Z" fill="#fff" stroke="#c9d1d9" stroke-width="4"/>' +
+      '<rect x="' + f1(ly.fx - 170) + '" y="' + f1(hy - 230) + '" width="14" height="230" fill="#6b4420"/>');
+  },
+  // the barrier, on its own so it can lift
+  decor: function (g, ly, sc) {
+    var bar = S('g', {}, g);
+    bar.innerHTML = '<path d="M0 0 H-437" stroke="#c73a2a" stroke-width="16"/><path d="M0 0 H-437" stroke="#fff" stroke-width="16" stroke-dasharray="30 30"/><circle r="12" fill="#6b4420"/>';
+    sc.bar = N(bar, ly.fx - 163, ly.gy - 200);
+  },
+  after: async function () { SFX.creak(); await to(RUN.scene.bar, { r: 80 }, 700); await exitRight(); },
+  greet: function () { SFX.bleat(); },
+  intro: [
+    ['capra', 'Baa! Halt! Nobody crosses my mountain without paying the toll.'],
+    ['juno', 'How much is it?'],
+    ['capra', 'It’s on the sign. But first, show me the number on my abacus. The Romans did all their sums on one of these!'],
+    ['capra', 'Every wire is a column: ones on the right, then tens, then hundreds. A bead above the bar is worth five.']
+  ],
+  outro: [
+    ['capra', 'You may pass! Did you see? The Romans wrote numbers with letters, but they counted in columns.'],
+    ['capra', 'Just like the numbers you use: hundreds, tens and ones.'],
+    ['capra', 'And when a column is empty, you write 0. The Romans never had a 0. Ask about that in Rome!']
+  ],
+  rounds: function () {
+    return [
+      { t: 'abacus', v: rint(6, 8), cols: 2 },
+      { t: 'abacus', v: pick([23, 32, 21, 34]), cols: 2 },
+      { t: 'abacus', v: pick([48, 47, 39, 49]), cols: 2 },
+      { t: 'abacus', v: pick([204, 105, 307, 160]), cols: 3 },
+      { t: 'abacus', v: 365, cols: 3, year: true },
+      { t: 'abacus', v: 1666, cols: 4, every: true }
+    ];
+  }
+});
+PZ.abacus = function (cx, r) {
+  var nc = r.cols, st = { f: [], l: [] }, geo, beads = {}, i;
+  for (i = 0; i < nc; i++) { st.f.push(0); st.l.push(0); }
+  function place(c) { return nc - 1 - c; }
+  function value() { var v = 0, c; for (c = 0; c < nc; c++) { v += (st.f[c] * 5 + st.l[c]) * Math.pow(10, place(c)); } return v; }
+  function want(c) { return Math.floor(r.v / Math.pow(10, place(c))) % 10; }
+  function layout() {
+    var ly = cx.ly, P = ly.play, Tp = ly.top, o = {};
+    o.cw = Math.min(210, (P.w - 40) / nc);
+    o.fw = o.cw * nc + 40;
+    o.fx = P.x + P.w / 2 - o.fw / 2;
+    o.ft = P.y + 10; o.fh = ly.land ? P.h - 185 : Math.min(P.h - 190, 700);
+    o.bar = o.ft + o.fh * 0.3;
+    o.bh = Math.min(58, (o.ft + o.fh - o.bar) / 6.2); o.bw = o.cw * 0.66;
+    o.sign = { x: Tp.x + Tp.w / 2, y: Tp.y + Tp.h / 2, w: Math.min(Tp.w, 560), h: Math.min(Tp.h, 180) };
+    o.colX = function (c) { return o.fx + 20 + o.cw * (c + 0.5); };
+    return o;
+  }
+  function beadY(c, k) {
+    if (k === 0) { return st.f[c] ? geo.bar - geo.bh / 2 - 5 : geo.ft + geo.bh / 2 + 14; }
+    var up = k <= st.l[c];
+    return up ? geo.bar + geo.bh / 2 + 5 + (k - 1) * geo.bh : geo.ft + geo.fh - geo.bh / 2 - 14 - (4 - k) * geo.bh;
+  }
+  cx.draw = function () {
+    geo = layout();
+    var s = '', c, k, old = beads;
+    var sb = makeBoard(Lui, geo.sign); sb.show(roman(r.v));
+    s += '<rect x="' + f1(geo.fx) + '" y="' + f1(geo.ft) + '" width="' + f1(geo.fw) + '" height="' + f1(geo.fh) + '" rx="16" fill="#e9d3a6" stroke="#6b4420" stroke-width="12"/>';
+    for (c = 0; c < nc; c++) { s += '<path d="M' + f1(geo.colX(c)) + ' ' + f1(geo.ft + 8) + ' V' + f1(geo.ft + geo.fh - 8) + '" stroke="#8a6a3a" stroke-width="6"/>'; }
+    s += '<rect x="' + f1(geo.fx) + '" y="' + f1(geo.bar - 7) + '" width="' + f1(geo.fw) + '" height="14" fill="#6b4420"/>';
+    G(Lui, s);
+    beads = {};
+    for (c = 0; c < nc; c++) {
+      var p = place(c), col = PC[p], hasFive = p < 3;
+      // the letters for this wire: its own below, its five above
+      var lab = S('g', {}, Lui);
+      T(lab, PLL[p][0], { x: f1(geo.colX(c)), y: f1(geo.ft + geo.fh + 52), 'class': 'rnf', 'font-size': 50, 'text-anchor': 'middle', fill: col });
+      if (hasFive) { T(lab, PLL[p][1], { x: f1(geo.colX(c) + geo.cw * 0.36), y: f1(geo.ft + 40), 'class': 'rnf', 'font-size': 30, 'text-anchor': 'middle', fill: col, opacity: 0.8 }); }
+      // our digit for this column, live
+      var d = st.f[c] * 5 + st.l[c];
+      plaque(lab, geo.colX(c), geo.ft + geo.fh + 112, geo.cw * 0.6, 84, { fill: '#fffaf0', stroke: col, sw: 5 });
+      T(lab, String(d), { x: f1(geo.colX(c)), y: f1(geo.ft + geo.fh + 136), 'class': 'sans', 'font-size': 66, 'text-anchor': 'middle', fill: d ? col : ZC });
+      for (k = hasFive ? 0 : 1; k <= 4; k++) {
+        var key = c + '-' + k, y = beadY(c, k), bg2 = S('g', {}, Lui);
+        bg2.innerHTML = '<ellipse rx="' + f1(geo.bw / 2) + '" ry="' + f1(geo.bh / 2 - 3) + '" fill="' + col + '" stroke="rgba(0,0,0,.3)" stroke-width="3"/><ellipse cx="' + f1(-geo.bw * 0.14) + '" cy="' + f1(-geo.bh * 0.14) + '" rx="' + f1(geo.bw * 0.2) + '" ry="' + f1(geo.bh * 0.12) + '" fill="#fff" opacity=".45"/>';
+        var nd = N(bg2, geo.colX(c), old[key] ? old[key].y : y);
+        if (old[key] && Math.abs(old[key].y - y) > 1) { to(nd, { y: y }, 220, EO); }
+        beads[key] = nd;
+      }
+      // big tap areas: the top part toggles the five, the lower part adds one
+      (function (c2, five) {
+        if (five) { var h1 = S('rect', { 'class': 'hit', x: f1(geo.colX(c2) - geo.cw / 2), y: f1(geo.ft), width: f1(geo.cw), height: f1(geo.bar - geo.ft) }, Lui); h1.addEventListener('click', function () { tap(c2, true); }); }
+        var h2 = S('rect', { 'class': 'hit', x: f1(geo.colX(c2) - geo.cw / 2), y: f1(geo.bar), width: f1(geo.cw), height: f1(geo.ft + geo.fh - geo.bar) }, Lui);
+        h2.addEventListener('click', function () { tap(c2, false); });
+      })(c, hasFive);
+    }
+  };
+  function tap(c, five) {
+    cx.lock(async function () {
+      if (five) { st.f[c] = st.f[c] ? 0 : 1; }
+      else { st.l[c] = st.l[c] >= 4 ? 0 : st.l[c] + 1; }
+      SFX.bead(); if (!five && st.l[c] === 0) { setTimeout(SFX.bead, 60); setTimeout(SFX.bead, 120); }
+      clear(Lui); cx.draw();
+      await sleep(260);
+      if (value() === r.v) { await win(); }
+    });
+  }
+  async function win() {
+    SFX.bleat();
+    await sleep(300);
+    var ly = cx.ly;
+    if (cx.first && r.every && !RUN.sawEvery) { RUN.sawEvery = true; await talk([['capra', 'Look! {MDCLXVI} uses every letter once, from the biggest to the smallest.']]); }
+    await cx.solved(r.v, ly.top.x + ly.top.w / 2, ly.top.y + ly.top.h / 2);
+  }
+  cx.hint = function () {
+    var c;
+    for (c = 0; c < nc; c++) {
+      var w = want(c), wf = w >= 5 ? 1 : 0, wl = w % 5;
+      if (st.f[c] !== wf) { hintAt(geo.colX(c), (geo.ft + geo.bar) / 2, geo.cw * 0.5); return; }
+      if (st.l[c] !== wl) { hintAt(geo.colX(c), geo.bar + (geo.ft + geo.fh - geo.bar) / 2, geo.cw * 0.5); return; }
+    }
+  };
+  if (r.year && cx.first && !RUN.sawYear) {
+    RUN.sawYear = true;
+    cx.preface = [['capra', 'This one’s how many days there are in a year. Three hundreds, six tens, and five ones.']];
+  }
+};
+
+// =====================================================================
+//  IX. Rome. Lupa the wolf guards the Golden Milestone, where every
+//  road was measured from. How far did Juno walk (and where did the
+//  zeros come from)? Up the Hundred Steps, to the door on the
+//  invitation, and the Sacred Geese to count. Then the festival, and
+//  the end of the story: zero.
+// =====================================================================
+CH.push({
+  id: 'c9', key: 'IX', friend: 'lupa',
+  voice: function () { SFX.howl(); },
+  bg: function (g, ly) {
+    var hz = ly.hz, s = '', i;
+    sky(g, 'r-skyWarm', hz);
+    // the Capitol on its hill, with its temple
+    s += '<path d="M' + (-W) + ' ' + f1(hz) + ' Q' + f1(W * 0.1) + ' ' + f1(hz - 330) + ' ' + f1(W * 0.42) + ' ' + f1(hz - 300) + ' Q' + f1(W * 0.6) + ' ' + f1(hz - 290) + ' ' + f1(W * 0.75) + ' ' + f1(hz) + ' Z" fill="#9ab86a"/>';
+    var tx = W * 0.25, ty = hz - 320;
+    s += '<rect x="' + f1(tx - 150) + '" y="' + f1(ty - 20) + '" width="300" height="24" fill="#f4efe4" stroke="#c2b48f" stroke-width="3"/>';
+    for (i = 0; i < 6; i++) { s += '<rect x="' + f1(tx - 132 + i * 52) + '" y="' + f1(ty - 150) + '" width="18" height="130" fill="#fbf8ef" stroke="#c2b48f" stroke-width="3"/>'; }
+    s += '<path d="M' + f1(tx - 160) + ' ' + f1(ty - 150) + ' L' + f1(tx) + ' ' + f1(ty - 215) + ' L' + f1(tx + 160) + ' ' + f1(ty - 150) + ' Z" fill="#f4efe4" stroke="#c2b48f" stroke-width="4"/><circle cx="' + f1(tx) + '" cy="' + f1(ty - 172) + '" r="12" fill="#e8b830"/>';
+    // the Forum: a colonnade along the back
+    for (i = -2; i < W / 90 + 2; i++) { s += '<rect x="' + f1(i * 90 + 30) + '" y="' + f1(hz - 200) + '" width="26" height="200" fill="#f6f0e2" stroke="#cdbf9c" stroke-width="3"/>'; }
+    s += '<rect x="' + (-W) + '" y="' + f1(hz - 222) + '" width="' + (3 * W) + '" height="26" fill="#efe6d0" stroke="#cdbf9c" stroke-width="3"/>';
+    G(g, s);
+    ground(g, hz, '#efe3c6');
+    var t = '';
+    for (i = -1; i < W / 120 + 1; i++) { t += '<path d="M' + (i * 120) + ' ' + f1(hz) + ' V' + (H * 2) + '" stroke="#e0d1ae" stroke-width="3"/>'; }
+    G(g, t);
+  },
+  greet: function () { SFX.howl(); },
+  intro: [
+    ['juno', 'Rome! I made it! It’s so big!'],
+    ['lupa', 'Welcome, little goose. I am Lupa, and I guard the Golden Milestone.'],
+    ['lupa', 'Every road in the empire is measured from this golden stone. That’s why all roads lead to Rome!']
+  ],
+  rounds: function (first) {
+    var dist = first ? { v: 1500, name: 'Eboracum' } : pick([{ v: 1500, name: 'Eboracum' }, { v: 1200, name: 'Londinium' }, { v: 1100, name: 'Gesoriacum' }, { v: 700, name: 'Lugdunum' }]);
+    var door = first ? 42 : pick([42, 38, 44, 46, 47]);
+    var m = mileRound([60, 70, 80, 90, 100], 4); m.steps = true;
+    return [
+      { t: 'dial', v: dist.v, name: dist.name },
+      m,
+      { t: 'doors', v: door, opts: shuffle([door].concat(doorDecoys(door))) },
+      { t: 'carve', v: first ? 34 : rint(23, 38) }
+    ];
+  },
+  after: function () { return finale(); }
+});
+// the distances on the Golden Milestone are about right, in Roman miles
+// along the roads: York to Rome is near enough 1,500
+function doorDecoys(v) {
+  var t = Math.floor(v / 10), o = v % 10, c = [o * 10 + t, v + 20, v - 1, v + 1, v + 10, v - 30], out = [];
+  c.forEach(function (q) { if (q > 0 && q < 90 && q !== v && out.indexOf(q) < 0 && out.length < 4) { out.push(q); } });
+  return out;
+}
+PZ.dial = function (cx, r) {
+  var s0 = String(r.v), nd = Math.max(4, s0.length), tgt = ('0000' + s0).slice(-nd).split('').map(Number), st = { d: tgt.map(function () { return 0; }) }, geo;
+  function layout() {
+    var ly = cx.ly, P = ly.play, Tp = ly.top, o = {};
+    o.ww = Math.min(170, (P.w - 60) / nd - 20);
+    o.wh = o.ww * 1.15;
+    o.cy = ly.land ? P.y + P.h * 0.48 : P.y + Math.min(P.h * 0.4, 380);
+    o.x = function (i) { return P.x + P.w / 2 + (i - (nd - 1) / 2) * (o.ww + 24); };
+    o.sign = { x: Tp.x + Tp.w / 2, y: Tp.y + Tp.h / 2 };
+    return o;
+  }
+  cx.draw = function () {
+    geo = layout();
+    // the Golden Milestone, with the place and its distance
+    var sg = S('g', {}, Lui), S2 = geo.sign, rs = roman(r.v), nw = Math.max(strW(rs, 80) + 60, 300);
+    G(sg, '<rect x="' + f1(S2.x - nw / 2) + '" y="' + f1(S2.y - 100) + '" width="' + f1(nw) + '" height="200" rx="16" fill="#e8b830" stroke="#9a7212" stroke-width="7"/><rect x="' + f1(S2.x - nw / 2 + 12) + '" y="' + f1(S2.y - 88) + '" width="' + f1(nw - 24) + '" height="176" rx="10" fill="none" stroke="#fff3b0" stroke-width="3"/>');
+    T(sg, r.name, { x: f1(S2.x), y: f1(S2.y - 40), 'class': 'rnf', 'font-size': 40, 'text-anchor': 'middle', fill: '#5a3a10' });
+    numeral(sg, rs, S2.x, S2.y + 36, 80, { fill: '#5a3a10', carved: 'rgba(255,245,190,.7)' });
+    var i, k;
+    for (i = 0; i < nd; i++) {
+      (function (i2) {
+        var x = geo.x(i2), pl = nd - 1 - i2, col = PC[Math.min(3, pl)], d = st.d[i2], g = S('g', {}, Lui), aw = geo.ww, ah = geo.ww * 0.62;
+        G(g, '<rect x="' + f1(x - geo.ww / 2) + '" y="' + f1(geo.cy - geo.wh / 2) + '" width="' + f1(geo.ww) + '" height="' + f1(geo.wh) + '" rx="16" fill="#fffaf0" stroke="' + col + '" stroke-width="7"/>');
+        T(g, String(d), { x: f1(x), y: f1(geo.cy + geo.ww * 0.3), 'class': 'sans', 'font-size': f1(geo.ww * 0.86), 'text-anchor': 'middle', fill: d ? col : ZC });
+        [[-1, geo.cy - geo.wh / 2 - ah / 2 - 12], [1, geo.cy + geo.wh / 2 + ah / 2 + 12]].forEach(function (q) {
+          var up = q[0] < 0, b = S('g', {}, g);
+          G(b, '<rect x="' + f1(x - aw / 2) + '" y="' + f1(q[1] - ah / 2) + '" width="' + f1(aw) + '" height="' + f1(ah) + '" rx="14" fill="' + col + '"/><path d="M' + f1(x - aw * 0.2) + ' ' + f1(q[1] + (up ? ah * 0.15 : -ah * 0.15)) + ' L' + f1(x) + ' ' + f1(q[1] + (up ? -ah * 0.2 : ah * 0.2)) + ' L' + f1(x + aw * 0.2) + ' ' + f1(q[1] + (up ? ah * 0.15 : -ah * 0.15)) + '" stroke="#fff" stroke-width="9" fill="none" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<rect class="hit" x="' + f1(x - aw / 2 - 8) + '" y="' + f1(q[1] - ah / 2 - 8) + '" width="' + f1(aw + 16) + '" height="' + f1(ah + 16) + '"/>');
+          b.addEventListener('click', function () { tap(i2, up ? 1 : -1); });
+        });
+      })(i);
+    }
+  };
+  function tap(i, dir) {
+    cx.lock(async function () {
+      st.d[i] = (st.d[i] + dir + 10) % 10;
+      SFX.bead();
+      clear(Lui); cx.draw();
+      await sleep(200);
+      if (st.d.join('') === tgt.join('')) { await win(); }
+    });
+  }
+  async function win() {
+    SFX.yes();
+    var ly = cx.ly;
+    await reveal(r.v, ly.top.x + ly.top.w / 2, ly.top.y + ly.top.h / 2, LANDS ? 92 : 104, false);
+    if (cx.first && !RUN.sawZero) {
+      RUN.sawZero = true;
+      await talk([['juno', 'One thousand five hundred! That’s how far I walked!'], ['lupa', 'See the grey places? No tens, no ones. The Romans just wrote nothing there. You write 0.']]);
+    }
+    await cx.solved(null);
+  }
+  cx.hint = function () {
+    var i;
+    for (i = 0; i < nd; i++) {
+      if (st.d[i] !== tgt[i]) {
+        var up = ((tgt[i] - st.d[i] + 10) % 10) <= 5, y = up ? geo.cy - geo.wh / 2 - geo.ww * 0.31 - 12 : geo.cy + geo.wh / 2 + geo.ww * 0.31 + 12;
+        hintAt(geo.x(i), y, geo.ww * 0.55); return;
+      }
+    }
+  };
+  if (cx.first && !RUN.sawDial) {
+    RUN.sawDial = true;
+    cx.preface = [['lupa', 'This says {' + roman(r.v) + '} miles to ' + r.name + '. How far is that in your numbers?']];
+  }
+};
+// a street of doors; the invitation said which one
+PZ.doors = function (cx, r) {
+  var st = { tried: {} }, geo, doors = [];
+  function layout() {
+    var ly = cx.ly, P = ly.play, Tp = ly.top, o = {}, n = r.opts.length;
+    o.dw = Math.min(170, P.w / n - 24); o.dh = o.dw * 1.6;
+    o.base = ly.land ? P.y + P.h - 40 : P.y + Math.min(P.h - 40, 640);
+    o.x = function (j) { return P.x + P.w / 2 + (j - (n - 1) / 2) * (o.dw + 24); };
+    o.note = { x: Tp.x + Tp.w / 2, y: Tp.y + Tp.h / 2 };
+    return o;
+  }
+  cx.draw = function () {
+    geo = layout();
+    // the bit of the invitation that matters now: a door, and its number
+    var ng = S('g', {}, Lui), nx = geo.note.x, ny = geo.note.y, rs = roman(r.v), nw = strW(rs, 84) + 190;
+    G(ng, '<rect x="' + f1(nx - nw / 2) + '" y="' + f1(ny - 80) + '" width="' + f1(nw) + '" height="160" rx="14" fill="#f3e3b8" stroke="#b8975a" stroke-width="6"/><g transform="translate(' + f1(nx - nw / 2 + 70) + ' ' + f1(ny) + ') scale(.9)">' + inviteIcon('door') + '</g>');
+    numeral(ng, rs, nx + 50, ny, 84, { fill: '#3a2410' });
+    // the wall and its doors
+    var P = cx.ly.play;
+    G(Lui, '<rect x="' + f1(P.x - 30) + '" y="' + f1(geo.base - geo.dh - 120) + '" width="' + f1(P.w + 60) + '" height="' + f1(geo.dh + 140) + '" fill="#e7d3ad" stroke="#b8a47a" stroke-width="5"/>');
+    doors = [];
+    r.opts.forEach(function (v, j) {
+      var x = geo.x(j), g = S('g', {}, Lui), dw = geo.dw, dh = geo.dh, top = geo.base - dh, rs2 = roman(v), fs = Math.min(50, (dw - 16) / Math.max(0.6, strW(rs2, 1, 0.04)));
+      G(g, '<path d="M' + f1(x - dw / 2) + ' ' + f1(geo.base) + ' V' + f1(top + dw / 2) + ' A' + f1(dw / 2) + ' ' + f1(dw / 2) + ' 0 0 1 ' + f1(x + dw / 2) + ' ' + f1(top + dw / 2) + ' V' + f1(geo.base) + ' Z" fill="' + (st.tried[j] ? '#2b2118' : '#2b2118') + '"/>');
+      var leaf = S('g', {}, g);
+      leaf.innerHTML = '<path d="M0 ' + f1(dh) + ' V' + f1(dw / 2) + ' A' + f1(dw / 2) + ' ' + f1(dw / 2) + ' 0 0 1 ' + f1(dw) + ' ' + f1(dw / 2) + ' V' + f1(dh) + ' Z" fill="' + ['#8a5a2a', '#3f6e58', '#7b4fa0', '#b23a2a', '#3d6e9e'][j % 5] + '" stroke="#3a2410" stroke-width="5"/><circle cx="' + f1(dw * 0.78) + '" cy="' + f1(dh * 0.58) + '" r="8" fill="#e8b830"/><path d="M' + f1(dw * 0.5) + ' ' + f1(dw * 0.2) + ' V' + f1(dh) + '" stroke="#3a2410" stroke-width="3" opacity=".5"/>';
+      var ln = N(leaf, x - dw / 2, top);
+      // the house number, over the door
+      plaque(g, x, top - 52, dw + 10, 74, { fill: '#fffaf0', sw: 4 });
+      numeral(g, rs2, x, top - 52, fs, { fill: '#3a2410' });
+      if (st.tried[j]) { tagNum(g, v, x, geo.base + 36, 40); }
+      G(g, '<rect class="hit" x="' + f1(x - dw / 2 - 10) + '" y="' + f1(top - 90) + '" width="' + f1(dw + 20) + '" height="' + f1(dh + 100) + '"/>');
+      g.addEventListener('click', function () { tap(j); });
+      doors.push({ leaf: ln, x: x, top: top });
+    });
+  };
+  function tap(j) {
+    cx.lock(async function () {
+      var d = doors[j], v = r.opts[j];
+      SFX.door();
+      cx.juno.look(d.x, d.top); cx.friend.look(d.x, d.top);
+      if (v === r.v) {
+        // golden light, and music inside
+        G(Lui, '<path d="M' + f1(d.x - geo.dw / 2) + ' ' + f1(geo.base) + ' V' + f1(d.top + geo.dw / 2) + ' A' + f1(geo.dw / 2) + ' ' + f1(geo.dw / 2) + ' 0 0 1 ' + f1(d.x + geo.dw / 2) + ' ' + f1(d.top + geo.dw / 2) + ' V' + f1(geo.base) + ' Z" fill="#ffe58a"/>');
+        Lui.appendChild(d.leaf.el);
+        await to(d.leaf, { fx: 0.1 }, 700);
+        SFX.sparkle(); SFX.honk(3);
+        burst(d.x, d.top + geo.dh / 2, 30);
+        await cx.solved(r.v, cx.ly.top.x + cx.ly.top.w / 2, cx.ly.top.y + cx.ly.top.h / 2);
+        return;
+      }
+      // someone sleepy lives here
+      var face = G(Lui, '<g transform="translate(' + f1(d.x) + ' ' + f1(d.top + geo.dh * 0.45) + ')"><circle r="' + f1(geo.dw * 0.3) + '" fill="#8a6a4a"/><path d="M' + f1(-geo.dw * 0.16) + ' -6 q8 6 16 0 M' + f1(geo.dw * 0.16 - 16) + ' -6 q8 6 16 0" stroke="#1b1512" stroke-width="4" fill="none"/><path d="M-8 12 L8 12 L0 22 Z" fill="#e8a92a"/></g>');
+      Lui.appendChild(d.leaf.el);
+      await to(d.leaf, { fx: 0.15 }, 450);
+      tone({ f: 300, f2: 200, d: 0.5, v: 0.05, type: 'triangle' });
+      await sleep(700);
+      await to(d.leaf, { fx: 1 }, 400);
+      SFX.door();
+      st.tried[j] = true;
+      cx.miss();
+      clear(Lui); cx.draw();
+    });
+  }
+  cx.hint = function () { var j = r.opts.indexOf(r.v), d = doors[j]; if (d) { hintAt(d.x, d.top + geo.dh / 2, geo.dw * 0.75); } };
+  if (cx.first && !RUN.sawDoors) {
+    RUN.sawDoors = true;
+    cx.preface = [['juno', 'The last number on my invitation! Which door is it?']];
+  }
+};
+// the Sacred Geese, in rows of ten, to be written down
+function miniGoose(x, y, s, gold) {
+  return '<g transform="translate(' + f1(x) + ' ' + f1(y) + ') scale(' + s + ')"><ellipse cx="-4" cy="-14" rx="20" ry="13" fill="#fff" stroke="#c9c4bb" stroke-width="2.5"/><path d="M8 -20 Q16 -34 12 -44" stroke="#c9c4bb" stroke-width="10" stroke-linecap="round" fill="none"/><path d="M8 -20 Q16 -34 12 -44" stroke="#fff" stroke-width="7" stroke-linecap="round" fill="none"/><circle cx="14" cy="-46" r="7" fill="#fff" stroke="#c9c4bb" stroke-width="2"/><path d="M19 -48 L28 -45 L19 -42 Z" fill="#f29a2e"/><circle cx="15" cy="-48" r="1.6" fill="#111"/>' + (gold ? '<path d="M4 -26 Q12 -20 18 -28" stroke="#e8b830" stroke-width="3.5" fill="none"/>' : '') + '<path d="M-6 -2 v4 M2 -2 v4" stroke="#f29a2e" stroke-width="3"/></g>';
+}
+PZ.carve = function (cx, r) {
+  var st = { hist: [], total: 0 }, geo, tab = null;
+  function layout() {
+    var ly = cx.ly, P = ly.play, o = {};
+    if (ly.land) { o.flock = { x: P.x, y: P.y, w: P.w * 0.6, h: P.h * 0.72 }; o.tab = { x: P.x + P.w * 0.8, y: P.y + P.h * 0.32 }; o.btnY = P.y + P.h * 0.86; o.btnX = P.x + P.w / 2; }
+    else { o.flock = { x: P.x, y: P.y - 40, w: P.w, h: P.h * 0.5 }; o.tab = { x: 500, y: P.y + P.h * 0.58 }; o.btnY = P.y + P.h * 0.86; o.btnX = 500; }
+    o.br = ly.land ? 54 : 66;
+    return o;
+  }
+  cx.draw = function () {
+    geo = layout();
+    var F = geo.flock, tens = Math.floor(r.v / 10), ones = r.v % 10, rows = tens + (ones ? 1 : 0), gs = Math.min(F.w / 10 / 44, F.h / rows / 62, 1.4), s = '', i, k;
+    for (i = 0; i < rows; i++) {
+      var n = i < tens ? 10 : ones, y = F.y + F.h / 2 + (i - (rows - 1) / 2) * 62 * gs + 30 * gs;
+      if (i < tens) { s += '<rect x="' + f1(F.x + F.w / 2 - 5 * 44 * gs - 10) + '" y="' + f1(y - 54 * gs) + '" width="' + f1(10 * 44 * gs + 20) + '" height="' + f1(60 * gs) + '" rx="' + f1(16 * gs) + '" fill="rgba(232,184,48,.25)"/>'; }
+      for (k = 0; k < n; k++) { s += miniGoose(F.x + F.w / 2 + (k - 4.5) * 44 * gs, y, gs, true); }
+    }
+    G(Lui, s);
+    // the wax tablet
+    var T2 = geo.tab, tw = cx.ly.land ? Math.min(440, cx.ly.play.w * 0.38) : 560, th = 170, g = S('g', {}, Lui);
+    G(g, '<rect x="' + f1(T2.x - tw / 2) + '" y="' + f1(T2.y - th / 2) + '" width="' + f1(tw) + '" height="' + f1(th) + '" rx="14" fill="#8a5a2a" stroke="#5a3a1e" stroke-width="6"/><rect x="' + f1(T2.x - tw / 2 + 16) + '" y="' + f1(T2.y - th / 2 + 16) + '" width="' + f1(tw - 32) + '" height="' + f1(th - 32) + '" rx="8" fill="#3b2a1a"/>');
+    if (st.total) { var rs = roman(st.total), fs = Math.min(96, (tw - 60) / Math.max(0.6, strW(rs, 1, 0.06))); tab = numeral(g, rs, T2.x, T2.y, fs, { fill: '#f0d9a0', gap: 0.06 }); }
+    // the stylus buttons
+    var L = ['I', 'V', 'X', 'L'], bx, j;
+    for (j = 0; j <= L.length; j++) {
+      (function (j2) {
+        bx = geo.btnX + (j2 - L.length / 2) * (geo.br * 2 + 16);
+        var b = S('g', { transform: 'translate(' + f1(bx) + ' ' + f1(geo.btnY) + ')' }, Lui);
+        if (j2 < L.length) {
+          G(b, '<circle r="' + (geo.br + 3) + '" cy="6" fill="rgba(40,20,0,.25)"/><circle r="' + geo.br + '" fill="#efe6d0" stroke="#8a6a3a" stroke-width="5"/>');
+          T(b, L[j2], { y: f1(geo.br * 0.34), 'class': 'rnf', 'font-size': f1(geo.br), 'text-anchor': 'middle', fill: '#3a2410' });
+          b.addEventListener('click', function () { press(L[j2]); });
+        } else {
+          G(b, '<circle r="' + (geo.br + 3) + '" cy="6" fill="rgba(40,20,0,.25)"/><circle r="' + geo.br + '" fill="#d8c9a8" stroke="#8a6a3a" stroke-width="5"/><path d="M' + f1(geo.br * 0.4) + ' 0 H' + f1(-geo.br * 0.4) + ' m14 -14 l-14 14 l14 14" stroke="#7f2f1d" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/>');
+          b.addEventListener('click', undo);
+        }
+        G(b, '<circle class="hit" r="' + (geo.br + 10) + '"/>');
+      })(j);
+    }
+  };
+  function press(l) {
+    cx.lock(async function () {
+      var nv = st.total + LV[l];
+      if (nv > r.v) { cx.miss(); return; }
+      st.total = nv; st.hist.push(l);
+      SFX.chisel();
+      clear(Lui); cx.draw();
+      if (tab && tab.items.length) { var it = tab.items[tab.items.length - 1].n; it.s = 1.5; it.o = 0; it.set(); to(it, { s: 1, o: 1 }, 260, BACK); }
+      await sleep(250);
+      if (st.total === r.v) { SFX.honk(2); await cx.solved(r.v, cx.ly.top.x + cx.ly.top.w / 2, cx.ly.top.y + cx.ly.top.h / 2); }
+    });
+  }
+  function undo() {
+    cx.lock(async function () {
+      if (!st.hist.length) { return; }
+      st.total -= LV[st.hist.pop()]; SFX.coinBack();
+      clear(Lui); cx.draw();
+    });
+  }
+  cx.hint = function () {
+    var left = r.v - st.total, L = ['L', 'X', 'V', 'I'], k, l = 'I';
+    for (k = 0; k < L.length; k++) { if (LV[L[k]] <= left) { l = L[k]; break; } }
+    var j = ['I', 'V', 'X', 'L'].indexOf(l), bx = geo.btnX + (j - 2) * (geo.br * 2 + 16);
+    hintAt(bx, geo.btnY, geo.br + 20);
+  };
+  if (cx.first && !RUN.sawCarve) {
+    RUN.sawCarve = true;
+    cx.preface = [['lupa', 'The Sacred Geese are gathering! Write down how many there are, on this wax tablet.'], ['lupa', 'They stand in rows of ten, to make it easy.']];
+  }
+};
+// The end of the story: the festival, and zero.
+async function finale() {
+  var ly = RUN.ly, geese = [], i, xs;
+  xs = LANDS ? [ly.fx - 260, ly.fx - 420, ly.fx - 580] : [640, 480, 320];
+  for (i = 0; i < 3; i++) {
+    var gq = makeChar('goose', { gold: true, laurel: true });
+    gq.place(W + 160 + i * 160, LANDS ? ly.gy : ly.gy - 330, ly.cs * 0.95, -1);
+    geese.push(gq);
+  }
+  ON.geese = geese[0];
+  SFX.honk(3);
+  await Promise.all(geese.map(function (gq, k) { return gq.walkTo(xs[k], 300).then(function () { gq.dir = -1; }); }));
+  await talk([
+    ['geese', 'Welcome, Juno of Eboracum! You found the door, and you read every number on the way.'],
+    ['geese', 'Let the Festival of the Geese begin!']
+  ]);
+  for (i = 0; i < 4; i++) {
+    SFX.honk(2);
+    geese.concat([RUN.juno, RUN.friend]).forEach(function (c) { c.play('cheer', 900); });
+    burst(W * (0.25 + 0.17 * i), ly.top.y + 100, 40);
+    await sleep(700);
+  }
+  SFX.win();
+  await talk([
+    ['juno', 'Lupa, what number is on the Golden Milestone itself?'],
+    ['lupa', 'None at all! Here, the distance to Rome is nothing. And the Romans had no number for nothing.'],
+  ]);
+  // zero
+  var zg = S('g', {}, Ltop), zn;
+  G(zg, '<circle r="150" fill="#fff8d8" stroke="#e8b830" stroke-width="10"/>');
+  T(zg, '0', { y: 80, 'class': 'sans', 'font-size': 240, 'text-anchor': 'middle', fill: '#cc6a12' });
+  zn = N(zg, W / 2, ly.top.y + ly.top.h / 2 + 60, 0.1); zn.o = 0; zn.set();
+  SFX.sparkle();
+  await to(zn, { s: LANDS ? 0.9 : 1, o: 1 }, 600, BACK);
+  await talk([
+    ['lupa', 'Far away in India, clever people invented one: 0. It says “nothing in this place”.'],
+    ['lupa', 'With 0 and nine other digits you can write any number at all. That’s why the whole world uses them now.']
+  ]);
+  await to(zn, { o: 0, s: 0.6 }, 300);
+  zg.parentNode.removeChild(zg);
+  // the invitation, read at last
+  var inv = LANDS ? await showInvite(W / 2, 360, 0.6, true) : await showInvite(W / 2, H * 0.5 + 80, Math.min(0.95, H * 0.62 / 850), true);
+  await talk([['juno', 'And now I can read my invitation! Day fifteen, a hundred steps, and door forty-two. Honk!']]);
+  await to(inv.node, { o: 0, s: 0.05 }, 400);
+  SAVE.fin = true; save();
+  for (i = 0; i < 3; i++) { burst(W * (0.3 + 0.2 * i), ly.top.y + 80, 50); await sleep(400); }
+}
+
+// =====================================================================
 //  The map: the road from Eboracum to Rome, top to bottom, north to
 //  south. A medallion for each place, and the real map in the corner.
 // =====================================================================
@@ -3261,7 +3728,8 @@ function boot() {
     };
     setTimeout(wait, 300);
   }
-  window.__rr = { SAVE: SAVE, CH: CH, runChapter: runChapter, goMap: goMap, roman: roman, get cx() { return cx; }, get RUN() { return RUN; } };
+  // a handle for scripted play-throughs (harmless to players)
+  window.__rr = { SAVE: SAVE, CH: CH, runChapter: runChapter, goMap: goMap, roman: roman, finale: function () { return finale(); }, get cx() { return cx; }, get RUN() { return RUN; } };
 }
 boot();
 </script>

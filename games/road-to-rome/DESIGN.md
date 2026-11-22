@@ -5,46 +5,53 @@ redirects here.
 
 ## The idea
 
-Juno is a young white goose at the Roman fort of Eboracum (York). Her
-granny tells the true story of the geese who honked and saved Rome while
-the guard dogs slept. An eagle brings an invitation from the Sacred Geese
-of Rome to their festival. It is full of marks Juno can't read, and the last
-one is the number of the door she has to find. She walks there, and on
-the way the friends she helps teach her the marks.
+Juno is a young Roman Tufted goose (a real breed, with a curl of feathers
+on her head) at the fort of Eboracum (York). Her granny tells the true
+story of the geese who honked and saved Rome while the guard dogs slept.
+An eagle brings an invitation from the Sacred Geese of Rome to their
+festival. It has three numbers Juno can't read: the day, the steps up the
+hill, and the door to knock on. She walks there, and the friends she helps
+on the way teach her the marks. At the end she reads the invitation.
 
-The numerals are a code to crack, and cracking each one opens something
-(a gate, a market stall, a boat, a parade, a mountain pass, the last
-door). Each chapter's puzzle also teaches something that matters in
-modern maths, and every answer is shown in our own digits too:
+The numerals are a code to crack, and cracking one always opens something:
+a gate, a stall, a boat, a mountain pass, the last door. Each chapter's
+puzzle is also a piece of modern maths, and every answer is shown in our
+own digits too, coloured by place (ones blue, tens green, hundreds orange,
+thousands pink, zeros grey), so the Roman numbers lead back to the real
+ones rather than away from them.
 
 | | Place | Friend | Puzzle | Modern maths |
 |---|---|---|---|---|
-| I | Eboracum | Rufus, the sleepy guard dog | count the sheep into the pen; tallies turn into V and X; IIII → IV | counting, grouping in 5s and 10s, one less than |
-| II | Ermine Street | Mola, the mole road-builder | put back the missing milestone | sequences: on, back, in 5s and 10s; first L |
-| III | Londinium | Porcia, the pig baker | pay the price with I/V/X coins; change makes IV and IX | making amounts, change, many ways to make a number |
-| IV | Dubris | Pica, the magpie money-changer | pour two purses together, swap five Is for a V and two Vs for an X | addition with exchange (carrying) |
-| V | The sea | Lutra, the otter ferryman | load crates until the boat sits level | equality, missing numbers, more/less |
-| VI | Lutetia | the mouse centurion | line the mice up by the numbers on their shields | ordering; long isn't always big; position matters (IV/VI like 12/21) |
-| VII | Lugdunum | Felix, the mosaic cat | tap out a rectangle of exactly XII tiles | arrays, times tables, factor pairs |
-| VIII | The Alps | Capra, the goat with an abacus | set the toll on the Roman abacus | place value (the Romans calculated in columns) |
-| IX | Rome | Lupa, the wolf at the Golden Milestone | how far did you walk (MCCC → 1300: zero!), find the door, count the flock | zero, place value, reading big numbers |
+| I | Eboracum | Rufus, the sleepy guard dog | count sheep into the pen; tallies gather into V (a hand) and X (two Vs); IIII becomes IV | counting, grouping in 5s and 10s, one less than (5 − 1 = 4) |
+| II | Londinium | Porcia, the pig baker | pay the price with I, V, X coins; when there aren't four little coins, pay a big one and the change sits in front of it: IV, IX | making amounts, change, more than one way to pay |
+| III | Dubris | Lutra, the otter ferryman | load crates until the boat sits level; it tips towards the heavier side | equality, missing numbers, more and less |
+| IV | Gesoriacum | Pica, the magpie | tip two purses together and swap five Is for a V, two Vs for an X | addition with exchange (carrying) |
+| V | the road south | Mola, the mole | put back the missing milestone | sequences: on and back in ones, in 5s, 2s or 3s, 10s; the first L and XL |
+| VI | Lutetia | Centurion Mus | line the mice up on the steps, smallest first | ordering; long isn't always big (XXXVIII < XL); order matters (IV, VI like 12, 21) |
+| VII | Lugdunum | Felix, the mosaic cat | tap out a rectangle with exactly the tiles in his basket | arrays, times tables, factor pairs |
+| VIII | the Alps | Capra, the goat | set the toll on a Roman abacus (a wire per place, a five-bead above the bar) | place value; the Romans counted in columns |
+| IX | Rome | Lupa, the wolf at the Golden Milestone | how far is Eboracum (MD → 1500: the zeros); the Hundred Steps (C); the door (XLII); count the Sacred Geese in rows of ten | zero, place value, reading and writing bigger numbers |
 
-The ending: the Golden Milestone, where every Roman road was measured
-from, needs a number for "no distance at all", and the Romans didn't have
-one. People in India invented it: 0. That's why our numbers work.
+The ending: the Golden Milestone, from which every Roman road was
+measured, needs a number for "no distance at all", and the Romans had
+none. People in India invented it: 0. With 0 and nine other digits you
+can write any number, which is why the whole world uses them now.
 
 ## Rules kept
 
-- Words only in the story, which is read aloud (device speech, en-GB, off
-  in the parent panel). Every puzzle is wordless: the friend looks at,
-  points to and reacts to things, and a ring shows the way after two
-  misses or a long pause.
-- No losing, no timers. A wrong answer teaches: the wrong pen of sheep
-  shows its own number, an overpaid coin comes back, the boat tilts.
+- Words only in the story, read aloud by the device (en-GB; off in the
+  parent panel). Every puzzle is wordless: the friend looks, points and
+  reacts, and a ring shows the way after two misses or a long pause.
+- No losing, no timers. A wrong try teaches: the wrong pen of sheep shows
+  its number, an overpaid coin comes back, the boat tips, a door opens on
+  someone sleepy.
 - Each round earns a laurel leaf, gold on a first try with no hint.
-- Numbers are drawn afresh each time a chapter is replayed; the story
-  plays the first time only.
+- Numbers are drawn afresh each time a chapter is replayed; the story plays
+  the first time only (the parent panel can bring it back).
 - Players (the shared block), the adult gear, synthesised sound for
   everything, reduced motion honoured, portrait and landscape.
-- The map is a real one: the coast is baked from the Natural Earth map
-  already in Hoot's Postcards (`tools/road-to-rome-map.js`).
+- The road map is drawn, with big medallions to tap; the real map is in the
+  corner (tap it to see it big), its coast baked from the Natural Earth map
+  already in Hoot's Postcards by `tools/road-to-rome-map.js`.
+- Distances on the Golden Milestone are about right, in Roman miles along
+  the roads (York to Rome is near enough 1,500).

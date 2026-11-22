@@ -79,6 +79,12 @@ it. The other three piece styles (Friends, Blocks, Shadows) are drawn in
 the page. It speaks piece names with the device's speech synthesis only,
 no recordings, and falls back to each piece's synthesised tune.
 
+Juno's Road to Rome (which replaced Roman Numeral Workshop; the old
+address redirects) reads its story aloud with the device's speech, en-GB,
+switchable in the parent panel. The words are always on screen too, typed
+out with a blip voice where there is no speech. The puzzles themselves
+have no words. Every sound effect is synthesised.
+
 ## Maps
 
 Hoot's Postcards carries its own world: Natural Earth's 1:110m countries
@@ -88,6 +94,11 @@ fetched when it runs, so it works offline in the app. If a place ever
 needs another country picked out by name, `tools/hoots-postcards-map.js`
 re-bakes it from that file. Like the ffmpeg pass, it is a one-off, not a
 build step.
+
+Juno's Road to Rome's little real map (the inset on its road map) is the
+coast of the same data, from Eboracum to Rome, baked into its `LAND`
+literal (about 11 KB, no borders) by `tools/road-to-rome-map.js`, which
+reads Hoot's `WORLD`. Same rule: a one-off, nothing to run.
 
 ## Adult mode
 
@@ -109,11 +120,12 @@ from `games/post-a-letter/post-a-letter.html` (it sits just before
 - Don't draw a visible cog or corner dot of your own.
 
 Players: games that keep one child's progress apart from another's (Chess
-Quest, Recorder Garden 1 and 2, Hoot's Postcards) have named players. A child
+Quest, Recorder Garden 1 and 2, Hoot's Postcards, Juno's Road to Rome) have
+named players. A child
 may add themselves from the picker (the + tile) without the gate; rename,
 delete, "open everything" and "start again" are parent-only, per player, in
 the panel's Players section. The picker shows only with two or more players
-and the adult gear stays visible on it. The three newer games embed the
+and the adult gear stays visible on it. The newer games embed the
 `Players` block that sits just before their main script (Chess Quest has an
 older hand-built version): each player owns the game's whole save, the old
 single save migrates in as Player 1, and changing player reloads the page so
@@ -122,7 +134,8 @@ game that gains saved levels. Equine Dentist Academy is deliberately left
 alone; every other game is meant for a single sitting.
 
 Applied so far to Chess Quest, Dictionary, Numberbots, Post a Letter,
-Post a Number, Recorder Garden 1 and 2 and Hoot's Postcards. The others have no parent controls yet; add the gate when one
+Post a Number, Recorder Garden 1 and 2, Hoot's Postcards and Juno's Road to
+Rome. The others have no parent controls yet; add the gate when one
 needs them.
 
 ## Hosting
