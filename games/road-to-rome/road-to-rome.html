@@ -798,6 +798,7 @@ function frame(t) {
     if (p >= 1) { TW.splice(TW.indexOf(w), 1); w.res(); }
   }
   for (i = 0; i < CHARS.length; i++) { CHARS[i].update(dt, t / 1000); }
+  for (i = TICKS.length - 1; i >= 0; i--) { if (TICKS[i].ep !== epoch) { TICKS.splice(i, 1); } else { TICKS[i].fn(dt); } }
   dlgFrame(dt);
   fxFrame(dt);
   if (pendingLayout && canRelayout()) { pendingLayout = false; relayout(); }
@@ -2022,6 +2023,637 @@ PZ.pens = function (cx, r) {
   if (cx.first && !RUN.sawPens) {
     RUN.sawPens = true;
     setTimeout(function () { cx.lock(function () { return talk([['rufus', 'Oh dear, the sheep are in three pens. Which pen has {' + roman(st.v) + '} sheep?']]); }); }, 400);
+  }
+};
+
+// =====================================================================
+//  More shared pieces: an equation in both kinds of number, coins,
+//  crates, food, and a per-frame hook
+// =====================================================================
+var TICKS = [];
+function tick(fn) { var t = { ep: epoch, fn: fn }; TICKS.push(t); return t; }
+// VII + V = XII written over 7 + 5 = 12, each in its place colours
+async function equation(terms, x0, y0, keep) {
+  var size = LANDS ? 64 : 72, g = S('g', {}, Ltop), inner = S('g', {}, g), gap = size * 0.3, node, total, x, cw;
+  cw = terms.map(function (t) { return typeof t === 'number' ? Math.max(strW(roman(t), size, size * 0.04), String(t).length * size * 0.6) : size * 0.55; });
+  total = cw.reduce(function (a, b) { return a + b; }, 0) + gap * (terms.length - 1) + size * 0.9;
+  plaque(inner, 0, 0, total, size * 2.7, { sw: 6 });
+  S('path', { d: 'M' + f1(-total / 2 + 20) + ' 0 H' + f1(total / 2 - 20), stroke: '#e6d6b0', 'stroke-width': 3 }, inner);
+  x = -total / 2 + size * 0.45;
+  terms.forEach(function (t, i) {
+    var m = x + cw[i] / 2;
+    if (typeof t === 'number') {
+      numeral(inner, roman(t), m, -size * 0.62, size, { colours: true });
+      digitsText(inner, t, m, size * 0.62, size * 0.92);
+    } else {
+      [-size * 0.62, size * 0.62].forEach(function (yy) { T(inner, t, { x: f1(m), y: f1(yy + size * 0.3), 'class': 'sans', 'font-size': f1(size * 0.8), 'text-anchor': 'middle', fill: '#8a6414' }); });
+    }
+    x += cw[i] + gap;
+  });
+  var sc = Math.min(1, (W - 40) / total);
+  node = N(g, x0, y0, 0.3 * sc); node.o = 0; node.set();
+  SFX.merge();
+  await to(node, { s: sc, o: 1 }, 380, BACK);
+  say(terms.map(function (t) { return t === '+' ? 'plus' : t === '=' ? 'equals' : t === '−' ? 'take away' : t === '×' ? 'times' : String(t); }).join(' '), 1.1);
+  if (keep) { return node; }
+  await sleep(2600);
+  await to(node, { o: 0 }, 250);
+  if (g.parentNode) { g.parentNode.removeChild(g); }
+  return null;
+}
+var COINK = { I: ['url(#r-coinB)', '#7a3f14'], V: ['url(#r-coinS)', '#4f5562'], X: ['url(#r-coinG)', '#7a5610'], L: ['url(#r-coinG)', '#7a5610'] };
+function coinArt(l, r) {
+  var k = COINK[l], rr = l === 'L' ? r * 1.12 : r;
+  return '<circle r="' + f1(rr + 2) + '" cy="6" fill="rgba(40,20,0,.28)"/><circle r="' + f1(rr) + '" fill="' + k[0] + '" stroke="' + k[1] + '" stroke-width="4"/>' +
+    '<circle r="' + f1(rr * 0.8) + '" fill="none" stroke="' + k[1] + '" stroke-width="2.5" stroke-dasharray="3 6" opacity=".55"/>' +
+    '<text y="' + f1(rr * 0.34) + '" text-anchor="middle" class="rnf" font-size="' + f1(rr * 0.95) + '" fill="' + k[1] + '">' + l + '</text>';
+}
+function crateArt(v, w, h) {
+  var s = '<rect x="' + f1(-w / 2) + '" y="' + f1(-h) + '" width="' + f1(w) + '" height="' + f1(h) + '" rx="8" fill="#c9924f" stroke="#7a4a1e" stroke-width="5"/>' +
+    '<path d="M' + f1(-w / 2 + 8) + ' ' + f1(-h + 8) + ' L' + f1(w / 2 - 8) + ' -8 M' + f1(w / 2 - 8) + ' ' + f1(-h + 8) + ' L' + f1(-w / 2 + 8) + ' -8" stroke="#a06a32" stroke-width="6" opacity=".45"/>';
+  var rs = roman(v), fs = Math.min(h * 0.5, (w - 22) / Math.max(0.7, strW(rs, 1, 0.04)));
+  s += '<rect x="' + f1(-w / 2 + 10) + '" y="' + f1(-h / 2 - fs * 0.55) + '" width="' + f1(w - 20) + '" height="' + f1(fs * 1.1) + '" rx="8" fill="#fbf1d8"/>';
+  return { s: s, fs: fs, y: -h / 2, rs: rs };
+}
+function foodArt(k) {
+  switch (k) {
+    // Roman bread was round and scored into eight, like the loaves found at Pompeii
+    case 'panis': return '<circle r="56" fill="#d39248" stroke="#9a5f24" stroke-width="5"/><path d="M0 -54 V54 M-54 0 H54 M-38 -38 L38 38 M38 -38 L-38 38" stroke="#9a5f24" stroke-width="4"/><circle r="11" fill="#d39248" stroke="#9a5f24" stroke-width="3"/>';
+    case 'cake': return '<ellipse cy="12" rx="62" ry="22" fill="#b97a34"/><rect x="-62" y="-14" width="124" height="26" fill="#dda353"/><ellipse cy="-14" rx="62" ry="22" fill="#f0c46a" stroke="#c98a3e" stroke-width="4"/><path d="M-42 -18 q10 14 20 0 q10 14 20 0 q10 14 20 0 q10 14 20 0" stroke="#e39a1a" stroke-width="6" fill="none" stroke-linecap="round"/>';
+    case 'figs': return '<ellipse cy="30" rx="66" ry="18" fill="#8a5a2a"/>' + [[-28, 14], [28, 14], [0, -8]].map(function (p) { return '<g transform="translate(' + p[0] + ' ' + p[1] + ')"><path d="M-20 18 Q-32 -4 -6 -20 Q0 -26 6 -20 Q32 -4 20 18 Q0 28 -20 18 Z" fill="#6a2c5a" stroke="#4a1a3e" stroke-width="3"/><path d="M0 -22 V-30" stroke="#5a7a2a" stroke-width="5" stroke-linecap="round"/></g>'; }).join('');
+    case 'grapes': var s = '<path d="M0 -50 q10 -14 28 -10" stroke="#5a7a2a" stroke-width="6" fill="none"/><path d="M6 -52 q26 -26 46 -2 q-24 12 -46 2" fill="#6aa84f"/>', i, j;
+      for (j = 0; j < 4; j++) { for (i = 0; i < 4 - j; i++) { s += '<circle cx="' + ((i - (3 - j) / 2) * 24) + '" cy="' + (-30 + j * 22) + '" r="13" fill="#7b4fa0" stroke="#4e2c6e" stroke-width="2.5"/>'; } }
+      return s;
+    case 'cheese': return '<path d="M-60 30 L60 30 L60 -10 L-60 10 Z" fill="#f2cf5c" stroke="#b8902a" stroke-width="5" stroke-linejoin="round"/><path d="M-60 10 L60 -10 L40 -34 Z" fill="#f7dd7a" stroke="#b8902a" stroke-width="5" stroke-linejoin="round"/><circle cx="-10" cy="14" r="7" fill="#d9b23e"/><circle cx="30" cy="8" r="5" fill="#d9b23e"/>';
+  }
+  return '';
+}
+// every way to pick some of these values that add up to want; the fewest
+// first, and those keeping what's already chosen ahead of the rest
+function bestSubset(vals, want, keep) {
+  var n = vals.length, best = null, bs = 1e9, m, i, s, c, sc;
+  for (m = 1; m < (1 << n); m++) {
+    s = 0; c = 0; sc = 0;
+    for (i = 0; i < n; i++) { if (m & (1 << i)) { s += vals[i]; c++; if (keep && keep[i]) { sc -= 10; } } else if (keep && keep[i]) { sc += 10; } }
+    if (s !== want) { continue; }
+    sc += c;
+    if (sc < bs) { bs = sc; best = m; }
+  }
+  if (best === null) { return null; }
+  var out = []; for (i = 0; i < n; i++) { if (best & (1 << i)) { out.push(i); } }
+  return out;
+}
+function seaArt(g, ly, o) {
+  o = o || {};
+  var hz = ly.hz, s = '';
+  s += '<rect x="' + (-W) + '" y="' + f1(hz) + '" width="' + (3 * W) + '" height="' + (2 * H) + '" fill="url(#r-sea)"/>';
+  for (var k = 0; k < 6; k++) {
+    var y = hz + 40 + k * (k + 2) * 22, d = 'M' + (-W) + ' ' + y;
+    for (var x = -W; x < 2 * W; x += 120) { d += ' q30 -14 60 0 t60 0'; }
+    s += '<path d="' + d + '" stroke="#fff" stroke-width="' + (3 + k) + '" fill="none" opacity="' + (0.22 + k * 0.04) + '"/>';
+  }
+  G(g, s);
+}
+
+// =====================================================================
+//  II. Londinium. Porcia the pig sells bread for coins. Pay the price
+//  with I, V and X coins; when there aren't enough little coins, pay a
+//  big one and she gives one back: that is what IV and IX mean.
+// =====================================================================
+function bgTown(g, ly, o) {
+  o = o || {};
+  var hz = ly.hz, s = '', x, i;
+  sky(g, 'r-skyDay', hz);
+  G(g, '<circle cx="' + f1(W * 0.85) + '" cy="' + f1(hz - 380) + '" r="60" fill="#fff4c4" opacity=".9"/>');
+  if (o.sea) { G(g, '<rect x="' + (-W) + '" y="' + f1(hz - 110) + '" width="' + (3 * W) + '" height="110" fill="#5fb4cf"/><path d="M' + (-W) + ' ' + f1(hz - 80) + ' H' + (2 * W) + '" stroke="#fff" stroke-width="3" opacity=".5"/>'); }
+  // houses with red tiled roofs, and a temple
+  for (x = -W, i = 0; x < 2 * W; x += 210, i++) {
+    var h = 130 + (i * 53) % 90, w2 = 170, y0 = hz - (o.sea ? 110 : 20) - h;
+    if (Math.abs(x + w2 / 2 - W * 0.5) < 260 && o.temple) { continue; }
+    s += '<rect x="' + x + '" y="' + f1(y0) + '" width="' + w2 + '" height="' + f1(h) + '" fill="' + ['#efe2c6', '#e8d4b0', '#f2e8d2'][i % 3] + '" stroke="#c9b48a" stroke-width="3"/>';
+    s += '<path d="M' + (x - 14) + ' ' + f1(y0) + ' L' + (x + w2 / 2) + ' ' + f1(y0 - 54) + ' L' + (x + w2 + 14) + ' ' + f1(y0) + ' Z" fill="#c4553a" stroke="#93391f" stroke-width="3"/>';
+    s += '<rect x="' + (x + 30) + '" y="' + f1(y0 + 34) + '" width="30" height="40" rx="15" fill="#6b4a30"/><rect x="' + (x + 105) + '" y="' + f1(y0 + 34) + '" width="30" height="40" rx="15" fill="#6b4a30"/>';
+  }
+  if (o.temple) {
+    var tx = W * 0.5, ty = hz - (o.sea ? 110 : 20);
+    s += '<rect x="' + f1(tx - 230) + '" y="' + f1(ty - 30) + '" width="460" height="30" fill="#efe6d0" stroke="#b8a47a" stroke-width="3"/>';
+    for (i = 0; i < 6; i++) { s += '<rect x="' + f1(tx - 200 + i * 76) + '" y="' + f1(ty - 230) + '" width="26" height="200" fill="#fbf6ea" stroke="#b8a47a" stroke-width="3"/>'; }
+    s += '<path d="M' + f1(tx - 240) + ' ' + f1(ty - 230) + ' L' + f1(tx) + ' ' + f1(ty - 320) + ' L' + f1(tx + 240) + ' ' + f1(ty - 230) + ' Z" fill="#efe6d0" stroke="#b8a47a" stroke-width="4"/>';
+  }
+  if (o.lighthouse) {
+    var lx0 = o.lighthouse;
+    s += '<path d="M' + f1(lx0 - 50) + ' ' + f1(hz - 110) + ' L' + f1(lx0 - 30) + ' ' + f1(hz - 420) + ' H' + f1(lx0 + 30) + ' L' + f1(lx0 + 50) + ' ' + f1(hz - 110) + ' Z" fill="#e2d6bb" stroke="#a89470" stroke-width="4"/>' +
+      '<path d="M' + f1(lx0 - 44) + ' ' + f1(hz - 200) + ' H' + f1(lx0 + 44) + ' M' + f1(lx0 - 38) + ' ' + f1(hz - 300) + ' H' + f1(lx0 + 38) + '" stroke="#a89470" stroke-width="4"/>' +
+      '<rect x="' + f1(lx0 - 24) + '" y="' + f1(hz - 460) + '" width="48" height="40" fill="#e2d6bb" stroke="#a89470" stroke-width="4"/><circle cx="' + f1(lx0) + '" cy="' + f1(hz - 478) + '" r="18" fill="#ffd34d"/>';
+  }
+  G(g, s);
+  // cobbles
+  G(g, '<rect x="' + (-W) + '" y="' + f1(hz) + '" width="' + (3 * W) + '" height="' + (2 * H) + '" fill="#cdbd9c"/>');
+  var c = '';
+  for (i = 0; i < 70; i++) { c += '<ellipse cx="' + rnd(W) + '" cy="' + f1(hz + 30 + rnd(Math.max(100, H - hz))) + '" rx="' + (18 + rnd(16)) + '" ry="' + (8 + rnd(6)) + '" fill="#bba985" opacity=".7"/>'; }
+  G(g, c);
+}
+CH.push({
+  id: 'c2', key: 'II', friend: 'porcia',
+  voice: function () { SFX.oink(); },
+  bg: function (g, ly) {
+    bgTown(g, ly, { temple: true });
+    // the market stall behind the counter
+    var x0 = ly.land ? ly.play.x - 40 : 20, x1 = ly.land ? ly.play.x + ly.play.w + 40 : W - 20, y = ly.land ? ly.play.y - 6 : ly.play.y + 10, s = '', k, n = 9, w = (x1 - x0) / n;
+    s += '<rect x="' + f1(x0 + 10) + '" y="' + f1(y - 250) + '" width="16" height="260" fill="#8a5a2a"/><rect x="' + f1(x1 - 26) + '" y="' + f1(y - 250) + '" width="16" height="260" fill="#8a5a2a"/>';
+    for (k = 0; k < n; k++) { s += '<path d="M' + f1(x0 + k * w) + ' ' + f1(y - 260) + ' H' + f1(x0 + (k + 1) * w) + ' V' + f1(y - 210) + ' Q' + f1(x0 + (k + 0.5) * w) + ' ' + f1(y - 186) + ' ' + f1(x0 + k * w) + ' ' + f1(y - 210) + ' Z" fill="' + (k % 2 ? '#fff3d6' : '#c73a2a') + '"/>'; }
+    G(g, s);
+  },
+  greet: function () { SFX.oink(); },
+  intro: [
+    ['porcia', 'Fresh bread! Honey cakes! Figs from far away! Oink!'],
+    ['juno', 'Ooh, I’m hungry. Granny gave me a purse of coins.'],
+    ['porcia', 'Every coin has a number on it. The price is on my board.'],
+    ['porcia', 'Put coins on my counter that add up to the price, and it’s yours!']
+  ],
+  outro: [
+    ['porcia', 'What a clever goose! Any coins will do, as long as they add up to the price.'],
+    ['porcia', 'And now you know a secret: a little number in front of a big one means take it away.'],
+    ['porcia', '{IV} is five, take away one. {IX} is ten, take away one.'],
+    ['porcia', 'Here, you’ve been such a help. Take this purse of coins for your journey!']
+  ],
+  rounds: function () {
+    var a = rint(6, 8), b = rint(11, 13), c = pick([14, 19]), d = pick([24, 26, 27, 29]);
+    return [
+      { t: 'coins', v: a, item: 'panis', purse: shopPurse(a, 2) },
+      { t: 'coins', v: b, item: 'cake', purse: shopPurse(b, 2) },
+      { t: 'coins', v: 4, item: 'figs', purse: ['V', 'V', 'I', 'X'], teach: true },
+      { t: 'coins', v: 9, item: 'grapes', purse: ['X', 'V', 'I', 'I'] },
+      { t: 'coins', v: c, item: 'cheese', purse: shopPurse(c, 1) },
+      { t: 'coins', v: d, item: 'cake', purse: shopPurse(d, 2) }
+    ];
+  },
+  after: async function () { RUN.juno.play('cheer', 900); SFX.honk(2); await sleep(500); await RUN.juno.walkTo(W + 200, 340); }
+});
+// a purse that can pay the price, with a spare coin or two. Where the
+// price ends in 4 or 9 there are never four little Is: it has to be paid
+// with a bigger coin and some change.
+function shopPurse(p, extra) {
+  var o = p % 10, base = tally(p - (o === 4 || o === 9 ? o : 0)).split(''), k;
+  if (o === 4) { base.push('V', 'I'); }
+  if (o === 9) { base.push('X', 'I'); }
+  for (k = 0; k < extra; k++) { base.push(pick(p > 12 ? ['X', 'V', 'I'] : ['V', 'I', 'X'])); }
+  var nI = base.filter(function (l) { return l === 'I'; }).length;
+  if ((o === 4 && nI >= 4) || (o === 9 && nI >= 4)) { base = base.filter(function (l, i) { return l !== 'I' || i < base.indexOf('I') + 1; }); }
+  return shuffle(base);
+}
+PZ.coins = function (cx, r) {
+  var st = { p: r.v, coins: r.purse.map(function (l, i) { return { l: l, id: i, at: 'purse' }; }), change: null }, geo, nodes = {}, item = null;
+  function onCounter() { return st.coins.filter(function (c) { return c.at === 'counter'; }).sort(function (a, b) { return LV[b.l] - LV[a.l] || a.id - b.id; }); }
+  function inPurse() { return st.coins.filter(function (c) { return c.at === 'purse'; }).sort(function (a, b) { return LV[b.l] - LV[a.l] || a.id - b.id; }); }
+  function total() { return onCounter().reduce(function (s, c) { return s + LV[c.l]; }, 0); }
+  function seq() { var cs = onCounter(); if (st.change) { cs.splice(cs.length - 1, 0, st.change); } return cs; }
+  function changeSet() { var o = st.p % 10; return (o === 4 || o === 9) ? tally(st.p - o) + (o === 4 ? 'V' : 'X') : null; }
+  function isChange() { var w = changeSet(); return !!w && onCounter().map(function (c) { return c.l; }).join('') === w; }
+  function layout() {
+    var ly = cx.ly, P = ly.play, Tp = ly.top, o = {};
+    o.cr = ly.land ? 60 : 64;
+    o.board = { x: Tp.x + Tp.w / 2 + 100, y: Tp.y + Tp.h / 2, w: Math.min(Tp.w * 0.55, 420), h: Math.min(Tp.h, 180) };
+    o.item = { x: o.board.x - o.board.w / 2 - 110, y: o.board.y + 6 };
+    if (ly.land) { o.counter = { x: P.x, y: P.y + 10, w: P.w, h: 200 }; o.purse = { x: P.x + 30, y: P.y + 290, w: P.w - 60, h: P.h - 300 }; }
+    else { o.counter = { x: P.x, y: P.y + 30, w: P.w, h: 210 }; o.purse = { x: P.x + 10, y: P.y + 330, w: P.w - 20, h: Math.max(280, P.h - 340) }; }
+    return o;
+  }
+  function cpos(k, n) { var gap = Math.min(geo.cr * 2 + 16, (geo.counter.w - 60) / Math.max(1, n)); return { x: geo.counter.x + geo.counter.w / 2 + (k - (n - 1) / 2) * gap, y: geo.counter.y + geo.counter.h / 2 + 4 }; }
+  function ppos(k, n) {
+    var per = Math.max(1, Math.floor(geo.purse.w / (geo.cr * 2 + 26))), rows = Math.ceil(n / per), row = Math.floor(k / per), inRow = Math.min(per, n - row * per), col = k % per, gap = geo.cr * 2 + 26;
+    return { x: geo.purse.x + geo.purse.w / 2 + (col - (inRow - 1) / 2) * gap, y: geo.purse.y + geo.purse.h / 2 + (row - (rows - 1) / 2) * (geo.cr * 2 + 24) };
+  }
+  function place(c, p) {
+    var g = S('g', {}, Lui);
+    g.innerHTML = coinArt(c.l, geo.cr) + (c.at === 'change' ? '<circle r="' + (geo.cr + 8) + '" fill="none" stroke="#c73a2a" stroke-width="6" stroke-dasharray="10 8"/>' : '') + '<circle class="hit" r="' + (geo.cr + 14) + '"/>';
+    nodes[c.id] = N(g, p.x, p.y);
+    if (c.at === 'change') { nodes[c.id].y -= 18; nodes[c.id].r = -12; nodes[c.id].set(); }
+    else { g.addEventListener('click', function () { tap(c.id); }); }
+  }
+  cx.draw = function () {
+    geo = layout();
+    var C = geo.counter, Pu = geo.purse;
+    G(Lui, '<rect x="' + f1(C.x - 20) + '" y="' + f1(C.y + 18) + '" width="' + f1(C.w + 40) + '" height="' + f1(C.h) + '" rx="14" fill="rgba(60,30,5,.25)"/>' +
+      '<rect x="' + f1(C.x - 20) + '" y="' + f1(C.y) + '" width="' + f1(C.w + 40) + '" height="' + f1(C.h) + '" rx="14" fill="url(#r-wood)" stroke="#6b4420" stroke-width="6"/>' +
+      '<path d="M' + f1(C.x) + ' ' + f1(C.y + C.h * 0.35) + ' H' + f1(C.x + C.w) + ' M' + f1(C.x) + ' ' + f1(C.y + C.h * 0.72) + ' H' + f1(C.x + C.w) + '" stroke="rgba(80,45,15,.25)" stroke-width="4"/>');
+    G(Lui, '<path d="M' + f1(Pu.x) + ' ' + f1(Pu.y + 20) + ' Q' + f1(Pu.x) + ' ' + f1(Pu.y) + ' ' + f1(Pu.x + 30) + ' ' + f1(Pu.y) + ' H' + f1(Pu.x + Pu.w - 30) + ' Q' + f1(Pu.x + Pu.w) + ' ' + f1(Pu.y) + ' ' + f1(Pu.x + Pu.w) + ' ' + f1(Pu.y + 20) + ' V' + f1(Pu.y + Pu.h - 30) + ' Q' + f1(Pu.x + Pu.w) + ' ' + f1(Pu.y + Pu.h) + ' ' + f1(Pu.x + Pu.w - 30) + ' ' + f1(Pu.y + Pu.h) + ' H' + f1(Pu.x + 30) + ' Q' + f1(Pu.x) + ' ' + f1(Pu.y + Pu.h) + ' ' + f1(Pu.x) + ' ' + f1(Pu.y + Pu.h - 30) + ' Z" fill="#9a6a3a" stroke="#6b4420" stroke-width="6" stroke-dasharray="14 8"/>');
+    var b = makeBoard(Lui, geo.board); b.show(roman(st.p));
+    item = N(G(Lui, '<ellipse cy="40" rx="70" ry="16" fill="rgba(60,30,5,.2)"/>' + foodArt(r.item)), geo.item.x, geo.item.y, 1.05);
+    nodes = {};
+    var cs = seq(), ps = inPurse();
+    cs.forEach(function (c, k) { place(c, cpos(k, cs.length)); });
+    ps.forEach(function (c, k) { place(c, ppos(k, ps.length)); });
+  };
+  function settle(ms) {
+    var cs = seq(), ps = inPurse(), all = [];
+    cs.forEach(function (c, k) { var p = cpos(k, cs.length); all.push(to(nodes[c.id], { x: p.x, y: p.y - (c.at === 'change' ? 18 : 0) }, ms || 300)); });
+    ps.forEach(function (c, k) { var p = ppos(k, ps.length); all.push(to(nodes[c.id], { x: p.x, y: p.y }, ms || 300)); });
+    return Promise.all(all);
+  }
+  function tap(id) {
+    cx.lock(async function () {
+      var c = st.coins[id], t;
+      if (c.at === 'purse') {
+        c.at = 'counter'; SFX.coin();
+        nodes[id].el.parentNode.appendChild(nodes[id].el);
+        cx.juno.look(nodes[id].x, nodes[id].y);
+        await settle(320);
+        t = total();
+        if (t === st.p) { await win(); return; }
+        if (t > st.p) {
+          if (isChange()) { await change(); return; }
+          // too much: Porcia pushes it back
+          SFX.oink(); cx.miss();
+          await sleep(450);
+          c.at = 'purse'; SFX.coinBack();
+          await settle(320);
+        }
+      } else if (c.at === 'counter') { c.at = 'purse'; SFX.coinBack(); await settle(300); }
+    });
+  }
+  // she keeps the big coin and puts a little one back in front of it
+  async function change() {
+    st.change = { l: 'I', id: 'chg', at: 'change' };
+    place(st.change, { x: cx.friend.x - 50, y: cx.friend.y - 130 * cx.friend.s });
+    var cs = seq(), k = cs.indexOf(st.change), p = cpos(k, cs.length), o = st.p % 10;
+    cx.friend.play('point', 900, { x: p.x, y: p.y });
+    SFX.coinBack();
+    await Promise.all([hopTo(nodes.chg, p.x, p.y - 18, 600, 90), settle(450)]);
+    var eq = G(Ltop, ''), C = geo.counter, ey = C.y + C.h + 70;
+    plaque(eq, C.x + C.w / 2, ey, 360, 100, { fill: '#fffaf0' });
+    [[o === 4 ? '5' : '10', PC[0], -120], ['−', '#8a6414', -50], ['1', PC[0], 10], ['=', '#8a6414', 70], [String(o), PC[0], 130]].forEach(function (q) {
+      T(eq, q[0], { x: f1(C.x + C.w / 2 + q[2]), y: f1(ey + 22), 'class': 'sans', 'font-size': 62, 'text-anchor': 'middle', fill: q[1] });
+    });
+    var en = N(eq, 0, 0); en.o = 0; en.set();
+    await to(en, { o: 1 }, 300);
+    await sleep(1200);
+    await win();
+  }
+  async function win() {
+    SFX.oink();
+    cx.friend.play('cheer', 900);
+    await hopTo(item, cx.juno.x + 60 * cx.juno.dir, cx.juno.y - 120 * cx.juno.s, 700, 160);
+    cx.juno.play('cheer', 900); SFX.honk(1);
+    await to(item, { s: 0.2, o: 0 }, 300);
+    await cx.solved(st.p, geo.board.x, geo.board.y);
+  }
+  cx.hint = function () {
+    var all = st.coins, vals = all.map(function (c) { return LV[c.l]; }), keep = all.map(function (c) { return c.at === 'counter'; }), sub = bestSubset(vals, st.p, keep), want, i, target = null;
+    if (!sub) {
+      // pay with the bigger coin and take change: which coins make that?
+      want = (changeSet() || '').split(''); sub = [];
+      var used = {};
+      want.forEach(function (l) {
+        var j = -1, q;
+        for (q = 0; q < all.length && j < 0; q++) { if (!used[q] && all[q].l === l && all[q].at === 'counter') { j = q; } }
+        for (q = 0; q < all.length && j < 0; q++) { if (!used[q] && all[q].l === l) { j = q; } }
+        if (j >= 0) { used[j] = true; sub.push(j); }
+      });
+    }
+    for (i = 0; i < all.length && !target; i++) { if (all[i].at === 'counter' && sub.indexOf(i) < 0) { target = i; } }
+    for (i = 0; i < all.length && target === null; i++) { if (all[i].at === 'purse' && sub.indexOf(i) >= 0) { target = i; } }
+    if (target === null || !nodes[target]) { return; }
+    hintAt(nodes[target].x, nodes[target].y, geo.cr + 26);
+  };
+  if (r.teach && cx.first) {
+    setTimeout(function () {
+      cx.lock(function () {
+        return talk([['juno', 'Oh no! It’s {IV}, and I’ve only got one {=I} coin.'], ['porcia', 'Never mind! Give me a {=V}, and I’ll give you an {=I} back. Five, take away one!']]);
+      });
+    }, 500);
+  }
+};
+
+// =====================================================================
+//  III. Dubris. Lutra the otter's boat must sit level before it can
+//  cross the sea: load crates until both sides weigh the same.
+// =====================================================================
+CH.push({
+  id: 'c3', key: 'III', friend: 'lutra',
+  voice: function () { SFX.chirp(); },
+  bg: function (g, ly) {
+    var hz = ly.hz;
+    sky(g, 'r-skyDay', hz);
+    // the white cliffs, and the Romans' lighthouse on top (it still stands)
+    G(g, '<path d="M' + (-W) + ' ' + f1(hz) + ' L' + (-W) + ' ' + f1(hz - 200) + ' L' + f1(W * 0.18) + ' ' + f1(hz - 210) + ' Q' + f1(W * 0.3) + ' ' + f1(hz - 190) + ' ' + f1(W * 0.34) + ' ' + f1(hz) + ' Z" fill="#f4f1e6" stroke="#d4cdb8" stroke-width="4"/>' +
+      '<path d="M' + (-W) + ' ' + f1(hz - 200) + ' L' + f1(W * 0.18) + ' ' + f1(hz - 210) + ' Q' + f1(W * 0.25) + ' ' + f1(hz - 214) + ' ' + f1(W * 0.27) + ' ' + f1(hz - 200) + '" stroke="#8fb85a" stroke-width="16" fill="none"/>');
+    var lx0 = W * 0.12, ty = hz - 210, s = '';
+    s += '<path d="M' + f1(lx0 - 36) + ' ' + f1(ty) + ' L' + f1(lx0 - 22) + ' ' + f1(ty - 200) + ' H' + f1(lx0 + 22) + ' L' + f1(lx0 + 36) + ' ' + f1(ty) + ' Z" fill="#e2d6bb" stroke="#a89470" stroke-width="4"/><path d="M' + f1(lx0 - 30) + ' ' + f1(ty - 70) + ' H' + f1(lx0 + 30) + ' M' + f1(lx0 - 26) + ' ' + f1(ty - 140) + ' H' + f1(lx0 + 26) + '" stroke="#a89470" stroke-width="4"/><circle cx="' + f1(lx0) + '" cy="' + f1(ty - 214) + '" r="16" fill="#ffd34d"/>';
+    G(g, s);
+    seaArt(g, ly);
+    // a sandy beach for Juno, a jetty for Lutra
+    G(g, '<ellipse cx="' + f1(ly.jx) + '" cy="' + f1(ly.gy + 40) + '" rx="' + f1(ly.land ? 330 : 300) + '" ry="' + (ly.land ? 120 : 90) + '" fill="#ecd9a2"/>' +
+      '<rect x="' + f1(ly.fx - 150) + '" y="' + f1(ly.gy - 20) + '" width="' + (2 * W) + '" height="44" fill="#a8743a" stroke="#6b4420" stroke-width="4"/>' +
+      '<rect x="' + f1(ly.fx - 130) + '" y="' + f1(ly.gy + 20) + '" width="18" height="200" fill="#6b4420"/><rect x="' + f1(ly.fx + 60) + '" y="' + f1(ly.gy + 20) + '" width="18" height="200" fill="#6b4420"/>');
+  },
+  greet: function () { SFX.chirp(); },
+  intro: [
+    ['lutra', 'Ahoy, Juno! Off across the sea to Gaul? Hop in my boat!'],
+    ['lutra', 'Wait! My boat must sit level, or over we go. Splash!'],
+    ['lutra', 'One side is loaded already. Load the other side so it weighs just the same.']
+  ],
+  outro: [
+    ['lutra', 'Level as a millpond! When both sides weigh the same, we say they’re equal.'],
+    ['lutra', 'And did you see? There’s more than one way to make the same number.'],
+    ['lutra', 'All aboard! Next stop, Gaul!']
+  ],
+  rounds: function () {
+    return [boatRound(1), boatRound(2), boatRound(3), boatRound(4), boatRound(5)];
+  },
+  after: async function () { RUN.juno.play('cheer', 900); SFX.honk(2); SFX.splash(); await sleep(500); await RUN.juno.walkTo(W + 200, 340); }
+});
+// crates for the boat: one side fixed, the dock with at least one pair
+// that balances it, and some that don't
+function boatRound(lv) {
+  var left, pre = [], need, a, b, dock, i, tries = 0;
+  if (lv === 1) { left = [rint(5, 7)]; }
+  else if (lv === 2) { left = [rint(8, 10)]; }
+  else if (lv === 3) { left = [10, rint(2, 5)]; }
+  else if (lv === 4) { left = [rint(14, 18)]; pre = [rint(4, 6)]; }
+  else { left = [20, rint(2, 8)]; }
+  need = left.reduce(function (s, v) { return s + v; }, 0) - pre.reduce(function (s, v) { return s + v; }, 0);
+  do {
+    a = rint(Math.max(1, Math.ceil(need * 0.25)), Math.floor(need * 0.75)); b = need - a;
+    tries++;
+  } while ((a === b || left.indexOf(a) >= 0 || left.indexOf(b) >= 0) && tries < 30);
+  dock = [a, b];
+  for (i = 0; dock.length < (lv < 3 ? 4 : 5) && i < 60; i++) {
+    var d = rint(1, Math.max(4, need - 1));
+    if (dock.indexOf(d) < 0 && d !== need) { dock.push(d); }
+  }
+  return { t: 'boat', left: left, pre: pre, dock: shuffle(dock) };
+}
+PZ.boat = function (cx, r) {
+  var st = { crates: r.dock.map(function (v, i) { return { v: v, id: i, on: false, k: 0 }; }), seq: 0 }, geo, boat = null, cnodes = {}, ang = 0, tk;
+  var L = r.left.reduce(function (s, v) { return s + v; }, 0), PRE = r.pre.reduce(function (s, v) { return s + v; }, 0);
+  function loaded() { return st.crates.filter(function (c) { return c.on; }).sort(function (a, b) { return a.k - b.k; }); }
+  function R() { return PRE + loaded().reduce(function (s, c) { return s + c.v; }, 0); }
+  function aim() { return clamp((R() - L) * 1.6, -13, 13); }
+  function layout() {
+    var ly = cx.ly, P = ly.play, o = {};
+    if (ly.land) {
+      o.bx = P.x + P.w * 0.34; o.by = ly.hz + 130; o.half = Math.min(P.w * 0.36, 420);
+      o.dock = { x: o.bx + o.half + 50, w: (ly.fx - 110) - (o.bx + o.half + 50), base: ly.gy - 20, per: 2 };
+    } else {
+      o.bx = 500; o.by = ly.play.y + 330; o.half = 380;
+      o.dock = { x: 270, w: 460, base: o.by + 370, per: 3 };
+    }
+    o.cw = Math.min(130, o.half * 0.33, ly.land ? o.dock.w / 2.3 : 999); o.chh = o.cw * 0.9;
+    return o;
+  }
+  function slotX(side, k) { return side * (geo.half * 0.16 + k * geo.cw * 1.04 + geo.cw / 2); }
+  // the crates still on the jetty, stacked in a little pile
+  function dockPos(i2) {
+    var D = geo.dock, list = st.crates.filter(function (c) { return !c.on; }), k = list.indexOf(st.crates[i2]), per = D.per, n = list.length, row = Math.floor(k / per), inRow = Math.min(per, n - row * per), col = k % per;
+    return { x: D.x + D.w / 2 + (col - (inRow - 1) / 2) * geo.cw * 1.08, y: D.base - row * (geo.chh + 6) };
+  }
+  function crate(parent, v, x, y) {
+    var g = S('g', {}, parent), c = crateArt(v, geo.cw, geo.chh);
+    g.innerHTML = c.s;
+    numeral(g, c.rs, 0, c.y, c.fs, { fill: '#3a2410' });
+    G(g, '<rect class="hit" x="' + f1(-geo.cw / 2 - 10) + '" y="' + f1(-geo.chh - 10) + '" width="' + f1(geo.cw + 20) + '" height="' + f1(geo.chh + 20) + '"/>');
+    return N(g, x, y);
+  }
+  cx.draw = function () {
+    geo = layout();
+    var D = geo.dock, half = geo.half;
+    // the jetty under the dock crates, on its posts
+    var jx0 = D.x - 30, jx1 = cx.ly.land ? W + 50 : D.x + D.w + 30;
+    G(Lui, '<rect x="' + f1(jx0 + 20) + '" y="' + f1(D.base + 20) + '" width="18" height="260" fill="#6b4420"/><rect x="' + f1(jx1 - 60) + '" y="' + f1(D.base + 20) + '" width="18" height="260" fill="#6b4420"/>' +
+      '<rect x="' + f1(jx0) + '" y="' + f1(D.base - 2) + '" width="' + f1(jx1 - jx0) + '" height="40" rx="6" fill="#a8743a" stroke="#6b4420" stroke-width="5"/>');
+    boat = N(S('g', {}, Lui), geo.bx, geo.by);
+    var bg = boat.el;
+    G(bg, '<path d="M0 0 V-300" stroke="#6b4420" stroke-width="10"/><path d="M8 -292 Q120 -200 8 -70 Z" fill="#fff3d6" stroke="#c9b48a" stroke-width="4"/><path d="M8 -250 Q60 -200 8 -130" stroke="#c73a2a" stroke-width="10" fill="none"/>' +
+      '<path d="M' + f1(-half - 30) + ' -6 L' + f1(half + 30) + ' -6 Q' + f1(half) + ' 90 ' + f1(half - 80) + ' 96 L' + f1(-half + 80) + ' 96 Q' + f1(-half) + ' 90 ' + f1(-half - 30) + ' -6 Z" fill="#8a5a2a" stroke="#5a3a1e" stroke-width="6"/>' +
+      '<path d="M' + f1(-half) + ' 30 H' + f1(half) + '" stroke="#c9924f" stroke-width="10"/><circle cx="' + f1(-half * 0.55) + '" cy="58" r="10" fill="#5a3a1e"/><circle cx="' + f1(half * 0.55) + '" cy="58" r="10" fill="#5a3a1e"/>');
+    // the fixed load on the left (roped down) and anything already on the right
+    // left to right, biggest first, so a row of crates never reads like one numeral backwards
+    r.left.forEach(function (v, k) { crate(bg, v, slotX(-1, r.left.length - 1 - k), -6); });
+    function rope(x) { return '<path d="M' + f1(x - geo.cw / 2 - 6) + ' -4 L' + f1(x - geo.cw / 2 + 4) + ' ' + f1(-geo.chh * 0.16) + ' H' + f1(x + geo.cw / 2 - 4) + ' L' + f1(x + geo.cw / 2 + 6) + ' -4" stroke="#e8d49a" stroke-width="6" fill="none" stroke-linecap="round"/>'; }
+    r.pre.forEach(function (v, k) { crate(bg, v, slotX(1, k), -6); G(bg, rope(slotX(1, k))); });
+    r.left.forEach(function (v, k) { G(bg, rope(slotX(-1, r.left.length - 1 - k))); });
+    cnodes = {};
+    loaded().forEach(function (c, k) { cnodes[c.id] = crate(bg, c.v, slotX(1, r.pre.length + k), -6); cnodes[c.id].el.addEventListener('click', function () { tap(c.id); }); });
+    st.crates.forEach(function (c, i2) { if (!c.on) { var p = dockPos(i2); cnodes[c.id] = crate(Lui, c.v, p.x, p.y); cnodes[c.id].el.addEventListener('click', function () { tap(c.id); }); } });
+    // the sea in front of the hull
+    var wv = 'M' + f1(geo.bx - half - 60) + ' ' + f1(geo.by + 70), q;
+    for (q = 0; q < Math.ceil((2 * half + 120) / 80); q++) { wv += ' q20 -14 40 0 t40 0'; }
+    G(Lui, '<path d="' + wv + ' V' + f1(geo.by + 130) + ' H' + f1(geo.bx - half - 60) + ' Z" fill="#4f9fc0" opacity=".8"/>');
+    boat.r = ang; boat.set();
+  };
+  tk = tick(function (dt) {
+    if (!boat) { return; }
+    var target = aim();
+    ang += (target - ang) * Math.min(1, dt * (RM ? 30 : 3.5));
+    boat.r = ang + (RM ? 0 : Math.sin(performance.now() / 700) * 0.8);
+    boat.set();
+  });
+  function tap(id) {
+    cx.lock(async function () {
+      var c = st.crates[id], from = cnodes[id], p, wp;
+      if (!c.on) {
+        if (r.pre.length + loaded().length >= 3) { SFX.no(); return; }
+        // from the dock into the boat: fly to where the slot is now
+        c.on = true; c.k = ++st.seq;
+        var k = r.pre.length + loaded().length - 1, rad = boat.r * Math.PI / 180, sx = slotX(1, k);
+        wp = { x: geo.bx + sx * Math.cos(rad) + 6 * Math.sin(rad), y: geo.by + sx * Math.sin(rad) - 6 * Math.cos(rad) };
+        SFX.stone();
+        await hopTo(from, wp.x, wp.y, 520, 120);
+      } else {
+        c.on = false;
+        SFX.stone();
+      }
+      clear(Lui); cx.draw();
+      cx.juno.look(geo.bx, geo.by); cx.friend.look(geo.bx, geo.by);
+      await sleep(700);
+      var rv = R();
+      if (rv === L) { await win(); return; }
+      if (c.on && rv > L) { SFX.splash(); cx.miss(); }
+    });
+  }
+  async function win() {
+    SFX.yes();
+    await sleep(400);
+    var terms = [];
+    r.left.forEach(function (v, i2) { if (i2) { terms.push('+'); } terms.push(v); });
+    terms.push('=');
+    var rs = r.pre.concat(loaded().map(function (c) { return c.v; }));
+    rs.forEach(function (v, i2) { if (i2) { terms.push('+'); } terms.push(v); });
+    var ly = cx.ly;
+    await equation(terms, W / 2, ly.top.y + ly.top.h / 2);
+    tk.ep = -1;
+    await cx.solved(null);
+  }
+  cx.hint = function () {
+    var vals = st.crates.map(function (c) { return c.v; }), keep = st.crates.map(function (c) { return c.on; }), sub = bestSubset(vals, L - PRE, keep), i2;
+    if (!sub) { return; }
+    for (i2 = 0; i2 < st.crates.length; i2++) { if (st.crates[i2].on && sub.indexOf(i2) < 0) { var ln = cnodes[i2], rad = boat.r * Math.PI / 180; hintAt(geo.bx + ln.x * Math.cos(rad), geo.by + ln.x * Math.sin(rad) - geo.chh / 2, geo.cw * 0.85); return; } }
+    for (i2 = 0; i2 < st.crates.length; i2++) { if (!st.crates[i2].on && sub.indexOf(i2) >= 0) { var dn = cnodes[i2]; hintAt(dn.x, dn.y - geo.chh / 2, geo.cw * 0.85); return; } }
+  };
+};
+
+// =====================================================================
+//  IV. Gesoriacum. Pica the magpie swaps coins: five Is for a V, two
+//  Vs for an X. Tip two purses together and tidy them up, and the total
+//  can be read straight off the coins. Carrying, the Roman way.
+// =====================================================================
+CH.push({
+  id: 'c4', key: 'IV', friend: 'pica',
+  voice: function () { SFX.chatter(); },
+  bg: function (g, ly) { bgTown(g, ly, { sea: true, lighthouse: W * 0.8 }); },
+  greet: function () { SFX.chatter(); },
+  intro: [
+    ['pica', 'Ooh! Shiny coins! Shiny, shiny! Are they for me?'],
+    ['juno', 'No! I’ve got two purses now, Granny’s and Porcia’s. But how much have I got altogether?'],
+    ['pica', 'Tip them out and I’ll swap them. Five {=I}s for one {=V}. Two {=V}s for one {=X}.'],
+    ['pica', 'Fewer coins, same money. Then it’s easy to count!']
+  ],
+  outro: [
+    ['pica', 'All tidy! Swapping lots of little coins for one big one makes counting easy.'],
+    ['pica', 'People still do it today, in their sums: ten ones swap for one ten!'],
+    ['juno', 'Thank you, Pica! Honk!']
+  ],
+  rounds: function () {
+    var L1 = [[3, 2], [2, 3], [4, 1], [1, 4], [3, 3], [2, 4], [4, 3], [3, 4]];
+    var L2 = [[6, 7], [7, 6], [5, 6], [8, 5], [7, 8], [6, 5]];
+    var L3 = [[17, 8], [16, 7], [18, 7], [12, 13], [15, 8], [17, 6]];
+    var L4 = [[16, 19], [19, 16], [17, 18], [18, 17], [27, 8]];
+    var L5 = [[18, 19], [19, 18], [17, 15], [28, 7]];
+    return [L1, L2, L3, L4, L5].map(function (l) { var q = pick(l); return { t: 'swap', a: q[0], b: q[1] }; });
+  },
+  after: async function () { RUN.juno.play('cheer', 900); SFX.honk(2); await sleep(500); await RUN.juno.walkTo(W + 200, 340); }
+});
+var SWAP = { I: ['V', 5], V: ['X', 2], X: ['L', 5], L: ['C', 2] };
+PZ.swap = function (cx, r) {
+  var id = 0, st = { coins: [], tray: [], ttype: null, poured: false }, geo, nodes = {}, i;
+  tally(r.a).split('').concat(tally(r.b).split('')).forEach(function (l) { st.coins.push({ l: l, id: id++, at: 'table' }); });
+  function table() { return st.coins.filter(function (c) { return c.at === 'table'; }).sort(function (a, b) { return LV[b.l] - LV[a.l] || a.id - b.id; }); }
+  function count(l) { return st.coins.filter(function (c) { return c.at !== 'gone' && c.l === l; }).length; }
+  function canSwap() { return ['I', 'V', 'X', 'L'].some(function (l) { return count(l) >= SWAP[l][1]; }); }
+  function layout() {
+    var ly = cx.ly, P = ly.play, Tp = ly.top, o = {};
+    o.cr = ly.land ? 54 : 58;
+    o.purses = { x: Tp.x + Tp.w / 2, y: Tp.y + Tp.h / 2 };
+    o.table = { x: P.x, y: P.y + 10, w: P.w, h: ly.land ? 300 : 330 };
+    o.tray = { x: ly.land ? P.x + P.w * 0.42 : 470, y: ly.land ? P.y + 420 : P.y + 470 };
+    return o;
+  }
+  function tpos(k, n) {
+    var T2 = geo.table, gap = geo.cr * 2 + 12, per = Math.max(1, Math.floor((T2.w - 40) / gap)), rows = Math.ceil(n / per), row = Math.floor(k / per), inRow = Math.min(per, n - row * per), col = k % per;
+    return { x: T2.x + T2.w / 2 + (col - (inRow - 1) / 2) * gap, y: T2.y + T2.h / 2 + (row - (rows - 1) / 2) * (geo.cr * 2 + 16) };
+  }
+  function slotPos(k) { var need = st.ttype ? SWAP[st.ttype][1] : 5, gap = geo.cr * 2 + 10; return { x: geo.tray.x + (k - (need - 1) / 2) * gap, y: geo.tray.y }; }
+  function coinNode(c, p) {
+    var g = S('g', {}, Lui);
+    g.innerHTML = coinArt(c.l, geo.cr) + '<circle class="hit" r="' + (geo.cr + 12) + '"/>';
+    g.addEventListener('click', function () { tap(c.id); });
+    nodes[c.id] = N(g, p.x, p.y);
+    return nodes[c.id];
+  }
+  cx.draw = function () {
+    geo = layout();
+    var T2 = geo.table, need = st.ttype ? SWAP[st.ttype][1] : 5, gap = geo.cr * 2 + 10, tw = need * gap + gap * 1.6, s = '', k;
+    // the two purses, and what's in them
+    var pu = S('g', {}, Lui), wA = strW(roman(r.a), 76) + 30, wB = strW(roman(r.b), 76) + 30, tot = wA + wB + 90 + 160, x0 = geo.purses.x - tot / 2;
+    G(pu, purseArt(x0 + 40, geo.purses.y) + purseArt(x0 + 40 + 80 + wA + 70, geo.purses.y));
+    numeral(pu, roman(r.a), x0 + 80 + wA / 2, geo.purses.y, 76, { fill: '#3a2410' });
+    T(pu, '+', { x: f1(x0 + 80 + wA + 35), y: f1(geo.purses.y + 26), 'class': 'sans', 'font-size': 70, 'text-anchor': 'middle', fill: '#8a6414' });
+    numeral(pu, roman(r.b), x0 + 80 + wA + 70 + 80 + wB / 2, geo.purses.y, 76, { fill: '#3a2410' });
+    // the table
+    G(Lui, '<rect x="' + f1(T2.x - 20) + '" y="' + f1(T2.y) + '" width="' + f1(T2.w + 40) + '" height="' + f1(T2.h) + '" rx="16" fill="#3f6e58" stroke="#284a3a" stroke-width="6"/>');
+    // Pica's swapping tray: a slot for each coin she wants, and what she gives
+    s += '<rect x="' + f1(geo.tray.x - tw / 2 + gap * 0.3) + '" y="' + f1(geo.tray.y - geo.cr - 18) + '" width="' + f1(tw) + '" height="' + f1(geo.cr * 2 + 36) + '" rx="20" fill="url(#r-wood)" stroke="#6b4420" stroke-width="6"/>';
+    for (k = 0; k < need; k++) { var sp = slotPos(k); s += '<circle cx="' + f1(sp.x) + '" cy="' + f1(sp.y) + '" r="' + (geo.cr + 4) + '" fill="rgba(60,30,5,.35)" stroke="#f6e7c0" stroke-width="4" stroke-dasharray="10 8"/>'; }
+    var ax = slotPos(need - 1).x + gap * 0.62;
+    s += '<path d="M' + f1(ax - 20) + ' ' + f1(geo.tray.y) + ' h34 m-14 -14 l14 14 l-14 14" stroke="#fff3d6" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/>';
+    G(Lui, s);
+    if (st.ttype) { G(Lui, coinArt(SWAP[st.ttype][0], geo.cr), { transform: 'translate(' + f1(ax + gap * 0.62) + ' ' + f1(geo.tray.y) + ')', opacity: 0.45 }); }
+    // Pica's price list: five Is for a V, two Vs for an X
+    var lg = S('g', {}, Lui), Tp = cx.ly.top, lx0 = cx.ly.land ? Tp.x + Tp.w - 120 : 500, ly0 = cx.ly.land ? Tp.y + Tp.h / 2 : geo.tray.y + 190;
+    plaque(lg, lx0, ly0, 300, 160, { fill: '#fffaf0' });
+    [['I', 5, 'V'], ['V', 2, 'X']].forEach(function (q, row) {
+      var yy = ly0 - 38 + row * 76, kk;
+      for (kk = 0; kk < q[1]; kk++) { G(lg, coinArt(q[0], 16), { transform: 'translate(' + f1(lx0 - 120 + kk * 30) + ' ' + f1(yy) + ')' }); }
+      G(lg, '<path d="M' + f1(lx0 + 34) + ' ' + f1(yy) + ' h30 m-12 -12 l12 12 l-12 12" stroke="#8a6414" stroke-width="5" fill="none" stroke-linecap="round"/>');
+      G(lg, coinArt(q[2], 24), { transform: 'translate(' + f1(lx0 + 104) + ' ' + f1(yy) + ')' });
+    });
+    nodes = {};
+    var tb = table();
+    tb.forEach(function (c, k2) { coinNode(c, tpos(k2, tb.length)); });
+    st.tray.forEach(function (cid, k2) { coinNode(st.coins[cid], slotPos(k2)); });
+  };
+  function purseArt(x, y) { return '<g transform="translate(' + f1(x) + ' ' + f1(y) + ')"><path d="M-34 -20 Q-44 40 0 44 Q44 40 34 -20 Z" fill="#9a6a3a" stroke="#6b4420" stroke-width="5"/><path d="M-30 -22 Q0 -40 30 -22" stroke="#6b4420" stroke-width="6" fill="none"/><circle cy="-30" r="7" fill="#e8b830"/></g>'; }
+  function settle(ms) {
+    var tb = table(), all = [];
+    tb.forEach(function (c, k) { var p = tpos(k, tb.length); all.push(to(nodes[c.id], { x: p.x, y: p.y }, ms || 300)); });
+    st.tray.forEach(function (cid, k) { var p = slotPos(k); all.push(to(nodes[cid], { x: p.x, y: p.y }, ms || 300)); });
+    return Promise.all(all);
+  }
+  function tap(cid) {
+    cx.lock(async function () {
+      var c = st.coins[cid], need;
+      if (c.at === 'tray') { st.tray.splice(st.tray.indexOf(cid), 1); c.at = 'table'; if (!st.tray.length) { st.ttype = null; } SFX.coinBack(); clear(Lui); cx.draw(); return; }
+      if (st.ttype && st.ttype !== c.l) { st.tray.forEach(function (t) { st.coins[t].at = 'table'; }); st.tray = []; st.ttype = null; }
+      if (!SWAP[c.l]) { return; }
+      st.ttype = c.l; c.at = 'tray'; st.tray.push(cid);
+      need = SWAP[c.l][1];
+      SFX.coin();
+      var before = { x: nodes[cid].x, y: nodes[cid].y };
+      clear(Lui); cx.draw();
+      var n = nodes[cid], p = { x: n.x, y: n.y }; n.x = before.x; n.y = before.y; n.set();
+      await hopTo(n, p.x, p.y, 380, 60);
+      if (st.tray.length === need) { await doSwap(); return; }
+      // not enough of these to make a swap at all
+      if (count(c.l) < need && st.tray.length === count(c.l)) {
+        await sleep(300);
+        SFX.chatter(); cx.miss();
+        await sleep(500);
+        st.tray.forEach(function (t) { st.coins[t].at = 'table'; }); st.tray = []; st.ttype = null;
+        clear(Lui); cx.draw();
+      }
+    });
+  }
+  async function doSwap() {
+    var l = st.ttype, out = SWAP[l][0], fx0 = cx.friend.x, fy0 = cx.friend.y - 150 * cx.friend.s;
+    SFX.chatter(); cx.friend.play('hop', 500, { h: 40 });
+    await Promise.all(st.tray.map(function (t, k) { var n = nodes[t]; return sleep(k * 60).then(function () { return Promise.all([hopTo(n, fx0, fy0, 420, 80), to(n, { s: 0.3 }, 420)]); }); }));
+    st.tray.forEach(function (t) { st.coins[t].at = 'gone'; nodes[t].el.setAttribute('opacity', '0'); });
+    st.tray = []; st.ttype = null;
+    var nc = { l: out, id: st.coins.length, at: 'table' };
+    st.coins.push(nc);
+    clear(Lui); cx.draw();
+    var n = nodes[nc.id], p = { x: n.x, y: n.y };
+    n.x = fx0; n.y = fy0; n.s = 0.3; n.set();
+    SFX.coin();
+    await Promise.all([hopTo(n, p.x, p.y, 520, 140), to(n, { s: 1 }, 520)]);
+    SFX.merge();
+    if (cx.first && !RUN.sawSwap) { RUN.sawSwap = true; await talk([['pica', l === 'I' ? 'Five {=I}s, one {=V}! Same money, fewer coins.' : 'Two {=V}s, one {=X}! Same money, fewer coins.']]); }
+    if (!canSwap()) { await win(); }
+  }
+  async function win() {
+    await sleep(400);
+    var ly = cx.ly;
+    clear(Lui); cx.draw();
+    await equation([r.a, '+', r.b, '=', r.a + r.b], W / 2, ly.top.y + ly.top.h / 2);
+    await cx.solved(null);
+  }
+  cx.hint = function () {
+    var l = null, k;
+    if (st.ttype && count(st.ttype) >= SWAP[st.ttype][1]) { l = st.ttype; }
+    ['I', 'V', 'X', 'L'].forEach(function (q) { if (!l && count(q) >= SWAP[q][1]) { l = q; } });
+    if (!l) { return; }
+    if (st.ttype && st.ttype !== l) { var t0 = st.tray[0]; hintAt(nodes[t0].x, nodes[t0].y, geo.cr + 22); return; }
+    var tb = table();
+    for (k = 0; k < tb.length; k++) { if (tb[k].l === l) { var n = nodes[tb[k].id]; hintAt(n.x, n.y, geo.cr + 22); return; } }
+  };
+  // the purses tip out
+  if (!st.poured) {
+    st.poured = true;
+    setTimeout(function () {
+      if (!nodes || cx.over) { return; }
+      table().forEach(function (c, k) { var n = nodes[c.id]; if (!n) { return; } var y = n.y; n.y = geo.purses.y; n.o = 0; n.set(); sleep(k * 70).then(function () { SFX.coin(); return to(n, { y: y, o: 1 }, 380, EO); }); });
+    }, 30);
   }
 };
 
