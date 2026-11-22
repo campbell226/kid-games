@@ -1346,7 +1346,8 @@ function initGear() {
   window.gearBtn = AdultGate.attach(openParent);
 }
 var _show = show;
-show = function (name) { _show(name); if (window.gearBtn) { window.gearBtn.style.display = (name === 'map' || name === 'who') ? 'flex' : 'none'; window.gearBtn.style.opacity = name === 'who' ? '0.8' : '0'; }
+show = function (name) { _show(name); if (window.gearBtn) { window.gearBtn.style.display = (name === 'map' || name === 'who') ? 'flex' : 'none'; window.gearBtn.style.opacity = name === 'who' ? '0.8' : '0';
+    if (name === 'who' && window.gearBtn.getAnimations) { window.gearBtn.getAnimations().forEach(function (a) { a.cancel(); }); } }
   $('whoBtn').style.display = name === 'map' ? 'flex' : 'none'; };
 
 function initUI() {
