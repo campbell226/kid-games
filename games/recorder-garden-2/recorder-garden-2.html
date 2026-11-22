@@ -138,6 +138,362 @@
 </svg>
 
 <script>
+// Adult gate. The same block sits in every game that has parent controls.
+// A gear in the top-right flashes three times at launch so a grown-up knows
+// it is there, then is invisible. Hold it for 1.5 s and it asks one
+// random question with a number pad. Right opens the controls; wrong
+// closes quietly. It is a speed bump for a button-bashing child, not security.
+// Use: var gearBtn = AdultGate.attach(openParent);
+var AdultGate = (function () {
+  'use strict';
+  var QS = [
+    ['What is 2 to the power 3?', 8],
+    ['What is the first digit of pi?', 3],
+    ['What are the first two digits of pi after the point?', 14],
+    ['How many days are there in a leap year?', 366],
+    ['What is 7 × 8?', 56],
+    ['What is the square root of 144?', 12],
+    ['How many players are on the pitch for one football team?', 11],
+    ['At what temperature in °C does water boil?', 100],
+    ['How many minutes are there in a day?', 1440],
+    ['What is the atomic number of carbon?', 6],
+    ['What is 15% of 200?', 30],
+    ['How many degrees do the angles of a triangle add up to?', 180]
+  ];
+  var RM = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function css(n, s) { n.style.cssText = s; return n; }
+
+  function attach(open) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.setAttribute('aria-label', 'Parent controls');
+    btn.innerHTML = '<svg viewBox="0 0 40 40" width="100%" height="100%"><path fill="#fff" fill-rule="evenodd" d="M17.5 7.2L18.1 2.6L21.9 2.6L22.5 7.2L27.2 9.2L30.9 6.3L33.7 9.1L30.8 12.8L32.8 17.5L37.4 18.1L37.4 21.9L32.8 22.5L30.8 27.2L33.7 30.9L30.9 33.7L27.2 30.8L22.5 32.8L21.9 37.4L18.1 37.4L17.5 32.8L12.8 30.8L9.1 33.7L6.3 30.9L9.2 27.2L7.2 22.5L2.6 21.9L2.6 18.1L7.2 17.5L9.2 12.8L6.3 9.1L9.1 6.3L12.8 9.2ZM20 13.6a6.4 6.4 0 1 0 0.01 0Z"/></svg>';
+    css(btn, 'position:fixed;top:max(8px,env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right));' +
+      'width:56px;height:56px;padding:12px;border:0;border-radius:50%;background:rgba(0,0,0,0.35);' +
+      'opacity:0;z-index:40;cursor:pointer;touch-action:none;-webkit-tap-highlight-color:transparent;');
+    document.body.appendChild(btn);
+
+    // Three flashes, then gone. Reduced motion: held steady, then a fade.
+    if (btn.animate) {
+      btn.animate(RM
+        ? [{ opacity: 0.8 }, { opacity: 0.8, offset: 0.8 }, { opacity: 0 }]
+        : [{ opacity: 0 }, { opacity: 0.8, offset: 0.08 }, { opacity: 0, offset: 0.16 },
+           { opacity: 0.8, offset: 0.32 }, { opacity: 0, offset: 0.4 },
+           { opacity: 0.8, offset: 0.56 }, { opacity: 0 }],
+        { duration: RM ? 3000 : 2400, delay: 700, fill: 'none' });
+    }
+
+    var t = 0;
+    function stop() { clearTimeout(t); }
+    btn.addEventListener('pointerdown', function () { stop(); t = setTimeout(ask, 1500); });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (e) { btn.addEventListener(e, stop); });
+    btn.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
+    function ask() {
+      var q = QS[Math.floor(Math.random() * QS.length)], typed = '';
+      var wrap = css(document.createElement('div'),
+        'position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;' +
+        'background:rgba(12,24,40,0.6);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;');
+      var box = css(document.createElement('div'),
+        'background:#fdfaf3;color:#22303f;border-radius:18px;padding:18px;width:min(320px,92vw);' +
+        'box-shadow:0 18px 50px rgba(0,0,0,0.35);text-align:center;');
+      var qt = css(document.createElement('div'), 'font-size:16px;margin-bottom:10px;min-height:46px;');
+      qt.textContent = q[0];
+      var shown = css(document.createElement('div'),
+        'font-size:30px;font-weight:700;height:46px;line-height:46px;border-radius:10px;background:#fff;border:2px solid #cfd8e0;margin-bottom:10px;');
+      var pad = css(document.createElement('div'), 'display:grid;grid-template-columns:repeat(3,1fr);gap:8px;');
+      box.appendChild(qt); box.appendChild(shown); box.appendChild(pad);
+      wrap.appendChild(box);
+      function close() { if (wrap.parentNode) { wrap.parentNode.removeChild(wrap); } document.removeEventListener('keydown', key); }
+      function submit() { var ok = typed !== '' && +typed === q[1]; close(); if (ok) { open(); } }
+      function press(k) {
+        if (k === 'ok') { submit(); return; }
+        if (k === 'del') { typed = typed.slice(0, -1); }
+        else if (typed.length < 5) { typed += k; }
+        shown.textContent = typed;
+      }
+      function key(e) {
+        if (e.key === 'Escape') { close(); }
+        else if (e.key === 'Enter') { submit(); }
+        else if (e.key === 'Backspace') { press('del'); }
+        else if (/^[0-9]$/.test(e.key)) { press(e.key); }
+      }
+      ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'ok'].forEach(function (k) {
+        var b = css(document.createElement('button'),
+          'min-height:52px;border:2px solid #cfd8e0;border-radius:11px;background:' + (k === 'ok' ? '#c8102e' : '#fff') +
+          ';color:' + (k === 'ok' ? '#fff' : '#22303f') + ';font:inherit;font-size:22px;font-weight:600;cursor:pointer;');
+        b.type = 'button';
+        b.textContent = k === 'del' ? '⌫' : (k === 'ok' ? '✓' : k);
+        b.addEventListener('click', function () { press(k); });
+        pad.appendChild(b);
+      });
+      wrap.addEventListener('click', function (e) { if (e.target === wrap) { close(); } });
+      document.addEventListener('keydown', key);
+      document.body.appendChild(wrap);
+    }
+    return btn;
+  }
+  return { attach: attach };
+})();
+
+// Players. The same block sits in every game that keeps one child's progress
+// apart from another's (Chess Quest has its own older version). Each player
+// owns the game's whole save. A game reads its save with Players.raw(),
+// writes it with Players.write(data), and calls Players.start() once at the
+// end of its set-up. The picker, the + tile, the parent's Players section and
+// the adult gear all come from here. Changing player reloads the page, so a
+// game never has to rebuild a scene for someone else.
+//
+//   var PL = Players.make({
+//     key:     'game-players',        // where the envelope is kept
+//     legacy:  ['game'],              // old single saves, copied in as Player 1
+//     fresh:   function () { return {...}; },   // a new player's save
+//     summary: function (data) { return '12 flowers'; },
+//     btn:     'left:50%;margin-left:-27px;top:12px;',  // who button position
+//     shared:  function (box, ui) { ... }       // game-wide parent settings
+//   });
+var Players = (function () {
+  'use strict';
+  var COLS = ['#ff6b6b', '#ff9b3d', '#f2b134', '#3a9d4d', '#4aa3ff', '#b07cff'];
+  var MAX = 8;
+
+  function el(tag, cls, parent, text) {
+    var e = document.createElement(tag);
+    if (cls) { e.className = cls; }
+    if (text !== undefined) { e.textContent = text; }
+    if (parent) { parent.appendChild(e); }
+    return e;
+  }
+
+  function make(cfg) {
+    var env = { players: [], cur: '' };
+    var frozen = false, dirty = false, startCur = '', gear = null;
+    var whoEl = null, btnEl = null, parentEl = null;
+
+    function pid() { return 'p' + Date.now().toString(36) + Math.floor(Math.random() * 1e5).toString(36); }
+    function find(id) { var i; for (i = 0; i < env.players.length; i++) { if (env.players[i].id === id) { return env.players[i]; } } return null; }
+    function curP() { return find(env.cur); }
+    function flush() { try { localStorage.setItem(cfg.key, JSON.stringify(env)); } catch (e) { /* private window: nothing lost that mattered */ } }
+    function initialOf(n) { n = (n || '').trim(); return n ? Array.from(n)[0].toUpperCase() : '?'; }
+
+    // ---- storage ----
+    (function () {
+      var o = null, d = null, k;
+      try { o = JSON.parse(localStorage.getItem(cfg.key) || 'null'); } catch (e) { o = null; }
+      if (o && Array.isArray(o.players)) {
+        env.players = o.players.filter(function (p) { return p && typeof p.id === 'string' && p.data && typeof p.data === 'object'; });
+        env.cur = typeof o.cur === 'string' ? o.cur : '';
+      } else {
+        // Before there were players there was one save. It becomes Player 1,
+        // and the old key is left where it is as a spare copy.
+        for (k = 0; k < (cfg.legacy || []).length && !d; k++) {
+          try { d = JSON.parse(localStorage.getItem(cfg.legacy[k]) || 'null'); } catch (e) { d = null; }
+          if (d && typeof d !== 'object') { d = null; }
+        }
+        if (d) {
+          env.players = [{ id: pid(), name: 'Player 1', col: COLS[0], all: false, data: d }];
+          env.cur = env.players[0].id;
+          flush();
+        }
+      }
+      if (!find(env.cur)) { env.cur = env.players.length === 1 ? env.players[0].id : ''; }
+    })();
+
+    function raw() { var p = curP(); return p ? p.data : null; }
+    function write(data) { var p = curP(); if (p && !frozen) { p.data = data; flush(); } }
+    function all() { var p = curP(); return !!(p && p.all); }
+
+    function go() {
+      try { history.replaceState(null, '', location.pathname + location.search + '#as'); } catch (e) { /* ignore */ }
+      location.reload();
+    }
+
+    // ---- look ----
+    function addStyle() {
+      var s = document.createElement('style');
+      s.textContent =
+        '.pl-who[hidden],.pl-parent[hidden]{display:none!important;}' +
+        '.pl-who{position:fixed;inset:0;z-index:50;background:linear-gradient(#2b3d78,#1e2a4a 70%);display:flex;align-items:center;justify-content:center;overflow-y:auto;padding:70px 16px 30px;font-family:ui-rounded,system-ui,-apple-system,"Segoe UI",sans-serif;color:#fff;touch-action:manipulation;}' +
+        '.pl-who .wbox{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:22px;max-width:760px;margin:auto;}' +
+        '.pl-who button,.pl-btn,.pl-parent button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;-webkit-tap-highlight-color:transparent;padding:0;}' +
+        '.pl-tile{width:clamp(110px,26vw,170px);display:flex;flex-direction:column;align-items:center;gap:8px;font-size:clamp(18px,4vmin,26px);font-weight:800;}' +
+        '.pl-face{width:100%;aspect-ratio:1;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:clamp(54px,13vmin,84px);font-weight:900;box-shadow:0 7px 0 rgba(0,0,0,.25);text-shadow:0 3px 0 rgba(0,0,0,.2);}' +
+        '.pl-tile:active .pl-face{transform:scale(.93);}' +
+        '.pl-tile.add .pl-face{background:rgba(255,255,255,.12);border:5px dashed rgba(255,255,255,.55);box-shadow:none;}' +
+        '.pl-tile .pn{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}' +
+        '.pl-form{display:flex;flex-direction:column;align-items:center;gap:22px;margin:auto;}' +
+        '.pl-form input{font:inherit;font-size:clamp(28px,7vmin,44px);font-weight:800;text-align:center;padding:10px 14px;border-radius:18px;border:0;width:min(80vw,360px);color:#22303f;}' +
+        '.pl-sw{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;}' +
+        '.pl-sw button{width:clamp(52px,12vmin,70px);height:clamp(52px,12vmin,70px);border-radius:50%;box-shadow:0 5px 0 rgba(0,0,0,.25);}' +
+        '.pl-sw button.on{outline:6px solid #fff;outline-offset:2px;}' +
+        '.pl-go{width:clamp(80px,18vmin,110px);height:clamp(80px,18vmin,110px);border-radius:50%;background:#3a9d4d!important;box-shadow:0 7px 0 rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;}' +
+        '.pl-go svg,.pl-back svg{width:60%;height:60%;}' +
+        '.pl-back{position:absolute;left:14px;top:14px;width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,.18)!important;display:flex;align-items:center;justify-content:center;}' +
+        '.pl-shk{animation:plshk .4s;}@keyframes plshk{0%,100%{transform:translateX(0)}25%{transform:translateX(-9px)}75%{transform:translateX(9px)}}' +
+        '.pl-btn{position:fixed;z-index:30;width:54px;height:54px;border-radius:50%;border:4px solid #fff!important;font-size:26px;font-weight:900;color:#fff;box-shadow:0 4px 0 rgba(0,0,0,.3);text-shadow:0 2px 0 rgba(0,0,0,.2);display:none;align-items:center;justify-content:center;font-family:ui-rounded,system-ui,sans-serif;}' +
+        '.pl-parent{position:fixed;inset:0;z-index:55;background:rgba(10,14,34,.97);overflow-y:auto;padding:18px;color:#fff;font:16px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;}' +
+        '.pl-parent .box{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:14px;}' +
+        '.pl-parent h3{margin:6px 0 0;font-size:20px;}' +
+        '.pl-parent .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:18px;}' +
+        '.pl-parent input{font:inherit;font-size:20px;padding:8px 12px;border-radius:10px;border:0;width:100%;max-width:240px;color:#22303f;}' +
+        '.pl-parent .pb{padding:12px 16px;border-radius:12px;background:#3b4a82;font-size:18px;font-weight:700;}' +
+        '.pl-parent .pb.on{background:#3a9d4d;}.pl-parent .pb.danger{background:#a63a3a;}' +
+        '.pl-parent .plr{background:#1a2350;border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:10px;}' +
+        '.pl-parent .dot{width:34px;height:34px;border-radius:50%;flex:none;}' +
+        '.pl-parent small{opacity:.65;}';
+      document.head.appendChild(s);
+    }
+
+    function paintBtn() {
+      var p = curP();
+      if (!btnEl) { return; }
+      if (!p || (whoEl && !whoEl.hidden)) { btnEl.style.display = 'none'; return; }
+      btnEl.style.background = p.col || COLS[0];
+      btnEl.textContent = initialOf(p.name);
+      btnEl.style.display = 'flex';
+    }
+
+    function gearVisible(on) {
+      if (!gear) { return; }
+      if (on && gear.getAnimations) { gear.getAnimations().forEach(function (a) { a.cancel(); }); }
+      gear.style.opacity = on ? '0.8' : '0';
+      gear.style.zIndex = on ? '56' : '40';
+    }
+
+    function hideWho() { if (whoEl) { whoEl.hidden = true; } gearVisible(false); paintBtn(); }
+
+    function showWho(adding) {
+      var box, inp, sw, go2, ok, bk, col = COLS[env.players.length % COLS.length];
+      if (!whoEl) { whoEl = el('div', 'pl-who', document.body); }
+      whoEl.innerHTML = ''; whoEl.hidden = false;
+      gearVisible(true); paintBtn();
+      if (adding) {
+        box = el('div', 'pl-form', whoEl);
+        inp = el('input', '', box); inp.type = 'text'; inp.maxLength = 14;
+        inp.setAttribute('autocomplete', 'off'); inp.setAttribute('autocapitalize', 'words'); inp.setAttribute('aria-label', 'Name');
+        sw = el('div', 'pl-sw', box);
+        COLS.forEach(function (c) {
+          var b = el('button', c === col ? 'on' : '', sw); b.style.background = c; b.setAttribute('aria-label', 'Colour');
+          b.onclick = function () { col = c; Array.prototype.forEach.call(sw.children, function (x) { x.className = x === b ? 'on' : ''; }); };
+        });
+        go2 = el('button', 'pl-go', box);
+        go2.innerHTML = '<svg viewBox="0 0 100 100"><path d="M20 53 L42 75 L82 28" fill="none" stroke="#fff" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        go2.setAttribute('aria-label', 'Done');
+        ok = function () {
+          var nm = inp.value.trim(), p;
+          if (!nm) { inp.classList.add('pl-shk'); setTimeout(function () { inp.classList.remove('pl-shk'); }, 450); inp.focus(); return; }
+          p = { id: pid(), name: nm, col: col, all: false, data: cfg.fresh() };
+          env.players.push(p); env.cur = p.id; flush(); go();
+        };
+        go2.onclick = ok;
+        inp.onkeydown = function (ev) { if (ev.key === 'Enter') { ok(); } };
+        if (env.players.length) {
+          bk = el('button', 'pl-back', whoEl);
+          bk.innerHTML = '<svg viewBox="0 0 100 100"><path d="M62 18 L28 50 L62 82" fill="none" stroke="#fff" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+          bk.setAttribute('aria-label', 'Back');
+          bk.onclick = function () { showWho(false); };
+        }
+        setTimeout(function () { try { inp.focus(); } catch (e) { /* ignore */ } }, 60);
+        return;
+      }
+      box = el('div', 'wbox', whoEl);
+      env.players.forEach(function (p) {
+        var t = el('button', 'pl-tile', box), f = el('div', 'pl-face', t, initialOf(p.name));
+        f.style.background = p.col || COLS[0];
+        el('div', 'pn', t, p.name);
+        t.onclick = function () {
+          if (p.id === startCur && p.id === env.cur) { hideWho(); return; }
+          env.cur = p.id; flush(); go();
+        };
+      });
+      if (env.players.length < MAX) {
+        var a = el('button', 'pl-tile add', box);
+        a.innerHTML = '<div class="pl-face"><svg viewBox="0 0 100 100" style="width:50%;height:50%"><path d="M50 18 V82 M18 50 H82" stroke="#fff" stroke-width="14" stroke-linecap="round"/></svg></div>';
+        a.setAttribute('aria-label', 'New player');
+        a.onclick = function () { showWho(true); };
+      }
+    }
+
+    // ---- the parent's side ----
+    function toggle(parent, label, isOn, fn) {
+      var b = el('button', 'pb' + (isOn ? ' on' : ''), parent, label);
+      b.onclick = fn;
+      return b;
+    }
+    function confirmBtn(parent, label, sure, fn) {
+      var b = el('button', 'pb danger', parent, label);
+      b.onclick = function () {
+        if (b.getAttribute('data-sure')) { fn(); return; }
+        b.setAttribute('data-sure', '1'); b.textContent = sure;
+      };
+      return b;
+    }
+    function change(p, fn) {
+      fn();
+      if (p.id === env.cur) { frozen = true; dirty = true; }
+      flush();
+    }
+
+    function openParent() {
+      var box, done;
+      if (!parentEl) { parentEl = el('div', 'pl-parent', document.body); parentEl.setAttribute('role', 'dialog'); }
+      parentEl.innerHTML = ''; parentEl.hidden = false;
+      box = el('div', 'box', parentEl);
+      el('h3', '', box, 'Parent controls');
+      el('h3', '', box, 'Players');
+      if (!env.players.length) { el('small', '', box, 'No players yet. A child can add themselves from the picture screen, or add one here.'); }
+      env.players.forEach(function (p) {
+        var card = el('div', 'plr', box), r = el('div', 'row', card), ni, sm = cfg.summary ? cfg.summary(p.data) : '';
+        el('div', 'dot', r).style.background = p.col || COLS[0];
+        ni = el('input', '', r); ni.type = 'text'; ni.maxLength = 14; ni.value = p.name; ni.setAttribute('aria-label', 'Name');
+        ni.oninput = function () { if (ni.value.trim()) { p.name = ni.value.trim(); flush(); paintBtn(); } };
+        ni.onchange = function () { if (!ni.value.trim()) { ni.value = p.name; } };
+        if (sm) { el('small', '', r, sm); }
+        r = el('div', 'row', card);
+        toggle(r, 'Open everything', p.all, function () { change(p, function () { p.all = !p.all; }); openParent(); });
+        confirmBtn(r, 'Start again', 'Tap again to wipe their progress', function () {
+          change(p, function () { p.data = cfg.fresh(); p.all = false; }); openParent();
+        });
+        confirmBtn(r, 'Delete', 'Tap again to delete ' + p.name, function () {
+          change(p, function () { env.players = env.players.filter(function (q) { return q !== p; }); if (env.cur === p.id) { env.cur = ''; } });
+          dirty = true; openParent();
+        });
+      });
+      if (env.players.length < MAX) {
+        el('button', 'pb', box, 'Add a player').onclick = function () { parentEl.hidden = true; showWho(true); };
+      }
+      if (cfg.shared) { cfg.shared(box, { el: el, toggle: toggle, confirmBtn: confirmBtn, again: openParent }); }
+      done = el('button', 'pb', box, 'Done');
+      done.onclick = function () {
+        parentEl.hidden = true;
+        if (dirty) { go(); }
+      };
+    }
+
+    // ---- launch ----
+    function start() {
+      var hadHash = location.hash === '#as';
+      if (hadHash) { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* ignore */ } }
+      addStyle();
+      startCur = env.cur;
+      btnEl = el('button', 'pl-btn', document.body);
+      btnEl.style.cssText = cfg.btn || 'left:12px;top:12px;';
+      btnEl.setAttribute('aria-label', 'Who is playing');
+      btnEl.onclick = function () { showWho(false); };
+      gear = AdultGate.attach(openParent);
+      if (!env.players.length) { showWho(true); }
+      else if (env.players.length > 1 && !(hadHash && find(env.cur))) { showWho(false); }
+      paintBtn();
+    }
+
+    return { raw: raw, write: write, all: all, start: start, openParent: openParent, current: curP };
+  }
+  return { make: make };
+})();
+</script>
+
+<script>
 (function () {
   'use strict';
 
@@ -935,9 +1291,24 @@
   var TRIAL_MS = 5 * 60 * 1000;
   var LOCK_HOLD = 0.9;
 
+  // Each child has their own garden. Players holds them all; this game
+  // only ever sees the current one's save.
+  var PL = Players.make({
+    key: 'recorder-garden-2-players',
+    legacy: ['recorder-garden-2'],
+    fresh: function () { return { flowers: 0, done: [0, 0, 0, 0, 0], garden: [], tune: 0, pos: 0, four: true, finished: false, best: 0, trial: null }; },
+    summary: function (d) { return (d.flowers | 0) + ' flowers, song ' + (((d.best | 0) + 1)); },
+    btn: 'left:50%;margin-left:-27px;top:12px;',
+    shared: function (box, ui) {
+      ui.el('h3', '', box, 'Everyone');
+      var r = ui.el('div', 'row', box);
+      ui.toggle(r, 'Helper button (plays the note for her)', cheatOn, function () { cheatOn = !cheatOn; drawUI(); ui.again(); });
+    }
+  });
+
   function load() {
     try {
-      var s = JSON.parse(window.localStorage.getItem('recorder-garden-2') || 'null');
+      var s = PL.raw();
       if (s && typeof s.flowers === 'number') {
         save.flowers = s.flowers;
         // Counted per friend, and there are four of them now. A saved
@@ -969,7 +1340,7 @@
     } catch (e) {}
   }
   function persist() {
-    try { window.localStorage.setItem('recorder-garden-2',JSON.stringify(save)); } catch (e) {}
+    PL.write(save);
   }
   // The rabbit comes once B is hers, the badger once B and A both are.
   var ARRIVE_AT = [0, 3, 8];
@@ -1640,22 +2011,8 @@
     g.appendChild(body);
     micRing = body.querySelector('.ring');
 
-    var rs = sz, rr = rs * 0.6;
-    resetCirc = 2 * Math.PI * rr;
-    var rst = el('g', {
-      transform: 'translate(' + (L.W - 22 - rs / 2) + ',' + (22 + rs / 2) + ')'
-    });
-    rst.innerHTML =
-      '<rect x="' + (-rs / 2) + '" y="' + (-rs / 2) + '" width="' + rs + '" height="' + rs
-      + '" rx="' + (rs * 0.3) + '" fill="#fdf6e3" opacity="0.5" stroke="#c99a5e" stroke-width="3"/>'
-      + flowerIcon(rs)
-      + '<circle class="rring" cx="0" cy="0" r="' + rr + '" fill="none" stroke="#c2564f" stroke-width="'
-      + (rs * 0.11) + '" stroke-linecap="round" stroke-dasharray="' + resetCirc
-      + '" stroke-dashoffset="' + resetCirc + '" transform="rotate(-90)"/>'
-      + '<rect class="hit" x="' + (-rs * 0.68) + '" y="' + (-rs * 0.68) + '" width="' + (rs * 1.36)
-      + '" height="' + (rs * 1.36) + '" data-ui="reset"/>';
-    g.appendChild(rst);
-    resetRing = rst.querySelector('.rring');
+    var rs = sz;
+    resetRing = null;
 
     if (cheatOn) {
       var chx = L.W - 22 - rs - 14 - rs / 2;
@@ -1672,29 +2029,7 @@
       g.appendChild(ch);
     }
 
-    // The countdown belongs in the middle of the screen. On the button it
-    // is directly underneath the thumb holding the button down, which is
-    // the one place it cannot be seen. This one is for me, so it says so
-    // in words.
-    var R = clamp(Math.min(L.W, L.H) * 0.19, 96, 260);
-    bigCirc = 2 * Math.PI * R;
-    resetBig = el('g', {
-      'class': 'plain', opacity: 0,
-      transform: 'translate(' + (L.W / 2) + ',' + (L.H / 2) + ')'
-    });
-    resetBig.innerHTML =
-      '<circle cx="0" cy="0" r="' + (R * 1.32) + '" fill="#1b2718" opacity="0.66"/>'
-      + '<circle cx="0" cy="0" r="' + R + '" fill="none" stroke="#ffffff" stroke-width="'
-      + (R * 0.15) + '" opacity="0.28"/>'
-      + '<circle class="bigring" cx="0" cy="0" r="' + R + '" fill="none" stroke="#f2c141"'
-      + ' stroke-width="' + (R * 0.15) + '" stroke-linecap="round" stroke-dasharray="' + bigCirc
-      + '" stroke-dashoffset="' + bigCirc + '" transform="rotate(-90)"/>'
-      + '<text x="0" y="' + (R * 0.12) + '" text-anchor="middle" fill="#ffffff"'
-      + ' font-family="ui-rounded, Segoe UI, system-ui, -apple-system, sans-serif"'
-      + ' font-size="' + (R * 0.3) + '" font-weight="800"'
-      + ' letter-spacing="' + (R * 0.03) + '">RESET</text>';
-    g.appendChild(resetBig);
-    bigRing = resetBig.querySelector('.bigring');
+    resetBig = null; bigRing = null;
 
     drawSelector(g);
   }
@@ -2091,7 +2426,7 @@
 
   // The selector. What she may play is what she has earned, unless a parent
   // has opened the way for a while.
-  function reachable() { return save.trial ? TUNES.length - 1 : save.best; }
+  function reachable() { return (save.trial || PL.all()) ? TUNES.length - 1 : save.best; }
 
   function goTo(i, pos, intro) {
     var k, f;
@@ -2429,7 +2764,6 @@
     var ui = t.closest('[data-ui]');
     if (ui) {
       var which = ui.getAttribute('data-ui');
-      if (which === 'reset') { resetting = true; resetHold = 0; return; }
       if (which === 'tune') { replayTune(); return; }
       if (which === 'prev') { if (tune.idx > 0) { goTo(tune.idx - 1, 0, true); } return; }
       if (which === 'next') {
@@ -2473,21 +2807,6 @@
   });
 
   function release() {
-    if (resetting) {
-      var p = resetHold / RESET_HOLD;
-      if (p >= 0.25 && p < 0.5) {
-        cheatStreak++;
-        if (cheatStreak >= 4 && !cheatOn) {
-          cheatOn = true;
-          [0, 4, 7].forEach(function (s, i) {
-            bell(0.02 + i * 0.07, 880 * Math.pow(2, s / 12), 0.22, 0.35);
-          });
-          drawUI();
-        }
-      } else {
-        cheatStreak = 0;
-      }
-    }
     touchHold = -1; resetting = false; resetHold = 0; cheatHeld = false;
     lock = null;
   }
@@ -2534,6 +2853,7 @@
   buildFriends();
   computeLayout();
   requestAnimationFrame(frame);
+  PL.start();
 })();
 </script>
 </body>
