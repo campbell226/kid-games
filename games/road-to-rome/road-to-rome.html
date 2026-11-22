@@ -1591,6 +1591,14 @@ async function runChapter(i) {
   if (ch.after) { await ch.after(); }
   showDone(i, s);
 }
+// Juno says goodbye and walks on, in front of her friend, who waves
+async function exitRight() {
+  RUN.juno.play('cheer', 900); SFX.honk(2);
+  if (RUN.friend) { RUN.friend.play('point', 1400, { x: W + 300, y: RUN.ly.gy - 300 }); if (RUN.ch.voice) { RUN.ch.voice(); } }
+  await sleep(500);
+  Lchar.appendChild(RUN.juno.g);
+  await RUN.juno.walkTo(W + 200, 340);
+}
 function showDone(i, s) {
   var d = $('done'), wr = $('dWreath'), bt = $('dBtns'), res = RUN.res, n = res.length, m = '', k, a, x, y, ch = CH[i];
   // a wreath, one pair of leaves for each round: gold for a first try
@@ -2188,7 +2196,7 @@ CH.push({
       { t: 'coins', v: d, item: 'cake', purse: shopPurse(d, 2) }
     ];
   },
-  after: async function () { RUN.juno.play('cheer', 900); SFX.honk(2); await sleep(500); await RUN.juno.walkTo(W + 200, 340); }
+  after: exitRight
 });
 // a purse that can pay the price, with a spare coin or two. Where the
 // price ends in 4 or 9 there are never four little Is: it has to be paid
@@ -2361,7 +2369,7 @@ CH.push({
   rounds: function () {
     return [boatRound(1), boatRound(2), boatRound(3), boatRound(4), boatRound(5)];
   },
-  after: async function () { RUN.juno.play('cheer', 900); SFX.honk(2); SFX.splash(); await sleep(500); await RUN.juno.walkTo(W + 200, 340); }
+  after: function () { SFX.splash(); return exitRight(); }
 });
 // crates for the boat: one side fixed, the dock with at least one pair
 // that balances it, and some that don't
@@ -2522,7 +2530,7 @@ CH.push({
     var L5 = [[18, 19], [19, 18], [17, 15], [28, 7]];
     return [L1, L2, L3, L4, L5].map(function (l) { var q = pick(l); return { t: 'swap', a: q[0], b: q[1] }; });
   },
-  after: async function () { RUN.juno.play('cheer', 900); SFX.honk(2); await sleep(500); await RUN.juno.walkTo(W + 200, 340); }
+  after: exitRight
 });
 var SWAP = { I: ['V', 5], V: ['X', 2], X: ['L', 5], L: ['C', 2] };
 PZ.swap = function (cx, r) {
@@ -2655,6 +2663,418 @@ PZ.swap = function (cx, r) {
       table().forEach(function (c, k) { var n = nodes[c.id]; if (!n) { return; } var y = n.y; n.y = geo.purses.y; n.o = 0; n.set(); sleep(k * 70).then(function () { SFX.coin(); return to(n, { y: y, o: 1 }, 380, EO); }); });
     }, 30);
   }
+};
+
+// a little label in our own digits, place-coloured
+function tagNum(parent, n, x, y, size) {
+  var s = String(n), w = s.length * size * 0.6 + size * 0.6, g = S('g', {}, parent);
+  plaque(g, x, y, w, size * 1.3, { fill: '#fffaf0', sw: 4 });
+  digitsText(g, n, x, y - size * 0.02, size);
+  return g;
+}
+
+// =====================================================================
+//  V. The road south. Mola the mole puts back the milestones a storm
+//  knocked down. Which one goes in the gap? Patterns: on in ones, back
+//  in ones, in fives, in twos or threes, in tens, and the first L.
+// =====================================================================
+CH.push({
+  id: 'c5', key: 'V', friend: 'mola',
+  voice: function () { SFX.snuffle(); },
+  bg: function (g, ly) {
+    var hz = ly.hz;
+    sky(g, 'r-skyWarm', hz);
+    hills(g, hz - 120, '#b9cf7a', 70, 0.8);
+    hills(g, hz - 40, '#a3c266', 50, 1.7);
+    // fields of wheat, and poplars along the road, as in Gaul
+    var s = '', x;
+    for (x = 40; x < W; x += 230) { s += '<path d="M' + x + ' ' + f1(hz - 30) + ' q-16 -60 0 -150 q16 90 0 150 Z" fill="#5f8a3a"/>'; }
+    G(g, s);
+    ground(g, hz, '#d9c77a');
+  },
+  greet: function () { SFX.snuffle(); },
+  intro: [
+    ['mola', 'Oh, bother and bricks! The storm has knocked down my milestones.'],
+    ['mola', 'Every mile along the road there’s a stone with a number on it, so travellers know how far they’ve come.'],
+    ['mola', 'Without them, everybody gets lost! Can you help me put them back in the right places?']
+  ],
+  outro: [
+    ['mola', 'All mended! Did you spot the patterns? On in ones, back in ones, in fives, in tens…'],
+    ['mola', 'When you spot a pattern, you can guess what comes next. That works with every kind of number.'],
+    ['juno', 'Thank you, Mola! Which way to Lutetia?'],
+    ['mola', 'Just follow the milestones!']
+  ],
+  rounds: function (first) {
+    var a = rint(1, 4), b = rint(11, 15), c = rint(16, 20), d = pick([5, 10]), e = pick([2, 3]);
+    return [
+      mileRound([a, a + 1, a + 2, a + 3, a + 4], rint(2, 3)),
+      mileRound([b, b + 1, b + 2, b + 3, b + 4], rint(1, 3)),
+      mileRound([c, c - 1, c - 2, c - 3, c - 4], rint(2, 4)),
+      mileRound([d, d + 5, d + 10, d + 15, d + 20], rint(2, 4)),
+      mileRound([e, 2 * e, 3 * e, 4 * e, 5 * e], rint(2, 4)),
+      mileRound([10, 20, 30, 40, 50], 3, true)
+    ];
+  },
+  after: exitRight
+});
+function mileRound(seq, gap, isL) {
+  var v = seq[gap], d = seq[1] - seq[0], mir = { 4: 6, 6: 4, 9: 11, 11: 9, 14: 16, 16: 14, 19: 21, 21: 19, 40: 60, 60: 40, 90: 110 };
+  var c = [];
+  if (mir[v] && seq.indexOf(mir[v]) < 0) { c.push(mir[v]); }
+  [v + d, v - d, v + 1, v - 1, v + 2, v + 3, v - 2].forEach(function (q) { if (q > 0 && q !== v && c.indexOf(q) < 0 && seq.indexOf(q) < 0) { c.push(q); } });
+  return { t: 'miles', seq: seq, gap: gap, opts: shuffle([v].concat(c.slice(0, 2))), isL: !!isL };
+}
+function milestoneArt(w, h) {
+  return '<ellipse cx="0" cy="4" rx="' + f1(w * 0.62) + '" ry="12" fill="rgba(60,40,10,.25)"/>' +
+    '<path d="M' + f1(-w / 2) + ' 0 V' + f1(-h + w / 2) + ' A' + f1(w / 2) + ' ' + f1(w / 2) + ' 0 0 1 ' + f1(w / 2) + ' ' + f1(-h + w / 2) + ' V0 Z" fill="#ddd2b8" stroke="#9c8a66" stroke-width="5"/>' +
+    '<path d="M' + f1(-w / 2 + 10) + ' ' + f1(-h * 0.2) + ' H' + f1(w / 2 - 10) + '" stroke="#b9a983" stroke-width="3"/>';
+}
+PZ.miles = function (cx, r) {
+  var st = { placed: false }, geo, chN = [], n = r.seq.length, v = r.seq[r.gap];
+  function layout() {
+    var ly = cx.ly, P = ly.play, o = {};
+    o.sp = (ly.land ? P.w : P.w) / n;
+    o.w = Math.min(150, o.sp * 0.8); o.h = o.w * 1.45;
+    o.rowY = ly.land ? P.y + P.h * 0.5 : P.y + Math.min(P.h * 0.45, 520);
+    o.chY = ly.land ? P.y + P.h * 0.93 : o.rowY + Math.min(P.h * 0.45, 460);
+    o.x = function (i) { return P.x + o.sp * (i + 0.5); };
+    o.fs = function (s) { return Math.min(o.w * 0.44, (o.w - 18) / Math.max(0.6, strW(s, 1, 0.04))); };
+    return o;
+  }
+  function stone(parent, val, x, y, rot) {
+    var g = S('g', {}, parent), rs = roman(val);
+    g.innerHTML = milestoneArt(geo.w, geo.h);
+    numeral(g, rs, 0, -geo.h * 0.55, geo.fs(rs), { fill: '#4a3a22', carved: 'rgba(255,255,255,.6)' });
+    G(g, '<rect class="hit" x="' + f1(-geo.w / 2 - 14) + '" y="' + f1(-geo.h - 14) + '" width="' + f1(geo.w + 28) + '" height="' + f1(geo.h + 28) + '"/>');
+    var nd = N(g, x, y); nd.r = rot || 0; nd.set();
+    return nd;
+  }
+  cx.draw = function () {
+    geo = layout();
+    var P = cx.ly.play, i;
+    // the road
+    G(Lui, '<rect x="' + (-W) + '" y="' + f1(geo.rowY + 6) + '" width="' + (3 * W) + '" height="70" fill="#a9a08c"/><path d="M' + (-W) + ' ' + f1(geo.rowY + 41) + ' H' + (2 * W) + '" stroke="#c9c0aa" stroke-width="6" stroke-dasharray="40 30"/>');
+    for (i = 0; i < n; i++) {
+      if (i === r.gap && !st.placed) {
+        G(Lui, '<ellipse cx="' + f1(geo.x(i)) + '" cy="' + f1(geo.rowY) + '" rx="' + f1(geo.w * 0.55) + '" ry="18" fill="#5a4020"/><path d="M' + f1(geo.x(i) + geo.w * 0.4) + ' ' + f1(geo.rowY - 4) + ' q30 -40 60 0 Z" fill="#7a5a30"/>');
+      } else {
+        stone(Lui, r.seq[i], geo.x(i), geo.rowY, 0);
+      }
+    }
+    chN = [];
+    if (!st.placed) {
+      r.opts.forEach(function (o, j) {
+        var x = P.x + P.w / 2 + (j - (r.opts.length - 1) / 2) * Math.min(P.w / r.opts.length, 260);
+        var nd = stone(Lui, o, x, geo.chY, (j - 1) * 7);
+        nd.el.addEventListener('click', function () { tap(j); });
+        chN.push(nd);
+      });
+    }
+  };
+  function tap(j) {
+    cx.lock(async function () {
+      var nd = chN[j], o = r.opts[j], gx = geo.x(r.gap), x0 = nd.x, y0 = nd.y, r0 = nd.r;
+      nd.el.parentNode.appendChild(nd.el);
+      cx.friend.look(gx, geo.rowY); cx.juno.look(gx, geo.rowY);
+      nd.r = 0;
+      await hopTo(nd, gx, geo.rowY, 520, 140);
+      if (o === v) {
+        SFX.stone(); st.placed = true;
+        clear(Lui); cx.draw();
+        await countAlong();
+        await cx.solved(v);
+        return;
+      }
+      // it doesn't belong here
+      SFX.stone();
+      await anim(500, function (p) { nd.r = Math.sin(p * Math.PI * 4) * 10 * (1 - p); nd.set(); });
+      cx.miss();
+      await hopTo(nd, x0, y0, 420, 80);
+      nd.r = r0; nd.set();
+    });
+  }
+  // under each stone its number in our digits, and the step between them
+  async function countAlong() {
+    var d = r.seq[1] - r.seq[0], i, ty = geo.rowY + 120, size = cx.ly.land ? 46 : 52;
+    for (i = 0; i < n; i++) {
+      var g = tagNum(Ltop, r.seq[i], geo.x(i), ty, size), nd = N(g, 0, 0); nd.o = 0; nd.set();
+      tone({ f: 523 * Math.pow(2, (d > 0 ? i : n - 1 - i) / 7), d: 0.18, type: 'triangle', v: 0.06 });
+      await to(nd, { o: 1 }, 160);
+      if (i < n - 1) {
+        T(Ltop, (d > 0 ? '+' : '−') + Math.abs(d), { x: f1((geo.x(i) + geo.x(i + 1)) / 2), y: f1(ty - 52), 'class': 'sans', 'font-size': f1(size * 0.7), 'text-anchor': 'middle', fill: '#8a6414' });
+      }
+      await sleep(120);
+    }
+    await sleep(700);
+  }
+  cx.hint = function () { var j = r.opts.indexOf(v), nd = chN[j]; if (nd) { hintAt(nd.x, nd.y - geo.h / 2, geo.h * 0.65); } };
+  if (r.isL && cx.first && !RUN.sawL) {
+    RUN.sawL = true;
+    setTimeout(function () { cx.lock(function () { return talk([['mola', 'See this big stone at the end? {=L} means fifty: five tens.'], ['mola', 'So what comes just before it? Remember {IV} and {IX}…']]); }); }, 500);
+  }
+};
+
+// =====================================================================
+//  VI. Lutetia. The mouse cohort must line up for the parade, smallest
+//  number first, on steps that climb as the numbers grow. Long isn't
+//  always big (XXXVIII < XL), and order matters (IV, VI; like 12, 21).
+// =====================================================================
+CH.push({
+  id: 'c6', key: 'VI', friend: 'centurio',
+  voice: function () { SFX.squeak(); },
+  bg: function (g, ly) {
+    var hz = ly.hz;
+    sky(g, 'r-skyDay', hz);
+    // the island in the river, with its buildings
+    G(g, '<rect x="' + (-W) + '" y="' + f1(hz - 90) + '" width="' + (3 * W) + '" height="90" fill="#6fb4c9"/>');
+    var s = '', x, i;
+    for (x = -60, i = 0; x < W + 60; x += 190, i++) {
+      var h = 110 + (i * 37) % 70, y0 = hz - 90 - h;
+      s += '<rect x="' + x + '" y="' + f1(y0) + '" width="150" height="' + f1(h) + '" fill="' + ['#efe2c6', '#e8d4b0'][i % 2] + '" stroke="#c9b48a" stroke-width="3"/><path d="M' + (x - 12) + ' ' + f1(y0) + ' L' + (x + 75) + ' ' + f1(y0 - 46) + ' L' + (x + 162) + ' ' + f1(y0) + ' Z" fill="#c4553a"/>';
+    }
+    G(g, s);
+    // banners on poles
+    s = '';
+    for (x = 120; x < W; x += 420) { s += '<path d="M' + x + ' ' + f1(hz) + ' V' + f1(hz - 300) + '" stroke="#8a5a2a" stroke-width="8"/><path d="M' + (x - 50) + ' ' + f1(hz - 290) + ' H' + (x + 50) + ' V' + f1(hz - 190) + ' L' + x + ' ' + f1(hz - 210) + ' L' + (x - 50) + ' ' + f1(hz - 190) + ' Z" fill="#b23a2a" stroke="#e8b830" stroke-width="4"/><circle cx="' + x + '" cy="' + f1(hz - 250) + '" r="14" fill="#e8b830"/>'; }
+    G(g, s);
+    ground(g, hz, '#e3d2a2');
+  },
+  greet: function () { SFX.squeak(); },
+  intro: [
+    ['centurio', 'Ten-SHUN! Oh, hello. I’m Centurion Mus. My cohort marches in the parade today.'],
+    ['centurio', 'But look at them! All in a muddle.'],
+    ['centurio', 'They must stand on the steps in order: the smallest number on the lowest step, all the way up to the biggest.']
+  ],
+  outro: [
+    ['centurio', 'Splendid! The finest cohort in all of Gaul!'],
+    ['centurio', 'Did you notice? A long number isn’t always a big one. {XXXVIII} is long, but {XL} is bigger.'],
+    ['centurio', 'And the same marks in a different order make a different number: {IV} and {VI}. Just like 12 and 21!'],
+    ['juno', 'Honk! Forward, march!']
+  ],
+  rounds: function () {
+    var a = rint(3, 5), b = rint(7, 9), c = rint(13, 16);
+    return [
+      { t: 'parade', vals: shuffle([a, a + 1, a + 2]) },
+      { t: 'parade', vals: shuffle([b, b + 1, b + 2, b + 3]) },
+      { t: 'parade', vals: shuffle(pick([[9, 10, 11, 12], [8, 9, 11, 12], [4, 6, 9, 11]])) },
+      { t: 'parade', vals: shuffle([c, c + 1, c + 3, c + 5, c + 6]) },
+      { t: 'parade', vals: shuffle(pick([[29, 38, 40, 41, 50], [28, 33, 38, 40, 45], [19, 28, 37, 40, 44]])) },
+      { t: 'parade', vals: shuffle([4, 6, 9, 11, 14, 16]) }
+    ];
+  },
+  after: exitRight
+});
+PZ.parade = function (cx, r) {
+  var n = r.vals.length, sorted = r.vals.slice().sort(function (a, b) { return a - b; }), st = { lined: [], jit: r.vals.map(function () { return [Math.random(), Math.random()]; }) }, geo, mice = [];
+  function layout() {
+    var ly = cx.ly, P = ly.play, o = {};
+    o.sp = P.w / n;
+    o.ms = clamp(o.sp / 250, 0.32, 0.62);           // mouse size
+    o.sw = Math.min(o.sp * 0.92, 210); o.sh = Math.min(o.sw * 0.55, 92);   // shield
+    o.stepBase = ly.land ? P.y + P.h - 40 : P.y + P.h - 30;
+    o.stepH = function (k) { return 40 + k * (ly.land ? 32 : 40); };
+    o.stepX = function (k) { return P.x + o.sp * (k + 0.5); };
+    var top = ly.land ? P.y + 20 : ly.top.y + 30, bottom = o.stepBase - o.stepH(n - 1) - 300 * o.ms - 30, cols = Math.min(n, ly.land ? n : 3), rows = Math.ceil(n / cols);
+    o.home = function (i) {
+      var c = i % cols, rw = Math.floor(i / cols), cw = P.w / cols, rh = Math.max(120, (bottom - top) / rows);
+      return { x: P.x + cw * (c + 0.5) + (st.jit[i][0] - 0.5) * cw * 0.25, y: top + rh * (rw + 1) - 10 + (st.jit[i][1] - 0.5) * 20 };
+    };
+    return o;
+  }
+  function mouse(i, x, y) {
+    var g = S('g', {}, Lui), rs = roman(r.vals[i]), fs = Math.min(geo.sh * 0.62, (geo.sw - 22) / Math.max(0.6, strW(rs, 1, 0.04)));
+    g.innerHTML = '<g class="ms" transform="scale(' + geo.ms.toFixed(3) + ')">' + critterArt(CRIT.miles) + '</g>';
+    var sy = -150 * geo.ms + geo.sh * 0.1;
+    G(g, '<rect x="' + f1(-geo.sw / 2) + '" y="' + f1(sy - geo.sh / 2 + 5) + '" width="' + f1(geo.sw) + '" height="' + f1(geo.sh) + '" rx="12" fill="rgba(60,20,10,.3)"/>' +
+      '<rect x="' + f1(-geo.sw / 2) + '" y="' + f1(sy - geo.sh / 2) + '" width="' + f1(geo.sw) + '" height="' + f1(geo.sh) + '" rx="12" fill="#b23a2a" stroke="#e8b830" stroke-width="5"/>' +
+      '<rect x="' + f1(-geo.sw / 2 + 9) + '" y="' + f1(sy - geo.sh / 2 + 9) + '" width="' + f1(geo.sw - 18) + '" height="' + f1(geo.sh - 18) + '" rx="8" fill="#fbf1d8"/>');
+    numeral(g, rs, 0, sy, fs, { fill: '#3a2410' });
+    G(g, '<rect class="hit" x="' + f1(-Math.max(geo.sw, 120) / 2) + '" y="' + f1(-300 * geo.ms - 20) + '" width="' + f1(Math.max(geo.sw, 120)) + '" height="' + f1(300 * geo.ms + 30) + '"/>');
+    g.addEventListener('click', function () { tap(i); });
+    return N(g, x, y);
+  }
+  cx.draw = function () {
+    geo = layout();
+    var k, s = '';
+    for (k = 0; k < n; k++) {
+      var x = geo.stepX(k), h = geo.stepH(k), w = geo.sp * 0.96;
+      s += '<rect x="' + f1(x - w / 2) + '" y="' + f1(geo.stepBase - h) + '" width="' + f1(w) + '" height="' + f1(h + 30) + '" fill="#e2d6bb" stroke="#a89470" stroke-width="4"/>';
+    }
+    G(Lui, s);
+    mice = [];
+    r.vals.forEach(function (v, i) {
+      var k2 = st.lined.indexOf(i), p = k2 >= 0 ? { x: geo.stepX(k2), y: geo.stepBase - geo.stepH(k2) } : geo.home(i);
+      mice[i] = mouse(i, p.x, p.y);
+    });
+  };
+  function tap(i) {
+    cx.lock(async function () {
+      if (st.lined.indexOf(i) >= 0) { return; }
+      var nd = mice[i], next = sorted[st.lined.length];
+      SFX.squeak();
+      cx.friend.look(nd.x, nd.y); cx.juno.look(nd.x, nd.y);
+      if (r.vals[i] === next) {
+        var k = st.lined.length;
+        st.lined.push(i);
+        nd.el.parentNode.appendChild(nd.el);
+        await hopTo(nd, geo.stepX(k), geo.stepBase - geo.stepH(k), 600, 120);
+        SFX.march();
+        if (st.lined.length === n) { await win(); }
+        return;
+      }
+      // not yet: the mouse looks at its shield and shakes its head
+      await anim(600, function (p) { nd.r = Math.sin(p * Math.PI * 4) * 9 * (1 - p); nd.set(); });
+      cx.miss();
+    });
+  }
+  async function win() {
+    var k, size = cx.ly.land ? 42 : 50;
+    for (k = 0; k < n; k++) {
+      var i = st.lined[k], nd = mice[i];
+      SFX.march();
+      hopTo(nd, nd.x, nd.y, 260, 30);
+      var g = tagNum(Ltop, r.vals[i], geo.stepX(k), geo.stepBase - 4 - size * 0.4, size), tn = N(g, 0, 0); tn.o = 0; tn.set();
+      to(tn, { o: 1 }, 150);
+      tone({ f: 440 * Math.pow(2, k / 7), d: 0.18, type: 'triangle', v: 0.06 });
+      await sleep(240);
+    }
+    await sleep(600);
+    await cx.solved(null);
+  }
+  cx.hint = function () {
+    var i = r.vals.indexOf(sorted[st.lined.length]), nd = mice[i];
+    if (nd) { hintAt(nd.x, nd.y - 150 * geo.ms, Math.max(geo.sw, 120) * 0.65); }
+  };
+};
+
+// =====================================================================
+//  VII. Lugdunum. Felix the cat is laying a mosaic floor: tap out a
+//  rectangle that uses exactly the tiles in his basket. Rows times
+//  columns; the times tables, and the different ways to make a number.
+// =====================================================================
+CH.push({
+  id: 'c7', key: 'VII', friend: 'felix',
+  voice: function () { SFX.meow(); },
+  bg: function (g, ly) {
+    var hz = ly.hz, s = '', x;
+    // inside a villa: painted walls, red and ochre panels, a row of columns
+    G(g, '<rect x="' + (-W) + '" y="' + (-H) + '" width="' + (3 * W) + '" height="' + f1(H + hz) + '" fill="#c4553a"/>');
+    for (x = -60; x < W + 200; x += 260) {
+      s += '<rect x="' + x + '" y="' + f1(hz - 520) + '" width="200" height="400" fill="#e7b85a" stroke="#7f2f1d" stroke-width="8"/><rect x="' + (x + 30) + '" y="' + f1(hz - 490) + '" width="140" height="340" fill="none" stroke="#7f2f1d" stroke-width="3"/>';
+      s += '<path d="M' + (x + 100) + ' ' + f1(hz - 400) + ' q-30 40 0 80 q30 -40 0 -80" fill="#3f7fb0"/>';
+    }
+    s += '<rect x="' + (-W) + '" y="' + f1(hz - 110) + '" width="' + (3 * W) + '" height="110" fill="#2b2118" opacity=".35"/>';
+    G(g, s);
+    ground(g, hz, '#e9dcc0');
+    var t = '', i, j;
+    for (i = -2; i < W / 60 + 2; i++) { for (j = 0; j < 30; j++) { if ((i + j) % 2) { t += '<rect x="' + (i * 60) + '" y="' + f1(hz + j * 60) + '" width="60" height="60" fill="#dccca8"/>'; } } }
+    G(g, t);
+  },
+  greet: function () { SFX.meow(); },
+  intro: [
+    ['felix', 'Mrrrow! Mind the floor, it isn’t finished. I’m making a mosaic for a grand villa.'],
+    ['felix', 'A mosaic is a picture made of little square tiles, laid in neat rows.'],
+    ['felix', 'I’ve counted the tiles in my basket. Make me a rectangle that uses every single one!']
+  ],
+  outro: [
+    ['felix', 'Purr-fect! The number of rows times the number in each row: that’s how many tiles.'],
+    ['felix', '{III} rows of {IV} is twelve, and so is {IV} rows of {III}. It’s your times tables!'],
+    ['juno', 'It’s beautiful, Felix. Honk!']
+  ],
+  rounds: function () {
+    return [{ t: 'mosaic', v: pick([6, 8]) }, { t: 'mosaic', v: pick([9, 10]) }, { t: 'mosaic', v: 12 }, { t: 'mosaic', v: pick([15, 16]) }, { t: 'mosaic', v: pick([20, 25]) }];
+  },
+  after: exitRight
+});
+var TILEC = ['#3f7fb0', '#f2c64a', '#c73a2a', '#2f8a4a', '#f7f2e6', '#7b4fa0'];
+PZ.mosaic = function (cx, r) {
+  var N5 = 5, st = { rows: 0, cols: 0, tried: {} }, geo, pal = shuffle(TILEC);
+  function layout() {
+    var ly = cx.ly, P = ly.play, Tp = ly.top, o = {};
+    if (ly.land) { o.cell = Math.min((P.h - 20) / N5, (P.w * 0.58) / N5, 130); o.gx = P.x + Math.max(30, (P.w * 0.6 - o.cell * N5) / 2); o.gy = P.y + (P.h - o.cell * N5) / 2; o.ro = { x: o.gx + o.cell * N5 + (P.x + P.w - o.gx - o.cell * N5) / 2, y: P.y + P.h * 0.5 }; }
+    else { o.cell = Math.min((P.w - 40) / N5, (P.h - 220) / N5, 170); o.gx = P.x + (P.w - o.cell * N5) / 2; o.gy = P.y + 10; o.ro = { x: 500, y: o.gy + o.cell * N5 + 110 }; }
+    o.basket = { x: Tp.x + Tp.w / 2, y: Tp.y + Tp.h / 2 };
+    return o;
+  }
+  function count() { return st.rows * st.cols; }
+  cx.draw = function () {
+    geo = layout();
+    var s = '', i, j, c = geo.cell, n = count();
+    // the frame and empty sockets
+    s += '<rect x="' + f1(geo.gx - 14) + '" y="' + f1(geo.gy - 14) + '" width="' + f1(c * N5 + 28) + '" height="' + f1(c * N5 + 28) + '" rx="12" fill="#5a4630"/>';
+    for (i = 0; i < N5; i++) { for (j = 0; j < N5; j++) {
+      var on = i < st.rows && j < st.cols;
+      s += '<rect x="' + f1(geo.gx + j * c + 4) + '" y="' + f1(geo.gy + i * c + 4) + '" width="' + f1(c - 8) + '" height="' + f1(c - 8) + '" rx="6" fill="' + (on ? pal[(i + j) % 3] : '#e9dcc0') + '" stroke="' + (on ? 'rgba(0,0,0,.25)' : '#cbbb98') + '" stroke-width="3"/>';
+    } }
+    G(Lui, s);
+    // a tap anywhere in the grid picks that corner
+    for (i = 0; i < N5; i++) { for (j = 0; j < N5; j++) {
+      (function (i2, j2) {
+        var h = S('rect', { 'class': 'hit', x: f1(geo.gx + j2 * c), y: f1(geo.gy + i2 * c), width: f1(c), height: f1(c), 'data-rc': i2 + ',' + j2 }, Lui);
+        h.addEventListener('click', function () { tap(i2 + 1, j2 + 1); });
+      })(i, j);
+    } }
+    // the corner handle
+    if (n) { G(Lui, '<circle cx="' + f1(geo.gx + st.cols * c - 4) + '" cy="' + f1(geo.gy + st.rows * c - 4) + '" r="16" fill="#fff" stroke="#7f2f1d" stroke-width="5" pointer-events="none"/>'); }
+    // Felix's basket: the tiles he has, used ones faded, any he's short of dashed in red
+    var B = geo.basket, per = 5, total = Math.max(r.v, n), groups = Math.ceil(total / per), gpr = Math.min(groups, 5), rowsN = Math.ceil(groups / 5), k, bs = '';
+    var tw = clamp((cx.ly.top.w - 240) / (gpr * per + gpr * 0.6), 16, cx.ly.land ? 32 : 36);
+    var bw = gpr * (per * tw + tw * 0.6) + 24, bh = rowsN * (tw + 10) + 28, left = B.x - (190 + bw) / 2;
+    var bd = makeBoard(Lui, { x: left + 85, y: B.y, w: 170, h: Math.min(cx.ly.top.h, 150) }); bd.show(roman(r.v));
+    var bxl = left + 190 + 12;
+    bs += '<rect x="' + f1(left + 190) + '" y="' + f1(B.y - bh / 2) + '" width="' + f1(bw) + '" height="' + f1(bh) + '" rx="18" fill="#c48a4c" stroke="#6b4420" stroke-width="5"/>';
+    for (k = 0; k < total; k++) {
+      var gi = Math.floor(k / per), col = gi % 5, rw = Math.floor(gi / 5), x = bxl + col * (per * tw + tw * 0.6) + (k % per) * tw, y = B.y - bh / 2 + 14 + rw * (tw + 10);
+      if (k < r.v) { bs += '<rect x="' + f1(x) + '" y="' + f1(y) + '" width="' + f1(tw - 5) + '" height="' + f1(tw - 5) + '" rx="4" fill="' + pal[k % 3] + '" opacity="' + (k < n ? 0.25 : 1) + '"/>'; }
+      else { bs += '<rect x="' + f1(x) + '" y="' + f1(y) + '" width="' + f1(tw - 5) + '" height="' + f1(tw - 5) + '" rx="4" fill="none" stroke="#c73a2a" stroke-width="3" stroke-dasharray="5 4"/>'; }
+    }
+    G(Lui, bs);
+    // rows x columns = how many, in both kinds of number
+    if (n) {
+      var R = geo.ro, sz = cx.ly.land ? 50 : 58, g = S('g', {}, Lui), parts = [st.rows, '×', st.cols, '=', n], cw2 = parts.map(function (q) { return typeof q === 'number' ? Math.max(strW(roman(q), sz), String(q).length * sz * 0.6) : sz * 0.6; }), tot = cw2.reduce(function (a, b) { return a + b; }, 0) + 16 * 4 + 30, xx = R.x - tot / 2 + 15;
+      plaque(g, R.x, R.y, tot, sz * 2.6, { fill: n === r.v ? '#fff3c4' : '#fffaf0' });
+      parts.forEach(function (q, idx) {
+        var m = xx + cw2[idx] / 2;
+        if (typeof q === 'number') { numeral(g, roman(q), m, R.y - sz * 0.62, sz, { colours: true }); digitsText(g, q, m, R.y + sz * 0.62, sz * 0.9); }
+        else { T(g, q, { x: f1(m), y: f1(R.y - sz * 0.62 + sz * 0.3), 'class': 'sans', 'font-size': f1(sz * 0.8), 'text-anchor': 'middle', fill: '#8a6414' }); T(g, q, { x: f1(m), y: f1(R.y + sz * 0.62 + sz * 0.3), 'class': 'sans', 'font-size': f1(sz * 0.8), 'text-anchor': 'middle', fill: '#8a6414' }); }
+        xx += cw2[idx] + 16;
+      });
+    }
+  };
+  function tap(rw, cl) {
+    cx.lock(async function () {
+      st.rows = rw; st.cols = cl;
+      SFX.clack();
+      clear(Lui); cx.draw();
+      cx.juno.look(geo.gx + cl * geo.cell, geo.gy + rw * geo.cell); cx.friend.look(geo.gx + cl * geo.cell, geo.gy + rw * geo.cell);
+      if (count() === r.v) { await win(); return; }
+      var key = rw + 'x' + cl;
+      if (!st.tried[key]) { st.tried[key] = true; cx.miss(true); }
+      if (cx.misses >= 3 && cx.hint) { cx.helped = true; cx.hint(); }
+    });
+  }
+  async function win() {
+    var i, j, c = geo.cell, g = S('g', {}, Ltop);
+    SFX.meow();
+    // the tiles bloom into a pattern
+    for (i = 0; i < st.rows; i++) { for (j = 0; j < st.cols; j++) {
+      var cxp = geo.gx + j * c + c / 2, cyp = geo.gy + i * c + c / 2, rr = (c - 14) / 2, kk = (i + j) % 2;
+      G(g, '<rect x="' + f1(cxp - rr) + '" y="' + f1(cyp - rr) + '" width="' + f1(2 * rr) + '" height="' + f1(2 * rr) + '" rx="6" fill="' + pal[(i * 2 + j) % 4] + '"/>' + (kk ? '<circle cx="' + f1(cxp) + '" cy="' + f1(cyp) + '" r="' + f1(rr * 0.55) + '" fill="' + pal[(i + j + 2) % 5] + '"/>' : '<path d="M' + f1(cxp) + ' ' + f1(cyp - rr * 0.7) + ' L' + f1(cxp + rr * 0.7) + ' ' + f1(cyp) + ' L' + f1(cxp) + ' ' + f1(cyp + rr * 0.7) + ' L' + f1(cxp - rr * 0.7) + ' ' + f1(cyp) + ' Z" fill="' + pal[(i + j + 3) % 5] + '"/>'));
+      SFX.clack();
+      await sleep(RM ? 0 : 35);
+    } }
+    SFX.sparkle();
+    await sleep(500);
+    var ly = cx.ly;
+    await equation([st.rows, '×', st.cols, '=', r.v], W / 2, ly.top.y + ly.top.h / 2);
+    await cx.solved(null);
+  }
+  cx.hint = function () {
+    var rw, cl, best = null;
+    for (rw = 2; rw <= N5 && !best; rw++) { if (r.v % rw === 0 && r.v / rw <= N5 && r.v / rw >= 2) { best = [rw, r.v / rw]; } }
+    if (!best) { best = [1, r.v]; }
+    hintAt(geo.gx + (best[1] - 0.5) * geo.cell, geo.gy + (best[0] - 0.5) * geo.cell, geo.cell * 0.7);
+  };
 };
 
 // =====================================================================
