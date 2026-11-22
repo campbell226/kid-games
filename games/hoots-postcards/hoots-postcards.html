@@ -231,6 +231,362 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
 </script>
 
 <script>
+// Adult gate. The same block sits in every game that has parent controls.
+// A gear in the top-right flashes three times at launch so a grown-up knows
+// it is there, then is invisible. Hold it for 1.5 s and it asks one
+// random question with a number pad. Right opens the controls; wrong
+// closes quietly. It is a speed bump for a button-bashing child, not security.
+// Use: var gearBtn = AdultGate.attach(openParent);
+var AdultGate = (function () {
+  'use strict';
+  var QS = [
+    ['What is 2 to the power 3?', 8],
+    ['What is the first digit of pi?', 3],
+    ['What are the first two digits of pi after the point?', 14],
+    ['How many days are there in a leap year?', 366],
+    ['What is 7 × 8?', 56],
+    ['What is the square root of 144?', 12],
+    ['How many players are on the pitch for one football team?', 11],
+    ['At what temperature in °C does water boil?', 100],
+    ['How many minutes are there in a day?', 1440],
+    ['What is the atomic number of carbon?', 6],
+    ['What is 15% of 200?', 30],
+    ['How many degrees do the angles of a triangle add up to?', 180]
+  ];
+  var RM = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function css(n, s) { n.style.cssText = s; return n; }
+
+  function attach(open) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.setAttribute('aria-label', 'Parent controls');
+    btn.innerHTML = '<svg viewBox="0 0 40 40" width="100%" height="100%"><path fill="#fff" fill-rule="evenodd" d="M17.5 7.2L18.1 2.6L21.9 2.6L22.5 7.2L27.2 9.2L30.9 6.3L33.7 9.1L30.8 12.8L32.8 17.5L37.4 18.1L37.4 21.9L32.8 22.5L30.8 27.2L33.7 30.9L30.9 33.7L27.2 30.8L22.5 32.8L21.9 37.4L18.1 37.4L17.5 32.8L12.8 30.8L9.1 33.7L6.3 30.9L9.2 27.2L7.2 22.5L2.6 21.9L2.6 18.1L7.2 17.5L9.2 12.8L6.3 9.1L9.1 6.3L12.8 9.2ZM20 13.6a6.4 6.4 0 1 0 0.01 0Z"/></svg>';
+    css(btn, 'position:fixed;top:max(8px,env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right));' +
+      'width:56px;height:56px;padding:12px;border:0;border-radius:50%;background:rgba(0,0,0,0.35);' +
+      'opacity:0;z-index:40;cursor:pointer;touch-action:none;-webkit-tap-highlight-color:transparent;');
+    document.body.appendChild(btn);
+
+    // Three flashes, then gone. Reduced motion: held steady, then a fade.
+    if (btn.animate) {
+      btn.animate(RM
+        ? [{ opacity: 0.8 }, { opacity: 0.8, offset: 0.8 }, { opacity: 0 }]
+        : [{ opacity: 0 }, { opacity: 0.8, offset: 0.08 }, { opacity: 0, offset: 0.16 },
+           { opacity: 0.8, offset: 0.32 }, { opacity: 0, offset: 0.4 },
+           { opacity: 0.8, offset: 0.56 }, { opacity: 0 }],
+        { duration: RM ? 3000 : 2400, delay: 700, fill: 'none' });
+    }
+
+    var t = 0;
+    function stop() { clearTimeout(t); }
+    btn.addEventListener('pointerdown', function () { stop(); t = setTimeout(ask, 1500); });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (e) { btn.addEventListener(e, stop); });
+    btn.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
+    function ask() {
+      var q = QS[Math.floor(Math.random() * QS.length)], typed = '';
+      var wrap = css(document.createElement('div'),
+        'position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;' +
+        'background:rgba(12,24,40,0.6);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;');
+      var box = css(document.createElement('div'),
+        'background:#fdfaf3;color:#22303f;border-radius:18px;padding:18px;width:min(320px,92vw);' +
+        'box-shadow:0 18px 50px rgba(0,0,0,0.35);text-align:center;');
+      var qt = css(document.createElement('div'), 'font-size:16px;margin-bottom:10px;min-height:46px;');
+      qt.textContent = q[0];
+      var shown = css(document.createElement('div'),
+        'font-size:30px;font-weight:700;height:46px;line-height:46px;border-radius:10px;background:#fff;border:2px solid #cfd8e0;margin-bottom:10px;');
+      var pad = css(document.createElement('div'), 'display:grid;grid-template-columns:repeat(3,1fr);gap:8px;');
+      box.appendChild(qt); box.appendChild(shown); box.appendChild(pad);
+      wrap.appendChild(box);
+      function close() { if (wrap.parentNode) { wrap.parentNode.removeChild(wrap); } document.removeEventListener('keydown', key); }
+      function submit() { var ok = typed !== '' && +typed === q[1]; close(); if (ok) { open(); } }
+      function press(k) {
+        if (k === 'ok') { submit(); return; }
+        if (k === 'del') { typed = typed.slice(0, -1); }
+        else if (typed.length < 5) { typed += k; }
+        shown.textContent = typed;
+      }
+      function key(e) {
+        if (e.key === 'Escape') { close(); }
+        else if (e.key === 'Enter') { submit(); }
+        else if (e.key === 'Backspace') { press('del'); }
+        else if (/^[0-9]$/.test(e.key)) { press(e.key); }
+      }
+      ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'ok'].forEach(function (k) {
+        var b = css(document.createElement('button'),
+          'min-height:52px;border:2px solid #cfd8e0;border-radius:11px;background:' + (k === 'ok' ? '#c8102e' : '#fff') +
+          ';color:' + (k === 'ok' ? '#fff' : '#22303f') + ';font:inherit;font-size:22px;font-weight:600;cursor:pointer;');
+        b.type = 'button';
+        b.textContent = k === 'del' ? '⌫' : (k === 'ok' ? '✓' : k);
+        b.addEventListener('click', function () { press(k); });
+        pad.appendChild(b);
+      });
+      wrap.addEventListener('click', function (e) { if (e.target === wrap) { close(); } });
+      document.addEventListener('keydown', key);
+      document.body.appendChild(wrap);
+    }
+    return btn;
+  }
+  return { attach: attach };
+})();
+
+// Players. The same block sits in every game that keeps one child's progress
+// apart from another's (Chess Quest has its own older version). Each player
+// owns the game's whole save. A game reads its save with Players.raw(),
+// writes it with Players.write(data), and calls Players.start() once at the
+// end of its set-up. The picker, the + tile, the parent's Players section and
+// the adult gear all come from here. Changing player reloads the page, so a
+// game never has to rebuild a scene for someone else.
+//
+//   var PL = Players.make({
+//     key:     'game-players',        // where the envelope is kept
+//     legacy:  ['game'],              // old single saves, copied in as Player 1
+//     fresh:   function () { return {...}; },   // a new player's save
+//     summary: function (data) { return '12 flowers'; },
+//     btn:     'left:50%;margin-left:-27px;top:12px;',  // who button position
+//     shared:  function (box, ui) { ... }       // game-wide parent settings
+//   });
+var Players = (function () {
+  'use strict';
+  var COLS = ['#ff6b6b', '#ff9b3d', '#f2b134', '#3a9d4d', '#4aa3ff', '#b07cff'];
+  var MAX = 8;
+
+  function el(tag, cls, parent, text) {
+    var e = document.createElement(tag);
+    if (cls) { e.className = cls; }
+    if (text !== undefined) { e.textContent = text; }
+    if (parent) { parent.appendChild(e); }
+    return e;
+  }
+
+  function make(cfg) {
+    var env = { players: [], cur: '' };
+    var frozen = false, dirty = false, startCur = '', gear = null;
+    var whoEl = null, btnEl = null, parentEl = null;
+
+    function pid() { return 'p' + Date.now().toString(36) + Math.floor(Math.random() * 1e5).toString(36); }
+    function find(id) { var i; for (i = 0; i < env.players.length; i++) { if (env.players[i].id === id) { return env.players[i]; } } return null; }
+    function curP() { return find(env.cur); }
+    function flush() { try { localStorage.setItem(cfg.key, JSON.stringify(env)); } catch (e) { /* private window: nothing lost that mattered */ } }
+    function initialOf(n) { n = (n || '').trim(); return n ? Array.from(n)[0].toUpperCase() : '?'; }
+
+    // ---- storage ----
+    (function () {
+      var o = null, d = null, k;
+      try { o = JSON.parse(localStorage.getItem(cfg.key) || 'null'); } catch (e) { o = null; }
+      if (o && Array.isArray(o.players)) {
+        env.players = o.players.filter(function (p) { return p && typeof p.id === 'string' && p.data && typeof p.data === 'object'; });
+        env.cur = typeof o.cur === 'string' ? o.cur : '';
+      } else {
+        // Before there were players there was one save. It becomes Player 1,
+        // and the old key is left where it is as a spare copy.
+        for (k = 0; k < (cfg.legacy || []).length && !d; k++) {
+          try { d = JSON.parse(localStorage.getItem(cfg.legacy[k]) || 'null'); } catch (e) { d = null; }
+          if (d && typeof d !== 'object') { d = null; }
+        }
+        if (d) {
+          env.players = [{ id: pid(), name: 'Player 1', col: COLS[0], all: false, data: d }];
+          env.cur = env.players[0].id;
+          flush();
+        }
+      }
+      if (!find(env.cur)) { env.cur = env.players.length === 1 ? env.players[0].id : ''; }
+    })();
+
+    function raw() { var p = curP(); return p ? p.data : null; }
+    function write(data) { var p = curP(); if (p && !frozen) { p.data = data; flush(); } }
+    function all() { var p = curP(); return !!(p && p.all); }
+
+    function go() {
+      try { history.replaceState(null, '', location.pathname + location.search + '#as'); } catch (e) { /* ignore */ }
+      location.reload();
+    }
+
+    // ---- look ----
+    function addStyle() {
+      var s = document.createElement('style');
+      s.textContent =
+        '.pl-who[hidden],.pl-parent[hidden]{display:none!important;}' +
+        '.pl-who{position:fixed;inset:0;z-index:50;background:linear-gradient(#2b3d78,#1e2a4a 70%);display:flex;align-items:center;justify-content:center;overflow-y:auto;padding:70px 16px 30px;font-family:ui-rounded,system-ui,-apple-system,"Segoe UI",sans-serif;color:#fff;touch-action:manipulation;}' +
+        '.pl-who .wbox{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:22px;max-width:760px;margin:auto;}' +
+        '.pl-who button,.pl-btn,.pl-parent button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;-webkit-tap-highlight-color:transparent;padding:0;}' +
+        '.pl-tile{width:clamp(110px,26vw,170px);display:flex;flex-direction:column;align-items:center;gap:8px;font-size:clamp(18px,4vmin,26px);font-weight:800;}' +
+        '.pl-face{width:100%;aspect-ratio:1;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:clamp(54px,13vmin,84px);font-weight:900;box-shadow:0 7px 0 rgba(0,0,0,.25);text-shadow:0 3px 0 rgba(0,0,0,.2);}' +
+        '.pl-tile:active .pl-face{transform:scale(.93);}' +
+        '.pl-tile.add .pl-face{background:rgba(255,255,255,.12);border:5px dashed rgba(255,255,255,.55);box-shadow:none;}' +
+        '.pl-tile .pn{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}' +
+        '.pl-form{display:flex;flex-direction:column;align-items:center;gap:22px;margin:auto;}' +
+        '.pl-form input{font:inherit;font-size:clamp(28px,7vmin,44px);font-weight:800;text-align:center;padding:10px 14px;border-radius:18px;border:0;width:min(80vw,360px);color:#22303f;}' +
+        '.pl-sw{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;}' +
+        '.pl-sw button{width:clamp(52px,12vmin,70px);height:clamp(52px,12vmin,70px);border-radius:50%;box-shadow:0 5px 0 rgba(0,0,0,.25);}' +
+        '.pl-sw button.on{outline:6px solid #fff;outline-offset:2px;}' +
+        '.pl-go{width:clamp(80px,18vmin,110px);height:clamp(80px,18vmin,110px);border-radius:50%;background:#3a9d4d!important;box-shadow:0 7px 0 rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;}' +
+        '.pl-go svg,.pl-back svg{width:60%;height:60%;}' +
+        '.pl-back{position:absolute;left:14px;top:14px;width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,.18)!important;display:flex;align-items:center;justify-content:center;}' +
+        '.pl-shk{animation:plshk .4s;}@keyframes plshk{0%,100%{transform:translateX(0)}25%{transform:translateX(-9px)}75%{transform:translateX(9px)}}' +
+        '.pl-btn{position:fixed;z-index:30;width:54px;height:54px;border-radius:50%;border:4px solid #fff!important;font-size:26px;font-weight:900;color:#fff;box-shadow:0 4px 0 rgba(0,0,0,.3);text-shadow:0 2px 0 rgba(0,0,0,.2);display:none;align-items:center;justify-content:center;font-family:ui-rounded,system-ui,sans-serif;}' +
+        '.pl-parent{position:fixed;inset:0;z-index:55;background:rgba(10,14,34,.97);overflow-y:auto;padding:18px;color:#fff;font:16px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;}' +
+        '.pl-parent .box{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:14px;}' +
+        '.pl-parent h3{margin:6px 0 0;font-size:20px;}' +
+        '.pl-parent .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:18px;}' +
+        '.pl-parent input{font:inherit;font-size:20px;padding:8px 12px;border-radius:10px;border:0;width:100%;max-width:240px;color:#22303f;}' +
+        '.pl-parent .pb{padding:12px 16px;border-radius:12px;background:#3b4a82;font-size:18px;font-weight:700;}' +
+        '.pl-parent .pb.on{background:#3a9d4d;}.pl-parent .pb.danger{background:#a63a3a;}' +
+        '.pl-parent .plr{background:#1a2350;border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:10px;}' +
+        '.pl-parent .dot{width:34px;height:34px;border-radius:50%;flex:none;}' +
+        '.pl-parent small{opacity:.65;}';
+      document.head.appendChild(s);
+    }
+
+    function paintBtn() {
+      var p = curP();
+      if (!btnEl) { return; }
+      if (!p || (whoEl && !whoEl.hidden)) { btnEl.style.display = 'none'; return; }
+      btnEl.style.background = p.col || COLS[0];
+      btnEl.textContent = initialOf(p.name);
+      btnEl.style.display = 'flex';
+    }
+
+    function gearVisible(on) {
+      if (!gear) { return; }
+      if (on && gear.getAnimations) { gear.getAnimations().forEach(function (a) { a.cancel(); }); }
+      gear.style.opacity = on ? '0.8' : '0';
+      gear.style.zIndex = on ? '56' : '40';
+    }
+
+    function hideWho() { if (whoEl) { whoEl.hidden = true; } gearVisible(false); paintBtn(); }
+
+    function showWho(adding) {
+      var box, inp, sw, go2, ok, bk, col = COLS[env.players.length % COLS.length];
+      if (!whoEl) { whoEl = el('div', 'pl-who', document.body); }
+      whoEl.innerHTML = ''; whoEl.hidden = false;
+      gearVisible(true); paintBtn();
+      if (adding) {
+        box = el('div', 'pl-form', whoEl);
+        inp = el('input', '', box); inp.type = 'text'; inp.maxLength = 14;
+        inp.setAttribute('autocomplete', 'off'); inp.setAttribute('autocapitalize', 'words'); inp.setAttribute('aria-label', 'Name');
+        sw = el('div', 'pl-sw', box);
+        COLS.forEach(function (c) {
+          var b = el('button', c === col ? 'on' : '', sw); b.style.background = c; b.setAttribute('aria-label', 'Colour');
+          b.onclick = function () { col = c; Array.prototype.forEach.call(sw.children, function (x) { x.className = x === b ? 'on' : ''; }); };
+        });
+        go2 = el('button', 'pl-go', box);
+        go2.innerHTML = '<svg viewBox="0 0 100 100"><path d="M20 53 L42 75 L82 28" fill="none" stroke="#fff" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        go2.setAttribute('aria-label', 'Done');
+        ok = function () {
+          var nm = inp.value.trim(), p;
+          if (!nm) { inp.classList.add('pl-shk'); setTimeout(function () { inp.classList.remove('pl-shk'); }, 450); inp.focus(); return; }
+          p = { id: pid(), name: nm, col: col, all: false, data: cfg.fresh() };
+          env.players.push(p); env.cur = p.id; flush(); go();
+        };
+        go2.onclick = ok;
+        inp.onkeydown = function (ev) { if (ev.key === 'Enter') { ok(); } };
+        if (env.players.length) {
+          bk = el('button', 'pl-back', whoEl);
+          bk.innerHTML = '<svg viewBox="0 0 100 100"><path d="M62 18 L28 50 L62 82" fill="none" stroke="#fff" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+          bk.setAttribute('aria-label', 'Back');
+          bk.onclick = function () { showWho(false); };
+        }
+        setTimeout(function () { try { inp.focus(); } catch (e) { /* ignore */ } }, 60);
+        return;
+      }
+      box = el('div', 'wbox', whoEl);
+      env.players.forEach(function (p) {
+        var t = el('button', 'pl-tile', box), f = el('div', 'pl-face', t, initialOf(p.name));
+        f.style.background = p.col || COLS[0];
+        el('div', 'pn', t, p.name);
+        t.onclick = function () {
+          if (p.id === startCur && p.id === env.cur) { hideWho(); return; }
+          env.cur = p.id; flush(); go();
+        };
+      });
+      if (env.players.length < MAX) {
+        var a = el('button', 'pl-tile add', box);
+        a.innerHTML = '<div class="pl-face"><svg viewBox="0 0 100 100" style="width:50%;height:50%"><path d="M50 18 V82 M18 50 H82" stroke="#fff" stroke-width="14" stroke-linecap="round"/></svg></div>';
+        a.setAttribute('aria-label', 'New player');
+        a.onclick = function () { showWho(true); };
+      }
+    }
+
+    // ---- the parent's side ----
+    function toggle(parent, label, isOn, fn) {
+      var b = el('button', 'pb' + (isOn ? ' on' : ''), parent, label);
+      b.onclick = fn;
+      return b;
+    }
+    function confirmBtn(parent, label, sure, fn) {
+      var b = el('button', 'pb danger', parent, label);
+      b.onclick = function () {
+        if (b.getAttribute('data-sure')) { fn(); return; }
+        b.setAttribute('data-sure', '1'); b.textContent = sure;
+      };
+      return b;
+    }
+    function change(p, fn) {
+      fn();
+      if (p.id === env.cur) { frozen = true; dirty = true; }
+      flush();
+    }
+
+    function openParent() {
+      var box, done;
+      if (!parentEl) { parentEl = el('div', 'pl-parent', document.body); parentEl.setAttribute('role', 'dialog'); }
+      parentEl.innerHTML = ''; parentEl.hidden = false;
+      box = el('div', 'box', parentEl);
+      el('h3', '', box, 'Parent controls');
+      el('h3', '', box, 'Players');
+      if (!env.players.length) { el('small', '', box, 'No players yet. A child can add themselves from the picture screen, or add one here.'); }
+      env.players.forEach(function (p) {
+        var card = el('div', 'plr', box), r = el('div', 'row', card), ni, sm = cfg.summary ? cfg.summary(p.data) : '';
+        el('div', 'dot', r).style.background = p.col || COLS[0];
+        ni = el('input', '', r); ni.type = 'text'; ni.maxLength = 14; ni.value = p.name; ni.setAttribute('aria-label', 'Name');
+        ni.oninput = function () { if (ni.value.trim()) { p.name = ni.value.trim(); flush(); paintBtn(); } };
+        ni.onchange = function () { if (!ni.value.trim()) { ni.value = p.name; } };
+        if (sm) { el('small', '', r, sm); }
+        r = el('div', 'row', card);
+        toggle(r, 'Open everything', p.all, function () { change(p, function () { p.all = !p.all; }); openParent(); });
+        confirmBtn(r, 'Start again', 'Tap again to wipe their progress', function () {
+          change(p, function () { p.data = cfg.fresh(); p.all = false; }); openParent();
+        });
+        confirmBtn(r, 'Delete', 'Tap again to delete ' + p.name, function () {
+          change(p, function () { env.players = env.players.filter(function (q) { return q !== p; }); if (env.cur === p.id) { env.cur = ''; } });
+          dirty = true; openParent();
+        });
+      });
+      if (env.players.length < MAX) {
+        el('button', 'pb', box, 'Add a player').onclick = function () { parentEl.hidden = true; showWho(true); };
+      }
+      if (cfg.shared) { cfg.shared(box, { el: el, toggle: toggle, confirmBtn: confirmBtn, again: openParent }); }
+      done = el('button', 'pb', box, 'Done');
+      done.onclick = function () {
+        parentEl.hidden = true;
+        if (dirty) { go(); }
+      };
+    }
+
+    // ---- launch ----
+    function start() {
+      var hadHash = location.hash === '#as';
+      if (hadHash) { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* ignore */ } }
+      addStyle();
+      startCur = env.cur;
+      btnEl = el('button', 'pl-btn', document.body);
+      btnEl.style.cssText = cfg.btn || 'left:12px;top:12px;';
+      btnEl.setAttribute('aria-label', 'Who is playing');
+      btnEl.onclick = function () { showWho(false); };
+      gear = AdultGate.attach(openParent);
+      if (!env.players.length) { showWho(true); }
+      else if (env.players.length > 1 && !(hadHash && find(env.cur))) { showWho(false); }
+      paintBtn();
+    }
+
+    return { raw: raw, write: write, all: all, start: start, openParent: openParent, current: curP };
+  }
+  return { make: make };
+})();
+</script>
+
+<script>
 (function () {
   'use strict';
 
@@ -319,28 +675,30 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
       dev: {}, routes: [], pieces: 0, told: {}
     };
   }
+  // Each child has their own postman. Players holds them all; this game only
+  // ever sees the current one's save.
+  var PL = Players.make({
+    key: 'hoots-postcards-players',
+    legacy: [SAVE_KEY, OLD_KEY],
+    fresh: freshSave,
+    summary: function (d) { return (d.miles | 0) + ' miles'; },
+    btn: 'right:12px;bottom:12px;'
+  });
+  function PUFF() { return PL.all() ? 20 : saved.puff; }
+  function CAP() { return PL.all() ? 4 : saved.cap; }
   var saved = freshSave();
   (function () {
-    var o = null, full = false;
-    try {
-      var raw = window.localStorage.getItem(SAVE_KEY);
-      if (raw) { o = JSON.parse(raw); full = true; }
-      else {
-        raw = window.localStorage.getItem(OLD_KEY);
-        if (raw) { o = JSON.parse(raw); }
-      }
-    } catch (e) { o = null; /* a private window, a data: page; nothing lost */ }
+    var o = PL.raw(), full = true;
     if (!o || typeof o !== 'object') { return; }
     function obj(x) { return (x && typeof x === 'object' && !Array.isArray(x)) ? x : {}; }
     function int(x, a, b, d) { return (typeof x === 'number' && isFinite(x)) ? clamp(Math.round(x), a, b) : d; }
     function strs(x) { return Array.isArray(x) ? x.filter(function (s) { return typeof s === 'string'; }) : []; }
     saved.v = obj(o.v);
     saved.miles = int(o.miles, 0, 999999, 0);
-    if (!full) { return; }
     if (typeof o.here === 'string') { saved.here = o.here; }
     saved.puff = int(o.puff, 1, 20, 5);
     saved.cap = int(o.cap, 1, 4, 2);
-    saved.bag = strs(o.bag).slice(0, saved.cap);
+    saved.bag = strs(o.bag).slice(0, CAP());
     saved.seen = obj(o.seen); saved.held = obj(o.held); saved.dev = obj(o.dev);
     saved.prologue = o.prologue === true;
     saved.ch = int(o.ch, 0, 99, 0);
@@ -352,11 +710,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     saved.told = obj(o.told);
   })();
   function persist() {
-    try { window.localStorage.setItem(SAVE_KEY, JSON.stringify(saved)); } catch (e) { /* as above */ }
-  }
-  function startAgain() {
-    try { window.localStorage.removeItem(SAVE_KEY); window.localStorage.removeItem(OLD_KEY); } catch (e) { /* fine */ }
-    window.location.reload();
+    PL.write(saved);
   }
   function visits(id) {
     var n = saved.v[id];
@@ -846,7 +1200,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     }
     var left = needAt(c.place) || [];
     if (!left.length) { return ''; }
-    var k = left[0], it = ITEMS[k], who = 'the ' + whoIs(c.place) + ' in ' + inName(c.place), full = bag.length >= saved.cap;
+    var k = left[0], it = ITEMS[k], who = 'the ' + whoIs(c.place) + ' in ' + inName(c.place), full = bag.length >= CAP();
     var room = full ? ' My satchel’s full, so I’ll have to put something back.' : '';
     var one = /^an? /.test(itemName(k)) ? 'one' : 'some';
     if (left.length > 1 && left.every(function (x) { return bag.indexOf(x) >= 0; })) {
@@ -994,7 +1348,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     return ['These are my feathers. Each one can carry me a thousand miles.', 'Flying uses them up. But whenever I land somewhere, I get them all back.'];
   }
   function bagLines() {
-    return ['This is my satchel. It has ' + ['no', 'one', 'two', 'three', 'four'][saved.cap] + ' pockets, so I can carry ' + ['nothing', 'one thing', 'two things', 'three things', 'four things'][saved.cap] + ' at a time.'];
+    return ['This is my satchel. It has ' + ['no', 'one', 'two', 'three', 'four'][CAP()] + ' pockets, so I can carry ' + ['nothing', 'one thing', 'two things', 'three things', 'four things'][CAP()] + ' at a time.'];
   }
   function globeLessons() {
     if (mode !== 'globe' || modeT < 0.8 || !saved.prologue || dlg.cur || spot.busy || fl) { return; }
@@ -1009,13 +1363,13 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     }
     if (saved.told.trip) { starLessons(); }
     if (sel && !saved.told.trip && previewReady()) {
-      var cost = tripCost(here, sel), short = cost > saved.puff;
+      var cost = tripCost(here, sel), short = cost > PUFF();
       if (short) { saidTooFar = true; }
       teach('trip', [
         { at: $('pvpips'), lines: ['Each feather on the line is a thousand miles. This trip needs ' + cost + '.'] },
         { at: hud.feathers, lines: short
-          ? ['But I’ve only got ' + saved.puff + ' feathers, so I’d run out of puff on the way.', 'I’ll have to stop somewhere nearer first, and get my puff back.']
-          : ['I’ve got ' + saved.puff + ' feathers, so I can make it. Tap the place again to go!'] }
+          ? ['But I’ve only got ' + PUFF() + ' feathers, so I’d run out of puff on the way.', 'I’ll have to stop somewhere nearer first, and get my puff back.']
+          : ['I’ve got ' + PUFF() + ' feathers, so I can make it. Tap the place again to go!'] }
       ]);
     }
   }
@@ -5590,7 +5944,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     var g = hud.g;
     clear(g);
     if (!saved.prologue) { return; }
-    var m = 14, gap = 8, b = bagArt(saved.cap, SLOT_PX, saved.bag, gap);
+    var m = 14, gap = 8, b = bagArt(CAP(), SLOT_PX, saved.bag, gap);
     var bg = el('g', { 'data-hit': 'bag', transform: 'translate(' + m + ',' + f2(VH - m - b.h) + ')' }, g);
     bg.innerHTML = b.art;
     hud.bag = bg;
@@ -5609,10 +5963,10 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
   // need beyond what he has show as dashed outlines: that's the shortfall.
   function refreshFeathers() {
     if (!hud.feathers) { return; }
-    var cost = sel ? tripCost(here, sel) : 0, s = '', n = Math.max(saved.puff, cost);
+    var cost = sel ? tripCost(here, sel) : 0, s = '', n = Math.max(PUFF(), cost);
     for (var i = 0; i < n; i++) {
       var x = i * 21;
-      if (i >= saved.puff) { s += '<g transform="translate(' + x + ',0)">' + featherArt('none', '#a8b0c8', true) + '</g>'; }
+      if (i >= PUFF()) { s += '<g transform="translate(' + x + ',0)">' + featherArt('none', '#a8b0c8', true) + '</g>'; }
       else { s += '<g transform="translate(' + x + ',0)">' + featherArt(i < cost ? '#ffd34a' : '#f2e2c4', i < cost ? '#b07a10' : '#a87b55') + '</g>'; }
     }
     // a clear patch behind, so a finger anywhere on the row counts
@@ -5746,7 +6100,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     cam.goal = z;
     keepHoot(goal, z);
     selT = performance.now();
-    var short = tripCost(here, id) > saved.puff;
+    var short = tripCost(here, id) > PUFF();
     if (starry(here)) { saidStars = true; starsLesson = true; }
     setGear(gh, 'sweat', short);
     if (short) {
@@ -5764,7 +6118,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
       dur: reduced ? 0.6 : clamp(1.4 + ang * R2D / 42, 2, 5.6), nextFlap: 0, px: 0, py: 0,
       carry: saved.bag.length > 0,
       // if he hasn't the puff for it, how far along he'll get
-      runAt: cost > saved.puff ? saved.puff * per / miles : 0
+      runAt: cost > PUFF() ? PUFF() * per / miles : 0
     };
     sel = null; pointArrow = null;
     setGear(gh, 'sweat', false);
@@ -6146,8 +6500,8 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
       var k = len.length - 1;
       return { f: fs[k], x: xs[k], y: ys[k] };
     }
-    if (n > saved.puff) {
-      var cut = at(tot * (saved.puff + 0.5) / (n + 1)).f;
+    if (n > PUFF()) {
+      var cut = at(tot * (PUFF() + 0.5) / (n + 1)).f;
       ok.setAttribute('d', arcPath(a, b, 0, cut, R, lift));
       grey.setAttribute('d', arcPath(a, b, cut, 1, R, lift));
     } else {
@@ -6160,7 +6514,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     for (i = 0; i < pipNodes.length; i++) {
       var g = pipNodes[i];
       if (i >= n) { g.setAttribute('display', 'none'); continue; }
-      var p = at(tot * (i + 1) / (n + 1)), inReach = i < saved.puff, want = (inReach ? 'y' : 'n') + (starry(here) ? 's' : '');
+      var p = at(tot * (i + 1) / (n + 1)), inReach = i < PUFF(), want = (inReach ? 'y' : 'n') + (starry(here) ? 's' : '');
       if (g.getAttribute('data-k') !== want) {
         g.setAttribute('data-k', want);
         g.innerHTML = '<circle r="15" fill="' + (inReach ? '#fff6dc' : '#3a4260') + '" stroke="' + (inReach ? '#b07a10' : '#8a93b0') + '" stroke-width="2"' + (inReach ? '' : ' stroke-dasharray="4 3"') + '/>'
@@ -6792,11 +7146,11 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     shud.slots = []; shud.g = null;
     if (!S || !saved.prologue) { return; }
     var u = 1000 / VW, slot = SLOT_PX * 1.15 * u, gap = 8 * u, m = 14 * u;
-    var b = bagArt(saved.cap, slot, saved.bag, gap), x0 = m, y0 = SH - m - b.h;
+    var b = bagArt(CAP(), slot, saved.bag, gap), x0 = m, y0 = SH - m - b.h;
     shud.g = el('g', { transform: 'translate(' + f2(x0) + ',' + f2(y0) + ')' }, g);
     shud.g.innerHTML = b.art;
     shud.x0 = x0; shud.y0 = y0; shud.u = u; shud.slot = slot;
-    for (var i = 0; i < saved.cap; i++) {
+    for (var i = 0; i < CAP(); i++) {
       var cx = x0 + gap + slot / 2 + i * (slot + gap), cy = y0 + gap + slot / 2;
       shud.slots.push({ x: cx, y: cy });
       el('circle', { class: 'hit', cx: f2(cx), cy: f2(cy), r: f2(slot / 2 + 5 * u), 'data-hit': 'slot:' + i }, g);
@@ -6857,7 +7211,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
   }
 
   function setBag(list2) {
-    saved.bag = list2.slice(0, saved.cap);
+    saved.bag = list2.slice(0, CAP());
     persist();
   }
 
@@ -6867,7 +7221,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
     var pile = null;
     S.piles.forEach(function (q) { if (q.item === item) { pile = q; } });
     if (!pile) { return; }
-    if (saved.bag.length >= saved.cap) {
+    if (saved.bag.length >= CAP()) {
       S.hoot.shake = 0.6;
       SND.bonk();
       var arm = function () { if (S) { S.swap = { item: item, pile: pile, until: S.time + 6 }; } };
@@ -7238,7 +7592,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
         done();
       });
     }
-    if (bag.length < saved.cap) { put(); return; }
+    if (bag.length < CAP()) { put(); return; }
     var i = bag.length - 1;
     while (i >= 0 && ITEMS[bag[i]].keep) { i -= 1; }
     if (i < 0) { put(); return; }
@@ -7803,14 +8157,6 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
       S.home.oldbag = ob;
     }
 
-    // a parent's control, small and out of the way: hold it, then confirm
-    var rx = land ? 1000 - 16 - 170 : 500 - 85, ry = H - 16 - 46;
-    var rs = el('g', { 'data-hit': 'reset', transform: 'translate(' + f2(rx) + ',' + f2(ry) + ')' }, hg);
-    rs.innerHTML = '<rect width="170" height="46" rx="23" fill="#efe2c8" opacity="0.85" stroke="#c8b48c" stroke-width="2"/>'
-      + '<text x="85" y="30" font-size="21" text-anchor="middle" fill="#7a6a5a">Start again</text>'
-      + '<rect class="rs-bar" x="14" y="38" width="0" height="5" rx="2.5" fill="#d9434e"/>';
-    S.home.resetBar = rs.querySelector('.rs-bar');
-
     // Hoot goes on top of all that
     var keep = S.hoot ? { x: S.hoot.x, y: S.hoot.y, op: S.hoot.op, gear: S.hoot.gear } : null;
     S.hoot = makeHoot(hg, false);
@@ -8008,7 +8354,6 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
       if (zz.parentNode) { zz.parentNode.removeChild(zz); }
       return;
     }
-    if (key === 'reset') { S.resetHold = { t: 0 }; return; }
     if (key === 'lamp') {
       if (!tapOk('lamp', 0.5)) { return; }
       S.lampOn = !S.lampOn;
@@ -8120,6 +8465,7 @@ n:{"canada":3,"usa":4,"indonesia":8,"kenya":13,"greenland":22,"safrica":25,"mexi
   VR = viewRows(view.lon, view.lat);
   if (!saved.prologue) { openHome(); }
   requestAnimationFrame(frame);
+  PL.start();
 })();
 </script>
 </body>
