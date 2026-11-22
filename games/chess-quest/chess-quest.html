@@ -1048,8 +1048,9 @@ function nextRound() {
     win: function (d) {
       if (c.over) { return; }
       c.over = true;
-      if (c.miss === 0) { run.gold++; }
-      dotDone(c.i, c.miss === 0);
+      var gold = c.miss === 0 && !c.helped;
+      if (gold) { run.gold++; }
+      dotDone(c.i, gold);
       SFX.ok(); owl('cheer', 1800); confettiAt($('owl'), 16);
       later(nextRound, d || 1400);
     }
@@ -1066,7 +1067,7 @@ var idleT = 0;
 function armIdle() {
   clearTimeout(idleT);
   idleT = setTimeout(function () {
-    if (run && run.ctx && !run.ctx.over && !$('play').classList.contains('hidden') && run.ctx.hint) { run.ctx.hint(); owl('talk', 900); }
+    if (run && run.ctx && !run.ctx.over && !$('play').classList.contains('hidden') && run.ctx.hint) { run.ctx.helped = true; run.ctx.hint(); owl('talk', 900); }
     if (run) { armIdle(); }
   }, (run && run.ctx && run.ctx.idleMs) || 13000);
 }
@@ -1736,7 +1737,7 @@ function startSquare(t, kind, blockers) {
 var moveCarry = null;
 ROUNDS.moves = function (c, st) {
   var t = st.piece === '*' ? pick(['r', 'b', 'q', 'n', 'k']) : st.piece, kind = st.plan[c.i], test = kind === 'test', first = test && st.plan[c.i - 1] !== 'test';
-  var sq, id, steps = 2, stepMiss = 0, busy = false, target = -1, dm, cand, d, dots = !test, i;
+  var sq, id, steps = 2, stepMiss = 0, busy = false, target = -1, dm, cand, d, dots = !test, i, far;
   boardRound(c, false);
   if (t !== 'p' && st.piece !== '*' && moveCarry && moveCarry.run === run) { sq = moveCarry.sq; id = Bd.add(t, 'w', sq, {}); }
   else { sq = startSquare(t, kind === 'test' ? 'star2' : kind, null); id = Bd.add(t, 'w', sq, { pop: true }); }
@@ -1775,6 +1776,12 @@ ROUNDS.moves = function (c, st) {
     for (i = 0; i < 64; i++) {
       if (t === 'p') { if (i > sq && (i - sq) % 8 === 0 && (i - sq) / 8 >= d && (i - sq) / 8 <= d + (d === 2 ? 1 : 0) && i < 56) { cand.push(i); } }
       else if (dm[i] === d) { cand.push(i); }
+    }
+    // a slider's first star is far away, in one go: otherwise the child
+    // learns that a rook, bishop or queen steps one square at a time
+    if (kind === 'star1' && (t === 'r' || t === 'b' || t === 'q')) {
+      far = cand.filter(function (s) { return Math.max(Math.abs((s >> 3) - (sq >> 3)), Math.abs((s & 7) - (sq & 7))) >= 3; });
+      if (far.length) { cand = far; }
     }
     target = pick(cand);
     Bd.starAt(target);
