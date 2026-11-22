@@ -114,15 +114,15 @@ may add themselves from the picker (the + tile) without the gate; rename,
 delete, "open everything" and "start again" are parent-only, per player, in
 the panel's Players section. The picker shows only with two or more players
 and the adult gear stays visible on it. The three newer games embed the
- block that sits just before their main script (Chess Quest has an
+`Players` block that sits just before their main script (Chess Quest has an
 older hand-built version): each player owns the game's whole save, the old
 single save migrates in as Player 1, and changing player reloads the page so
 no scene has to be rebuilt. Copy that block, not Chess Quest's, into any
 game that gains saved levels. Equine Dentist Academy is deliberately left
 alone; every other game is meant for a single sitting.
 
-Applied so far to Chess Quest, Dictionary, Numberbots, Post a Letter and
-Post a Number. The others have no parent controls yet; add the gate when one
+Applied so far to Chess Quest, Dictionary, Numberbots, Post a Letter,
+Post a Number, Recorder Garden 1 and 2 and Hoot's Postcards. The others have no parent controls yet; add the gate when one
 needs them.
 
 ## Hosting
