@@ -31,6 +31,12 @@ and landscape both have to work.
 - Characters move through the space believably — walk the gaps, turn to face
   what they're addressing, don't slide over things.
 - Honour `prefers-reduced-motion`.
+- I generally dislike text-to-speech. Don't reach for the device's voice;
+  where a game has it at all, it is off by default and a parent turns it
+  on. Recordings, synthesised sound or words on screen come first.
+- Parent-panel settings that are on or off are real switches (a sliding
+  knob and the word On/Off), never a button that only changes colour.
+  Pick-one rows tick the chosen option.
 
 ## Sound
 
@@ -80,9 +86,9 @@ the page. It speaks piece names with the device's speech synthesis only,
 no recordings, and falls back to each piece's synthesised tune.
 
 Juno's Road to Rome (which replaced Roman Numeral Workshop; the old
-address redirects) reads its story aloud with the device's speech, en-GB,
-switchable in the parent panel. The words are always on screen too, typed
-out with a blip voice where there is no speech. The puzzles themselves
+address redirects) types its story out on screen with a blip voice. The
+device's speech (en-GB) can read it aloud too, but that is off unless
+switched on in the parent panel. The puzzles themselves
 have no words. Every sound effect is synthesised.
 
 ## Maps

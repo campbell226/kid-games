@@ -39,8 +39,9 @@ can write any number, which is why the whole world uses them now.
 
 ## Rules kept
 
-- Words only in the story, read aloud by the device (en-GB; off in the
-  parent panel). Every puzzle is wordless: the friend looks, points and
+- Words only in the story, typed out on screen. The device can read them
+  aloud (en-GB), but only if a parent switches it on: James dislikes
+  text-to-speech, so it is off by default. Every puzzle is wordless: the friend looks, points and
   reacts, and a ring shows the way after two misses or a long pause.
 - No losing, no timers. A wrong try teaches: the wrong pen of sheep shows
   its number, an overpaid coin comes back, the boat tips, a door opens on

@@ -181,7 +181,14 @@
   #parent label, #parent .row { display: flex; align-items: center; gap: 10px; font-size: 18px; }
   #parent input[type=text] { font: inherit; font-size: 20px; padding: 8px 12px; border-radius: 10px; border: 0; width: 100%; max-width: 280px; }
   #parent .pb2 { padding: 12px 16px; border-radius: 12px; background: #3b4a82; font-size: 18px; font-weight: 700; }
-  #parent .pb2.on { background: #3a9d4d; }
+  #parent .pb2.on:not(.tg) { background: #3a9d4d; }
+  #parent .pb2.on:not(.tg)::before { content: "\2713\00a0"; }
+  #parent .pb2.tg { display: inline-flex; align-items: center; gap: 12px; }
+  #parent .tgs { position: relative; flex: none; width: 56px; height: 32px; border-radius: 16px; background: #5d6378; box-shadow: inset 0 0 0 2px rgba(255,255,255,.35); }
+  #parent .tgs i { position: absolute; left: 4px; top: 4px; width: 24px; height: 24px; border-radius: 50%; background: #fff; }
+  #parent .pb2.tg.on .tgs { background: #3a9d4d; }
+  #parent .pb2.tg.on .tgs i { left: 28px; }
+  #parent .tw { min-width: 2.2em; text-align: left; font-weight: 800; }
   #parent .pb2.danger { background: #a63a3a; }
   #parent small { opacity: 0.6; line-height: 1.4; }
   #parent .plr { background: #1a2350; border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
@@ -1289,6 +1296,16 @@ function buildMap() {
 }
 
 // ---------- parent controls ----------
+// an on/off setting is a real switch: the knob's side and the word say
+// it, not only the colour
+function pswitch(parent, label, isOn) {
+  var b = h('button', 'pb2 tg' + (isOn ? ' on' : ''), parent);
+  b.setAttribute('role', 'switch'); b.setAttribute('aria-checked', isOn ? 'true' : 'false');
+  h('span', '', b).textContent = label;
+  h('span', 'tgs', b, '<i></i>');
+  h('span', 'tw', b, isOn ? 'On' : 'Off');
+  return b;
+}
 function openParent() {
   var p = $('parent'), box, styles, i;
   p.innerHTML = '';
@@ -1306,7 +1323,7 @@ function openParent() {
     for (var k in pl.stages) { if (pl.stages[k] && pl.stages[k].done) { done++; } }
     h('small', '', r, done + ' of ' + STAGES.length + ' stages done');
     r = h('div', 'row', card);
-    bo = h('button', 'pb2' + (pl.all ? ' on' : ''), r, 'Open every stage');
+    bo = pswitch(r, 'Open every stage', pl.all);
     bo.onclick = function () { pl.all = !pl.all; if (pl.id === CFG.cur) { pullPlayer(pl); } saveCfg(); openParent(); };
     bx = h('button', 'pb2 danger', r, 'Start again');
     bx.onclick = function () {
@@ -1331,11 +1348,12 @@ function openParent() {
     b.onclick = function () { CFG.style = s[0]; saveCfg(); openParent(); };
   });
   var r1 = h('div', 'row', box);
-  var bs = h('button', 'pb2' + (CFG.sound !== false ? ' on' : ''), r1, 'Sound');
+  r1.style.flexWrap = 'wrap';
+  var bs = pswitch(r1, 'Sound', CFG.sound !== false);
   bs.onclick = function () { CFG.sound = CFG.sound === false; saveCfg(); openParent(); };
-  var bv = h('button', 'pb2' + (CFG.speech !== false ? ' on' : ''), r1, 'Spoken names');
+  var bv = pswitch(r1, 'Spoken names', CFG.speech !== false);
   bv.onclick = function () { CFG.speech = CFG.speech === false; saveCfg(); openParent(); };
-  var bh = h('button', 'pb2' + (CFG.haptic !== false ? ' on' : ''), r1, 'Buzz');
+  var bh = pswitch(r1, 'Buzz', CFG.haptic !== false);
   bh.onclick = function () { CFG.haptic = CFG.haptic === false; saveCfg(); openParent(); if (CFG.haptic && navigator.vibrate) { navigator.vibrate(40); } };
   h('small', '', box, 'Classic pieces by Colin M.L. Burnett (Cburnett), Wikimedia Commons, CC BY-SA 3.0. Everything else, including every sound, is drawn or made in this page. Hold the gear (top right; always showing on the player-picker screen, invisible after the first seconds on the map) to get back here.');
   var cl = h('button', 'pb2', box, 'Done');
