@@ -22,20 +22,30 @@ ones rather than away from them.
 
 | | Place | Friend | Puzzle | Modern maths |
 |---|---|---|---|---|
-| I | Eboracum | Rufus, the sleepy guard dog | count sheep into the pen; tallies gather into V (a hand) and X (two Vs); IIII becomes IV | counting, grouping in 5s and 10s, one less than (5 − 1 = 4) |
-| II | Londinium | Porcia, the pig baker | pay the price with I, V, X coins; when there aren't four little coins, pay a big one and the change sits in front of it: IV, IX | making amounts, change, more than one way to pay |
+| I | Eboracum | Rufus, the sleepy guard dog | count sheep into the pen; tallies gather into V (a hand) and X (two Vs); then find the pen that matches the board. 1 to 10 only, no IV or IX | counting, grouping in 5s and 10s |
+| II | Londinium | Porcia, the pig baker | pay the price with I, V, X coins; when there aren't four little coins, pay a big one and the change sits in front of it: IV, IX (first met here). Up to XXIII | making amounts, change, one less than (5 − 1 = 4), more than one way to pay |
 | III | Dubris | Lutra, the otter ferryman | load crates until the boat sits level; it tips towards the heavier side | equality, missing numbers, more and less |
 | IV | Gesoriacum | Pica, the magpie | tip two purses together and swap five Is for a V, two Vs for an X | addition with exchange (carrying) |
 | V | the road south | Mola, the mole | put back the missing milestone | sequences: on and back in ones, in 5s, 2s or 3s, 10s; the first L and XL |
 | VI | Lutetia | Centurion Mus | line the mice up on the steps, smallest first | ordering; long isn't always big (XXXVIII < XL); order matters (IV, VI like 12, 21) |
 | VII | Lugdunum | Felix, the mosaic cat | tap out a rectangle with exactly the tiles in his basket | arrays, times tables, factor pairs |
-| VIII | the Alps | Capra, the goat | set the toll on a Roman abacus (a wire per place, a five-bead above the bar) | place value; the Romans counted in columns |
+| VIII | the Alps | Capra, the goat | set the toll on a Roman abacus (a wire per place, a five-bead above the bar); C is introduced before the first hundreds; D and M are only named, and Capra sets MDCLXVI herself | place value; the Romans counted in columns |
 | IX | Rome | Lupa, the wolf at the Golden Milestone | how far is Eboracum (MD → 1500: the zeros); the Hundred Steps (C); the door (XLII); count the Sacred Geese in rows of ten | zero, place value, reading and writing bigger numbers |
 
 The ending: the Golden Milestone, from which every Roman road was
 measured, needs a number for "no distance at all", and the Romans had
 none. People in India invented it: 0. With 0 and nine other digits you
 can write any number, which is why the whole world uses them now.
+
+## Order of new ideas
+
+Build a number before reading it, and name a letter before asking for
+it. Each new idea gets one round of its own before it is mixed with
+anything bigger. The biggest number asked for, by chapter: 10 (12 on a
+replay), 23, 28, 35, 50, 50, 25, 365 (1666 is Capra's to show), 1500.
+Chapter I originally asked for VIII in its fourth round, before the
+child had built it, and taught IV twice; chapter VIII asked for C, D and
+M before anyone had said what they were. Both fixed on 23 November 2026.
 
 ## Rules kept
 

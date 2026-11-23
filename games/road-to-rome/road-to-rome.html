@@ -1873,15 +1873,19 @@ CH.push({
     ['rufus', 'Remember: {I} is one, {V} is a hand of five, and {X} is two hands, ten.'],
     ['rufus', 'The gate is open. Good luck on the road to Rome!']
   ],
+  // One to ten, and always build a number before reading it: count the
+  // sheep in (the tallies gather into V and X as she goes), then find the
+  // pen that matches what's on the board. No IV or IX here; Porcia
+  // teaches those with coins, where taking away is something you can see.
   rounds: function (first) {
-    var a = rint(6, 8), b = pick([4, 6, 11, 12]);
+    var c = first ? rint(6, 7) : rint(6, 8), a = first ? c : rint(5, 8), b = first ? rint(6, 8) : pick([6, 7, 8, 10, 11, 12]);
     return [
-      { t: 'count', n: first ? 3 : rint(2, 4) },
-      { t: 'count', n: rint(5, 7) },
-      { t: 'count', n: rint(10, 12) },
-      { t: 'pens', v: a, opts: shuffle([a].concat(nearNums(a, 2, 14))) },
-      { t: 'count', n: 4, four: true },
-      { t: 'pens', v: b, opts: shuffle([b].concat(nearNums(b, 2, 14))) }
+      { t: 'count', n: first ? 3 : rint(2, 3) },
+      { t: 'count', n: 5 },
+      { t: 'count', n: c },
+      { t: 'pens', v: a, opts: shuffle([a].concat(penNums(a))) },
+      { t: 'count', n: 10 },
+      { t: 'pens', v: b, opts: shuffle([b].concat(penNums(b))) }
     ];
   },
   after: async function () {
@@ -1897,6 +1901,14 @@ CH.push({
     j.g.setAttribute('opacity', 0);
   }
 });
+
+// The other two pens for Rufus: close by, never IV or IX (not taught
+// yet), and never more than twelve
+function penNums(v) {
+  var c = shuffle([v - 1, v + 1, v - 2, v + 2]), out = [], i;
+  for (i = 0; i < c.length && out.length < 2; i++) { if (c[i] >= 2 && c[i] <= 12 && c[i] !== 4 && c[i] !== 9) { out.push(c[i]); } }
+  return out;
+}
 
 // Count the sheep into the pen. Each one carves a line; groups gather.
 PZ.count = function (cx, r) {
@@ -1949,7 +1961,7 @@ PZ.count = function (cx, r) {
       await Promise.all([hopTo(nd, p.x, p.y, 560, 120), to(nd, { s: geo.ps }, 560)]);
       nd.fx = 1; nd.set();
       await step(st.done);
-      if (st.done === st.n) { await sleep(250); if (r.four) { await four(); } cx.solved(st.n, geo.board.x, geo.board.y); }
+      if (st.done === st.n) { await sleep(250); cx.solved(st.n, geo.board.x, geo.board.y); }
     });
   }
   async function step(n) {
@@ -1984,34 +1996,6 @@ PZ.count = function (cx, r) {
     }
     await to(n, { o: 0, s: 0.6 }, 250);
     g.parentNode.removeChild(g);
-  }
-  // IIII becomes IV: the first line slides in front of a V
-  async function four() {
-    var b = geo.board, items = board.items.slice(), xs, eq;
-    if (cx.first) {
-      await talk([['rufus', 'Four lines! Chiselling is hard work.'], ['rufus', 'Four is one less than five. So soldiers carve {=I} in front of {=V}, like this: {IV}.']]);
-    }
-    xs = board.xs('IV', board.size('IV'));
-    await anim(400, function (p) {
-      items.forEach(function (it, j) {
-        if (j === 0) { it.n.x = it.x + (xs[0] - it.x) * p; }
-        else { it.n.y = b.y - 120 * p; it.n.o = 1 - p; }
-        it.n.set();
-      });
-    });
-    board.show('IV', 1); st.tal = 'IV';
-    SFX.merge();
-    eq = G(Ltop, '');
-    var eqy = cx.ly.land ? b.y + b.h / 2 + 70 : b.y + b.h / 2 + 80;
-    plaque(eq, b.x, eqy, 330, 96, { fill: '#fffaf0' });
-    T(eq, '5', { x: b.x - 110, y: eqy + 22, 'class': 'sans', 'font-size': 64, 'text-anchor': 'middle', fill: PC[0] });
-    T(eq, '−', { x: b.x - 55, y: eqy + 20, 'class': 'sans', 'font-size': 60, 'text-anchor': 'middle', fill: '#8a6414' });
-    T(eq, '1', { x: b.x, y: eqy + 22, 'class': 'sans', 'font-size': 64, 'text-anchor': 'middle', fill: PC[0] });
-    T(eq, '=', { x: b.x + 55, y: eqy + 20, 'class': 'sans', 'font-size': 60, 'text-anchor': 'middle', fill: '#8a6414' });
-    T(eq, '4', { x: b.x + 110, y: eqy + 22, 'class': 'sans', 'font-size': 64, 'text-anchor': 'middle', fill: PC[0] });
-    var en = N(eq, 0, 0); en.o = 0; en.set();
-    await to(en, { o: 1 }, 300);
-    await sleep(1300);
   }
   cx.hint = function () {
     var i2; for (i2 = 0; i2 < st.sheep.length; i2++) { if (st.sheep[i2].pen < 0) { var nd = nodes[i2]; hintAt(nd.x, nd.y - 45 * nd.s, 75 * nd.s + 20); return; } }
@@ -2221,13 +2205,16 @@ CH.push({
     ['porcia', '{IV} is five, take away one. {IX} is ten, take away one.'],
     ['porcia', 'Here, you’ve been such a help. Take this purse of coins for your journey!']
   ],
-  rounds: function () {
-    var a = rint(6, 8), b = rint(11, 13), c = pick([14, 19]), d = pick([24, 26, 27, 29]);
+  // Up to the low twenties. IV and IX are taught here; after them comes
+  // one price that uses IV again (XIV), then plain ones, so the new idea
+  // settles before it is mixed with anything bigger.
+  rounds: function (first) {
+    var a = rint(6, 8), b = rint(11, 13), c = first ? 14 : pick([14, 19]), d = pick([15, 16, 17, 18, 20, 21, 22, 23]);
     return [
       { t: 'coins', v: a, item: 'panis', purse: shopPurse(a, 2) },
       { t: 'coins', v: b, item: 'cake', purse: shopPurse(b, 2) },
-      { t: 'coins', v: 4, item: 'figs', purse: ['V', 'V', 'I', 'X'], teach: true },
-      { t: 'coins', v: 9, item: 'grapes', purse: ['X', 'V', 'I', 'I'] },
+      { t: 'coins', v: 4, item: 'figs', purse: ['V', 'V', 'I', 'X'], teach: 4 },
+      { t: 'coins', v: 9, item: 'grapes', purse: ['X', 'V', 'I', 'I'], teach: 9 },
       { t: 'coins', v: c, item: 'cheese', purse: shopPurse(c, 1) },
       { t: 'coins', v: d, item: 'cake', purse: shopPurse(d, 2) }
     ];
@@ -2360,8 +2347,12 @@ PZ.coins = function (cx, r) {
     if (target === null || !nodes[target]) { return; }
     hintAt(nodes[target].x, nodes[target].y, geo.cr + 26);
   };
-  if (r.teach && cx.first) {
-    cx.preface = [['juno', 'Oh no! It’s {IV}, and I’ve only got one {=I} coin.'], ['porcia', 'Never mind! Give me a {=V}, and I’ll give you an {=I} back. Five, take away one!']];
+  // IV and IX are new here (Rufus only counted up), so each gets its word
+  if (r.teach === 4 && cx.first) {
+    cx.preface = [['juno', 'What’s that? An {=I} in front of a {=V}?'], ['porcia', 'A little number in front of a big one means take it away. {IV} is five, take away one: four!'], ['juno', 'But I’ve only got one {=I} coin.'], ['porcia', 'Never mind! Give me a {=V}, and I’ll give you an {=I} back.']];
+  }
+  if (r.teach === 9 && cx.first) {
+    cx.preface = [['porcia', 'Now an {=I} in front of an {=X}. Ten, take away one!']];
   }
 };
 
@@ -2843,7 +2834,7 @@ PZ.miles = function (cx, r) {
   cx.hint = function () { var j = r.opts.indexOf(v), nd = chN[j]; if (nd) { hintAt(nd.x, nd.y - geo.h / 2, geo.h * 0.65); } };
   if (r.steps && cx.first && !RUN.sawSteps) {
     RUN.sawSteps = true;
-    cx.preface = [['lupa', 'Now up the Hundred Steps to the temple! There’s a marker every ten steps.'], ['lupa', '{=C} means a hundred: ten tens. What’s missing?']];
+    cx.preface = [['lupa', 'Now up the Hundred Steps to the temple! There’s a marker every ten steps.'], ['lupa', 'Remember Capra’s abacus? {=C} is a hundred: ten tens. What’s missing?']];
   }
   if (r.isL && cx.first && !RUN.sawL) {
     RUN.sawL = true;
@@ -3158,12 +3149,15 @@ CH.push({
     ['capra', 'Just like the numbers you use: hundreds, tens and ones.'],
     ['capra', 'And when a column is empty, you write 0. The Romans never had a 0. Ask about that in Rome!']
   ],
+  // Ones, then tens, then a new letter: C, a hundred, said out loud
+  // before it is asked for. D and M are never asked for at all: Capra
+  // sets MDCLXVI herself, as a show, at the end.
   rounds: function () {
     return [
       { t: 'abacus', v: rint(6, 8), cols: 2 },
       { t: 'abacus', v: pick([23, 32, 21, 34]), cols: 2 },
       { t: 'abacus', v: pick([48, 47, 39, 49]), cols: 2 },
-      { t: 'abacus', v: pick([204, 105, 307, 160]), cols: 3 },
+      { t: 'abacus', v: pick([100, 110, 120, 150, 160]), cols: 3, hundred: true },
       { t: 'abacus', v: 365, cols: 3, year: true },
       { t: 'abacus', v: 1666, cols: 4, every: true }
     ];
@@ -3240,8 +3234,31 @@ PZ.abacus = function (cx, r) {
     SFX.bleat();
     await sleep(300);
     var ly = cx.ly;
-    if (cx.first && r.every && !RUN.sawEvery) { RUN.sawEvery = true; await talk([['capra', 'Look! {MDCLXVI} uses every letter once, from the biggest to the smallest.']]); }
+    if (r.every) { await talk([['capra', 'Look! {MDCLXVI} uses every letter once, from the biggest to the smallest.']]); }
     await cx.solved(r.v, ly.top.x + ly.top.w / 2, ly.top.y + ly.top.h / 2);
+  }
+  // The last one is Capra's to show, not Juno's to do: two letters nobody
+  // has met, so she says what they are and sets the beads herself, a
+  // wire at a time, biggest first
+  if (r.every) {
+    var me = cx;
+    me.hint = null;
+    setTimeout(function () {
+      if (cx !== me) { return; }
+      me.lock(async function () {
+        var c, d;
+        await talk([['capra', 'Two more letters, the biggest of all. {=D} is five hundred, and {=M} is a thousand.'], ['capra', 'Watch, and I’ll set this one for you.']]);
+        for (c = 0; c < nc; c++) {
+          d = want(c);
+          me.friend.look(geo.colX(c), geo.bar);
+          if (d >= 5) { st.f[c] = 1; SFX.bead(); clear(Lui); cx.draw(); await sleep(RM ? 150 : 420); }
+          while (st.l[c] < d % 5) { st.l[c]++; SFX.bead(); clear(Lui); cx.draw(); await sleep(RM ? 120 : 300); }
+          await sleep(RM ? 100 : 250);
+        }
+        await win();
+      });
+    }, 400);
+    return;
   }
   cx.hint = function () {
     var c;
@@ -3251,6 +3268,9 @@ PZ.abacus = function (cx, r) {
       if (st.l[c] !== wl) { hintAt(geo.colX(c), geo.bar + (geo.ft + geo.fh - geo.bar) / 2, geo.cw * 0.5); return; }
     }
   };
+  if (r.hundred && cx.first) {
+    cx.preface = [['capra', 'A new letter! {=C} means a hundred: ten tens.'], ['capra', 'It goes on the hundreds wire, the one with {=C} under it.']];
+  }
   if (r.year && cx.first && !RUN.sawYear) {
     RUN.sawYear = true;
     cx.preface = [['capra', 'This one’s how many days there are in a year. Three hundreds, six tens, and five ones.']];
@@ -3374,7 +3394,7 @@ PZ.dial = function (cx, r) {
   };
   if (cx.first && !RUN.sawDial) {
     RUN.sawDial = true;
-    cx.preface = [['lupa', 'This says {' + roman(r.v) + '} miles to ' + r.name + '. How far is that in your numbers?']];
+    cx.preface = [['lupa', 'This says {' + roman(r.v) + '} miles to ' + r.name + '. How far is that in your numbers?'], ['lupa', 'Remember Capra’s big letters? {=M} is a thousand, {=D} is five hundred, {=C} is a hundred.']];
   }
 };
 // a street of doors; the invitation said which one
